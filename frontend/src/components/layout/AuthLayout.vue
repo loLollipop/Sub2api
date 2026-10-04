@@ -1,14 +1,9 @@
 <template>
-  <div class="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+  <div class="local-auth relative flex min-h-screen items-center justify-center overflow-hidden p-4">
     <!-- Background -->
     <div
-      class="absolute inset-0 bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
+      class="absolute inset-0 bg-[#f8f9fb] dark:bg-[#10141c]"
     ></div>
-
-    <!-- Decorative Elements -->
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="auth-grid absolute inset-0"></div>
-    </div>
 
     <!-- Content Container -->
     <div class="relative z-10 w-full max-w-md">
@@ -17,11 +12,11 @@
         <!-- Custom Logo or Default Logo -->
         <template v-if="settingsLoaded">
           <div
-            class="mb-4 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-primary-500/30"
+            class="mb-4 inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800"
           >
             <img :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
           </div>
-          <h1 class="text-gradient mb-2 text-3xl font-bold">
+          <h1 class="mb-2 text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">
             {{ siteName }}
           </h1>
           <p class="text-sm text-gray-500 dark:text-dark-400">
@@ -31,7 +26,7 @@
       </div>
 
       <!-- Card Container -->
-      <div class="card-glass rounded-2xl p-8 shadow-glass">
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-700 dark:bg-dark-900 sm:p-8">
         <slot />
       </div>
 
@@ -53,6 +48,7 @@
 </template>
 
 <script setup lang="ts">
+import '@/styles/console-local.css'
 import { computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores'
 import LegalFooterLinks from '@/components/legal/LegalFooterLinks.vue'

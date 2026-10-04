@@ -14,7 +14,12 @@
           <Icon name="menu" size="md" />
         </button>
 
-        <nav v-if="isConsoleSignal" class="signal-breadcrumb" :aria-label="pageTitle">
+        <router-link v-if="localConsole" :to="authStore.isAdmin ? '/admin/dashboard' : '/dashboard'" class="local-brand" :title="appStore.siteName">
+          <span class="local-brand-mark"><img :src="siteLogo || '/logo.svg'" alt="" class="h-full w-full object-contain" /></span>
+          <span class="local-brand-name">{{ appStore.siteName }}</span>
+          <span v-if="authStore.isAdmin" class="local-role-badge hidden sm:inline-flex">{{ t('admin.users.roles.admin') }}</span>
+        </router-link>
+        <nav v-else-if="isConsoleSignal" class="signal-breadcrumb" :aria-label="pageTitle">
           <router-link :to="authStore.isAdmin ? '/admin/dashboard' : '/dashboard'" class="signal-breadcrumb-home" :title="appStore.siteName">
             {{ appStore.siteName }}
           </router-link>
@@ -73,6 +78,12 @@
 
         <!-- Language Switcher -->
         <LocaleSwitcher class="header-locale" />
+
+        <button v-if="localConsole" type="button" class="header-shortcut local-theme-toggle btn-icon"
+          :title="isDark ? t('nav.lightMode') : t('nav.darkMode')"
+          :aria-label="isDark ? t('nav.lightMode') : t('nav.darkMode')" @click="toggleTheme">
+          <Icon :name="isDark ? 'sun' : 'moon'" size="sm" />
+        </button>
 
         <!-- Subscription Progress (for users with active subscriptions) -->
         <SubscriptionProgressMini v-if="user" class="header-subscriptions" />
@@ -289,11 +300,16 @@ import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { useConsoleSignal } from '@/composables/useConsoleSignal'
 import ConsoleNavigationSearch from './ConsoleNavigationSearch.vue'
 
+withDefaults(defineProps<{ localConsole?: boolean }>(), { localConsole: false })
+
 const router = useRouter()
 const route = useRoute()
 const { isConsoleSignal, isAdminSignal } = useConsoleSignal()
 const { t } = useI18n()
 const appStore = useAppStore()
+const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
+const isDark = ref(document.documentElement.classList.contains('dark'))
+let themeObserver: MutationObserver | undefined
 const authStore = useAuthStore()
 const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
@@ -365,6 +381,12 @@ function toggleMobileSidebar() {
   appStore.toggleMobileSidebar()
 }
 
+function toggleTheme() {
+  isDark.value = !document.documentElement.classList.contains('dark')
+  document.documentElement.classList.toggle('dark', isDark.value)
+  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+}
+
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value
 }
@@ -401,10 +423,13 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 onMounted(() => {
+  themeObserver = new MutationObserver(() => { isDark.value = document.documentElement.classList.contains('dark') })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
   document.addEventListener('click', handleClickOutside)
 })
 
 onBeforeUnmount(() => {
+  themeObserver?.disconnect()
   document.removeEventListener('click', handleClickOutside)
 })
 </script>

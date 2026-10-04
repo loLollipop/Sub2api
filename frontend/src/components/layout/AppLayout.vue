@@ -1,25 +1,13 @@
 <template>
   <div
     class="min-h-screen"
-    :class="[isConsoleSignal ? 'console-signal' : 'bg-gray-50 dark:bg-dark-950', { 'signal-admin': isAdminSignal, 'signal-nav-collapsed': sidebarCollapsed }]"
+    :class="[isConsoleSignal ? 'console-signal console-local' : 'bg-gray-50 dark:bg-dark-950', { 'signal-admin': isAdminSignal }]"
   >
-    <ConsoleAtmosphere v-if="isConsoleSignal" />
-    <!-- Background Decoration -->
-    <div v-if="!isConsoleSignal" class="pointer-events-none fixed inset-0 bg-mesh-gradient"></div>
+    <AppHeader local-console />
+    <AppSidebar horizontal />
 
-    <!-- Sidebar -->
-    <AppSidebar />
-
-    <!-- Main Content Area -->
-    <div
-      class="relative min-h-screen transition-all duration-300"
-      :class="[sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64', { 'signal-frame': isConsoleSignal }]"
-    >
-      <!-- Header -->
-      <AppHeader />
-
-      <!-- Main Content -->
-      <main class="p-4 md:p-6 lg:p-8" :class="{ 'signal-main': isConsoleSignal }">
+    <div class="signal-frame local-frame">
+      <main id="console-main" class="signal-main local-main p-4 md:p-6 lg:p-8">
         <slot />
       </main>
     </div>
@@ -31,20 +19,17 @@ import '@/styles/onboarding.css'
 import '@/styles/console-signal.css'
 import '@/styles/console-account.css'
 import '@/styles/console-studio.css'
+import '@/styles/console-local.css'
 import { computed, onMounted } from 'vue'
-import { useAppStore } from '@/stores'
 import { useAuthStore } from '@/stores/auth'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useConsoleSignal } from '@/composables/useConsoleSignal'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
-import ConsoleAtmosphere from './ConsoleAtmosphere.vue'
 
-const appStore = useAppStore()
 const authStore = useAuthStore()
 const { isConsoleSignal, isAdminSignal } = useConsoleSignal()
-const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 const { replayTour } = useOnboardingTour({

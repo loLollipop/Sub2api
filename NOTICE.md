@@ -7,5 +7,3 @@ The codebase is derived from Sub2API, including work from [Wei-Shaw/sub2api](htt
 Existing copyrights remain with their respective holders. The original [GNU Lesser General Public License v3.0](LICENSE), source notices, and third-party license/copyright notices are preserved. A single-maintainer commit history does not transfer those copyrights or grant additional commercial rights.
 
 Go module/package identifiers and external model-pricing references retain their established technical paths for compatibility. They are not statements about the maintainer of this repository. Historical issue, audit and specification references remain source evidence rather than current project links.
-
-The customized console presentation also references the `frontend-local` work in [qhongchen/sub2api](https://github.com/qhongchen/sub2api/tree/dev), inspected at dev commit `ca5cc62f`. The existing API, authentication and application features remain from this distribution; its frontend was not wholesale replaced by that reference fork.

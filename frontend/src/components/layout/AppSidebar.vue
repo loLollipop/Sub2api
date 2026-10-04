@@ -1,78 +1,10 @@
 <template>
-  <div v-if="horizontal" ref="localNavRef" class="local-navigation hidden lg:block">
-    <nav class="local-navigation-inner" :aria-label="t('common.toggleMenu')">
-      <div class="local-navigation-links">
-        <router-link
-          v-for="item in localPrimaryNavItems" :key="item.path" :to="item.path"
-          class="local-nav-link" :class="{ 'local-nav-link-active': isActive(item.path) }"
-          :aria-current="isActive(item.path) ? 'page' : undefined"
-          :id="item.path === '/admin/accounts' ? 'sidebar-channel-manage' : item.path === '/admin/groups' ? 'sidebar-group-manage' : undefined"
-          :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
-          @click="handleLocalNavigation(item.path)"
-        >
-          <component :is="item.icon" v-if="item.icon" class="h-4 w-4 shrink-0" />
-          <span>{{ item.label }}</span>
-        </router-link>
-
-        <div v-if="localMoreNavItems.length" class="local-nav-popover">
-          <button
-            ref="localMoreTrigger" type="button" class="local-nav-link"
-            :class="{ 'local-nav-link-active': localMoreNavItems.some(item => isActive(item.path)) }"
-            :aria-expanded="localOpenMenu === 'more'" aria-controls="local-nav-more"
-            @click="toggleLocalMenu('more')"
-          >
-            {{ t('common.more') }}
-            <Icon name="chevronDown" size="xs" :class="{ 'rotate-180': localOpenMenu === 'more' }" />
-          </button>
-          <div v-if="localOpenMenu === 'more'" id="local-nav-more" class="local-nav-dropdown">
-            <router-link
-              v-for="item in localMoreNavItems" :key="item.path" :to="item.path"
-              class="local-menu-link" :class="{ 'local-menu-link-active': isActive(item.path) }"
-              :aria-current="isActive(item.path) ? 'page' : undefined"
-              @click="handleLocalNavigation(item.path)"
-            >
-              <span v-if="item.iconSvg" class="h-4 w-4 shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)" />
-              <component :is="item.icon" v-else-if="item.icon" class="h-4 w-4 shrink-0" />
-              <span>{{ item.label }}</span>
-            </router-link>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="localAccountNavItems.length" class="local-nav-popover local-account-navigation">
-        <button
-          ref="localAccountTrigger" type="button" class="local-nav-link"
-          :class="{ 'local-nav-link-active': localAccountNavItems.some(item => isActive(item.path)) }"
-          :aria-expanded="localOpenMenu === 'account'" aria-controls="local-nav-account"
-          @click="toggleLocalMenu('account')"
-        >
-          <Icon name="user" size="sm" />{{ t('nav.myAccount') }}
-          <Icon name="chevronDown" size="xs" />
-        </button>
-        <div v-if="localOpenMenu === 'account'" id="local-nav-account" class="local-nav-dropdown local-nav-dropdown-right">
-          <router-link
-            v-for="item in localAccountNavItems" :key="item.path" :to="item.path"
-            class="local-menu-link" :class="{ 'local-menu-link-active': isActive(item.path) }"
-            :aria-current="isActive(item.path) ? 'page' : undefined"
-            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
-            @click="handleLocalNavigation(item.path)"
-          >
-            <span v-if="item.iconSvg" class="h-4 w-4 shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)" />
-            <component :is="item.icon" v-else-if="item.icon" class="h-4 w-4 shrink-0" />
-            <span>{{ item.label }}</span>
-          </router-link>
-        </div>
-      </div>
-    </nav>
-  </div>
   <aside
     class="sidebar"
     :class="[
       sidebarCollapsed ? 'w-[72px]' : 'w-64',
-      { '-translate-x-full lg:translate-x-0': !mobileOpen, 'signal-sidebar': isConsoleSignal, 'local-mobile-sidebar': horizontal }
+      { '-translate-x-full lg:translate-x-0': !mobileOpen, 'signal-sidebar': isConsoleSignal }
     ]"
-    :inert="horizontal && !mobileOpen"
-    :aria-hidden="horizontal && !mobileOpen ? 'true' : undefined"
   >
     <!-- Logo/Brand -->
     <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
@@ -152,11 +84,11 @@
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
               :id="
-                !horizontal && item.path === '/admin/accounts'
+                item.path === '/admin/accounts'
                   ? 'sidebar-channel-manage'
-                  : !horizontal && item.path === '/admin/groups'
+                  : item.path === '/admin/groups'
                     ? 'sidebar-group-manage'
-                    : !horizontal && item.path === '/admin/redeem'
+                    : item.path === '/admin/redeem'
                       ? 'sidebar-wallet'
                       : undefined
               "
@@ -217,7 +149,6 @@
 
     <!-- Bottom Section -->
     <div class="sidebar-footer mt-auto border-t border-gray-100 p-3 dark:border-dark-800">
-      <LocaleSwitcher v-if="horizontal" class="mb-2" />
       <!-- Theme Toggle -->
       <button
         @click="toggleTheme"
@@ -235,7 +166,6 @@
 
       <!-- Collapse Button -->
       <button
-        v-if="!horizontal"
         @click="toggleSidebar"
         class="sidebar-link w-full"
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
@@ -264,15 +194,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import VersionBadge from '@/components/common/VersionBadge.vue'
-import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import { useConsoleSignal } from '@/composables/useConsoleSignal'
-
-const props = withDefaults(defineProps<{ horizontal?: boolean }>(), { horizontal: false })
 
 interface NavItem {
   path: string
@@ -321,16 +248,11 @@ const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
 const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
 
-const sidebarCollapsed = computed(() => !props.horizontal && appStore.sidebarCollapsed)
+const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 const isDark = ref(document.documentElement.classList.contains('dark'))
-let themeObserver: MutationObserver | undefined
-const localNavRef = ref<HTMLElement | null>(null)
-const localMoreTrigger = ref<HTMLButtonElement | null>(null)
-const localAccountTrigger = ref<HTMLButtonElement | null>(null)
-const localOpenMenu = ref<'more' | 'account' | null>(null)
 
 const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 
@@ -959,59 +881,6 @@ function toggleSidebar() {
   appStore.toggleSidebar()
 }
 
-// One navigation declaration serves the desktop header and mobile drawer.
-// Expand-only groups become their existing child links, never invented routes.
-function flattenLocalNavigation(items: NavItem[]): NavItem[] {
-  return items.flatMap(item => item.children?.length
-    ? [...(item.expandOnly ? [] : [item]), ...flattenLocalNavigation(item.children)]
-    : item.expandOnly ? [] : [item])
-}
-
-const localNavItems = computed(() => {
-  const items = isAdmin.value ? adminNavItems.value : appStore.backendModeEnabled ? [] : userNavItems.value
-  return [...new Map(flattenLocalNavigation(items).map(item => [item.path, item])).values()]
-})
-const localPrimaryPaths = computed(() => isAdmin.value
-  ? ['/admin/dashboard', '/admin/accounts', '/admin/users', '/admin/groups', '/admin/usage']
-  : ['/dashboard', '/keys', '/usage', '/monitor'])
-const localPrimaryNavItems = computed(() => localPrimaryPaths.value.flatMap(path => {
-  const item = localNavItems.value.find(item => item.path === path)
-  return item ? [item] : []
-}))
-const localMoreNavItems = computed(() => localNavItems.value.filter(item => !localPrimaryPaths.value.includes(item.path)))
-const localAccountNavItems = computed(() => isAdmin.value && !authStore.isSimpleMode
-  ? flattenLocalNavigation(personalNavItems.value) : [])
-
-function toggleLocalMenu(menu: 'more' | 'account') {
-  localOpenMenu.value = localOpenMenu.value === menu ? null : menu
-}
-
-function handleLocalNavigation(path: string) {
-  localOpenMenu.value = null
-  handleMenuItemClick(path)
-}
-
-function handleLocalOutside(event: PointerEvent) {
-  if (localNavRef.value && !localNavRef.value.contains(event.target as Node)) localOpenMenu.value = null
-}
-
-function handleLocalEscape(event: KeyboardEvent) {
-  if (event.key !== 'Escape') return
-  if (localOpenMenu.value) {
-    const trigger = localOpenMenu.value === 'more' ? localMoreTrigger.value : localAccountTrigger.value
-    localOpenMenu.value = null
-    trigger?.focus()
-  }
-  if (props.horizontal && mobileOpen.value) closeMobile()
-}
-
-function handleLocalResize() {
-  if (window.innerWidth >= 1024 && mobileOpen.value) closeMobile()
-  if (window.innerWidth < 1024) localOpenMenu.value = null
-}
-
-watch(() => route.fullPath, () => { localOpenMenu.value = null })
-
 function toggleTheme() {
   isDark.value = !isDark.value
   document.documentElement.classList.toggle('dark', isDark.value)
@@ -1103,13 +972,6 @@ watch(
 )
 
 onMounted(() => {
-  themeObserver = new MutationObserver(() => { isDark.value = document.documentElement.classList.contains('dark') })
-  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-  if (props.horizontal) {
-    document.addEventListener('pointerdown', handleLocalOutside)
-    document.addEventListener('keydown', handleLocalEscape)
-    window.addEventListener('resize', handleLocalResize)
-  }
   void refreshBatchImageAccess()
   if (isAdmin.value) {
     adminSettingsStore.fetch()
@@ -1125,10 +987,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  themeObserver?.disconnect()
-  document.removeEventListener('pointerdown', handleLocalOutside)
-  document.removeEventListener('keydown', handleLocalEscape)
-  window.removeEventListener('resize', handleLocalResize)
   if (sidebarNavRef.value) {
     appStore.sidebarScrollTop = sidebarNavRef.value.scrollTop
   }

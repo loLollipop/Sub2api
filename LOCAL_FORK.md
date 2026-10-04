@@ -10,8 +10,6 @@
 
 ## 保留的本地修改
 
-- 管理员端与用户端界面参考 `qhongchen/sub2api` 的 `frontend-local` 重构，直接集成到现有 `frontend/`，保留当前接口、认证、支付、工单、插件及数据逻辑。个人 GHCR 构建入口和边界见 [定制前端说明](deploy/FRONTEND_LOCAL.md)。
-
 - 通过 `SUB2API_LEGACY_POOL_OWNER_EMAIL` 环境变量配置历史账号池的管理员归属；未配置时保留原兼容默认值。
 - 保留使用密钥弹窗中的 OpenCode 模型配置及相关测试修正。
 

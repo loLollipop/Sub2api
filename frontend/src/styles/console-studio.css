@@ -79,12 +79,13 @@
 }
 
 .console-signal {
+  --signal-shell-header-height: 64px;
   position: relative;
   isolation: isolate;
 }
 
 .console-signal .sidebar-header {
-  height: 64px;
+  height: var(--signal-shell-header-height);
   padding-inline: 16px;
   border-bottom-color: transparent;
 }
@@ -137,11 +138,12 @@
 }
 
 .console-signal .signal-header {
+  height: var(--signal-shell-header-height);
   background: var(--signal-surface);
   border-color: var(--signal-line);
 }
 
-.console-signal .header-inner { height: 56px; }
+.console-signal .header-inner { height: 100%; }
 
 @media (min-width: 1024px) {
   .console-signal { --signal-nav-size: 224px; }

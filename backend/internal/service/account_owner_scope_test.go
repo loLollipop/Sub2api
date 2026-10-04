@@ -70,6 +70,7 @@ func TestWithAccountOwnerScopeDefaultLegacyEmail(t *testing.T) {
 func TestWithAccountOwnerScopeInvalidAdmin(t *testing.T) {
 	t.Setenv(legacyPoolOwnerEmailEnv, "owner@example.com")
 
+	//nolint:staticcheck // SA1012: deliberately verifies the nil-context fallback.
 	ctx := WithAccountOwnerScope(nil, 0, "owner@example.com")
 	if ctx == nil {
 		t.Fatal("nil context must be replaced with a background context")
@@ -83,6 +84,7 @@ func TestWithAccountOwnerScopeInvalidAdmin(t *testing.T) {
 		t.Fatalf("negative admin scope = %d %v %v", id, seeLegacy, ok)
 	}
 
+	//nolint:staticcheck // SA1012: deliberately verifies nil-context lookup safety.
 	if id, seeLegacy, ok := AccountOwnerScopeDetail(nil); ok || id != 0 || seeLegacy {
 		t.Fatalf("nil context scope = %d %v %v", id, seeLegacy, ok)
 	}

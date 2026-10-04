@@ -429,6 +429,11 @@ describe('admin UsageView distribution metric toggles', () => {
   })
 
   it('keeps model and group metric toggles independent without refetching chart data', async () => {
+    // Keep the mount-time range and the assertion in the same formatted
+    // second. Advancing the fake clock by 120 ms near a real second boundary
+    // otherwise makes this deterministic behavior look one second different.
+    vi.setSystemTime(new Date('2026-10-04T12:00:00'))
+
     const wrapper = mount(UsageView, {
       global: {
         stubs: {

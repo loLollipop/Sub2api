@@ -1,0 +1,15 @@
+# Install as root: /etc/sub2api-release-updater.conf (mode 0600).
+# Values are shell assignments; do not put untrusted input in this file.
+REPOSITORY='loLollipop/Sub2api'
+SERVICE_NAME='sub2api.service'
+STATE_DIR='/var/lib/sub2api-release-updater'
+RELEASES_DIR='/srv/apps/sub2api-releases'
+DROPIN_PATH='/etc/systemd/system/sub2api.service.d/90-managed-release.conf'
+ENVIRONMENT_FILE='/srv/apps/sub2api-releases/20261004-update-ca0602bf/runtime-production.env'
+WORKING_DIRECTORY='/srv/apps/sub2api-releases/20261004-update-ca0602bf/source/backend'
+READY_URL='http://127.0.0.1:18081/readyz'
+API_BASE='https://api.github.com'
+HEALTH_ATTEMPTS=30
+HEALTH_SUCCESS_COUNT=3
+HEALTH_DELAY_SECONDS=2
+STOP_TIMEOUT_SECONDS=30

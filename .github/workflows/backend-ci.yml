@@ -34,6 +34,9 @@ jobs:
       - name: Verify Go version
         run: |
           go version | grep -q 'go1.26.6'
+      - name: Offline VPS release updater tests
+        run: |
+          sudo /bin/bash deploy/tests/vps-release-update-test.sh
       - name: Unit tests
         working-directory: backend
         run: make test-unit

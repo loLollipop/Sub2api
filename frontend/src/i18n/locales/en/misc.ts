@@ -23,6 +23,10 @@ export default {
     latestVersion: 'Latest Version',
     upToDate: "You're running the latest version.",
     updateAvailable: 'A new version is available!',
+    upstreamUpdateAvailable: 'New upstream version awaiting review',
+    upstreamReviewHint:
+      'Review the upstream changes first, then sync them to the personal repository and deploy through the release process. Upstream releases are never installed directly here.',
+    reviewUpstreamRelease: 'Review Upstream Release Notes',
     releaseNotes: 'Release Notes',
     noReleaseNotes: 'No release notes',
     viewUpdate: 'View Update',

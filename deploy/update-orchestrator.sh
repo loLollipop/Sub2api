@@ -106,10 +106,10 @@ done
 
 [ -n "$CURRENT_VERSION" ] || fail '--current-version is required'
 [ -n "$TARGET_VERSION" ] || fail '--target-version is required'
-if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}(-personal\.[1-9][0-9]*)?$ ]]; then
   fail "invalid current version: $CURRENT_VERSION"
 fi
-if [[ ! "$TARGET_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+if [[ ! "$TARGET_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}(-personal\.[1-9][0-9]*)?$ ]]; then
   fail "invalid target version: $TARGET_VERSION"
 fi
 case "$UPDATE_MODE" in

@@ -28,12 +28,13 @@ var (
 	ErrRollbackVersionNotAllowed = infraerrors.BadRequest("ROLLBACK_VERSION_NOT_ALLOWED", "version is not in the allowed rollback list")
 	ErrUpdateOrchestratorMissing = infraerrors.InternalServer("UPDATE_ORCHESTRATOR_MISSING", "update orchestrator is not configured")
 	ErrUpdateDisabled            = infraerrors.BadRequest("UPDATE_DISABLED", "online update is disabled on this deployment; use the release rollout process")
+	ErrUpstreamReviewRequired    = infraerrors.Conflict("UPSTREAM_REVIEW_REQUIRED", "upstream update requires review and synchronization to the personal repository before deployment")
 )
 
 const (
-	updateCacheKey = "update_check_cache"
-	updateCacheTTL = 1200 // 20 minutes
-	githubRepo     = "loLollipop/Sub2api"
+	updateCacheTTL      = 1200 // 20 minutes
+	upstreamMonitorRepo = "kiss-kedaya/sub2api"
+	personalReleaseRepo = "loLollipop/Sub2api"
 
 	// Security: allowed download domains for updates
 	allowedDownloadHost = "github.com"
@@ -103,6 +104,7 @@ type UpdateInfo struct {
 	CurrentVersion string       `json:"current_version"`
 	LatestVersion  string       `json:"latest_version"`
 	HasUpdate      bool         `json:"has_update"`
+	ReviewRequired bool         `json:"review_required"`
 	ReleaseInfo    *ReleaseInfo `json:"release_info,omitempty"`
 	Cached         bool         `json:"cached"`
 	Warning        string       `json:"warning,omitempty"`
@@ -200,8 +202,8 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 	return info, nil
 }
 
-// PerformUpdate downloads and applies the update
-// Uses atomic file replacement pattern for safe in-place updates
+// PerformUpdate intentionally refuses to install releases found by the
+// upstream monitor. They must be reviewed and republished personally first.
 func (s *UpdateService) PerformUpdate(ctx context.Context) error {
 	if s.updateRuntime.strategy == updateStrategyDisabled {
 		return ErrUpdateDisabled
@@ -216,11 +218,10 @@ func (s *UpdateService) PerformUpdate(ctx context.Context) error {
 		return ErrNoUpdateAvailable
 	}
 
-	if s.updateRuntime.strategy == updateStrategyOrchestrated {
-		return normalizeUpdateError(s.performOrchestratedUpdate(ctx, info))
-	}
-
-	return normalizeUpdateError(s.applyReleaseAssets(ctx, info.ReleaseInfo.Assets))
+	// CheckUpdate monitors the upstream project only. Upstream artifacts must
+	// first be reviewed and synchronized into the personal release repository;
+	// they are never eligible for direct installation by this service.
+	return ErrUpstreamReviewRequired
 }
 
 // normalizeUpdateError keeps update failures actionable for administrators.
@@ -286,8 +287,7 @@ func (s *UpdateService) performOrchestratedUpdate(ctx context.Context, info *Upd
 }
 
 // applyReleaseAssets downloads the platform archive from the given release assets,
-// verifies its checksum, and atomically swaps the running binary.
-// Shared by PerformUpdate (latest) and RollbackToVersion (specific older version).
+// verifies its checksum, and atomically swaps the running binary for rollback.
 func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []Asset) error {
 	// Find matching archive and checksum for current platform
 	archiveName := s.getArchiveName()
@@ -509,7 +509,7 @@ func (s *UpdateService) RollbackToVersion(ctx context.Context, version string) e
 // fetchRollbackCandidates fetches recent releases and keeps the newest
 // maxRollbackVersions entries strictly older than the current version.
 func (s *UpdateService) fetchRollbackCandidates(ctx context.Context) ([]*GitHubRelease, error) {
-	releases, err := s.githubClient.FetchRecentReleases(ctx, githubRepo, rollbackFetchPageSize)
+	releases, err := s.githubClient.FetchRecentReleases(ctx, personalReleaseRepo, rollbackFetchPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +525,7 @@ func (s *UpdateService) fetchRollbackCandidates(ctx context.Context) ([]*GitHubR
 			continue
 		}
 		// Only versions strictly older than current (also excludes current itself)
-		if compareVersions(v, s.currentVersion) >= 0 {
+		if comparePersonalReleaseVersions(v, s.currentVersion) >= 0 {
 			continue
 		}
 		seen[v] = true
@@ -533,7 +533,7 @@ func (s *UpdateService) fetchRollbackCandidates(ctx context.Context) ([]*GitHubR
 	}
 
 	sort.SliceStable(candidates, func(i, j int) bool {
-		return compareVersions(
+		return comparePersonalReleaseVersions(
 			strings.TrimPrefix(candidates[i].TagName, "v"),
 			strings.TrimPrefix(candidates[j].TagName, "v"),
 		) > 0
@@ -546,7 +546,7 @@ func (s *UpdateService) fetchRollbackCandidates(ctx context.Context) ([]*GitHubR
 }
 
 func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, error) {
-	release, err := s.githubClient.FetchLatestRelease(ctx, githubRepo)
+	release, err := s.githubClient.FetchLatestRelease(ctx, upstreamMonitorRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -562,10 +562,12 @@ func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, er
 		}
 	}
 
+	hasUpdate := compareVersions(s.currentVersion, latestVersion) < 0
 	return &UpdateInfo{
 		CurrentVersion: s.currentVersion,
 		LatestVersion:  latestVersion,
-		HasUpdate:      compareVersions(s.currentVersion, latestVersion) < 0,
+		HasUpdate:      hasUpdate,
+		ReviewRequired: hasUpdate,
 		ReleaseInfo: &ReleaseInfo{
 			Name:        release.Name,
 			Body:        release.Body,
@@ -763,6 +765,7 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 		CurrentVersion: s.currentVersion,
 		LatestVersion:  cached.Latest,
 		HasUpdate:      compareVersions(s.currentVersion, cached.Latest) < 0,
+		ReviewRequired: compareVersions(s.currentVersion, cached.Latest) < 0,
 		ReleaseInfo:    cached.ReleaseInfo,
 		Cached:         true,
 		BuildType:      s.buildType,
@@ -799,6 +802,38 @@ func compareVersions(current, latest string) int {
 		}
 	}
 	return 0
+}
+
+// comparePersonalReleaseVersions orders production releases in the personal
+// repository. Unlike the upstream monitor comparison, it treats personal.N as
+// an increasing revision of the same upstream base version.
+func comparePersonalReleaseVersions(left, right string) int {
+	if baseComparison := compareVersions(left, right); baseComparison != 0 {
+		return baseComparison
+	}
+
+	leftRevision := personalReleaseRevision(left)
+	rightRevision := personalReleaseRevision(right)
+	if leftRevision < rightRevision {
+		return -1
+	}
+	if leftRevision > rightRevision {
+		return 1
+	}
+	return 0
+}
+
+func personalReleaseRevision(version string) int {
+	version = strings.TrimPrefix(version, "v")
+	_, suffix, found := strings.Cut(version, "-")
+	if !found || !strings.HasPrefix(suffix, "personal.") {
+		return 0
+	}
+	revision, err := strconv.Atoi(strings.TrimPrefix(suffix, "personal."))
+	if err != nil || revision < 0 {
+		return 0
+	}
+	return revision
 }
 
 func parseVersion(v string) [3]int {

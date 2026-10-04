@@ -93,7 +93,9 @@ release:
     owner: "{{ .Env.GITHUB_REPO_OWNER }}"
     name: "{{ .Env.GITHUB_REPO_NAME }}"
   draft: false
-  prerelease: auto
+  # Personal tags (vX.Y.Z-personal.N) are production releases. Keeping them
+  # non-prerelease makes GitHub /releases/latest and the VPS updater agree.
+  prerelease: false
   name_template: "Sub2API {{.Version}} (Simple)"
   header: |
     > AI API Gateway Platform - 将 AI 订阅配额分发和管理

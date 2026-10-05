@@ -400,8 +400,15 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		}
 
 		if err != nil {
+			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, selectionSessionHash, account, err)
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				if service.IsGrokModerationRefusal(account.Platform, failoverErr.ResponseBody) {
+					result = service.PrepareGrokModerationRefusalResult(result, reqModel)
+					submitForwardUsage(result)
+					h.handleCCFailoverExhausted(c, failoverErr, service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward)
+					return
+				}
 				if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
 					submitForwardUsage(result)
 					h.handleCCFailoverExhausted(c, failoverErr, true)

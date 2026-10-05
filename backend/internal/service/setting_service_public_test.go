@@ -121,6 +121,37 @@ func TestSettingService_GetPublicSettings_ExposesCompactHomeEnabled(t *testing.T
 	require.False(t, missingSettings.CompactHomeEnabled)
 }
 
+func TestSettingService_SiteSubtitleIsOptional(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		values map[string]string
+		want   string
+	}{
+		{name: "missing", values: map[string]string{}, want: ""},
+		{name: "empty", values: map[string]string{SettingKeySiteSubtitle: ""}, want: ""},
+		{name: "configured", values: map[string]string{SettingKeySiteSubtitle: "Keep Running"}, want: "Keep Running"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			svc := NewSettingService(&settingPublicRepoStub{values: tc.values}, &config.Config{})
+			public, err := svc.GetPublicSettings(ctx)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, public.SiteSubtitle)
+
+			injected, err := svc.GetPublicSettingsForInjection(ctx)
+			require.NoError(t, err)
+			payload, ok := injected.(*PublicSettingsInjectionPayload)
+			require.True(t, ok)
+			require.Equal(t, tc.want, payload.SiteSubtitle)
+
+			adminSvc := NewSettingService(&settingGetAllRepoStub{values: tc.values}, &config.Config{})
+			admin, err := adminSvc.GetAllSettings(ctx)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, admin.SiteSubtitle)
+		})
+	}
+}
+
 func TestSettingService_ChannelMonitorHideThroughputDefaultsToPrivate(t *testing.T) {
 	missing := NewSettingService(&settingPublicRepoStub{values: map[string]string{}}, &config.Config{}).GetChannelMonitorRuntime(context.Background())
 	require.True(t, missing.HideThroughput)

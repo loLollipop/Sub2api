@@ -2,47 +2,50 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="proxy-toolbar">
           <!-- Left: Search + Filters -->
-          <div class="relative w-full sm:w-64">
-            <Icon
-              name="search"
-              size="md"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-            />
-            <input
-              v-model="searchQuery"
-              type="text"
-              :placeholder="t('admin.proxies.searchProxies')"
-              class="input pl-10"
-              @input="handleSearch"
-            />
-          </div>
+          <div class="proxy-toolbar-filters">
+            <div class="proxy-toolbar-search relative">
+              <Icon
+                name="search"
+                size="md"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              />
+              <input
+                v-model="searchQuery"
+                type="text"
+                :placeholder="t('admin.proxies.searchProxies')"
+                class="input pl-10"
+                @input="handleSearch"
+              />
+            </div>
 
-          <div class="w-full sm:w-40">
-            <Select
-              v-model="filters.protocol"
-              :options="protocolOptions"
-              :placeholder="t('admin.proxies.allProtocols')"
-              @change="handleFilterChange"
-            />
-          </div>
-          <div class="w-full sm:w-36">
-            <Select
-              v-model="filters.status"
-              :options="statusOptions"
-              :placeholder="t('admin.proxies.allStatus')"
-              @change="handleFilterChange"
-            />
+            <div class="proxy-toolbar-filter">
+              <Select
+                v-model="filters.protocol"
+                :options="protocolOptions"
+                :placeholder="t('admin.proxies.allProtocols')"
+                @change="handleFilterChange"
+              />
+            </div>
+            <div class="proxy-toolbar-filter">
+              <Select
+                v-model="filters.status"
+                :options="statusOptions"
+                :placeholder="t('admin.proxies.allStatus')"
+                @change="handleFilterChange"
+              />
+            </div>
           </div>
 
           <!-- Right: All action buttons -->
-          <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
+          <div class="proxy-toolbar-actions">
             <button
               @click="loadProxies"
               :disabled="loading"
               class="btn btn-secondary"
               :title="t('common.refresh')"
+              :aria-label="t('common.refresh')"
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
@@ -52,7 +55,7 @@
               class="btn btn-secondary"
               :title="t('admin.proxies.testConnection')"
             >
-              <Icon name="play" size="md" class="mr-2" />
+              <Icon name="play" size="md" />
               {{ t('admin.proxies.testConnection') }}
             </button>
             <button
@@ -61,7 +64,7 @@
               class="btn btn-secondary"
               :title="t('admin.proxies.batchQualityCheck')"
             >
-              <Icon name="shield" size="md" class="mr-2" :class="batchQualityChecking ? 'animate-pulse' : ''" />
+              <Icon name="shield" size="md" :class="batchQualityChecking ? 'animate-pulse' : ''" />
               {{ t('admin.proxies.batchQualityCheck') }}
             </button>
             <button
@@ -70,7 +73,7 @@
               class="btn btn-danger"
               :title="t('admin.proxies.batchDeleteAction')"
             >
-              <Icon name="trash" size="md" class="mr-2" />
+              <Icon name="trash" size="md" />
               {{ t('admin.proxies.batchDeleteAction') }}
             </button>
             <button @click="showImportData = true" class="btn btn-secondary">
@@ -80,7 +83,7 @@
               {{ selectedCount > 0 ? t('admin.proxies.dataExportSelected') : t('admin.proxies.dataExport') }}
             </button>
             <button @click="showCreateModal = true" class="btn btn-primary">
-              <Icon name="plus" size="md" class="mr-2" />
+              <Icon name="plus" size="md" />
               {{ t('admin.proxies.createProxy') }}
             </button>
           </div>
@@ -2063,3 +2066,64 @@ onUnmounted(() => {
   document.removeEventListener('click', closeCopyMenu)
 })
 </script>
+
+<style scoped>
+.proxy-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.proxy-toolbar-filters {
+  display: flex;
+  flex: 1 1 28rem;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.proxy-toolbar-search {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.proxy-toolbar-filter {
+  flex: 0 0 8rem;
+}
+
+.proxy-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 100%;
+  margin-left: auto;
+  gap: 6px;
+}
+
+.proxy-toolbar-actions > .btn {
+  flex-shrink: 0;
+  gap: 6px;
+  padding-right: 12px;
+  padding-left: 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .proxy-toolbar-search {
+    flex-basis: 100%;
+  }
+
+  .proxy-toolbar-filter {
+    flex: 1 1 8rem;
+    min-width: 0;
+  }
+
+  .proxy-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+</style>

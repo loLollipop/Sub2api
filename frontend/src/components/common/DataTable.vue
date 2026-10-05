@@ -555,6 +555,9 @@ const getColumnAriaSort = (key: string) => {
 }
 
 const getHeaderContentAlignmentClass = (column: Column) => {
+  if (props.stickyFirstColumn && hasSelectColumn.value && column.key === 'select') {
+    return 'justify-center'
+  }
   const className = column.class || ''
   if (className.includes('text-center')) return 'justify-center'
   if (className.includes('text-right')) return 'justify-end'

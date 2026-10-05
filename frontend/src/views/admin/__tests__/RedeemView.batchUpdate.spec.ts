@@ -148,6 +148,36 @@ describe('admin RedeemView batch update', () => {
     getAllGroups.mockResolvedValue([])
   })
 
+  it('reserves the same inline action height for used and unused codes', async () => {
+    const response = await listRedeemCodes()
+    response.items[1].status = 'used'
+    const wrapper = mount(RedeemView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: { template: '<div><slot name="table" /></div>' },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          Select: SelectStub,
+          GroupBadge: true,
+          GroupOptionItem: true,
+          Icon: true,
+          Teleport: true
+        }
+      }
+    })
+    await flushPromises()
+
+    const actions = wrapper.findAll('tbody tr').map((row) => row.get('td:last-child > div'))
+    expect(actions).toHaveLength(2)
+    for (const action of actions) expect(action.classes()).toContain('h-6')
+    expect(actions[0].get('button').classes()).toContain('inline-flex')
+    expect(actions[0].get('button').classes()).not.toContain('flex-col')
+    expect(actions[1].find('button').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('submits only checked fields for selected redeem codes', async () => {
     const wrapper = mount(RedeemView, {
       attachTo: document.body,

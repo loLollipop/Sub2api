@@ -222,6 +222,7 @@ describe('DataTable', () => {
     )
     expect(headerCells[1].classes()).toContain('sticky-col-left-second')
     expect(dataCells[1].classes()).toContain('sticky-col-left-second')
+    expect(headerCells[0].get('div').classes()).toContain('justify-center')
 
     const declarations = new Map<string, { value: string; important: boolean }>()
     dataTableStyles.walkRules('.sticky-select-col', (rule) => {

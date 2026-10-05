@@ -175,11 +175,11 @@
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center space-x-2">
+            <div class="flex h-6 items-center space-x-2">
               <button
                 v-if="row.status === 'unused'"
                 @click="handleDelete(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                class="inline-flex h-6 items-center gap-1 rounded px-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               >
                 <Icon name="trashSimple" size="none" class="h-4 w-4" :stroke-width="2" />
                 <span class="text-xs">{{ t('common.delete') }}</span>

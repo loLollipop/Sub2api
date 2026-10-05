@@ -195,6 +195,55 @@ describe('DataTable', () => {
     expect(unsafeInteractionDeclarations).toEqual([])
   })
 
+  it('keeps the frozen select column flush with the following frozen column', () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        columns: [
+          { key: 'select', label: '' },
+          { key: 'name', label: 'Name' },
+          { key: 'id', label: 'ID' }
+        ],
+        data: [{ id: 1, name: 'Stable row' }],
+        stickyFirstColumn: true
+      },
+      slots: {
+        'cell-select': '<input type="checkbox" />'
+      }
+    })
+
+    const headerCells = wrapper.findAll('thead th')
+    const dataCells = wrapper.findAll('tbody tr[data-index] td')
+
+    expect(headerCells[0].classes()).toEqual(
+      expect.arrayContaining(['sticky-col-left-first', 'sticky-select-col'])
+    )
+    expect(dataCells[0].classes()).toEqual(
+      expect.arrayContaining(['sticky-col-left-first', 'sticky-select-col'])
+    )
+    expect(headerCells[1].classes()).toContain('sticky-col-left-second')
+    expect(dataCells[1].classes()).toContain('sticky-col-left-second')
+
+    const declarations = new Map<string, { value: string; important: boolean }>()
+    dataTableStyles.walkRules('.sticky-select-col', (rule) => {
+      rule.walkDecls((declaration) => declarations.set(declaration.prop, {
+        value: declaration.value,
+        important: declaration.important
+      }))
+    })
+
+    expect(declarations.get('width')?.value).toBe('var(--select-col-width)')
+    expect(declarations.get('min-width')?.value).toBe('var(--select-col-width)')
+    expect(declarations.get('max-width')?.value).toBe('var(--select-col-width)')
+    expect(declarations.get('padding-left')).toEqual({ value: '0', important: true })
+    expect(declarations.get('padding-right')).toEqual({ value: '0', important: true })
+
+    const offsets: string[] = []
+    dataTableStyles.walkRules('.sticky-col-left-second', (rule) => {
+      rule.walkDecls('left', (declaration) => offsets.push(declaration.value))
+    })
+    expect(offsets).toContain('var(--select-col-width)')
+  })
+
   it('rejects broad transitions while allowing static base-row geometry', () => {
     expect(isUnsafeRowInteractionDeclaration('padding', '0.5rem', false)).toBe(false)
     expect(isUnsafeRowInteractionDeclaration('padding', '0.5rem', true)).toBe(true)

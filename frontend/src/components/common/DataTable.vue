@@ -848,7 +848,7 @@ const getStickyColumnClass = (column: Column, index: number) => {
     // 如果第一列是勾选列，固定前两列（勾选+名称）
     if (hasSelectColumn.value) {
       if (index === 0) {
-        classes.push('sticky-col sticky-col-left-first')
+        classes.push('sticky-col sticky-col-left-first sticky-select-col')
       } else if (index === 1) {
         classes.push('sticky-col sticky-col-left-second')
       }
@@ -941,7 +941,7 @@ defineExpose({
 <style scoped>
 /* 表格横向滚动 */
 .table-wrapper {
-  --select-col-width: 52px; /* 勾选列宽度：px-6 (24px*2) + checkbox (16px) */
+  --select-col-width: 52px;
   position: relative;
   overflow-x: auto;
   overflow-y: auto;
@@ -994,6 +994,21 @@ defineExpose({
 /* 双列固定（有勾选列时）：第一列（勾选） */
 .sticky-col-left-first {
   left: 0;
+}
+
+/*
+ * The second frozen column is positioned from --select-col-width, so the
+ * custom checkbox column must use that exact width as well. Letting the table
+ * auto-size this cell creates a narrow uncovered strip that flashes while the
+ * row and sticky-cell hover backgrounds change.
+ */
+.sticky-select-col {
+  width: var(--select-col-width);
+  min-width: var(--select-col-width);
+  max-width: var(--select-col-width);
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  text-align: center;
 }
 
 /* 双列固定（有勾选列时）：第二列（名称） */

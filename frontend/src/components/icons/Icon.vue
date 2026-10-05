@@ -1,12 +1,19 @@
 <template>
   <svg
     :class="sizeClass"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
+    :fill="definition.fill"
+    :viewBox="definition.viewBox"
+    :stroke="definition.stroke"
     :stroke-width="strokeWidth"
+    :stroke-linecap="definition.strokeLinecap"
+    :stroke-linejoin="definition.strokeLinejoin"
   >
-    <path stroke-linecap="round" stroke-linejoin="round" :d="iconPath" />
+    <component
+      :is="node.tag"
+      v-for="(node, index) in definition.nodes"
+      :key="index"
+      v-bind="node.attrs"
+    />
   </svg>
 </template>
 
@@ -15,12 +22,37 @@ import { computed } from 'vue'
 
 const props = withDefaults(defineProps<{
   name: keyof typeof icons
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'none'
   strokeWidth?: number
 }>(), {
   size: 'md',
   strokeWidth: 1.5
 })
+
+// Definitions are a static whitelist. Callers select a name, never markup or tags.
+type Paint = 'none' | 'currentColor' | 'black'
+type NodeStyle = {
+  fill?: Paint
+  stroke?: Paint
+  'fill-rule'?: 'nonzero' | 'evenodd'
+  'clip-rule'?: 'nonzero' | 'evenodd'
+  'stroke-linecap'?: 'butt' | 'round' | 'square'
+  'stroke-linejoin'?: 'miter' | 'round' | 'bevel'
+}
+type IconNode =
+  | { tag: 'path'; attrs: NodeStyle & { d: string } }
+  | { tag: 'circle'; attrs: NodeStyle & { cx: string; cy: string; r: string } }
+  | { tag: 'rect'; attrs: NodeStyle & { x: string; y: string; width: string; height: string; rx?: string; ry?: string } }
+  | { tag: 'line'; attrs: NodeStyle & { x1: string; y1: string; x2: string; y2: string } }
+  | { tag: 'polyline'; attrs: NodeStyle & { points: string } }
+type IconDefinition = string | {
+  viewBox: string
+  fill: Paint
+  stroke: Paint
+  strokeLinecap?: NodeStyle['stroke-linecap']
+  strokeLinejoin?: NodeStyle['stroke-linejoin']
+  nodes: readonly IconNode[]
+}
 
 const icons = {
   // Actions
@@ -132,12 +164,94 @@ const icons = {
   calculator: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z',
   fire: 'M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z',
   badge: 'M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z',
-  brain: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m0 0l-2.69 2.689c-1.232 1.232-.65 3.318 1.067 3.611A48.309 48.309 0 0012 21c2.773 0 5.491-.235 8.135-.687 1.718-.293 2.3-2.379 1.067-3.61L19.8 15.3M12 8.25a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm0 0v3m-3-1.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm0 0h6m-3 4.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z'
-} as const
+  brain: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m0 0l-2.69 2.689c-1.232 1.232-.65 3.318 1.067 3.611A48.309 48.309 0 0012 21c2.773 0 5.491-.235 8.135-.687 1.718-.293 2.3-2.379 1.067-3.61L19.8 15.3M12 8.25a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm0 0v3m-3-1.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm0 0h6m-3 4.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z',
+  // Existing inline glyph variants retain their geometry, fill, and viewBox.
+  searchCircle: { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', nodes: [{ tag: 'circle', attrs: { cx: '11', cy: '11', r: '8' } }, { tag: 'path', attrs: { d: 'm21 21-4.35-4.35' } }] },
+  checkCircleSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z","clip-rule":"evenodd"}}]},
+  shieldSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M9.661 2.237a.531.531 0 01.678 0 11.947 11.947 0 007.078 2.749.5.5 0 01.479.425c.069.52.104 1.05.104 1.59 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 01-.332 0C5.26 16.564 2 12.163 2 7c0-.538.035-1.069.104-1.589a.5.5 0 01.48-.425 11.947 11.947 0 007.077-2.75z","clip-rule":"evenodd"}}]},
+  arrowUpRight: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"}}]},
+  userGroup: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"}}]},
+  banknotes: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"}}]},
+  lockSquare: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"rect","attrs":{"x":"3","y":"11","width":"18","height":"11","rx":"2","ry":"2"}},{"tag":"path","attrs":{"d":"M7 11V7a5 5 0 0 1 10 0v4"}}]},
+  eyeOffOutline: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"path","attrs":{"d":"M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"}},{"tag":"line","attrs":{"x1":"1","y1":"1","x2":"23","y2":"23"}}]},
+  eyeOutline: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"path","attrs":{"d":"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"}},{"tag":"circle","attrs":{"cx":"12","cy":"12","r":"3"}}]},
+  searchOutline: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"circle","attrs":{"cx":"11","cy":"11","r":"8"}},{"tag":"line","attrs":{"x1":"21","y1":"21","x2":"16.65","y2":"16.65"}}]},
+  clockOutline: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"circle","attrs":{"cx":"12","cy":"12","r":"10"}},{"tag":"polyline","attrs":{"points":"12 6 12 12 16 14"}}]},
+  calendarOutline: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"rect","attrs":{"x":"3","y":"4","width":"18","height":"18","rx":"2","ry":"2"}},{"tag":"line","attrs":{"x1":"16","y1":"2","x2":"16","y2":"6"}},{"tag":"line","attrs":{"x1":"8","y1":"2","x2":"8","y2":"6"}},{"tag":"line","attrs":{"x1":"3","y1":"10","x2":"21","y2":"10"}}]},
+  dollarSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"line","attrs":{"x1":"12","y1":"1","x2":"12","y2":"23"}},{"tag":"path","attrs":{"d":"M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"}}]},
+  exclamationTriangleRounded: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"}}]},
+  usersRounded: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"}}]},
+  presentationChart: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"}}]},
+  questionCircleRounded: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"}}]},
+  exclamationCircleSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z","clip-rule":"evenodd"}}]},
+  questionCircleSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z","clip-rule":"evenodd"}}]},
+  infoCircleSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"}}]},
+  checkCircleSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"}}]},
+  arrowsRightLeft: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"}}]},
+  arrowRightWide: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M14 5l7 7m0 0l-7 7m7-7H3"}}]},
+  trashSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"}}]},
+  plusWide: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M12 4v16m8-8H4"}}]},
+  boltSlanted: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"}}]},
+  keyCompact: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1721.75 8.25z"}}]},
+  chevronRightSmall: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M9 5l7 7-7 7"}}]},
+  sparkle: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"}}]},
+  chevronDownSmall: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M19 9l-7 7-7-7"}}]},
+  checkSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M5 13l4 4L19 7"}}]},
+  clipboardDocument: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"}}]},
+  chevronDownSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z","clip-rule":"evenodd"}}]},
+  checkSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z","clip-rule":"evenodd"}}]},
+  clockHands: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"}}]},
+  eyeSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M15 12a3 3 0 11-6 0 3 3 0 016 0z"}},{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"}}]},
+  checkSolidThin: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z","clip-rule":"evenodd"}}]},
+  sortAsc: {"viewBox":"0 0 10 10","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"d":"M5 2L1.5 6.5h7L5 2z"}}]},
+  sortDesc: {"viewBox":"0 0 10 10","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"d":"M5 8L1.5 3.5h7L5 8z"}}]},
+  photo: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"}}]},
+  keySquare: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"}}]},
+  refreshSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"}}]},
+  chatBubbles: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"}}]},
+  questionCircleSolidLarge: {"viewBox":"0 0 24 24","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"d":"M12 2a10 10 0 100 20 10 10 0 000-20zm0 14a1 1 0 110 2 1 1 0 010-2zm1.07-7.75c0-.6-.49-1.25-1.32-1.25-.7 0-1.22.4-1.43 1.02a1 1 0 11-1.9-.62A3.41 3.41 0 0111.8 5c2.02 0 3.25 1.4 3.25 2.9 0 2-1.83 2.55-2.43 3.12-.43.4-.47.75-.47 1.23a1 1 0 01-2 0c0-1 .16-1.82 1.1-2.7.69-.64 1.82-1.05 1.82-2.06z"}}]},
+  logout: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"}}]},
+  eyeOffSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"}}]},
+  gripVertical: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"d":"M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"}}]},
+  tag: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"}},{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M6 6h.008v.008H6V6z"}}]},
+  listHeader: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"}}]},
+  documentDuplicate: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"}}]},
+  columns: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z"}}]},
+  chevronUpSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z","clip-rule":"evenodd"}}]},
+  sortBoth: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"d":"M10 3l-4 5h8l-4-5zM10 17l4-5H6l4 5z"}}]},
+  minus: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M20 12H4"}}]},
+  chevronLeftSmall: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"path","attrs":{"d":"M15 18l-6-6 6-6"}}]},
+  menuWide: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeLinejoin":"round","nodes":[{"tag":"path","attrs":{"d":"M3 12h18M3 6h18M3 18h18"}}]},
+  searchSmall: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"}}]},
+  stopSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"rect","attrs":{"x":"5","y":"5","width":"10","height":"10","rx":"2"}}]},
+  playSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"d":"M6 4.7a.8.8 0 0 1 1.2-.7l8.1 5.3a.8.8 0 0 1 0 1.4L7.2 16a.8.8 0 0 1-1.2-.7Z"}}]},
+  cubeAngled: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"}}]},
+  archiveBox: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"}}]},
+  editSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"}}]},
+  serverStack: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"}}]},
+  userSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"}}]},
+  chartBarCompact: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2z"}}]},
+  cogSimple: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"}},{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M15 12a3 3 0 11-6 0 3 3 0 016 0z"}}]},
+  arrowsPointingOut: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"}}]},
+  xCircleSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z","clip-rule":"evenodd"}}]},
+  exclamationTriangleSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z","clip-rule":"evenodd"}}]},
+  infoCircleSolid: {"viewBox":"0 0 20 20","fill":"currentColor","stroke":"none","nodes":[{"tag":"path","attrs":{"fill-rule":"evenodd","d":"M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 100 2 1 1 0 000-2zm-1 3a1 1 0 012 0v4a1 1 0 11-2 0v-4z","clip-rule":"evenodd"}}]},
+  trendingDown: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"}}]},
+  barsDescending: {"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","nodes":[{"tag":"path","attrs":{"stroke-linecap":"round","stroke-linejoin":"round","d":"M7 7h10M7 12h6m-6 5h3"}}]}
+} as const satisfies Record<string, IconDefinition>
 
-const iconPath = computed(() => icons[props.name])
+const definition = computed<Exclude<IconDefinition, string>>(() => {
+  const icon: IconDefinition = icons[props.name]
+  return typeof icon === 'string'
+    ? {
+        viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+        nodes: [{ tag: 'path', attrs: { d: icon, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } }]
+      }
+    : icon
+})
 
 const sizeClass = computed(() => ({
+  none: '',
   xs: 'h-3 w-3',
   sm: 'h-4 w-4',
   md: 'h-5 w-5',

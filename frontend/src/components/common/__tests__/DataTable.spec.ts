@@ -1,7 +1,10 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import postcss from 'postcss'
+import { parse } from 'vue/compiler-sfc'
 
 import DataTable from '../DataTable.vue'
+import dataTableSource from '../DataTable.vue?raw'
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
@@ -40,6 +43,71 @@ const stubMobileMatchMedia = () => {
     }))
   })
 }
+
+const { descriptor: dataTableDescriptor } = parse(dataTableSource)
+const dataTableStyles = postcss.parse(
+  dataTableDescriptor.styles.map((style) => style.content).join('\n')
+)
+const dataTableTemplate = dataTableDescriptor.template?.content ?? ''
+
+const interactionClassPattern =
+  /(?:(?:[a-z0-9_/-]+):)*(?:hover|group-hover(?:\/[a-z0-9_-]+)?):!?-?[a-z0-9_./%[\]():!-]+/gi
+
+const getInteractionClassTokens = (templateSource: string) =>
+  [...templateSource.matchAll(/(?:^|\s)(?::|v-bind:)?class\s*=\s*(["'])([\s\S]*?)\1/g)].flatMap(
+    (attributeMatch) => attributeMatch[2].match(interactionClassPattern) ?? []
+  )
+
+const changesGeometryUtility = (classToken: string) => {
+  const interactionVariant = classToken.match(/(?:^|:)(?:hover|group-hover(?:\/[a-z0-9_-]+)?):/i)
+  const utility = interactionVariant
+    ? classToken
+        .slice((interactionVariant.index ?? 0) + interactionVariant[0].length)
+        .replace(/^!/, '')
+        .replace(/^-/, '')
+    : ''
+
+  if (
+    /^(?:p[trblxy]?|m[trblxy]?|space-[xy]|translate-[xy]|scale(?:-[xy])?|rotate|skew-[xy]|w|h|size|min-w|max-w|min-h|max-h|gap(?:-[xy])?|inset(?:-[xy])?|top|right|bottom|left|basis|grid-cols|grid-rows|col-span|row-span|border-spacing(?:-[xy])?)-/.test(
+      utility
+    )
+  ) {
+    return true
+  }
+
+  if (/^border(?:-[trblxy])?(?:-(?:0|[0-9]+))?$/.test(utility)) return true
+
+  const arbitraryBorderWidth = utility.match(/^border(?:-[trblxy])?-\[(.+)\]$/)?.[1]
+  return arbitraryBorderWidth
+    ? /^(?:(?:length|line-width):)?(?:-?(?:\d|\.)|calc\(|clamp\(|min\(|max\()/.test(
+        arbitraryBorderWidth
+      )
+    : false
+}
+
+const changesLayoutGeometry = (property: string) =>
+  /^(?:padding|margin)(?:-|$)|^(?:transform|translate|scale|rotate|width|height|min-width|max-width|min-height|max-height|inset|top|right|bottom|left|display|position|box-sizing|gap|row-gap|column-gap|flex|flex-basis|grid-template-columns|grid-template-rows|font-size|line-height|letter-spacing)$/.test(
+    property
+  )
+
+const transitionsLayoutGeometry = (property: string, value: string) =>
+  property.startsWith('transition') &&
+  /(?:^|[\s,])(?:all|padding(?:-[a-z]+)?|margin(?:-[a-z]+)?|transform|translate|scale|rotate|width|height|min-width|max-width|min-height|max-height|inset|top|right|bottom|left|gap|row-gap|column-gap|flex(?:-basis)?|font-size|line-height|letter-spacing)(?:[\s,]|$)/.test(
+    value
+  )
+
+const isUnsafeRowInteractionDeclaration = (
+  property: string,
+  value: string,
+  targetsRowHover: boolean
+) =>
+  transitionsLayoutGeometry(property, value) ||
+  (targetsRowHover && changesLayoutGeometry(property))
+
+const targetsHoveringTableRow = (selector: string) =>
+  selector
+    .split(',')
+    .some((part) => /\btbody\b[^,{]*\btr\b[^,{]*:hover\b/i.test(part))
 
 describe('DataTable', () => {
   beforeEach(() => {
@@ -81,6 +149,130 @@ describe('DataTable', () => {
     expect(nameHeader.attributes('aria-sort')).toBe('descending')
     expect(nameHeader.findAll('svg')[0].classes()).toContain('text-gray-300')
     expect(nameHeader.findAll('svg')[1].classes()).toContain('text-primary-600')
+  })
+
+  it('keeps row hover visual-only without changing table geometry', () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        columns: [{ key: 'name', label: 'Name' }],
+        data: [{ id: 1, name: 'Stable row' }],
+        stickyFirstColumn: true
+      }
+    })
+
+    const dataRow = wrapper.get('tbody tr[data-index]')
+    expect(dataRow.classes()).toEqual(
+      expect.arrayContaining(['hover:bg-gray-50', 'dark:hover:bg-dark-800'])
+    )
+
+    const hoverBackgrounds: string[] = []
+    const unsafeInteractionDeclarations: string[] = []
+
+    dataTableStyles.walkRules((rule) => {
+      const targetsDataRow = rule.selector.includes('tbody tr:not([aria-hidden])')
+      const targetsRowHover = targetsHoveringTableRow(rule.selector)
+      if (!targetsDataRow && !targetsRowHover) return
+
+      rule.walkDecls((declaration) => {
+        if (targetsRowHover && declaration.prop === 'background-color') {
+          hoverBackgrounds.push(declaration.value)
+        }
+        if (
+          isUnsafeRowInteractionDeclaration(
+            declaration.prop,
+            declaration.value,
+            targetsRowHover
+          )
+        ) {
+          unsafeInteractionDeclarations.push(`${declaration.prop}: ${declaration.value}`)
+        }
+      })
+    })
+
+    expect(hoverBackgrounds).toEqual(
+      expect.arrayContaining(['rgb(249 250 251)', 'rgb(31 41 55)'])
+    )
+    expect(unsafeInteractionDeclarations).toEqual([])
+  })
+
+  it('rejects broad transitions while allowing static base-row geometry', () => {
+    expect(isUnsafeRowInteractionDeclaration('padding', '0.5rem', false)).toBe(false)
+    expect(isUnsafeRowInteractionDeclaration('padding', '0.5rem', true)).toBe(true)
+    expect(isUnsafeRowInteractionDeclaration('transition', 'all 140ms ease', false)).toBe(true)
+    expect(isUnsafeRowInteractionDeclaration('transition-property', 'opacity, all', false)).toBe(
+      true
+    )
+    expect(
+      isUnsafeRowInteractionDeclaration('transition', 'background-color 140ms ease', false)
+    ).toBe(false)
+  })
+
+  it('recognizes row hover selectors with intervening state pseudo-classes', () => {
+    expect(targetsHoveringTableRow('tbody tr:hover .sticky-col')).toBe(true)
+    expect(
+      targetsHoveringTableRow(
+        '.table-wrapper tbody tr:not([aria-hidden]):hover :is(td:first-child, .sticky-col)'
+      )
+    ).toBe(true)
+    expect(targetsHoveringTableRow('tbody tr:not([aria-hidden])')).toBe(false)
+  })
+
+  it('keeps the DataTable scrollbar thumb locally visible and interactive', () => {
+    const declarations = new Map<string, { value: string; important: boolean }>()
+
+    dataTableStyles.walkRules('.table-wrapper::-webkit-scrollbar-thumb', (rule) => {
+      rule.walkDecls((declaration) => {
+        declarations.set(declaration.prop, {
+          value: declaration.value,
+          important: declaration.important
+        })
+      })
+    })
+
+    expect(declarations.get('background-color')).toEqual({
+      value: 'rgba(107, 114, 128, 0.75)',
+      important: true
+    })
+    expect(declarations.get('background-clip')).toEqual({
+      value: 'padding-box',
+      important: true
+    })
+
+    const hoverColors: string[] = []
+    dataTableStyles.walkRules('.table-wrapper::-webkit-scrollbar-thumb:hover', (rule) => {
+      rule.walkDecls('background-color', (declaration) => hoverColors.push(declaration.value))
+    })
+    expect(hoverColors).toContain('rgba(75, 85, 99, 0.9)')
+  })
+
+  it('keeps template hover classes visual-only', () => {
+    const interactionClasses = getInteractionClassTokens(dataTableTemplate)
+    const unsafeGeometryClasses = interactionClasses.filter(changesGeometryUtility)
+
+    expect(interactionClasses).toEqual(
+      expect.arrayContaining(['hover:bg-gray-50', 'dark:hover:bg-dark-800'])
+    )
+    expect(unsafeGeometryClasses).toEqual([])
+
+    expect(
+      [
+        'hover:px-4',
+        'group-hover:-translate-y-1',
+        'dark:hover:scale-105',
+        'hover:w-full',
+        'hover:gap-2',
+        'hover:border-2',
+        'hover:border-[length:3px]'
+      ].every(changesGeometryUtility)
+    ).toBe(true)
+    expect(
+      [
+        'hover:bg-gray-50',
+        'dark:hover:text-white',
+        'group-hover:shadow-lg',
+        'hover:border-gray-200'
+      ].some(changesGeometryUtility)
+    ).toBe(false)
   })
 
   it('renders every row with no virtual padding spacer for small datasets (virtualization off)', async () => {

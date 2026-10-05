@@ -27,9 +27,7 @@
         </div>
         <div class="mt-2 flex items-center justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
           <span class="text-xs text-gray-400">{{ t('admin.accounts.modelCount', { count: modelValue.length }) }}</span>
-          <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
+          <Icon name="chevronDownSmall" size="none" class="h-5 w-5 text-gray-400" :stroke-width="2" />
         </div>
       </div>
       <!-- Dropdown List -->
@@ -67,9 +65,7 @@
                     : 'border-gray-300 dark:border-dark-500'
                 ]"
               >
-                <svg v-if="modelValue.includes(model.value)" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                </svg>
+                <Icon name="checkSimple" size="none" v-if="modelValue.includes(model.value)" class="h-3 w-3" :stroke-width="3" />
               </span>
               <ModelIcon :model="model.value" size="18px" />
               <span class="truncate text-gray-900 dark:text-white">{{ model.value }}</span>

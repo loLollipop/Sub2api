@@ -25,6 +25,7 @@
 .tickets-quota time { margin-left: auto; }
 .tickets-quota-used { color: var(--signal-amber); }
 .tickets-status-tabs { display: flex; gap: 22px; overflow-x: auto; border-bottom: 1px solid var(--signal-line); scrollbar-width: none; }
+.tickets-status-tabs::-webkit-scrollbar { display: none; }
 .tickets-status-tabs button { display: flex; align-items: center; gap: 8px; flex-shrink: 0; border-bottom: 2px solid transparent; padding: 10px 0 13px; color: var(--signal-muted); font-size: 13px; white-space: nowrap; }
 .tickets-status-tabs button:hover, .tickets-status-tabs button.active { color: var(--signal-accent); }
 .tickets-status-tabs button.active { border-color: var(--signal-accent); font-weight: 600; }

@@ -145,22 +145,10 @@
                 class="inline-flex h-5 w-4 flex-col items-center justify-center"
                 aria-hidden="true"
               >
-                <svg
-                  class="h-2.5 w-2.5"
-                  :class="getSortIndicatorClass(column.key, 'asc')"
-                  fill="currentColor"
-                  viewBox="0 0 10 10"
-                >
-                  <path d="M5 2L1.5 6.5h7L5 2z" />
-                </svg>
-                <svg
-                  class="-mt-0.5 h-2.5 w-2.5"
-                  :class="getSortIndicatorClass(column.key, 'desc')"
-                  fill="currentColor"
-                  viewBox="0 0 10 10"
-                >
-                  <path d="M5 8L1.5 3.5h7L5 8z" />
-                </svg>
+                <Icon name="sortAsc" size="none" class="h-2.5 w-2.5"
+                  :class="getSortIndicatorClass(column.key, 'asc')" :stroke-width="1" />
+                <Icon name="sortDesc" size="none" class="-mt-0.5 h-2.5 w-2.5"
+                  :class="getSortIndicatorClass(column.key, 'desc')" :stroke-width="1" />
               </span>
             </div>
           </th>
@@ -1032,19 +1020,10 @@ tbody .sticky-col {
   background-color: rgb(17 24 39);
 }
 
-/* hover 状态保持 */
-/* 行 hover：背景提亮 + 首列轻微内缩（纸张对齐感）。过渡集中在颜色，不干扰虚拟化测量。 */
+/* 行 hover 仅过渡颜色，避免改变单元格尺寸或虚拟化测量结果。 */
 @media (prefers-reduced-motion: no-preference) {
   .table-wrapper tbody tr:not([aria-hidden]) {
     transition: background-color 140ms ease;
-  }
-  .table-wrapper tbody tr:not([aria-hidden]) :is(td, .sticky-col) {
-    transition: padding-left 160ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .table-wrapper tbody tr:not([aria-hidden]):hover :is(td:first-child, .sticky-col:first-of-type) {
-      padding-left: 2px;
-    }
   }
 }
 

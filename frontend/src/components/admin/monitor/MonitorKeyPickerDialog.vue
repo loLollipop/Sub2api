@@ -17,9 +17,7 @@
           class="input pl-9"
           :placeholder="t('keys.searchPlaceholder')"
         />
-        <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-        </svg>
+        <Icon name="searchCircle" size="none" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" :stroke-width="2" />
       </div>
 
       <div v-if="loading" class="py-6 text-center text-sm text-gray-500">
@@ -73,6 +71,7 @@
 </template>
 
 <script setup lang="ts">
+import Icon from '@/components/icons/Icon.vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ApiKey } from '@/types'

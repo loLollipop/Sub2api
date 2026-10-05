@@ -31,7 +31,7 @@
         data-test="test-stop"
         @click="stopRun"
       >
-        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2" /></svg>
+        <Icon name="stopSolid" size="none" aria-hidden="true" :stroke-width="1" />
         {{ t('admin.accounts.batchTest.stop') }}
       </button>
       <template v-else>
@@ -43,7 +43,7 @@
           :disabled="!canTestAll"
           @click="startRun('all')"
         >
-          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6 4.7a.8.8 0 0 1 1.2-.7l8.1 5.3a.8.8 0 0 1 0 1.4L7.2 16a.8.8 0 0 1-1.2-.7Z" /></svg>
+          <Icon name="playSolid" size="none" aria-hidden="true" :stroke-width="1" />
           {{ testAllLabel }}
         </button>
         <button

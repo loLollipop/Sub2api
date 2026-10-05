@@ -720,6 +720,29 @@ describe("admin SettingsView payment visible method controls", () => {
     adminSettingsFetch.mockResolvedValue(undefined);
   });
 
+  it("starts independent settings requests while bulk hydration is pending", async () => {
+    let resolveSettings!: (value: typeof baseSettingsResponse) => void;
+    getSettings.mockReturnValueOnce(new Promise<typeof baseSettingsResponse>((resolve) => {
+      resolveSettings = resolve;
+    }));
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.find("form").exists()).toBe(false);
+    for (const load of [
+      getAdminApiKey, getOverloadCooldownSettings, getRateLimit429CooldownSettings,
+      getStreamTimeoutSettings, getRectifierSettings, getBetaPolicySettings,
+    ]) {
+      expect(load).toHaveBeenCalledOnce();
+    }
+    resolveSettings(baseSettingsResponse);
+    await flushPromises();
+    expect(wrapper.find("form").exists()).toBe(true);
+    await wrapper.get("#settings-tab-gateway").trigger("click");
+    await wrapper.get("#settings-tab-security").trigger("click");
+    expect(getOverloadCooldownSettings).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+
   it("submits the Codex ticket harvest toggle", async () => {
     getSettings.mockResolvedValueOnce({
       ...baseSettingsResponse,

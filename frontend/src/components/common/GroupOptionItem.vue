@@ -44,21 +44,14 @@
         </span>
       </div>
       <!-- Checkmark -->
-      <svg
-        v-if="showCheckmark && selected"
-        class="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        stroke-width="2"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-      </svg>
+      <Icon name="checkSimple" size="none" v-if="showCheckmark && selected"
+        class="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400" :stroke-width="2" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import Icon from '@/components/icons/Icon.vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import GroupBadge from './GroupBadge.vue'

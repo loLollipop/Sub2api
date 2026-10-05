@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(
-  resolve(process.cwd(), 'src/components/admin/account/ReAuthAccountModal.vue'),
+  resolve(process.cwd(), 'src/components/account/ReAuthAccountModal.vue'),
   'utf8'
 )
 

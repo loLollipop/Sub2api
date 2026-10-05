@@ -7,32 +7,12 @@
       :class="state === 'verified' ? 'aliyun-captcha-button--verified' : ''"
       :disabled="state === 'verified'"
     >
-      <svg
-        v-if="state === 'verified'"
+      <Icon name="checkCircleSolid" size="none" v-if="state === 'verified'"
         class="aliyun-captcha-icon"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path
-          fill-rule="evenodd"
-          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-          clip-rule="evenodd"
-        />
-      </svg>
-      <svg
-        v-else
+        aria-hidden="true" :stroke-width="1" />
+      <Icon name="shieldSolid" size="none" v-else
         class="aliyun-captcha-icon"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path
-          fill-rule="evenodd"
-          d="M9.661 2.237a.531.531 0 01.678 0 11.947 11.947 0 007.078 2.749.5.5 0 01.479.425c.069.52.104 1.05.104 1.59 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 01-.332 0C5.26 16.564 2 12.163 2 7c0-.538.035-1.069.104-1.589a.5.5 0 01.48-.425 11.947 11.947 0 007.077-2.75z"
-          clip-rule="evenodd"
-        />
-      </svg>
+        aria-hidden="true" :stroke-width="1" />
       <span>{{ buttonText }}</span>
     </button>
     <div :id="elementId"></div>
@@ -40,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import Icon from '@/components/icons/Icon.vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 

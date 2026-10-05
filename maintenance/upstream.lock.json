@@ -9,5 +9,12 @@
   "latest_observed_release_commit": "15bd8d12dc81f6d104dcc8c830ef7ad1b95d1200",
   "latest_observed_main_commit": "705e996f6e71d9f8d8eada8bde762e4cc76e4578",
   "sync_policy": "review-diff-then-squash",
+  "deferred_changes": [
+    {
+      "feature": "grok-moderation-refusal-billing",
+      "upstream_commits": ["8d487b465", "f0d3865f3", "8262ca158"],
+      "reason": "Refusal billing is attached to GatewayHandler, but normal Grok traffic uses OpenAIGatewayHandler. Preserve prior billing until the actual path and settlement are covered by endpoint tests."
+    }
+  ],
   "deployment_repository": "loLollipop/Sub2api"
 }

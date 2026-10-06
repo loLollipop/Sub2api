@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount, RouterLinkStub } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount, RouterLinkStub, type VueWrapper } from '@vue/test-utils'
 
 import HomeView from '../HomeView.vue'
 
@@ -18,7 +18,7 @@ const { appStore, authStore } = vi.hoisted(() => ({
   authStore: {
     isAuthenticated: false,
     isAdmin: false,
-    user: null as { email?: string } | null,
+    user: null as { email?: string; username?: string; role?: string; avatar_url?: string } | null,
     checkAuth: vi.fn(),
   },
 }))
@@ -32,6 +32,12 @@ vi.mock('@/composables/useClipboard', async () => {
 vi.mock('@/stores', () => ({
   useAppStore: () => appStore,
   useAuthStore: () => authStore,
+  useOnboardingStore: () => ({ replay: vi.fn() }),
+}))
+
+vi.mock('vue-router', async (importOriginal) => ({
+  ...await importOriginal<typeof import('vue-router')>(),
+  useRouter: () => ({ push: vi.fn() }),
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -46,6 +52,9 @@ vi.mock('vue-i18n', async (importOriginal) => {
   }
 })
 
+const wrappers: VueWrapper[] = []
+afterEach(() => { wrappers.splice(0).forEach((wrapper) => wrapper.unmount()) })
+
 function mountHome(settings: Record<string, unknown> = {}) {
   appStore.cachedPublicSettings = {
     site_name: 'Test site',
@@ -53,7 +62,7 @@ function mountHome(settings: Record<string, unknown> = {}) {
     ...settings,
   }
 
-  return mount(HomeView, {
+  const wrapper = mount(HomeView, {
     global: {
       stubs: {
         RouterLink: RouterLinkStub,
@@ -62,6 +71,8 @@ function mountHome(settings: Record<string, unknown> = {}) {
       },
     },
   })
+  wrappers.push(wrapper)
+  return wrapper
 }
 
 function compactDestination(wrapper: ReturnType<typeof mountHome>) {
@@ -185,15 +196,21 @@ describe('HomeView compact mode', () => {
   ])('keeps the default CTA destination for authenticated=%s admin=%s', (authenticated, admin, path) => {
     authStore.isAuthenticated = authenticated as boolean
     authStore.isAdmin = admin as boolean
-    authStore.user = { email: '  lol@example.test' }
+    authStore.user = { email: 'lol@example.test', username: 'Lollipop', role: admin ? 'admin' : 'user' }
     const wrapper = mountHome()
 
     expect(wrapper.getComponent('[data-testid="home-primary-cta"]').props('to')).toBe(path)
-    const accountEntry = wrapper.getComponent('[data-testid="home-account-entry"]')
-    expect(accountEntry.props('to')).toBe(path)
-    expect(accountEntry.text()).toContain(authenticated ? 'home.dashboard' : 'home.login')
-    if (authenticated) expect(accountEntry.get('.landing-account-mark').text()).toBe('L')
-    else expect(accountEntry.find('.landing-account-mark').exists()).toBe(false)
+    if (authenticated) {
+      expect(wrapper.find('[data-testid="home-account-entry"]').exists()).toBe(false)
+      const accountMenu = wrapper.get('[data-testid="home-account-menu"]')
+      expect(accountMenu.get('.header-avatar').text()).toBe('LO')
+      expect(accountMenu.get('.header-identity').text()).toContain('Lollipop')
+      expect(accountMenu.get('.header-identity').text()).toContain(`admin.users.roles.${admin ? 'admin' : 'user'}`)
+      expect(wrapper.findAllComponents(RouterLinkStub).filter((link) => link.props('to') === path)).toHaveLength(1)
+    } else {
+      expect(wrapper.getComponent('[data-testid="home-account-entry"]').props('to')).toBe('/login')
+      expect(wrapper.find('[data-testid="home-account-menu"]').exists()).toBe(false)
+    }
   })
 
   it('switches the API example format without making an API request', async () => {
@@ -273,11 +290,18 @@ describe('HomeView compact mode', () => {
     expect(unsafe.find('a[href^="javascript:"]').exists()).toBe(false)
   })
 
-  it('keeps an authenticated account entry without an email initial', () => {
+  it('uses the shared account menu for a user without an email', async () => {
     authStore.isAuthenticated = true
+    authStore.user = { username: 'Lollipop', role: 'admin', avatar_url: '/avatar.png' }
     const wrapper = mountHome()
-    expect(wrapper.getComponent('[data-testid="home-account-entry"]').props('to')).toBe('/dashboard')
-    expect(wrapper.find('.landing-account-mark').exists()).toBe(false)
+    expect(wrapper.get('.header-avatar img').attributes('src')).toBe('/avatar.png')
+    const trigger = wrapper.get('.header-user-button')
+    await trigger.trigger('click')
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.get('.dropdown').text()).toContain('nav.profile')
+    expect(wrapper.get('.dropdown').text()).not.toContain('onboarding.restartTour')
+    await trigger.trigger('keydown', { key: 'Escape' })
+    expect(trigger.attributes('aria-expanded')).toBe('false')
   })
 
   it('exposes legal policy links in compact and default footers', () => {

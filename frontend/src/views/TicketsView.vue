@@ -55,7 +55,10 @@
         </aside>
 
         <section class="tickets-detail" :aria-label="t('tickets.selectDetail')" :aria-busy="detailLoading">
-          <div v-if="!selectedID" class="tickets-welcome"><Icon name="chat" size="xl" /><h2>{{ t('tickets.selectTicket') }}</h2></div>
+          <div v-if="!selectedID" class="tickets-welcome">
+            <span class="tickets-welcome-icon" aria-hidden="true"><Icon name="chat" size="xl" /></span>
+            <h2>{{ t('tickets.selectTicket') }}</h2>
+          </div>
           <div v-else-if="detailLoading" class="tickets-empty" role="status"><Icon name="refresh" size="lg" class="animate-spin" /><p>{{ t('tickets.loading') }}</p></div>
           <div v-else-if="!detail" class="tickets-empty" role="alert"><Icon name="exclamationCircle" size="lg" /><p>{{ detailError || t('tickets.loadFailed') }}</p><button class="ticket-text-button" @click="refresh(true)">{{ t('tickets.retry') }}</button><button class="ticket-text-button" @click="back">{{ t('tickets.back') }}</button></div>
           <template v-else>

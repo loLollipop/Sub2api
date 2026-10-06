@@ -30,6 +30,9 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/modelPlaza/__tests__/PlazaFilterBar.spec.ts \
 	src/components/layout/__tests__/ConsoleNavigationSearch.spec.ts \
 	src/components/layout/__tests__/AppSidebar.spec.ts \
+	src/components/layout/__tests__/AccountMenu.spec.ts \
+	src/views/__tests__/HomeView.compact.spec.ts \
+	src/views/__tests__/TicketsView.stats.spec.ts \
 	src/components/common/__tests__/ConsoleTabs.spec.ts \
 	src/components/common/__tests__/DataTable.spec.ts \
 	src/components/payment/__tests__/AmountInput.spec.ts \

@@ -117,8 +117,8 @@ const codeTokens = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 57px;
-  padding: 12px 23px;
+  min-height: 48px;
+  padding: 10px 22px;
   border-bottom: 1px solid var(--home-line);
   background: var(--home-code-bg);
 }
@@ -130,14 +130,14 @@ const codeTokens = computed(() => {
 .api-preview__window-title > span { padding-inline: 3px; }
 .api-preview__language { flex-shrink: 0; border: 1px solid var(--home-line); border-radius: 6px; padding: 4px 8px; color: var(--home-muted); background: var(--home-panel); font: 600 10px/1.3 ui-monospace, monospace; }
 .api-preview__editor { min-width: 0; }
-.api-preview__toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 18px 22px 0; }
+.api-preview__toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px 0; }
 .api-preview__protocols { display: flex; flex-wrap: wrap; gap: 4px; }
 .api-preview__protocols button { min-height: 36px; padding: 7px 12px; border: 1px solid transparent; border-radius: 7px; color: var(--home-muted); font-size: 11px; font-weight: 550; transition: color 150ms, background 150ms; }
 .api-preview__protocols button.is-active { background: var(--home-accent-soft); color: var(--home-accent); }
 .api-preview__protocols button:hover { color: var(--home-accent); }
 .api-preview__copy { display: flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px; border-radius: 6px; color: var(--home-muted); font-size: 11px; }
 .api-preview__copy:hover { background: var(--home-code-bg); color: var(--home-ink); }
-.api-preview__code { height: 290px; max-width: 100%; overflow: auto; margin: 0; padding: 24px 27px 28px; color: var(--home-ink); font: 13px/1.85 'Cascadia Code', 'SFMono-Regular', Consolas, monospace; tab-size: 2; }
+.api-preview__code { min-height: 280px; max-width: 100%; overflow-x: auto; margin: 0; padding: 20px 22px; color: var(--home-ink); font: 12px/1.65 'Cascadia Code', 'SFMono-Regular', Consolas, monospace; tab-size: 2; }
 .syntax-command, .syntax-literal { color: var(--syntax-command); font-weight: 600; }
 .syntax-url { color: var(--syntax-url); }
 .syntax-key { color: var(--syntax-key); }
@@ -146,7 +146,7 @@ const codeTokens = computed(() => {
 .syntax-option { color: var(--home-muted); }
 .api-preview__cursor { display: inline-block; width: 7px; height: 1.15em; margin-left: 6px; vertical-align: -0.15em; background: var(--home-accent); animation: home-cursor-blink 1.2s steps(1, end) infinite; }
 @keyframes home-cursor-blink { 0%, 55%, 100% { opacity: 1; } 56%, 99% { opacity: 0; } }
-.api-preview__editor-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 13px 24px; border-top: 1px solid var(--home-line); color: var(--home-muted); font-size: 10px; }
+.api-preview__editor-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 11px 22px; border-top: 1px solid var(--home-line); color: var(--home-muted); font-size: 10px; }
 .api-preview__editor-footer > span:first-child { display: flex; align-items: center; gap: 7px; }
 .api-preview__method { font: 600 10px/1.7 ui-monospace, monospace; letter-spacing: 0.06em; }
 .api-preview :is(button, pre):focus-visible { outline: 2px solid var(--home-accent); outline-offset: 3px; }
@@ -158,6 +158,15 @@ const codeTokens = computed(() => {
   .api-preview__code { padding-inline: 20px; font-size: 11px; }
   .api-preview__toolbar { padding-inline: 14px; }
   .api-preview__editor-footer { padding-inline: 20px; }
+}
+@media (min-width: 761px) and (max-height: 800px) {
+  .api-preview__code { min-height: 264px; padding-block: 16px; line-height: 1.6; }
+}
+@media (min-width: 761px) and (max-height: 700px) {
+  .api-preview__header { min-height: 40px; padding-block: 8px; }
+  .api-preview__toolbar { padding-top: 8px; }
+  .api-preview__code { min-height: 240px; padding-block: 12px; line-height: 1.5; }
+  .api-preview__editor-footer { padding-block: 7px; }
 }
 @media (prefers-reduced-motion: reduce) { .api-preview * { transition: none !important; } .api-preview__cursor { animation: none; opacity: 1; } }
 </style>

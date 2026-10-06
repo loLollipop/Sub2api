@@ -96,7 +96,6 @@
     :github-url="githubUrl"
     :is-dark="isDark"
     :is-authenticated="isAuthenticated"
-    :user-initial="userInitial"
     :dashboard-path="dashboardPath"
     @toggle-theme="toggleTheme"
   />
@@ -141,7 +140,6 @@ const githubUrl = 'https://github.com/loLollipop/Sub2api'
 
 // Auth state
 const isAuthenticated = computed(() => authStore.isAuthenticated)
-const userInitial = computed(() => Array.from(authStore.user?.email?.trim() || '')[0]?.toUpperCase() || '')
 const isAdmin = computed(() => authStore.isAdmin)
 const dashboardPath = computed(() => isAdmin.value ? '/admin/dashboard' : '/dashboard')
 

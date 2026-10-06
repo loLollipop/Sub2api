@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount, type VueWrapper } from '@vue/test-utils'
 import { ref } from 'vue'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import postcss from 'postcss'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import TicketsView from '../TicketsView.vue'
 import type { TicketDetail } from '@/api/tickets'
@@ -47,14 +50,14 @@ function detailFixture(requester: Partial<Requester> = {}): TicketDetail {
   }
 }
 
-async function mountDetail(detail: TicketDetail, admin = true) {
+async function mountDetail(detail: TicketDetail, admin = true, selectInitially = true) {
   mocks.list.mockResolvedValue({ items: [detail.ticket], total: 1, page: 1, page_size: 20 })
   mocks.detail.mockResolvedValue(detail)
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/:scope(admin/)?tickets/:id?', component: { template: '<div />' } }],
   })
-  await router.push(admin ? '/admin/tickets/1' : '/tickets/1')
+  await router.push(`${admin ? '/admin/tickets' : '/tickets'}${selectInitially ? '/1' : ''}`)
   await router.isReady()
   wrapper = shallowMount(TicketsView, {
     props: { admin },
@@ -70,7 +73,7 @@ async function mountDetail(detail: TicketDetail, admin = true) {
     },
   })
   await flushPromises()
-  expect(wrapper.get('.ticket-detail-title h2').text()).toBe('Statistics test')
+  if (selectInitially) expect(wrapper.get('.ticket-detail-title h2').text()).toBe('Statistics test')
   return wrapper
 }
 
@@ -99,6 +102,33 @@ afterEach(() => {
   wrapper?.unmount()
   wrapper = undefined
   vi.useRealTimers()
+})
+
+describe('TicketsView detail panel empty state', () => {
+  it.each([true, false])('keeps the empty panel until a ticket is selected (admin=%s)', async (admin) => {
+    await mountDetail(detailFixture(), admin, false)
+    const panel = wrapper!.get('.tickets-detail > .tickets-welcome')
+    expect(panel.get('h2').text()).toBe('tickets.selectTicket')
+    expect(panel.get('.tickets-welcome-icon').attributes('aria-hidden')).toBe('true')
+    expect(wrapper!.find('.ticket-detail-header').exists()).toBe(false)
+    expect(mocks.detail).not.toHaveBeenCalled()
+    await wrapper!.get('.ticket-list-item').trigger('click')
+    await flushPromises()
+    expect(wrapper!.find('.tickets-welcome').exists()).toBe(false)
+    expect(wrapper!.get('.ticket-detail-title h2').text()).toBe('Statistics test')
+  })
+
+  it('uses the detail header surface for empty, loading and error states without recoloring conversations', () => {
+    const stylesheet = postcss.parse(readFileSync(resolve(process.cwd(), 'src/styles/tickets.css'), 'utf8'))
+    const backgrounds: string[] = []
+    stylesheet.walkRules('.tickets-detail > :is(.tickets-welcome, .tickets-empty)', (rule) => {
+      rule.walkDecls('background', (declaration) => { backgrounds.push(declaration.value) })
+    })
+    expect(backgrounds).toEqual(['var(--signal-surface)'])
+    stylesheet.walkRules('.tickets-detail', (rule) => {
+      expect(rule.nodes.some((node) => node.type === 'decl' && node.prop === 'background')).toBe(false)
+    })
+  })
 })
 
 describe('TicketsView requester statistics availability', () => {

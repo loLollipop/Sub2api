@@ -106,7 +106,11 @@
       <div class="h-48 w-48 shrink-0">
         <Doughnut :data="chartData" :options="doughnutOptions" />
       </div>
-      <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
+      <div
+        class="distribution-scroll max-h-48 w-full min-w-0 flex-1 overflow-auto"
+        :class="{ 'is-scrolling': scrollbarVisible }"
+        @scroll.passive="showScrollbar"
+      >
         <table class="w-full text-xs">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
@@ -186,7 +190,11 @@
       <div class="h-48 w-48 shrink-0">
         <Doughnut :data="rankingChartData" :options="rankingDoughnutOptions" />
       </div>
-      <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
+      <div
+        class="distribution-scroll max-h-48 w-full min-w-0 flex-1 overflow-auto"
+        :class="{ 'is-scrolling': scrollbarVisible }"
+        @scroll.passive="showScrollbar"
+      >
         <table class="w-full text-xs">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
@@ -244,7 +252,7 @@
 
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'vue-chartjs'
@@ -340,6 +348,23 @@ const enableRankingView = computed(() => props.enableRankingView)
 const showAccountCost = computed(() => props.showAccountCost)
 const distributionColspan = computed(() => showAccountCost.value ? 6 : 5)
 const activeView = ref<'model_distribution' | 'spending_ranking'>('model_distribution')
+const scrollbarVisible = ref(false)
+let scrollbarTimeout: ReturnType<typeof setTimeout> | undefined
+
+const hideScrollbar = () => {
+  clearTimeout(scrollbarTimeout)
+  scrollbarTimeout = undefined
+  scrollbarVisible.value = false
+}
+
+const showScrollbar = () => {
+  clearTimeout(scrollbarTimeout)
+  scrollbarVisible.value = true
+  scrollbarTimeout = setTimeout(hideScrollbar, 800)
+}
+
+watch(activeView, hideScrollbar)
+onBeforeUnmount(hideScrollbar)
 
 const chartColors = [
   '#3b82f6',
@@ -527,3 +552,43 @@ const formatCost = (value: number | null | undefined): string => {
   return safeValue.toFixed(4)
 }
 </script>
+
+<style scoped>
+.distribution-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 180ms ease;
+}
+
+.distribution-scroll.is-scrolling {
+  scrollbar-color: rgb(148 163 184 / 55%) transparent;
+}
+
+.distribution-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.distribution-scroll::-webkit-scrollbar-track,
+.distribution-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.distribution-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color 180ms ease;
+}
+
+.distribution-scroll.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgb(148 163 184 / 55%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .distribution-scroll,
+  .distribution-scroll::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}
+</style>

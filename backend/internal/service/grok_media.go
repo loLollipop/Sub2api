@@ -1145,8 +1145,15 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 		}
 	}
 
+	// Keep the configured relay's existing initial URL policy; the isolated
+	// downloader validates and pins every CDN hop and removes relay credentials
+	// after the first origin change.
+	contentCtx := upstreamCtx
+	if signedContent {
+		contentCtx = WithHTTPUpstreamPublicHostsOnly(contentCtx)
+	}
 	contentReq, err := http.NewRequestWithContext(
-		WithHTTPUpstreamRedirectsDisabled(upstreamCtx),
+		contentCtx,
 		http.MethodGet,
 		contentURL,
 		nil,
@@ -1161,6 +1168,7 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 			contentReq.Header.Set("Range", rangeHeader)
 		}
 	}
+	contentReq = contentReq.WithContext(WithHTTPUpstreamContentDownload(contentReq.Context(), !signedContent, contentReq.Header))
 	if !signedContent {
 		contentReq.Header.Set("Authorization", "Bearer "+token)
 		if account.IsGrokOAuth() && isGrokCLIProxyTarget(contentURL) {
@@ -1176,8 +1184,11 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 	}
 	defer func() { _ = contentResp.Body.Close() }()
 	contentRequestID := firstNonEmpty(contentResp.Header.Get("x-request-id"), contentResp.Header.Get("xai-request-id"), statusRequestID)
+	// A 3xx still visible here means the redirect was refused or the chain ended
+	// without reaching content; surface it as an upstream error instead of a
+	// generic failure so the cause is diagnosable.
 	if contentResp.StatusCode >= 300 && contentResp.StatusCode < 400 {
-		return nil, fmt.Errorf("grok media signed content redirect is not allowed")
+		return nil, fmt.Errorf("grok media content redirect was not followed (status %d)", contentResp.StatusCode)
 	}
 	if contentResp.StatusCode >= 400 && contentResp.StatusCode != http.StatusRequestedRangeNotSatisfiable {
 		return s.handleGrokMediaErrorResponse(ctx, contentResp, c, account, contentRequestID, "")

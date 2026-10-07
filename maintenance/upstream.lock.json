@@ -2,12 +2,12 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.0.59",
-  "imported_commit": "d40387ff6346c8f7073d28aff94d8374632df56e",
+  "imported_version": "2.0.61",
+  "imported_commit": "1b464c0da7ca27cbc7f5435dd812aa691fcf7195",
   "personal_baseline_commit": "b1c9de686ae9b9da61a02ba59fb7e3c8524644ec",
-  "latest_observed_version": "2.0.59",
-  "latest_observed_release_commit": "a752630947df9affbe312a868e9d6f7d6054c724",
-  "latest_observed_main_commit": "d40387ff6346c8f7073d28aff94d8374632df56e",
+  "latest_observed_version": "2.0.61",
+  "latest_observed_release_commit": "7051d4594f145ea5bf821d4f28371c01878d7cb9",
+  "latest_observed_main_commit": "1b464c0da7ca27cbc7f5435dd812aa691fcf7195",
   "sync_policy": "review-diff-then-squash",
   "deferred_changes": [
     {

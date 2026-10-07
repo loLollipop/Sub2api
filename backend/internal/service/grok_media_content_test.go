@@ -217,7 +217,13 @@ func TestForwardGrokMediaContentFetchesValidatedSignedURLWithoutCredentials(t *t
 	require.Empty(t, upstream.requests[1].Header.Get("Authorization"))
 	require.Empty(t, upstream.requests[1].Header.Get("User-Agent"))
 	require.Equal(t, "bytes=0-12", upstream.requests[1].Header.Get("Range"))
-	require.True(t, HTTPUpstreamRedirectsDisabled(upstream.requests[1].Context()))
+	// content 请求改为允许跟随上游重定向（第三方中转用 302 跳 CDN），
+	// 但仍逐跳校验落点是否为公网地址。
+	require.True(t, HTTPUpstreamPublicHostsOnly(upstream.requests[1].Context()))
+	require.False(t, HTTPUpstreamRedirectsDisabled(upstream.requests[1].Context()))
+	policy, isolated := HTTPUpstreamContentDownloadFromContext(upstream.requests[1].Context())
+	require.True(t, isolated)
+	require.False(t, policy.InitialRelay)
 }
 
 func TestForwardGrokMediaContentFollowsAuthenticatedSub2APIRelay(t *testing.T) {
@@ -272,6 +278,59 @@ func TestForwardGrokMediaContentRejectsUntrustedSignedURL(t *testing.T) {
 	require.Len(t, upstream.requests, 1)
 }
 
+// The content downloader distinguishes the configured relay from CDN hops.
+func TestForwardGrokMediaContentAllowsUpstreamRedirects(t *testing.T) {
+	upstream := &grokMediaContentUpstreamStub{
+		responses: []*http.Response{grokMediaContentStatusResponse(`{"status":"completed"}`), {
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"video/mp4"}},
+			Body:       io.NopCloser(strings.NewReader("video-payload")),
+		}},
+	}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	c, recorder := grokMediaContentTestContext(http.MethodGet, "https://api.example/v1/videos/task-1/content", nil)
+
+	result, err := svc.ForwardGrokMedia(
+		context.Background(), c, grokMediaContentTestAccount(),
+		GrokMediaEndpointVideoContent, "task-1", nil, "",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, "video-payload", recorder.Body.String())
+	require.Len(t, upstream.requests, 2)
+
+	contentReq := upstream.requests[1]
+	policy, isolated := HTTPUpstreamContentDownloadFromContext(contentReq.Context())
+	require.True(t, isolated, "content lookup must use the isolated downloader")
+	require.True(t, policy.InitialRelay, "the configured relay keeps the initial URL policy")
+	require.False(t, HTTPUpstreamPublicHostsOnly(contentReq.Context()))
+	require.False(t, HTTPUpstreamRedirectsDisabled(contentReq.Context()),
+		"content lookup must not blanket-reject 3xx responses")
+}
+
+func TestForwardGrokMediaContentCapturesDownloadHeadersBeforeOverrides(t *testing.T) {
+	upstream := &grokMediaContentUpstreamStub{responses: []*http.Response{
+		grokMediaContentStatusResponse(`{"status":"completed"}`),
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"video/mp4"}}, Body: io.NopCloser(strings.NewReader("video"))},
+	}}
+	account := grokMediaContentTestAccount()
+	account.Credentials[credKeyHeaderOverrideEnabled] = true
+	account.Credentials[credKeyHeaderOverrides] = map[string]any{"accept": "private-accept", "range": "private-range", "x-relay-token": "relay-secret"}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	c, recorder := grokMediaContentTestContext(http.MethodGet, "https://api.example/v1/videos/task-1/content", map[string]string{"Range": "bytes=0-3"})
+	_, err := svc.ForwardGrokMedia(context.Background(), c, account, GrokMediaEndpointVideoContent, "task-1", nil, "")
+	require.NoError(t, err)
+	require.Equal(t, "video", recorder.Body.String())
+	require.Len(t, upstream.requests, 2)
+	request := upstream.requests[1]
+	require.Equal(t, "relay-secret", getHeaderRaw(request.Header, "x-relay-token"))
+	require.Equal(t, "private-accept", getHeaderRaw(request.Header, "accept"))
+	require.Equal(t, "private-range", getHeaderRaw(request.Header, "range"))
+	policy, isolated := HTTPUpstreamContentDownloadFromContext(request.Context())
+	require.True(t, isolated)
+	require.Equal(t, http.Header{"Accept": {"*/*"}, "Range": {"bytes=0-3"}}, policy.Headers)
+}
 func TestGrokMediaSignedVideoContentURLRejectsDeceptiveOrigins(t *testing.T) {
 	for _, rawURL := range []string{
 		"https://vidgen.x.ai.attacker.invalid/video.mp4",

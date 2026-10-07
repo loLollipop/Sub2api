@@ -1,6 +1,9 @@
 package service
 
-import "context"
+import (
+	"context"
+	"net/http"
+)
 
 // HTTPUpstreamProfile marks HTTP upstream requests that need provider-specific
 // transport policy.
@@ -18,6 +21,41 @@ const (
 type httpUpstreamProfileContextKey struct{}
 type httpUpstreamDisableRedirectsContextKey struct{}
 type httpUpstreamPublicHostsOnlyContextKey struct{}
+type httpUpstreamContentDownloadContextKey struct{}
+
+// HTTPUpstreamContentDownloadPolicy selects the isolated content downloader.
+// InitialRelay applies the existing operator-configured URL policy to the first
+// request only. Redirects and signed CDN URLs always require public addresses.
+type HTTPUpstreamContentDownloadPolicy struct {
+	InitialRelay bool
+	Headers      http.Header
+}
+
+// WithHTTPUpstreamContentDownload captures download headers before account
+// overrides. Only these explicit headers may survive an origin change.
+func WithHTTPUpstreamContentDownload(ctx context.Context, initialRelay bool, headers http.Header) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	safeHeaders := make(http.Header)
+	for _, name := range []string{"Accept", "Range"} {
+		if values := headers.Values(name); len(values) > 0 {
+			safeHeaders[name] = append([]string(nil), values...)
+		}
+	}
+	return context.WithValue(ctx, httpUpstreamContentDownloadContextKey{}, HTTPUpstreamContentDownloadPolicy{
+		InitialRelay: initialRelay, Headers: safeHeaders,
+	})
+}
+
+func HTTPUpstreamContentDownloadFromContext(ctx context.Context) (HTTPUpstreamContentDownloadPolicy, bool) {
+	if ctx == nil {
+		return HTTPUpstreamContentDownloadPolicy{}, false
+	}
+	policy, ok := ctx.Value(httpUpstreamContentDownloadContextKey{}).(HTTPUpstreamContentDownloadPolicy)
+	policy.Headers = policy.Headers.Clone()
+	return policy, ok
+}
 
 // WithHTTPUpstreamProfile injects an upstream transport profile into ctx.
 func WithHTTPUpstreamProfile(ctx context.Context, profile HTTPUpstreamProfile) context.Context {

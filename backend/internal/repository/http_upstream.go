@@ -214,8 +214,15 @@ func captureUpstreamHeadersForOps(req *http.Request, resp *http.Response) {
 //   - inFlight > 0 的客户端不会被淘汰，确保活跃请求不被中断
 func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
 	applyGrokCLIProxyHeaders(req)
-	if err := s.validateRequestHost(req); err != nil {
-		return nil, err
+	var contentPolicy service.HTTPUpstreamContentDownloadPolicy
+	var contentDownload bool
+	if req != nil {
+		contentPolicy, contentDownload = service.HTTPUpstreamContentDownloadFromContext(req.Context())
+	}
+	if !contentDownload {
+		if err := s.validateRequestHost(req); err != nil {
+			return nil, err
+		}
 	}
 	profile := service.HTTPUpstreamProfileDefault
 	if req != nil {
@@ -233,8 +240,22 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	}
 
 	// 执行请求
-	client := s.httpClientForUpstreamRequest(entry.client, req)
-	client = httpClientWithGrokAccessDeniedFallback(client)
+	var client *http.Client
+	if contentDownload {
+		allowPrivateInitial := contentPolicy.InitialRelay && !s.shouldValidateResolvedIP() && !service.HTTPUpstreamPublicHostsOnly(req.Context())
+		client, err = newContentDownloadClient(entry.client, proxyURL, defaultPoolSettings(s.cfg), allowPrivateInitial, contentPolicy.Headers, defaultContentDownloadNetwork())
+		if err != nil {
+			atomic.AddInt64(&entry.inFlight, -1)
+			atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+			return nil, err
+		}
+		if service.HTTPUpstreamRedirectsDisabled(req.Context()) {
+			client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		}
+	} else {
+		client = s.httpClientForUpstreamRequest(entry.client, req)
+		client = httpClientWithGrokAccessDeniedFallback(client)
+	}
 	resp, err := servertiming.Do(client, req)
 	captureUpstreamHeadersForOps(req, resp)
 	if err != nil {
@@ -265,6 +286,11 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
 	if profile == nil {
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
+	}
+	if req != nil {
+		if _, contentDownload := service.HTTPUpstreamContentDownloadFromContext(req.Context()); contentDownload {
+			return s.Do(req, proxyURL, accountID, accountConcurrency)
+		}
 	}
 	// Plain HTTP has no TLS handshake to fingerprint. Reuse the normal transport
 	// so a configured HTTP or SOCKS proxy is not bypassed.

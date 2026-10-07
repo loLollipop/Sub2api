@@ -106,7 +106,9 @@ func TestCreateShadowFromRepositoryInheritsPersistedOwner(t *testing.T) {
 				expectAccountOwnerRead(mock, shadow.ID, tc.owner)
 				readCtx := ctx
 				if tc.owner != nil {
-					readCtx = service.WithAccountOwnerScope(context.Background(), tc.owner.(int64), 7)
+					ownerID, ok := tc.owner.(int64)
+					require.True(t, ok, "test owner must be an int64")
+					readCtx = service.WithAccountOwnerScope(context.Background(), ownerID, 7)
 				}
 				got, readErr := repo.GetByID(readCtx, shadow.ID)
 				require.NoError(t, readErr)

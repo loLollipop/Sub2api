@@ -5,6 +5,7 @@
 - 账号池权限由邮箱切换为 `security.account_pool_owner_user_id` / `SECURITY_ACCOUNT_POOL_OWNER_USER_ID`。正整数指定的管理员可管理全池；其他管理员只能管理自己的账号。0 保留未配置部署的全池可见性。
 - 生产启动前必须从原邮箱配置解析同一 active 管理员 ID 并设置新变量。当前只有一个 active 管理员；不得以默认 0 短暂运行，也不靠邮箱继续授予权限。
 - 修复同步审查发现的 Spark 影子归属缺陷：影子继承经过权限校验的母账号上传者，legacy nil 归属不被仓储改写为创建者；母账号所有者修改代理能继续传播到影子。客户端没有上传者字段入口。
+- 最终独立审查进一步发现 Ent 实体未包含 `created_by`，原真实读取会丢失归属。仓储现在沿同一 Ent client/transaction 为结果集批量加载归属，覆盖单个、批量、列表和影子读取，避免 N+1。新增真实仓储与 AdminService 组合回归验证归属继承、写入与回读、越权拒绝、NULL 保留、失败关闭及单连接事务；不改写已有归属数据。
 - 修复上游 CI 的 6 项 lint 报错：分页 context 类型断言使用 comma-ok，拒绝异常类型/空 loader 导致 panic；Go 格式化；支付日期错误信息小写，并保留回归检查。未降低 lint 或测试标准。
 - 前端按三方差异同步 DTO、分页和输入约束，保留个人 SettingsView 模块/卡片；affiliate 分页回写在独立卡片控制器中实现。保留首页 compact 透明头部、共享 AccountMenu、主题工单面板、品牌字体、个人构建脚本及 source-map-js override。Vue 范围更新为 ^3.5.43。
 - 保留个人更新器校验和、Release 仓库限制、生产 `UPDATE_STRATEGY=disabled` 和 schema validate-only 策略。Grok moderation refusal fixed-charge 继续 deferred，两个 gateway handler 仅导入 duplicate model 校验。

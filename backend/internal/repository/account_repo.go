@@ -382,8 +382,9 @@ func (r *accountRepository) GetByID(ctx context.Context, id int64) (*service.Acc
 	if len(accounts) == 0 {
 		return nil, service.ErrAccountNotFound
 	}
-	if err := r.ensureAccountOwnerVisible(ctx, id); err != nil {
-		return nil, err
+	if adminID, fullPool, scoped := service.AccountOwnerScopeDetail(ctx); scoped &&
+		!service.AccountVisibleToOwner(accounts[0].CreatedBy, adminID, fullPool) {
+		return nil, service.ErrAccountNotFound
 	}
 	return &accounts[0], nil
 }
@@ -579,6 +580,10 @@ func (r *accountRepository) GetByIDs(ctx context.Context, ids []int64) ([]*servi
 	if err != nil {
 		return nil, err
 	}
+	ownersByAccount, err := r.loadAccountOwners(ctx, accountIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	outByID := make(map[int64]*service.Account, len(entAccounts))
 	for _, entAcc := range entAccounts {
@@ -586,6 +591,7 @@ func (r *accountRepository) GetByIDs(ctx context.Context, ids []int64) ([]*servi
 		if out == nil {
 			continue
 		}
+		out.CreatedBy = ownersByAccount[entAcc.ID]
 
 		// Prefer the preloaded proxy edge when available.
 		if entAcc.Edges.Proxy != nil {
@@ -3666,6 +3672,10 @@ func (r *accountRepository) accountsToService(ctx context.Context, accounts []*d
 	if err != nil {
 		return nil, err
 	}
+	ownersByAccount, err := r.loadAccountOwners(ctx, accountIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	outAccounts := make([]service.Account, 0, len(accounts))
 	for _, acc := range accounts {
@@ -3673,6 +3683,7 @@ func (r *accountRepository) accountsToService(ctx context.Context, accounts []*d
 		if out == nil {
 			continue
 		}
+		out.CreatedBy = ownersByAccount[acc.ID]
 		if acc.ProxyID != nil {
 			if proxy, ok := proxyMap[*acc.ProxyID]; ok {
 				out.Proxy = proxy
@@ -3698,6 +3709,37 @@ func (r *accountRepository) accountsToService(ctx context.Context, accounts []*d
 	}
 
 	return outAccounts, nil
+}
+
+// created_by is maintained by SQL migration rather than the generated Ent
+// schema. Load it once per result set, using the same client/transaction as the
+// account entities; the pool executor may deadlock or miss uncommitted rows.
+func (r *accountRepository) loadAccountOwners(ctx context.Context, accountIDs []int64) (map[int64]*int64, error) {
+	owners := make(map[int64]*int64)
+	accountIDs = uniquePositiveInt64s(accountIDs)
+	if len(accountIDs) == 0 {
+		return owners, nil
+	}
+	rows, err := r.client.QueryContext(ctx, "SELECT id, created_by FROM accounts WHERE id = ANY($1)", pq.Array(accountIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id int64
+		var owner sql.NullInt64
+		if err := rows.Scan(&id, &owner); err != nil {
+			return nil, err
+		}
+		if owner.Valid {
+			value := owner.Int64
+			owners[id] = &value
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return owners, nil
 }
 
 func tempUnschedulablePredicate() dbpredicate.Account {
@@ -4355,9 +4397,19 @@ func (r *accountRepository) ListShadowsByParent(ctx context.Context, parentID in
 	if err != nil {
 		return nil, err
 	}
+	accountIDs := make([]int64, 0, len(rows))
+	for _, m := range rows {
+		accountIDs = append(accountIDs, m.ID)
+	}
+	ownersByAccount, err := r.loadAccountOwners(ctx, accountIDs)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]*service.Account, 0, len(rows))
 	for _, m := range rows {
-		out = append(out, accountEntityToService(m))
+		account := accountEntityToService(m)
+		account.CreatedBy = ownersByAccount[m.ID]
+		out = append(out, account)
 	}
 	return out, nil
 }

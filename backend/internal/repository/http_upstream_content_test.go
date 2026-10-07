@@ -347,7 +347,8 @@ func TestContentDownloadPrivateInitialRelayPolicyAndLifecycle(t *testing.T) {
 			cfg := &config.Config{}
 			cfg.Security.URLAllowlist.Enabled = tc.enabled
 			cfg.Security.URLAllowlist.AllowPrivateHosts = tc.allowPrivate
-			upstream := NewHTTPUpstream(cfg).(*httpUpstreamService)
+			upstream, ok := NewHTTPUpstream(cfg).(*httpUpstreamService)
+			require.True(t, ok)
 			ctx := service.WithHTTPUpstreamContentDownload(t.Context(), tc.relay, http.Header{"Accept": {"*/*"}})
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/start", nil)
 			require.NoError(t, err)

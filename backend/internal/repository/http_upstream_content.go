@@ -80,7 +80,12 @@ func newContentDownloadClient(base *http.Client, proxyRaw string, settings poolS
 		if leftInitialOrigin {
 			// Go copies the INITIAL headers again for every hop. Replace the
 			// entire map every time, even if the chain returns to the relay.
-			req.Header = safeHeaders.Clone()
+			clear(req.Header)
+			for _, name := range []string{"Accept", "Range"} {
+				if values := safeHeaders.Values(name); len(values) > 0 {
+					req.Header[name] = append([]string(nil), values...)
+				}
+			}
 			req.Host = ""
 		}
 		return nil
@@ -196,9 +201,10 @@ func (n contentDownloadNetwork) dialDestination(ctx context.Context, network, de
 	proxyAddress := proxyURL.Host
 	if proxyURL.Port() == "" {
 		port := "80"
-		if proxyURL.Scheme == "https" {
+		switch proxyURL.Scheme {
+		case "https":
 			port = "443"
-		} else if proxyURL.Scheme == "socks5h" || proxyURL.Scheme == "socks5" {
+		case "socks5h", "socks5":
 			port = "1080"
 		}
 		proxyAddress = net.JoinHostPort(proxyURL.Hostname(), port)

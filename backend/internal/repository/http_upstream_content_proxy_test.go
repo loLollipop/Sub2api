@@ -18,8 +18,8 @@ import (
 )
 
 func contentTestBridge(a, b net.Conn, aReader io.Reader) {
-	defer a.Close()
-	defer b.Close()
+	defer func() { _ = a.Close() }()
+	defer func() { _ = b.Close() }()
 	go func() { _, _ = io.Copy(b, aReader); _ = b.Close() }()
 	_, _ = io.Copy(a, b)
 }
@@ -47,7 +47,13 @@ func TestContentDownloadHTTPConnectPinsDestinationAndKeepsProxy(t *testing.T) {
 					http.Error(w, "bad pinned address", http.StatusBadGateway)
 					return
 				}
-				conn, rw, err := w.(http.Hijacker).Hijack()
+				hijacker, ok := w.(http.Hijacker)
+				if !ok {
+					_ = destination.Close()
+					http.Error(w, "hijacking unsupported", http.StatusInternalServerError)
+					return
+				}
+				conn, rw, err := hijacker.Hijack()
 				if err != nil {
 					_ = destination.Close()
 					return
@@ -125,7 +131,7 @@ func TestContentDownloadSOCKSPinsDestinationAndKeepsProxy(t *testing.T) {
 					results <- err.Error()
 					return
 				}
-				defer conn.Close()
+				defer func() { _ = conn.Close() }()
 				_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 				head := make([]byte, 2)
 				if _, err := io.ReadFull(conn, head); err != nil {
@@ -314,7 +320,13 @@ func TestContentDownloadHTTPUpgradeThroughPinnedProxy(t *testing.T) {
 			http.Error(w, "destination failed", http.StatusBadGateway)
 			return
 		}
-		conn, rw, err := w.(http.Hijacker).Hijack()
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			_ = destination.Close()
+			http.Error(w, "hijacking unsupported", http.StatusInternalServerError)
+			return
+		}
+		conn, rw, err := hijacker.Hijack()
 		if err != nil {
 			_ = destination.Close()
 			return

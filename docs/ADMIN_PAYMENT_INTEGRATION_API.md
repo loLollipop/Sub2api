@@ -99,18 +99,12 @@ curl -X POST "${BASE}/api/v1/admin/users/123/balance" \
   }'
 ```
 
-### 4) 购买页 / 自定义页面 URL Query 透传（iframe / 新窗口一致）
-当 Sub2API 打开 `purchase_subscription_url` 或用户侧自定义页面 iframe URL 时，会统一追加：
-- `user_id`
-- `token`
-- `theme`（`light` / `dark`）
-- `lang`（例如 `zh` / `en`，用于向嵌入页传递当前界面语言）
-- `ui_mode`（固定 `embedded`）
+### 4) 外部小铺购买兑换码
+管理员在支付设置中为 10 / 20 / 30 / 50 / 100 元五个固定档位分别填写商品链接，并启用 `purchase_subscription_enabled`。外部购买独立于 `payment_enabled`，并优先于内置支付。每档使用自己的链接，没有自定义金额；商品价格和兑换码面额以对应小铺商品为准。
 
-示例：
-```text
-https://pay.example.com/pay?user_id=123&token=<jwt>&theme=light&lang=zh&ui_mode=embedded
-```
+配置字段 `purchase_subscription_products` 是 JSON 对象，键只能是字符串 `"10"`、`"20"`、`"30"`、`"50"`、`"100"`，值为该档位的完整 http(s) 商品 URL。后台提供五行独立输入及安全预览。链接不得包含用户名、密码、控制字符或反斜杠，长度不超过 2048 字节，主机和端口必须合法。空值视为未配置；禁用时可以保存空配置，启用时至少需要一个有效商品链接。部分更新省略此字段会保留现值，发送 `{}` 会清空配置。旧 `purchase_subscription_url` 仅保留兼容读取和存储，不作为档位链接的回退，也不会自动迁移。
+
+未配置档位不可选择。用户选择可用商品并点击“前往购买”后，新标签页原样打开该档位的链接，不附加金额、身份或会话参数。用户在小铺购买兑换码后返回 `/redeem` 兑换。无可用商品时提示联系管理员，已有码仍可兑换。
 
 ### 5) 失败处理建议
 - 支付成功与充值成功分状态落库
@@ -219,18 +213,12 @@ curl -X POST "${BASE}/api/v1/admin/users/123/balance" \
   }'
 ```
 
-### 4) Purchase / Custom Page URL query forwarding (iframe and new tab)
-When Sub2API opens `purchase_subscription_url` or a user-facing custom page iframe URL, it appends:
-- `user_id`
-- `token`
-- `theme` (`light` / `dark`)
-- `lang` (for example `zh` / `en`, used to pass the current UI language to the embedded page)
-- `ui_mode` (fixed: `embedded`)
+### 4) External shop redeem codes
+In payment settings, configure a separate product URL for each fixed CNY 10 / 20 / 30 / 50 / 100 tier and enable `purchase_subscription_enabled`. External purchases work independently of `payment_enabled` and take precedence over built-in payments. Each tier uses its own URL, with no custom amount; prices and code values are determined by the corresponding shop product.
 
-Example:
-```text
-https://pay.example.com/pay?user_id=123&token=<jwt>&theme=light&lang=zh&ui_mode=embedded
-```
+`purchase_subscription_products` is a JSON object with only the string keys `"10"`, `"20"`, `"30"`, `"50"`, and `"100"`. Values are absolute http(s) URLs for the corresponding products. The admin page provides five independent inputs with safe previews. URLs must have valid hosts and ports, no credentials, control characters or backslashes, and at most 2048 bytes. Blank values mean unconfigured. Disabled purchases may have an empty configuration; enabling requires at least one valid product URL. Omitting the field in a partial update preserves it; sending `{}` clears it. The legacy `purchase_subscription_url` remains readable and stored for compatibility, without tier fallback or automatic migration.
+
+Unconfigured tiers cannot be selected. Selecting an available product and clicking “Go to shop” opens that tier’s exact URL in a new tab without adding amount, identity or session parameters. Users buy a code in the shop and return to `/redeem`. When no products are available, users are directed to contact an administrator; existing codes can still be redeemed.
 
 ### 5) Failure handling recommendations
 - Persist payment success and recharge success as separate states

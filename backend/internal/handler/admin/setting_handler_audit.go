@@ -2,6 +2,7 @@ package admin
 
 import (
 	"log/slog"
+	"maps"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -433,6 +434,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.PurchaseSubscriptionEnabled != after.PurchaseSubscriptionEnabled {
 		changed = append(changed, "purchase_subscription_enabled")
+	}
+	if !maps.Equal(before.PurchaseSubscriptionProducts, after.PurchaseSubscriptionProducts) {
+		changed = append(changed, "purchase_subscription_products")
 	}
 	if before.PurchaseSubscriptionURL != after.PurchaseSubscriptionURL {
 		changed = append(changed, "purchase_subscription_url")

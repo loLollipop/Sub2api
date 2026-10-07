@@ -65,6 +65,12 @@ export default {
 
   // Recharge / Subscription Page
   purchase: {
+    goToShop: '前往购买',
+    referenceAmount: '商品金额（人民币）',
+    shopDescription: '选择 10 / 20 / 30 / 50 / 100 元商品，前往小铺购买兑换码，再返回系统兑换。实际商品和兑换码面额以小铺为准。',
+    redeemCode: '返回系统兑换',
+    tierNotConfigured: '未配置',
+    invalidShopUrl: '暂无可购买的商品，请联系管理员；如已有码，可直接返回系统兑换。',
     title: '充值中心',
     description: '使用站内余额充值或支付宝、微信等方式完成充值',
     openInNewTab: '新窗口打开',

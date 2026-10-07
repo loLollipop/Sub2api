@@ -13,6 +13,7 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { isPurchaseEnabled } from '@/utils/featureFlags'
 import { isChunkLoadError, recoverFromChunkLoadError } from '@/utils/chunkLoadError'
 
 /**
@@ -341,7 +342,7 @@ const routes: RouteRecordRaw[] = [
       title: 'Recharge Center',
       titleKey: 'nav.buySubscription',
       descriptionKey: 'purchase.description',
-      requiresPayment: true
+      requiresPurchase: true
     }
   },
   {
@@ -938,12 +939,17 @@ router.beforeEach(async (to, _from, next) => {
   // 公共设置可能尚未加载（App.vue 的 onMounted 异步拉取晚于首次导航，且纯静态部署
   // 无 __APP_CONFIG__ 注入）。此时 cachedPublicSettings 为空会把 payment/risk_control
   // 误判为“未启用”而错误拦截，故这里先确保设置加载完成。
-  if ((to.meta.requiresPayment || to.meta.requiresRiskControl) && !appStore.publicSettingsLoaded) {
+  if ((to.meta.requiresPurchase || to.meta.requiresPayment || to.meta.requiresRiskControl) && !appStore.publicSettingsLoaded) {
     try {
       await appStore.fetchPublicSettings()
     } catch (error) {
       console.warn('Failed to load public settings in route guard', error)
     }
+  }
+
+  if (to.meta.requiresPurchase && appStore.publicSettingsLoaded && !isPurchaseEnabled()) {
+    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+    return
   }
 
   // Only an explicit value from successfully loaded settings can disable a route.

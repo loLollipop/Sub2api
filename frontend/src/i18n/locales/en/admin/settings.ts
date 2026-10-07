@@ -673,15 +673,19 @@ export default {
         hideCcsImportButtonHint: 'When enabled, the "Import to CCS" button will be hidden on the API Keys page'
       },
       purchase: {
-        title: 'Recharge / Subscription Page',
-        description: 'Show a "Recharge / Subscription" entry in the sidebar and open the configured URL in an iframe',
-        enabled: 'Show Recharge / Subscription Entry',
-        enabledHint: 'Only shown in standard mode (not simple mode)',
-        url: 'Recharge / Subscription URL',
-        urlPlaceholder: 'https://example.com/purchase',
-        urlHint: 'Must be an absolute http(s) URL',
+        title: 'External shop redeem codes',
+        description: 'When enabled, recharge uses the external shop first. Users select a configured CNY 10 / 20 / 30 / 50 / 100 product, buy a redeem code in the shop, then return to redeem it.',
+        enabled: 'Enable external purchases',
+        enabledHint: 'Independent of built-in payments; shown in standard mode.',
+        url: 'Shop product URL',
+        tierUrl: 'CNY {amount} product URL',
+        preview: 'Preview product',
+        invalidUrl: 'Enter a valid http(s) product URL for CNY {amount}, without credentials.',
+        productsRequired: 'Configure at least one product URL before enabling external purchases.',
+        urlPlaceholder: 'https://example.com/item/product',
+        urlHint: 'Configure a separate absolute http(s) product URL for each tier, without a username or password. Blank tiers are unavailable. It opens unchanged in a new tab, without amount or user identity parameters.',
         iframeWarning:
-          '⚠️ iframe note: Some websites block embedding via X-Frame-Options or CSP (frame-ancestors). If the page is blank, provide an "Open in new tab" alternative.',
+          'External purchases open in a new tab. Products and code values are determined by the shop.',
         integrationDoc: 'Payment Integration Docs',
         integrationDocHint: 'Covers endpoint specs, idempotency semantics, and code samples'
       },

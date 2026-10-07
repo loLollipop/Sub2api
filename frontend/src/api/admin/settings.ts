@@ -653,6 +653,9 @@ export interface SystemSettings {
   web_search_emulation_enabled?: boolean;
 
   // Payment configuration
+  purchase_subscription_enabled: boolean;
+  purchase_subscription_url: string;
+  purchase_subscription_products: Record<string, string>;
   payment_enabled: boolean;
   payment_recharge_center_enabled?: boolean;
   risk_control_enabled: boolean;
@@ -974,6 +977,9 @@ export interface UpdateSettingsRequest {
   codex_cli_only_allow_app_server_clients?: boolean;
   codex_cli_only_engine_fingerprint_signals?: string;
   // Payment configuration
+  purchase_subscription_enabled?: boolean;
+  purchase_subscription_url?: string;
+  purchase_subscription_products?: Record<string, string>;
   payment_enabled?: boolean;
   payment_recharge_center_enabled?: boolean;
   risk_control_enabled?: boolean;

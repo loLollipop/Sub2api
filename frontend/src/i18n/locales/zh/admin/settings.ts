@@ -668,15 +668,19 @@ export default {
         hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮'
       },
       purchase: {
-        title: '充值/订阅页面',
-        description: '在侧边栏展示“充值/订阅”入口，并在页面内通过 iframe 打开指定链接',
-        enabled: '显示充值/订阅入口',
-        enabledHint: '仅在标准模式（非简单模式）下展示',
-        url: '充值/订阅页面 URL',
-        urlPlaceholder: 'https://example.com/purchase',
-        urlHint: '必须是完整的 http(s) 链接',
+        title: '外部小铺购买兑换码',
+        description: '开启后，充值页优先使用外部购买模式。用户选择已配置的 10 / 20 / 30 / 50 / 100 元商品，前往小铺购买兑换码，再返回系统兑换。',
+        enabled: '启用外部购买',
+        enabledHint: '独立于内置支付开关，仅在标准模式下展示。',
+        url: '小铺商品链接',
+        tierUrl: '{amount} 元商品链接',
+        preview: '预览商品',
+        invalidUrl: '请为 {amount} 元档位填写有效的 http(s) 商品链接，不能包含用户名或密码。',
+        productsRequired: '开启外部购买前，请至少配置一个档位的商品链接。',
+        urlPlaceholder: 'https://example.com/item/product',
+        urlHint: '为每个档位分别填写完整的 http(s) 商品链接，不含用户名或密码；留空的档位不可购买。链接原样在新标签页打开，不附加金额或用户身份信息。',
         iframeWarning:
-          '⚠️ iframe 提示：部分网站会通过 X-Frame-Options 或 CSP（frame-ancestors）禁止被 iframe 嵌入，出现空白时可引导用户使用”新窗口打开”。',
+          '外部购买通过新标签页打开，商品与兑换码面额以小铺为准。',
         integrationDoc: '支付集成文档',
         integrationDocHint: '包含接口说明、幂等语义及示例代码'
       },

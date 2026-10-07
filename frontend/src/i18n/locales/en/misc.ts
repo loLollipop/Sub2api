@@ -67,6 +67,12 @@ export default {
 
   // Recharge / Subscription Page
   purchase: {
+    goToShop: 'Go to shop',
+    referenceAmount: 'Product amount (CNY)',
+    shopDescription: 'Select a CNY 10 / 20 / 30 / 50 / 100 product, buy a redeem code in the shop, then return here to redeem it. Products and code values are determined by the shop.',
+    redeemCode: 'Redeem a code',
+    tierNotConfigured: 'Not configured',
+    invalidShopUrl: 'No shop products are available. Please contact an administrator, or redeem a code you already have.',
     title: 'Recharge Center',
     description: 'Top up your balance with the built-in balance payment or Alipay/WeChat center',
     openInNewTab: 'Open in new tab',

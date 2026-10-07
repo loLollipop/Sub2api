@@ -3,6 +3,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
+import ExternalShopRecharge from '@/components/payment/ExternalShopRecharge.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import ConsoleTabs from '@/components/common/ConsoleTabs.vue'
@@ -14,6 +15,27 @@ const routeState = vi.hoisted(() => ({
   path: '/purchase',
   query: {} as Record<string, unknown>,
 }))
+
+const publicSettingsState = vi.hoisted(() => ({
+  publicSettingsLoaded: true,
+  cachedPublicSettings: {
+    payment_enabled: true,
+    purchase_subscription_enabled: false,
+    purchase_subscription_url: '',
+    purchase_subscription_products: {} as Record<string, string>,
+    custom_menu_items: [{ id: '322273f5aaa4d036', url: 'https://payment.example.test/recharge' }],
+  },
+  fetchPublicSettings: vi.fn(),
+}))
+
+beforeEach(() => {
+  publicSettingsState.publicSettingsLoaded = true
+  publicSettingsState.cachedPublicSettings.payment_enabled = true
+  publicSettingsState.cachedPublicSettings.purchase_subscription_enabled = false
+  publicSettingsState.cachedPublicSettings.purchase_subscription_url = ''
+  publicSettingsState.cachedPublicSettings.purchase_subscription_products = {}
+  publicSettingsState.fetchPublicSettings.mockReset()
+})
 
 const routerReplace = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
@@ -81,7 +103,7 @@ vi.mock('@/stores', async () => {
       showError,
       showInfo,
       showWarning,
-      cachedPublicSettings: { custom_menu_items: [{ id: '322273f5aaa4d036', url: 'https://payment.example.test/recharge' }] },
+      ...publicSettingsState,
     }),
   }
 })
@@ -1135,5 +1157,96 @@ describe('PaymentView instance recharge terms', () => {
     expect(text).toContain('payment.fee')
     expect(text).toContain(formatPaymentAmount(2.5, 'CNY'))
     expect(text).toContain(formatPaymentAmount(102.5, 'CNY'))
+  })
+})
+
+
+describe('PaymentView external shop initialization', () => {
+  beforeEach(() => {
+    vi.useRealTimers()
+    routeState.query = { tab: 'subscription', wechat_resume_token: 'legacy-token' }
+    getCheckoutInfo.mockReset()
+    createOrder.mockReset()
+    refreshUser.mockReset()
+    fetchActiveSubscriptions.mockClear()
+    routerReplace.mockReset()
+    publicSettingsState.cachedPublicSettings.payment_enabled = false
+    publicSettingsState.cachedPublicSettings.purchase_subscription_enabled = true
+    publicSettingsState.cachedPublicSettings.purchase_subscription_url = 'https://shop.example.test/legacy'
+    publicSettingsState.cachedPublicSettings.purchase_subscription_products = Object.fromEntries([10, 20, 30, 50, 100].map(tier => [String(tier), `https://shop.example.test/item/${tier}?source=site`]))
+    window.localStorage.setItem(PAYMENT_RECOVERY_STORAGE_KEY, 'legacy-order')
+  })
+
+  async function mountShop() {
+    const wrapper = shallowMount(PaymentView, { global: { stubs: {
+      AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false,
+      ExternalShopRecharge: false,
+      RouterLink: { template: '<a :href="to"><slot /></a>', props: ['to'] },
+    } } })
+    await flushPromises()
+    return wrapper
+  }
+
+  it('shows fixed shop tiers with internal payments disabled and creates no internal order', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wrapper = await mountShop()
+    expect(wrapper.findComponent(ExternalShopRecharge).exists()).toBe(true)
+    expect(wrapper.findAll('.shop-tier').map(button => button.text())).toEqual(['¥10', '¥20', '¥30', '¥50', '¥100'])
+    expect(wrapper.find('input').exists()).toBe(false)
+    expect(wrapper.find('iframe').exists()).toBe(false)
+    expect(wrapper.find('[href="/orders"]').exists()).toBe(false)
+    expect(wrapper.get('.shop-summary button').attributes('disabled')).toBeDefined()
+    await wrapper.get('.shop-tier').trigger('click')
+    await wrapper.get('.shop-summary button').trigger('click')
+    expect(open).toHaveBeenCalledWith(publicSettingsState.cachedPublicSettings.purchase_subscription_products['10'], '_blank', 'noopener,noreferrer')
+    expect(wrapper.get('[href="/redeem"]').exists()).toBe(true)
+    expect(getCheckoutInfo).not.toHaveBeenCalled()
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(refreshUser).not.toHaveBeenCalled()
+    expect(fetchActiveSubscriptions).not.toHaveBeenCalled()
+    expect(routerReplace).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toBe('legacy-order')
+    wrapper.unmount()
+    open.mockRestore()
+  })
+
+  it('does not use the legacy scalar URL when product configuration is absent', async () => {
+    publicSettingsState.cachedPublicSettings.purchase_subscription_products = {}
+    const wrapper = await mountShop()
+    expect(wrapper.findAll('.shop-tier').every(button => button.attributes('disabled') !== undefined)).toBe(true)
+    expect(wrapper.get('.shop-summary button').attributes('disabled')).toBeDefined()
+    expect(getCheckoutInfo).not.toHaveBeenCalled()
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(refreshUser).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('waits for public configuration before choosing the external initialization path', async () => {
+    publicSettingsState.publicSettingsLoaded = false
+    publicSettingsState.cachedPublicSettings.purchase_subscription_enabled = false
+    let resolveSettings!: () => void
+    publicSettingsState.fetchPublicSettings.mockImplementation(() => new Promise<void>(resolve => { resolveSettings = resolve }))
+    const wrapper = shallowMount(PaymentView, { global: { stubs: { AppLayout: { template: '<div><slot /></div>' } } } })
+    expect(publicSettingsState.fetchPublicSettings).toHaveBeenCalledOnce()
+    expect(getCheckoutInfo).not.toHaveBeenCalled()
+    // The API populates the same reactive cached object as the real app store.
+    publicSettingsState.cachedPublicSettings.purchase_subscription_enabled = true
+    resolveSettings()
+    await flushPromises()
+    expect(wrapper.findComponent(ExternalShopRecharge).exists()).toBe(true)
+    expect(getCheckoutInfo).not.toHaveBeenCalled()
+    expect(createOrder).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('does not initialize checkout when public settings remain unknown', async () => {
+    publicSettingsState.publicSettingsLoaded = false
+    publicSettingsState.cachedPublicSettings.purchase_subscription_enabled = false
+    publicSettingsState.fetchPublicSettings.mockResolvedValue(null)
+    const wrapper = await mountShop()
+    expect(wrapper.text()).toContain('payment.notAvailable')
+    expect(getCheckoutInfo).not.toHaveBeenCalled()
+    expect(createOrder).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 })

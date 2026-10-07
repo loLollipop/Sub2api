@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// plazaListedModelCatalog is the same model set GET /v1/models reads from
-// schedulable accounts. Nil keeps the plaza on channel mapping and pricing only.
+// plazaListedModelCatalog supplies the display model set for schedulable accounts.
+// Nil keeps the plaza on channel mapping and pricing only.
 type plazaListedModelCatalog interface {
 	GetAvailableModels(ctx context.Context, groupID *int64, platform string) []string
 }
@@ -31,7 +31,7 @@ func ProvideModelPlazaService(
 	gateway *GatewayService,
 ) *ModelPlazaService {
 	svc := NewModelPlazaService(channelRepo, groupRepo, pricingService, billingService, resolver)
-	svc.SetListedModelCatalog(gateway)
+	svc.SetListedModelCatalog(plazaGatewayModelCatalog{gateway: gateway})
 	return svc
 }
 

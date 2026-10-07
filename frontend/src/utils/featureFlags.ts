@@ -131,6 +131,12 @@ export const FeatureFlags = {
   }),
 } as const
 
+/** Purchase is available through either built-in payments or the external shop. */
+export function isPurchaseEnabled(): boolean {
+  return isFeatureFlagEnabled(FeatureFlags.payment)
+    || useAppStore().cachedPublicSettings?.purchase_subscription_enabled === true
+}
+
 export type RegisteredFeatureFlag = keyof typeof FeatureFlags
 
 /**

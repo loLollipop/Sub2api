@@ -6073,6 +6073,23 @@
               </p>
             </div>
             <div class="space-y-4 p-6">
+              <section class="rounded-lg border border-gray-200 p-4 dark:border-dark-700" data-testid="external-shop-settings">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 class="font-medium text-gray-900 dark:text-white">{{ t("admin.settings.purchase.title") }}</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.purchase.description") }}</p>
+                  </div>
+                  <Toggle v-model="form.purchase_subscription_enabled" data-testid="external-shop-toggle" :aria-label="t('admin.settings.purchase.enabled')" />
+                </div>
+                <div class="mt-4 space-y-3">
+                  <div v-for="tier in purchaseTiers" :key="tier">
+                    <label :for="`external-shop-url-${tier}`" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.purchase.tierUrl", { amount: tier }) }}</label>
+                    <input :id="`external-shop-url-${tier}`" v-model="form.purchase_subscription_products[tier]" type="url" class="input w-full" :placeholder="t('admin.settings.purchase.urlPlaceholder')" />
+                    <a v-if="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" :href="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block text-sm text-primary-500">{{ t("admin.settings.purchase.preview") }}</a>
+                  </div>
+                  <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.purchase.urlHint") }}</p>
+                </div>
+              </section>
               <!-- Enable toggle -->
               <div class="flex items-center justify-between">
                 <div>
@@ -7762,6 +7779,9 @@ const form = reactive<SettingsForm>({
   compact_home_enabled: false,
   backend_mode_enabled: false,
   hide_ccs_import_button: false,
+  purchase_subscription_enabled: false,
+  purchase_subscription_url: "",
+  purchase_subscription_products: {},
   payment_enabled: false,
   payment_recharge_center_enabled: false,
   risk_control_enabled: false,
@@ -9022,6 +9042,7 @@ async function loadSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
+    form.purchase_subscription_products = { ...(settings.purchase_subscription_products || {}) };
     syncCaptchaProviderSelection();
     if (!form.claude_oauth_system_prompt_blocks?.trim()) {
       form.claude_oauth_system_prompt_blocks =
@@ -9255,9 +9276,48 @@ function findDuplicateDefaultSubscription(
   });
 }
 
+const purchaseTiers = ["10", "20", "30", "50", "100"] as const;
+
+function hasUnsafeProductUrlCharacters(raw: string): boolean {
+  return Array.from(raw).some(char => {
+    const code = char.charCodeAt(0)
+    return code < 32 || (code >= 127 && code <= 159) || char === '\\'
+  })
+}
+
+function safePurchaseProductUrl(raw: string): string {
+  if (!raw || raw !== raw.trim() || raw.length > 2048 || (/\s/u.test(raw) || hasUnsafeProductUrlCharacters(raw)) || !/^https?:\/\//i.test(raw)) return ''
+  try {
+    const url = new URL(raw)
+    const authority = raw.split('://')[1]?.split(/[/?#]/)[0] || ''
+    const host = authority.startsWith('[') ? url.hostname : authority.split(':')[0] || ''
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password || (url.port && Number(url.port) < 1) || authority.endsWith(':')) return ''
+    if (/^[\d.]+$/.test(host) && (host.split('.').length !== 4 || host.split('.').some(part => String(Number(part)) !== part || Number(part) > 255))) return ''
+    if (!authority.startsWith('[') && (host.length > 253 || /^[\d.]+$/.test(host) && !/^\d+\.\d+\.\d+\.\d+$/.test(host)
+      || host.replace(/\.$/, '').split('.').some(label => !/^[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?$/u.test(label)))) return ''
+    return raw
+  } catch {
+    return ''
+  }
+}
+
 async function saveSettings() {
   saving.value = true;
   try {
+    const purchaseProducts: Record<string, string> = {};
+    for (const tier of purchaseTiers) {
+      const raw = form.purchase_subscription_products[tier] || "";
+      const url = raw.trim();
+      if (hasUnsafeProductUrlCharacters(raw) || (url && !safePurchaseProductUrl(url))) {
+        appStore.showError(t("admin.settings.purchase.invalidUrl", { amount: tier }));
+        return;
+      }
+      if (url) purchaseProducts[tier] = url;
+    }
+    if (form.purchase_subscription_enabled && Object.keys(purchaseProducts).length === 0) {
+      appStore.showError(t("admin.settings.purchase.productsRequired"));
+      return;
+    }
     const normalizedTableDefaultPageSize = parseTableDefaultPageSizeInput(form.table_default_page_size);
     if (normalizedTableDefaultPageSize === null) {
       appStore.showError(
@@ -9626,6 +9686,8 @@ async function saveSettings() {
         codexWhitelistRows.value,
       ),
       // Payment configuration
+      purchase_subscription_enabled: form.purchase_subscription_enabled,
+      purchase_subscription_products: purchaseProducts,
       payment_enabled: form.payment_enabled,
       payment_recharge_center_enabled: form.payment_recharge_center_enabled,
       risk_control_enabled: form.risk_control_enabled,

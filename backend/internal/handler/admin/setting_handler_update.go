@@ -153,21 +153,22 @@ type UpdateSettingsRequest struct {
 	GoogleOAuthFrontendRedirectURL string `json:"google_oauth_frontend_redirect_url"`
 
 	// OEM设置
-	SiteName                    string                `json:"site_name"`
-	SiteLogo                    string                `json:"site_logo"`
-	SiteSubtitle                string                `json:"site_subtitle"`
-	APIBaseURL                  string                `json:"api_base_url"`
-	ContactInfo                 string                `json:"contact_info"`
-	DocURL                      string                `json:"doc_url"`
-	HomeContent                 string                `json:"home_content"`
-	CompactHomeEnabled          bool                  `json:"compact_home_enabled"`
-	HideCcsImportButton         bool                  `json:"hide_ccs_import_button"`
-	PurchaseSubscriptionEnabled *bool                 `json:"purchase_subscription_enabled"`
-	PurchaseSubscriptionURL     *string               `json:"purchase_subscription_url"`
-	TableDefaultPageSize        int                   `json:"table_default_page_size"`
-	TablePageSizeOptions        []int                 `json:"table_page_size_options"`
-	CustomMenuItems             *[]dto.CustomMenuItem `json:"custom_menu_items"`
-	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
+	SiteName                     string                `json:"site_name"`
+	SiteLogo                     string                `json:"site_logo"`
+	SiteSubtitle                 string                `json:"site_subtitle"`
+	APIBaseURL                   string                `json:"api_base_url"`
+	ContactInfo                  string                `json:"contact_info"`
+	DocURL                       string                `json:"doc_url"`
+	HomeContent                  string                `json:"home_content"`
+	CompactHomeEnabled           bool                  `json:"compact_home_enabled"`
+	HideCcsImportButton          bool                  `json:"hide_ccs_import_button"`
+	PurchaseSubscriptionEnabled  *bool                 `json:"purchase_subscription_enabled"`
+	PurchaseSubscriptionURL      *string               `json:"purchase_subscription_url"`
+	PurchaseSubscriptionProducts *map[string]string    `json:"purchase_subscription_products"`
+	TableDefaultPageSize         int                   `json:"table_default_page_size"`
+	TablePageSizeOptions         []int                 `json:"table_page_size_options"`
+	CustomMenuItems              *[]dto.CustomMenuItem `json:"custom_menu_items"`
+	CustomEndpoints              *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
 	// 默认配置
 	DefaultConcurrency                        int                               `json:"default_concurrency"`
@@ -1242,24 +1243,29 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	purchaseURL := previousSettings.PurchaseSubscriptionURL
 	if req.PurchaseSubscriptionURL != nil {
 		purchaseURL = strings.TrimSpace(*req.PurchaseSubscriptionURL)
+		if purchaseURL != "" {
+			if _, err := service.NormalizePurchaseSubscriptionProducts(map[string]string{"10": purchaseURL}); err != nil {
+				response.BadRequest(c, "Legacy Purchase Subscription URL must be a valid absolute http(s) URL without credentials")
+				return
+			}
+		}
+	} else {
+		omitted[service.SettingKeyPurchaseSubscriptionURL] = struct{}{}
 	}
 
-	// - 启用时要求 URL 合法且非空
-	// - 禁用时允许为空；若提供了 URL 也做基本校验，避免误配置
-	if purchaseEnabled {
-		if purchaseURL == "" {
-			response.BadRequest(c, "Purchase Subscription URL is required when enabled")
+	purchaseProducts := previousSettings.PurchaseSubscriptionProducts
+	if req.PurchaseSubscriptionProducts != nil {
+		purchaseProducts, err = service.NormalizePurchaseSubscriptionProducts(*req.PurchaseSubscriptionProducts)
+		if err != nil {
+			response.BadRequest(c, "Invalid external shop products: "+err.Error())
 			return
 		}
-		if err := config.ValidateAbsoluteHTTPURL(purchaseURL); err != nil {
-			response.BadRequest(c, "Purchase Subscription URL must be an absolute http(s) URL")
-			return
-		}
-	} else if purchaseURL != "" {
-		if err := config.ValidateAbsoluteHTTPURL(purchaseURL); err != nil {
-			response.BadRequest(c, "Purchase Subscription URL must be an absolute http(s) URL")
-			return
-		}
+	} else {
+		omitted[service.SettingKeyPurchaseSubscriptionProducts] = struct{}{}
+	}
+	if purchaseEnabled && len(purchaseProducts) == 0 {
+		response.BadRequest(c, "External shop requires at least one configured product")
+		return
 	}
 
 	// Frontend URL 验证
@@ -1641,6 +1647,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		HideCcsImportButton:                    req.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:            purchaseEnabled,
 		PurchaseSubscriptionURL:                purchaseURL,
+		PurchaseSubscriptionProducts:           purchaseProducts,
 		TableDefaultPageSize:                   req.TableDefaultPageSize,
 		TablePageSizeOptions:                   req.TablePageSizeOptions,
 		CustomMenuItems:                        customMenuJSON,
@@ -2316,6 +2323,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		HideCcsImportButton:                                    updatedSettings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:                            updatedSettings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:                                updatedSettings.PurchaseSubscriptionURL,
+		PurchaseSubscriptionProducts:                           updatedSettings.PurchaseSubscriptionProducts,
 		TableDefaultPageSize:                                   updatedSettings.TableDefaultPageSize,
 		TablePageSizeOptions:                                   updatedSettings.TablePageSizeOptions,
 		CustomMenuItems:                                        dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),

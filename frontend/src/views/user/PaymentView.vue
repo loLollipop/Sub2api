@@ -4,6 +4,8 @@
       <div v-if="loading" class="flex items-center justify-center py-20">
         <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
       </div>
+      <ExternalShopRecharge v-else-if="externalShopEnabled" :products="appStore.cachedPublicSettings?.purchase_subscription_products || {}" :username="user?.username || ''" :balance="user?.balance || 0" />
+      <div v-else-if="settingsUnavailable" class="signal-empty-state">{{ t('payment.notAvailable') }}</div>
       <template v-else>
         <header v-if="paymentPhase === 'select' && !selectedPlan" class="signal-payment-heading">
           <div class="signal-payment-heading__icon" aria-hidden="true">
@@ -368,6 +370,7 @@ import { isMobileDevice } from '@/utils/device'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel, type PeakRateFields } from '@/utils/peak-rate'
 import type { SubscriptionPlan, CheckoutInfoResponse, CreateOrderResult, OrderType } from '@/types/payment'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ExternalShopRecharge from '@/components/payment/ExternalShopRecharge.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import ConsoleTabs from '@/components/common/ConsoleTabs.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
@@ -419,6 +422,8 @@ function subscriptionPeakRateLabel(sub: { group?: PeakRateFields | null }): stri
   return formatPeakRateWindow(sub.group, serverTimezoneLabel(appStore.cachedPublicSettings?.server_utc_offset))
 }
 
+const externalShopEnabled = computed(() => appStore.cachedPublicSettings?.purchase_subscription_enabled === true)
+const settingsUnavailable = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
@@ -1298,6 +1303,14 @@ async function resumeWechatPaymentFromQuery() {
 onMounted(async () => {
   document.addEventListener('fullscreenchange', handleRechargeCenterFullscreenChange)
   try {
+    if (!appStore.publicSettingsLoaded) {
+      await appStore.fetchPublicSettings()
+    }
+    if (externalShopEnabled.value) return
+    if (!appStore.publicSettingsLoaded || appStore.cachedPublicSettings?.payment_enabled === false) {
+      settingsUnavailable.value = true
+      return
+    }
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
     if (enabledMethods.value.length) {
@@ -1356,7 +1369,9 @@ onMounted(async () => {
   } catch (err: unknown) { appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error'))) }
   finally { loading.value = false }
   // Fetch active subscriptions (uses cache, non-blocking)
-  subscriptionStore.fetchActiveSubscriptions().catch(() => {})
+  if (!externalShopEnabled.value && appStore.publicSettingsLoaded && !settingsUnavailable.value) {
+    subscriptionStore.fetchActiveSubscriptions().catch(() => {})
+  }
 })
 
 onUnmounted(() => {

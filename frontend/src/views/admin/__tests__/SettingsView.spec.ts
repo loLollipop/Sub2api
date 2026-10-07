@@ -802,6 +802,71 @@ describe("admin SettingsView payment visible method controls", () => {
     wrapper.unmount();
   });
 
+  it("loads and saves five independent product links with built-in payments disabled", async () => {
+    const products = Object.fromEntries([10, 20, 30, 50, 100].map(tier => [String(tier), `https://shop.example.test/item/${tier}`]));
+    getSettings.mockResolvedValue({ ...baseSettingsResponse,
+      payment_enabled: false,
+      purchase_subscription_enabled: true,
+      purchase_subscription_url: "https://shop.example.test/legacy",
+      purchase_subscription_products: products,
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openPaymentTab(wrapper);
+    expect((wrapper.get('[data-testid="external-shop-toggle"]').element as HTMLInputElement).checked).toBe(true);
+    for (const tier of [10, 20, 30, 50, 100]) {
+      const input = wrapper.get(`#external-shop-url-${tier}`);
+      expect((input.element as HTMLInputElement).value).toBe(products[String(tier)]);
+      expect(input.attributes("disabled")).toBeUndefined();
+      await input.setValue(`https://shop.example.test/new/${tier}?source=site#details`);
+    }
+    const previews = wrapper.findAll('[data-testid="external-shop-settings"] a');
+    expect(previews).toHaveLength(5);
+    expect(previews[0]?.attributes()).toEqual(expect.objectContaining({ target: "_blank", rel: "noopener noreferrer", href: "https://shop.example.test/new/10?source=site#details" }));
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      payment_enabled: false,
+      purchase_subscription_enabled: true,
+      purchase_subscription_products: Object.fromEntries([10, 20, 30, 50, 100].map(tier => [String(tier), `https://shop.example.test/new/${tier}?source=site#details`])),
+      site_name: baseSettingsResponse.site_name,
+    }));
+    expect(updateSettings.mock.calls[0]?.[0]).not.toHaveProperty("purchase_subscription_url");
+    await wrapper.get('[data-testid="external-shop-toggle"]').setValue(false);
+    for (const tier of [10, 20, 30, 50, 100]) await wrapper.get(`#external-shop-url-${tier}`).setValue("");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenLastCalledWith(expect.objectContaining({ purchase_subscription_enabled: false, purchase_subscription_products: {} }));
+    wrapper.unmount();
+  });
+
+  it("defaults missing products to empty and requires a product before enabling", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openPaymentTab(wrapper);
+    expect(wrapper.findAll('[data-testid="external-shop-settings"] input[type="url"]')).toHaveLength(5);
+    expect((wrapper.get('#external-shop-url-10').element as HTMLInputElement).value).toBe("");
+    await wrapper.get('[data-testid="external-shop-toggle"]').setValue(true);
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it.each(["javascript:alert(1)", "https://user:secret@shop.example.test", "https://bad..host/item", "https://shop.example.test:99999/item", "https://shop.example.test:0/item", "https://shop.example.test:/item", "https://shop.example.test/\\evil"])("hides unsafe product previews and rejects %s", async url => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openPaymentTab(wrapper);
+    await wrapper.get('#external-shop-url-10').setValue(url);
+    expect(wrapper.find('[data-testid="external-shop-settings"] a').exists()).toBe(false);
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it("submits the compact home page toggle", async () => {
     const wrapper = mountView();
     await flushPromises();

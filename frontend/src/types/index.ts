@@ -244,6 +244,7 @@ export interface PublicSettings {
   hide_ccs_import_button: boolean
   purchase_subscription_enabled?: boolean
   purchase_subscription_url?: string
+  purchase_subscription_products?: Record<string, string>
   payment_enabled: boolean
   risk_control_enabled: boolean
   table_default_page_size: number

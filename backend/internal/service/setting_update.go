@@ -357,6 +357,18 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyHomeContent] = settings.HomeContent
 	updates[SettingKeyCompactHomeEnabled] = strconv.FormatBool(settings.CompactHomeEnabled)
 	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
+	products, err := NormalizePurchaseSubscriptionProducts(settings.PurchaseSubscriptionProducts)
+	if err != nil {
+		return nil, err
+	}
+	if settings.PurchaseSubscriptionEnabled && len(products) == 0 {
+		return nil, fmt.Errorf("external shop requires at least one configured product")
+	}
+	productsJSON, err := json.Marshal(products)
+	if err != nil {
+		return nil, err
+	}
+	updates[SettingKeyPurchaseSubscriptionProducts] = string(productsJSON)
 	updates[SettingKeyPurchaseSubscriptionEnabled] = strconv.FormatBool(settings.PurchaseSubscriptionEnabled)
 	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)
 	tableDefaultPageSize, tablePageSizeOptions := normalizeTablePreferences(

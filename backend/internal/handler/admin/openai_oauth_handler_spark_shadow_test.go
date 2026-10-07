@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -103,4 +104,14 @@ func TestCreateShadow_BadBody(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestCreateShadowClientCannotSpecifyOwner(t *testing.T) {
+	var req CreateShadowRequest
+	require.NoError(t, json.Unmarshal([]byte(`{"name":"shadow","created_by":999,"owner_id":999}`), &req))
+	require.Equal(t, "shadow", req.Name)
+	for _, typ := range []reflect.Type{reflect.TypeOf(req), reflect.TypeOf(service.ShadowOptions{})} {
+		_, exists := typ.FieldByName("CreatedBy")
+		require.False(t, exists, "uploader must come from the verified parent, never request input")
+	}
 }

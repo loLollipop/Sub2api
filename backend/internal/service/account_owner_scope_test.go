@@ -3,89 +3,99 @@ package service
 import (
 	"context"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestAccountVisibleToOwner(t *testing.T) {
 	own := int64(7)
 	other := int64(8)
-	legacy := int64(0)
 	if AccountVisibleToOwner(nil, 7, false) {
 		t.Fatal("legacy account must be hidden from an ordinary admin")
 	}
 	if !AccountVisibleToOwner(nil, 7, true) {
-		t.Fatal("legacy account should stay visible to the configured owner")
-	}
-	if !AccountVisibleToOwner(&legacy, 7, true) {
-		t.Fatal("non-positive uploader must be treated as a legacy account")
+		t.Fatal("legacy account should be visible to the configured pool owner")
 	}
 	if !AccountVisibleToOwner(&own, 7, false) {
 		t.Fatal("owner should see own upload")
 	}
-	if AccountVisibleToOwner(&other, 7, true) {
-		t.Fatal("another admin upload must stay hidden")
+	if !AccountVisibleToOwner(&other, 7, true) {
+		t.Fatal("the configured pool owner should see other admin uploads")
+	}
+	if AccountVisibleToOwner(&other, 7, false) {
+		t.Fatal("another admin upload must stay hidden from ordinary admins")
 	}
 	if !AccountVisibleToOwner(&other, 0, false) {
 		t.Fatal("no scope must not hide accounts")
 	}
-	if !AccountVisibleToOwner(nil, -1, false) {
-		t.Fatal("non-positive scope must not hide legacy accounts")
+}
+
+func TestAccountOwnerScopeUsesConfiguredUserID(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		adminID, configuredID int64
+		wantAll               bool
+	}{
+		{"configured owner", 7, 7, true},
+		{"different administrator", 8, 7, false},
+		{"unconfigured", 7, 0, false},
+		{"invalid configured owner", 7, -1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := WithAccountOwnerScope(context.Background(), tc.adminID, tc.configuredID)
+			id, fullPool, ok := AccountOwnerScopeDetail(ctx)
+			require.True(t, ok)
+			require.Equal(t, tc.adminID, id)
+			require.Equal(t, tc.wantAll, fullPool)
+			zero, owner, other := int64(0), int64(7), int64(8)
+			for _, createdBy := range []*int64{nil, &zero, &owner, &other} {
+				want := tc.wantAll || (createdBy != nil && *createdBy == tc.adminID)
+				require.Equal(t, want, AccountVisibleToOwner(createdBy, id, fullPool))
+			}
+		})
 	}
 }
 
-func TestWithAccountOwnerScopeConfiguredLegacyEmail(t *testing.T) {
-	t.Setenv(legacyPoolOwnerEmailEnv, "  Current.Admin@Example.COM  ")
-
-	ctx := WithAccountOwnerScope(context.Background(), 3, " current.admin@example.com ")
-	id, seeLegacy, ok := AccountOwnerScopeDetail(ctx)
-	if !ok || id != 3 || !seeLegacy {
-		t.Fatalf("configured owner scope = %d %v %v", id, seeLegacy, ok)
-	}
-
-	ctx = WithAccountOwnerScope(context.Background(), 4, legacyPoolOwnerEmail)
-	id, seeLegacy, ok = AccountOwnerScopeDetail(ctx)
-	if !ok || id != 4 || seeLegacy {
-		t.Fatalf("old default scope with override = %d %v %v", id, seeLegacy, ok)
-	}
-
-	ctx = WithAccountOwnerScope(context.Background(), 5, "other@example.com")
-	id, seeLegacy, ok = AccountOwnerScopeDetail(ctx)
-	if !ok || id != 5 || seeLegacy {
-		t.Fatalf("ordinary admin scope = %d %v %v", id, seeLegacy, ok)
-	}
-}
-
-func TestWithAccountOwnerScopeDefaultLegacyEmail(t *testing.T) {
-	for _, envValue := range []string{"", " \t\n "} {
-		t.Run("env="+envValue, func(t *testing.T) {
-			t.Setenv(legacyPoolOwnerEmailEnv, envValue)
-			ctx := WithAccountOwnerScope(context.Background(), 3, " Admin@sub2api.local ")
-			id, seeLegacy, ok := AccountOwnerScopeDetail(ctx)
-			if !ok || id != 3 || !seeLegacy {
-				t.Fatalf("default owner scope = %d %v %v", id, seeLegacy, ok)
+func TestEnsureAccountOwnerScopeNeverInventsAScope(t *testing.T) {
+	owner := WithAccountOwnerScope(context.Background(), 7, 7)
+	for _, tc := range []struct {
+		name    string
+		ctx     context.Context
+		adminID int64
+		wantID  int64
+		wantAll bool
+		wantOK  bool
+	}{
+		{"account route preserves owner", owner, 7, 7, true, true},
+		{"scheduled route preserves owner", owner, 7, 7, true, true},
+		{"another identity inherits nothing new", owner, 8, 7, true, true},
+		{"unscoped context stays unscoped", context.Background(), 7, 0, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := EnsureAccountOwnerScope(tc.ctx, tc.adminID)
+			id, all, ok := AccountOwnerScopeDetail(ctx)
+			require.Equal(t, tc.wantOK, ok)
+			if tc.wantOK {
+				require.Equal(t, tc.wantID, id)
+				require.Equal(t, tc.wantAll, all)
 			}
 		})
 	}
 }
 
 func TestWithAccountOwnerScopeInvalidAdmin(t *testing.T) {
-	t.Setenv(legacyPoolOwnerEmailEnv, "owner@example.com")
-
 	//nolint:staticcheck // SA1012: deliberately verifies the nil-context fallback.
-	ctx := WithAccountOwnerScope(nil, 0, "owner@example.com")
-	if ctx == nil {
-		t.Fatal("nil context must be replaced with a background context")
+	ctx := WithAccountOwnerScope(nil, 0, 7)
+	require.NotNil(t, ctx)
+	for _, ctx := range []context.Context{ctx, WithAccountOwnerScope(context.Background(), -1, 7)} {
+		id, fullPool, ok := AccountOwnerScopeDetail(ctx)
+		require.Zero(t, id)
+		require.False(t, fullPool)
+		require.False(t, ok)
 	}
-	if id, seeLegacy, ok := AccountOwnerScopeDetail(ctx); ok || id != 0 || seeLegacy {
-		t.Fatalf("zero admin scope = %d %v %v", id, seeLegacy, ok)
-	}
-
-	ctx = WithAccountOwnerScope(context.Background(), -1, "owner@example.com")
-	if id, seeLegacy, ok := AccountOwnerScopeDetail(ctx); ok || id != 0 || seeLegacy {
-		t.Fatalf("negative admin scope = %d %v %v", id, seeLegacy, ok)
-	}
-
 	//nolint:staticcheck // SA1012: deliberately verifies nil-context lookup safety.
-	if id, seeLegacy, ok := AccountOwnerScopeDetail(nil); ok || id != 0 || seeLegacy {
-		t.Fatalf("nil context scope = %d %v %v", id, seeLegacy, ok)
-	}
+	id, fullPool, ok := AccountOwnerScopeDetail(nil)
+	require.Zero(t, id)
+	require.False(t, fullPool)
+	require.False(t, ok)
 }

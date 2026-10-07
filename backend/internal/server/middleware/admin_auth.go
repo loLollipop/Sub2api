@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -17,8 +18,9 @@ func NewAdminAuthMiddleware(
 	userService *service.UserService,
 	settingService *service.SettingService,
 	auditService *service.AuditLogService,
+	cfg *config.Config,
 ) AdminAuthMiddleware {
-	return AdminAuthMiddleware(adminAuth(authService, userService, settingService, auditService))
+	return AdminAuthMiddleware(adminAuth(authService, userService, settingService, auditService, cfg))
 }
 
 // adminAuth 管理员认证中间件实现
@@ -30,6 +32,7 @@ func adminAuth(
 	userService *service.UserService,
 	settingService *service.SettingService,
 	auditService *service.AuditLogService,
+	cfg *config.Config,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// WebSocket upgrade requests cannot set Authorization headers in browsers.
@@ -41,6 +44,7 @@ func adminAuth(
 				if !validateJWTForAdmin(c, token, authService, userService, settingService, auditService) {
 					return
 				}
+				setAdminAccountOwnerScope(c, cfg)
 				c.Next()
 				return
 			}
@@ -52,6 +56,7 @@ func adminAuth(
 			if !validateAdminAPIKey(c, apiKey, settingService, userService) {
 				return
 			}
+			setAdminAccountOwnerScope(c, cfg)
 			c.Next()
 			return
 		}
@@ -69,6 +74,7 @@ func adminAuth(
 				if !validateJWTForAdmin(c, token, authService, userService, settingService, auditService) {
 					return
 				}
+				setAdminAccountOwnerScope(c, cfg)
 				c.Next()
 				return
 			}
@@ -77,6 +83,21 @@ func adminAuth(
 		// 无有效认证信息
 		AbortWithError(c, 401, "UNAUTHORIZED", "Authorization required")
 	}
+}
+
+// setAdminAccountOwnerScope is called only after administrator authentication.
+// Per-admin account-pool isolation is conditional: without a configured owner the
+// context keeps whole-pool visibility, so a deployment that never sets
+// security.account_pool_owner_user_id cannot lose access to its legacy accounts.
+func setAdminAccountOwnerScope(c *gin.Context, cfg *config.Config) {
+	subject, ok := GetAuthSubjectFromContext(c)
+	if !ok || subject.UserID <= 0 {
+		return
+	}
+	if cfg == nil || cfg.Security.AccountPoolOwnerUserID <= 0 {
+		return
+	}
+	c.Request = c.Request.WithContext(service.WithAccountOwnerScope(c.Request.Context(), subject.UserID, cfg.Security.AccountPoolOwnerUserID))
 }
 
 func isWebSocketUpgradeRequest(c *gin.Context) bool {
@@ -140,6 +161,10 @@ func validateAdminAPIKey(
 	admin, err := userService.GetFirstAdmin(c.Request.Context())
 	if err != nil {
 		AbortWithError(c, 500, "INTERNAL_ERROR", "No admin user found")
+		return false
+	}
+	if admin == nil || !admin.IsActive() || !admin.IsAdmin() {
+		AbortWithError(c, 403, "FORBIDDEN", "Active admin access required")
 		return false
 	}
 

@@ -162,6 +162,8 @@ export function useAffiliateCustomUsersPanel(enabled: () => boolean) {
       });
       affiliateState.entries = res.items ?? [];
       affiliateState.total = res.total ?? 0;
+      if (res.page > 0) affiliateState.page = res.page;
+      if (res.page_size > 0) affiliateState.pageSize = res.page_size;
       // Drop selections that are no longer visible.
       const visibleIds = new Set(affiliateState.entries.map((e) => e.user_id));
       affiliateState.selected = affiliateState.selected.filter((id) => visibleIds.has(id));

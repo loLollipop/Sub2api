@@ -14,6 +14,20 @@ function mountShop(config: Record<string, string> = products) {
 afterEach(() => vi.restoreAllMocks())
 
 describe('ExternalShopRecharge', () => {
+  it('keeps optional help in collapsed native disclosures while purchase and redemption remain exposed', () => {
+    const wrapper = mountShop()
+    for (const [selector, title] of [['.shop-faq', 'purchase.faqTitle'], ['.shop-reminders', 'purchase.remindersTitle']] as const) {
+      const disclosure = wrapper.get(selector)
+      expect(disclosure.element.tagName).toBe('DETAILS')
+      expect(disclosure.attributes('open')).toBeUndefined()
+      expect(disclosure.get('summary').text()).toBe(title)
+      expect(disclosure.get('summary').attributes('tabindex')).not.toBe('-1')
+    }
+    expect(wrapper.get('.shop-summary button').exists()).toBe(true)
+    expect(wrapper.get('[href="/redeem"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('shows an empty purchase summary, separate USD balance and the complete redemption journey', () => {
     const wrapper = mountShop()
     expect(wrapper.get('h1').text()).toBe('purchase.title')

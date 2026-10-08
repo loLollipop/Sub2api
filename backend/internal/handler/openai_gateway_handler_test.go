@@ -902,6 +902,34 @@ func TestOpenAIResponses_RejectsMessageIDAsPreviousResponseID(t *testing.T) {
 	require.Contains(t, w.Body.String(), "previous_response_id must be a response.id")
 }
 
+func TestOpenAIResponses_RejectsConflictingModelFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", strings.NewReader(
+		`{"model":"cheap-model","input":"hello","model":"gpt-6-astra"}`,
+	))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	groupID := int64(2)
+	c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{
+		ID:      101,
+		GroupID: &groupID,
+		User:    &service.User{ID: 1},
+	})
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{
+		UserID:      1,
+		Concurrency: 1,
+	})
+
+	h := newOpenAIHandlerForPreviousResponseIDValidation(t, nil)
+	h.Responses(c)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, w.Body.String(), service.ErrDuplicateModelField.Error())
+}
+
 func TestOpenAIResponses_AcceptsHTTPContinuationPreviousResponseIDBeforeRouting(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -1934,6 +1962,7 @@ type openAIResponsesWSUsageLogCase struct {
 	firstFrameCloseExpected bool
 	// secondTurnCloseExpected：第二个 turn 被拒（连接被 1008 关闭）。
 	secondTurnCloseExpected bool
+	expectedCloseReason     string
 }
 
 type openAIResponsesWSUsageLogResult struct {
@@ -3076,7 +3105,13 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		var closeErr coderws.CloseError
 		require.ErrorAs(t, readErr, &closeErr)
 		require.Equal(t, coderws.StatusPolicyViolation, closeErr.Code)
-		require.Contains(t, closeErr.Reason, "not available for this group")
+		require.True(t,
+			strings.Contains(closeErr.Reason, "not available for this group") ||
+				strings.Contains(closeErr.Reason, service.ErrDuplicateModelField.Error()),
+			closeErr.Reason)
+		if tc.expectedCloseReason != "" {
+			require.Equal(t, tc.expectedCloseReason, closeErr.Reason)
+		}
 		_ = clientConn.CloseNow()
 		return openAIResponsesWSUsageLogResult{}
 	}
@@ -3111,7 +3146,13 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 			var closeErr coderws.CloseError
 			require.ErrorAs(t, readErr, &closeErr)
 			require.Equal(t, coderws.StatusPolicyViolation, closeErr.Code)
-			require.Contains(t, closeErr.Reason, "not available for this group")
+			require.True(t,
+				strings.Contains(closeErr.Reason, "not available for this group") ||
+					strings.Contains(closeErr.Reason, service.ErrDuplicateModelField.Error()),
+				closeErr.Reason)
+			if tc.expectedCloseReason != "" {
+				require.Equal(t, tc.expectedCloseReason, closeErr.Reason)
+			}
 			_ = clientConn.CloseNow()
 			return openAIResponsesWSUsageLogResult{}
 		}

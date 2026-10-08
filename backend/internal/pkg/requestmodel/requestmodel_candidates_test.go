@@ -34,34 +34,42 @@ func TestFromBodyCandidatesDoesNotCopyWholeBody(t *testing.T) {
 	body := buildModelBody(bodySize, "claude-sonnet-5")
 	require.Greater(t, len(body), bodySize, "precondition: the fixture must exceed the target size")
 
-	got := FromBodyCandidates("", "application/json", body)
-	require.Equal(t, []string{"claude-sonnet-5"}, got)
+	for _, contentType := range []string{"application/json", "multipart/form-data; boundary=x"} {
+		t.Run(contentType, func(t *testing.T) {
+			got := FromBodyCandidates("", contentType, body)
+			require.Equal(t, []string{"claude-sonnet-5"}, got)
 
-	var before, after runtime.MemStats
-	runtime.GC()
-	runtime.ReadMemStats(&before)
-	_ = FromBodyCandidates("", "application/json", body)
-	runtime.ReadMemStats(&after)
+			var before, after runtime.MemStats
+			runtime.GC()
+			runtime.ReadMemStats(&before)
+			_ = FromBodyCandidates("", contentType, body)
+			runtime.ReadMemStats(&after)
 
-	allocated := after.TotalAlloc - before.TotalAlloc
-	// 允许解析器自身的少量临时分配，但绝不能是「复制整份 body」的量级。
-	require.Less(t, allocated, uint64(256*1024),
-		"解析 %d 字节的 body 分配了 %d 字节 —— 说明整份 body 又被复制了", len(body), allocated)
+			allocated := after.TotalAlloc - before.TotalAlloc
+			// 允许解析器自身的少量临时分配，但绝不能是「复制整份 body」的量级。
+			require.Less(t, allocated, uint64(256*1024),
+				"解析 %d 字节的 body 分配了 %d 字节 —— 说明整份 body 又被复制了", len(body), allocated)
+		})
+	}
 }
 
 // 零拷贝解析的代价是：gjson 返回的字符串可能与入参 body 共享底层数组。
 // 候选值会被上游做准入校验、可能跨请求存活，所以必须拷贝出来。
 // 这条测试锁住 strings.Clone。
 func TestFromBodyCandidatesDoesNotAliasCallerBuffer(t *testing.T) {
-	body := []byte(`{"model":"model-aaaa","session":{"model":"model-bbbb"}}`)
-	got := FromBodyCandidates("", "application/json", body)
-	require.Equal(t, []string{"model-aaaa"}, got)
+	for _, contentType := range []string{"application/json", "multipart/form-data; boundary=x"} {
+		t.Run(contentType, func(t *testing.T) {
+			body := []byte(`{"model":"model-aaaa","session":{"model":"model-bbbb"}}`)
+			got := FromBodyCandidates("", contentType, body)
+			require.Equal(t, []string{"model-aaaa"}, got)
 
-	// 模拟调用方复用/改写同一块缓冲区。
-	copy(body, []byte(`{"model":"ZZZZZZZZZZ","session":{"model":"ZZZZZZZZZZ"}}`))
+			// 模拟调用方复用/改写同一块缓冲区。
+			copy(body, []byte(`{"model":"ZZZZZZZZZZ","session":{"model":"ZZZZZZZZZZ"}}`))
 
-	require.Equal(t, []string{"model-aaaa"}, got,
-		"candidates must not change when the caller reuses the body buffer")
+			require.Equal(t, []string{"model-aaaa"}, got,
+				"candidates must not change when the caller reuses the body buffer")
+		})
+	}
 }
 
 // 两个候选函数合并成一趟遍历后，各自的独立语义必须保持不变。
@@ -114,5 +122,17 @@ func BenchmarkFromBodyCandidates(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+func TestConflictingModelCandidates(t *testing.T) {
+	if !ConflictingModelCandidates(FromBodyCandidates("", "application/json", []byte(`{"model":"cheap-model","model":"gpt-6-astra"}`))) {
+		t.Fatal("different duplicate models must conflict")
+	}
+	if ConflictingModelCandidates(FromBodyCandidates("", "application/json", []byte(`{"model":"gpt-6-astra","model":"gpt-6-astra"}`))) {
+		t.Fatal("identical duplicate models must not conflict")
+	}
+	if ConflictingModelCandidates(FromBodyCandidates("", "application/json", []byte(`{"model":"gpt-6-astra","input":{"model":"other"}}`))) {
+		t.Fatal("nested model must not conflict")
 	}
 }

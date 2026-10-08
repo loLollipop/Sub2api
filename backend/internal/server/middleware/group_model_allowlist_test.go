@@ -499,3 +499,46 @@ func TestGroupModelAllowlistDuplicateIdenticalModelsAllowed(t *testing.T) {
 		t.Fatalf("expected handler to run once, got %v", *calls)
 	}
 }
+
+func TestGroupModelAllowlistJSONWithMultipartContentType(t *testing.T) {
+	tests := []struct {
+		name   string
+		body   string
+		status int
+	}{
+		{"single blocked model", `{"model":"blocked"}`, http.StatusNotFound},
+		{"blocked last duplicate", `{"model":"allowed","model":"blocked"}`, http.StatusNotFound},
+		{"blocked first duplicate", `{"model":"blocked","model":"allowed"}`, http.StatusNotFound},
+		{"blocked case variant", `{"model":"allowed","Model":"blocked"}`, http.StatusNotFound},
+		{"single allowed model", `{"model":"allowed"}`, http.StatusOK},
+		{"identical allowed models", `{"model":"allowed","model":"allowed"}`, http.StatusOK},
+		{"unrelated nested model", `{"model":"allowed","input":{"model":"blocked"}}`, http.StatusOK},
+	}
+	for _, path := range []string{"/v1/responses", "/v1/chat/completions"} {
+		t.Run(path, func(t *testing.T) {
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					router, calls := newGroupModelAllowlistTestRouter(allowlistAPIKey(true, "allowed"), "/v1")
+					req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(tt.body))
+					req.Header.Set("Content-Type", "multipart/form-data; boundary=x")
+					w := httptest.NewRecorder()
+					router.ServeHTTP(w, req)
+
+					if w.Code != tt.status {
+						t.Fatalf("expected %d, got %d: %s", tt.status, w.Code, w.Body.String())
+					}
+					if tt.status == http.StatusNotFound {
+						if len(*calls) != 0 {
+							t.Fatalf("blocked JSON must not reach the handler, got %v", *calls)
+						}
+						if !strings.Contains(w.Body.String(), "blocked") {
+							t.Fatalf("expected blocked model in error, got %s", w.Body.String())
+						}
+					} else if len(*calls) != 1 {
+						t.Fatalf("allowed JSON must reach the handler once, got %v", *calls)
+					}
+				})
+			}
+		})
+	}
+}

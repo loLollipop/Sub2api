@@ -38,13 +38,13 @@
             <li><span class="shop-guide__number" aria-hidden="true">3</span><div><strong>{{ t('purchase.stepRedeemTitle') }}</strong><p>{{ t('purchase.stepRedeemDescription') }}</p></div></li>
           </ol>
         </section>
-        <section class="shop-faq" :aria-label="t('purchase.faqTitle')">
-          <h3><Icon name="questionCircle" size="sm" aria-hidden="true" />{{ t('purchase.faqTitle') }}</h3>
+        <details class="shop-faq">
+          <summary><span><Icon name="questionCircle" size="sm" aria-hidden="true" />{{ t('purchase.faqTitle') }}</span><Icon name="chevronDown" size="sm" aria-hidden="true" /></summary>
           <dl>
             <div><dt>{{ t('purchase.faqCreditQuestion') }}</dt><dd>{{ t('purchase.faqCreditAnswer') }}</dd></div>
             <div><dt>{{ t('purchase.faqValueQuestion') }}</dt><dd>{{ t('purchase.faqValueAnswer') }}</dd></div>
           </dl>
-        </section>
+        </details>
       </section>
       <aside class="shop-summary">
         <div class="shop-summary-heading"><h2>{{ t('purchase.purchaseSummary') }}</h2><Icon name="document" size="md" aria-hidden="true" /></div>
@@ -63,14 +63,14 @@
           {{ t('purchase.goToShop') }} <Icon name="externalLink" size="sm" aria-hidden="true" />
         </button>
         <p class="shop-purchase-hint"><Icon name="externalLink" size="xs" aria-hidden="true" />{{ t('purchase.redemptionRequired') }}</p>
-        <section class="shop-reminders" :aria-label="t('purchase.remindersTitle')">
-          <h3><Icon name="shield" size="sm" aria-hidden="true" />{{ t('purchase.remindersTitle') }}</h3>
+        <details class="shop-reminders">
+          <summary><span><Icon name="shield" size="sm" aria-hidden="true" />{{ t('purchase.remindersTitle') }}</span><Icon name="chevronDown" size="sm" aria-hidden="true" /></summary>
           <ul>
             <li><Icon name="creditCard" size="sm" aria-hidden="true" /><span>{{ t('purchase.reminderProduct') }}</span></li>
             <li><Icon name="userCircle" size="sm" aria-hidden="true" /><span>{{ t('purchase.reminderAccount') }}</span></li>
             <li><Icon name="lock" size="sm" aria-hidden="true" /><span>{{ t('purchase.reminderCode') }}</span></li>
           </ul>
-        </section>
+        </details>
         <div class="shop-redeem">
           <span>{{ t('purchase.haveCode') }}</span>
           <RouterLink to="/redeem"><span><Icon name="gift" size="sm" aria-hidden="true" />{{ t('purchase.redeemCode') }}</span><Icon name="arrowRight" size="sm" aria-hidden="true" /></RouterLink>
@@ -167,16 +167,16 @@ function openShop() {
 .shop-tier small { display: block; margin-top: 5px; font-size: 10px; font-weight: 400; overflow-wrap: anywhere; }
 .shop-tier:focus-visible, .shop-purchase:focus-visible, .shop-redeem a:focus-visible { outline: 2px solid var(--payment-accent); outline-offset: 3px; }
 .shop-guide { display: flex; flex: 1; flex-direction: column; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--payment-line); }
-.shop-guide h3, .shop-faq h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 16px; color: var(--payment-text); font-size: 13px; font-weight: 600; }
-.shop-guide h3 :deep(svg), .shop-faq h3 :deep(svg) { color: var(--payment-muted); }
+.shop-guide h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 16px; color: var(--payment-text); font-size: 13px; font-weight: 600; }
+.shop-guide h3 :deep(svg) { color: var(--payment-muted); }
 .shop-guide ol { display: grid; flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
 .shop-guide li { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; min-width: 0; padding: 18px 14px; border: 1px solid var(--payment-line); border-radius: 12px; background: var(--payment-bg); }
 .shop-guide__number { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid var(--payment-line); border-radius: 50%; color: var(--payment-accent); background: var(--payment-surface); font-size: 12px; font-weight: 650; }
 .shop-guide li:not(:last-child)::after { position: absolute; top: 33px; left: calc(100% - 10px); z-index: 1; width: 32px; border-top: 1px dashed var(--signal-control-line, var(--payment-line)); content: ''; }
 .shop-guide strong { font-size: 13px; font-weight: 600; }
 .shop-guide p { margin: 7px 0 0; color: var(--payment-muted); font-size: 12px; line-height: 1.7; }
-.shop-faq { padding-top: 24px; }
-.shop-faq dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 0; }
+.shop-faq { padding-top: 16px; }
+.shop-faq dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 10px 0 0; }
 .shop-faq dl > div { min-width: 0; padding-left: 12px; border-left: 2px solid var(--payment-line); }
 .shop-faq dt { color: var(--payment-text); font-size: 12px; font-weight: 600; line-height: 1.7; }
 .shop-faq dd { margin: 6px 0 0; color: var(--payment-muted); font-size: 12px; line-height: 1.7; }
@@ -197,10 +197,14 @@ function openShop() {
 .shop-purchase { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 48px; padding: 12px 16px; border: 1px solid var(--payment-accent); border-radius: 10px; color: var(--signal-on-accent, #fff); background: var(--payment-accent); font-size: 14px; font-weight: 600; transition: box-shadow 140ms ease, filter 140ms ease; }
 .shop-purchase:not(:disabled):hover { filter: brightness(.94); box-shadow: 0 4px 12px #007db520; }
 .shop-purchase:disabled { border-color: var(--payment-line); color: var(--payment-muted); background: var(--payment-bg); cursor: not-allowed; }
-.shop-reminders { display: flex; flex: 1; flex-direction: column; padding: 16px; border: 1px solid var(--payment-line); border-radius: 12px; background: var(--payment-bg); }
-.shop-reminders h3 { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--payment-text); font-size: 12px; font-weight: 600; }
-.shop-reminders h3 :deep(svg) { color: var(--payment-accent); }
-.shop-reminders ul { display: grid; align-content: start; gap: 10px; margin: 14px 0 0; padding: 0; color: var(--payment-muted); font-size: 12px; line-height: 1.7; list-style: none; }
+.shop-reminders { margin-top: auto; padding: 0 12px; border: 1px solid var(--payment-line); border-radius: 12px; background: var(--payment-bg); }
+.shop-faq > summary, .shop-reminders > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; border-radius: 6px; color: var(--payment-text); font-size: 13px; font-weight: 600; list-style: none; cursor: pointer; }
+.shop-faq > summary::-webkit-details-marker, .shop-reminders > summary::-webkit-details-marker { display: none; }
+.shop-faq > summary > span, .shop-reminders > summary > span { display: flex; align-items: center; gap: 7px; }
+.shop-faq > summary :deep(svg), .shop-reminders > summary :deep(svg) { flex: 0 0 auto; color: var(--payment-muted); }
+.shop-faq[open] > summary > :deep(svg), .shop-reminders[open] > summary > :deep(svg) { transform: rotate(180deg); }
+.shop-faq > summary:focus-visible, .shop-reminders > summary:focus-visible { outline: 2px solid var(--payment-accent); outline-offset: 3px; }
+.shop-reminders ul { display: grid; align-content: start; gap: 10px; margin: 0 0 12px; padding: 0; color: var(--payment-muted); font-size: 12px; line-height: 1.7; list-style: none; }
 .shop-reminders li { display: flex; align-items: flex-start; gap: 9px; }
 .shop-reminders li :deep(svg) { flex: 0 0 auto; margin-top: 2px; }
 .shop-redeem { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding: 9px 14px; border: 1px solid var(--payment-line); border-radius: 10px; background: var(--payment-surface); }
@@ -208,6 +212,42 @@ function openShop() {
 .shop-redeem a { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; border-radius: 4px; color: var(--payment-accent); font-size: 13px; font-weight: 600; }
 .shop-redeem a > span { display: inline-flex; align-items: center; gap: 8px; }
 .shop-redeem a:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* Share the top row on desktops instead of spending a second row on account details. */
+@media (min-width: 1280px) {
+  .external-shop { grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto 1fr; }
+  .shop-heading { padding-bottom: 0; border-bottom: 0; }
+  .shop-account { padding: 14px 18px; gap: 12px; }
+  .shop-account__icon { width: 32px; height: 32px; }
+  .shop-account__identity { gap: 8px; }
+  .shop-balance { padding-left: 14px; }
+  .shop-balance strong { font-size: 24px; }
+  .shop-layout { grid-column: 1 / -1; }
+}
+/* Compact short/zoomed desktop windows without clipping or disabling page scrolling. */
+@media (min-width: 1280px) and (max-height: 850px) {
+  .external-shop, .shop-layout { gap: 16px; }
+  .shop-heading h1 { font-size: 26px; }
+  .shop-amount, .shop-summary { padding: 18px; }
+  .shop-amount-hint { margin: 6px 0 14px; }
+  .shop-tier { min-height: 64px; padding: 12px 5px; font-size: 22px; }
+  .shop-guide { margin-top: 18px; padding-top: 16px; }
+  .shop-guide h3 { margin-bottom: 12px; }
+  .shop-guide li { gap: 10px; padding: 14px; }
+  .shop-summary { gap: 8px; }
+  .shop-reference { gap: 6px; padding: 12px 16px; }
+  .shop-reference strong { font-size: 34px; }
+  .shop-reference .shop-reference--empty { font-size: 20px; }
+  .shop-redeem { padding: 6px 12px; }
+}
+@media (min-width: 1280px) and (max-height: 700px) {
+  .shop-amount, .shop-summary { padding: 16px; }
+  .shop-summary { gap: 6px; }
+  .shop-reference { gap: 4px; padding-block: 10px; }
+  .shop-reference strong { font-size: 30px; }
+  .shop-reference .shop-reference--empty { font-size: 20px; }
+  .shop-redeem { padding-block: 4px; }
+  .shop-guide li { gap: 8px; padding: 12px; }
+}
 @container (max-width: 740px) { .shop-layout { grid-template-columns: minmax(0, 1fr); } }
 @container (max-width: 900px) {
   .shop-guide ol, .shop-faq dl { grid-template-columns: minmax(0, 1fr); }

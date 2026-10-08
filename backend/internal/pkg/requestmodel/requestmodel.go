@@ -45,9 +45,10 @@ func IsLiveRequestRoute(routePath string) bool {
 // （为空回落 session 候选）。候选包含重复键、大小写变体的全部出现。
 func FromBodyCandidates(routePath, contentType string, body []byte) []string {
 	var topLevel, session []string
-	if isMultipartContentType(contentType) {
-		// 声明为 multipart 的请求体只做 multipart 解析——gjson 的部分扫描
-		// 会在 multipart 字节流里误匹配 session JSON 内的 model 字段。
+	if isMultipartContentType(contentType) && !isJSONObject(body) {
+		// 真正的 multipart 请求体只做 multipart 解析，避免 gjson 的部分扫描
+		// 误匹配 session JSON 内的 model。JSON handler 不强制校验 MIME，
+		// 因此整份有效 JSON 对象必须走 JSON 提取，不能被伪造的 MIME 隐藏。
 		models, sessions := multipartModelCandidates(contentType, body)
 		topLevel = models
 		session = sessionModelCandidates(sessions)
@@ -87,6 +88,28 @@ func FromBodyForRoute(routePath, contentType string, body []byte) string {
 		return ""
 	}
 	return candidates[0]
+}
+
+// ConflictingModelCandidates reports that parsers could bill one model and
+// forward another. Identical repeats are not a conflict.
+func ConflictingModelCandidates(candidates []string) bool {
+	var first string
+	seen := false
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if !seen {
+			first = candidate
+			seen = true
+			continue
+		}
+		if candidate != first {
+			return true
+		}
+	}
+	return false
 }
 
 // FromJSON 从 JSON 请求体提取模型名：顶层 `model` 优先，其次 `session.model`（Live）。
@@ -229,6 +252,11 @@ func multipartModelCandidates(contentType string, body []byte) (models, sessions
 func isMultipartContentType(contentType string) bool {
 	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(contentType))
 	return err == nil && strings.EqualFold(mediaType, "multipart/form-data")
+}
+
+func isJSONObject(body []byte) bool {
+	trimmed := bytes.TrimSpace(body)
+	return len(trimmed) > 0 && trimmed[0] == '{' && gjson.ValidBytes(body)
 }
 
 // ResetRequestBody 把已读取（可能已被改写）的请求体回填到请求上，

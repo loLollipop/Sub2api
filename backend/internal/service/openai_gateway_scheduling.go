@@ -825,6 +825,44 @@ func prioritizeOpenAICompactAccounts(accounts []*Account) []*Account {
 	return out
 }
 
+func prioritizeNativeResponsesAccounts(accounts []*Account) []*Account {
+	if len(accounts) < 2 {
+		return accounts
+	}
+	native := make([]*Account, 0, len(accounts))
+	rest := make([]*Account, 0)
+	for _, account := range accounts {
+		if openAIAccountServesInboundResponsesNatively(account) {
+			native = append(native, account)
+			continue
+		}
+		rest = append(rest, account)
+	}
+	if len(native) == 0 || len(rest) == 0 {
+		return accounts
+	}
+	return append(native, rest...)
+}
+
+func prioritizeNativeResponsesLoaded(items []accountWithLoad) []accountWithLoad {
+	if len(items) < 2 {
+		return items
+	}
+	native := make([]accountWithLoad, 0, len(items))
+	rest := make([]accountWithLoad, 0)
+	for _, item := range items {
+		if openAIAccountServesInboundResponsesNatively(item.account) {
+			native = append(native, item)
+			continue
+		}
+		rest = append(rest, item)
+	}
+	if len(native) == 0 || len(rest) == 0 {
+		return items
+	}
+	return append(native, rest...)
+}
+
 // resolveOpenAIAccountUpstreamModelForRequest resolves the upstream model that
 // would be sent for a given request, honoring the legacy compact-only mapping
 // when the caller is on the /responses/compact path.
@@ -1103,14 +1141,25 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 	if preferLowUpstreamRate {
 		rateOrder = newOpenAILegacyUpstreamRateOrder(eligible, time.Now(), s.openAIOAuthSchedulingRateMultiplier(ctx))
 	}
+	preferNativeResponses := openAIPreferNativeResponses(ctx)
 	sort.SliceStable(eligible, func(i, j int) bool {
 		a, b := eligible[i], eligible[j]
+		if preferNativeResponses {
+			if requireCompact && compactTiers[a.ID] != compactTiers[b.ID] {
+				return compactTiers[a.ID] > compactTiers[b.ID]
+			}
+			aNative := openAIAccountServesInboundResponsesNatively(a)
+			bNative := openAIAccountServesInboundResponsesNatively(b)
+			if aNative != bNative {
+				return aNative
+			}
+		}
 		aMapped := len(a.GetModelMapping()) > 0
 		bMapped := len(b.GetModelMapping()) > 0
 		if aMapped != bMapped {
 			return aMapped
 		}
-		if requireCompact && compactTiers[a.ID] != compactTiers[b.ID] {
+		if !preferNativeResponses && requireCompact && compactTiers[a.ID] != compactTiers[b.ID] {
 			return compactTiers[a.ID] > compactTiers[b.ID]
 		}
 		if rateCmp := rateOrder.compare(a, b); rateCmp != 0 {
@@ -1176,6 +1225,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 	cfg := s.schedulingConfig()
 	preferLowUpstreamRate := useUpstreamTokenCost && s.isOpenAILowUpstreamRatePriorityEnabled(ctx)
+	preferNativeResponses := openAIPreferNativeResponses(ctx)
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	var stickyAccountID int64
 	if sessionHash != "" && s.cache != nil {
@@ -1424,6 +1474,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				return rateOrder.compare(available[i].account, available[j].account) < 0
 			})
 		}
+		if preferNativeResponses {
+			available = prioritizeNativeResponsesLoaded(available)
+		}
 
 		selectionOrder := make([]accountWithLoad, 0, len(available))
 		if requireCompact {
@@ -1480,6 +1533,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				return rateOrder.compare(ordered[i], ordered[j]) < 0
 			})
 		}
+		if preferNativeResponses {
+			ordered = prioritizeNativeResponsesAccounts(ordered)
+		}
 		if requireCompact {
 			ordered = prioritizeOpenAICompactAccounts(ordered)
 		}
@@ -1529,6 +1585,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		sort.SliceStable(candidates, func(i, j int) bool {
 			return rateOrder.compare(candidates[i], candidates[j]) < 0
 		})
+	}
+	if preferNativeResponses {
+		candidates = prioritizeNativeResponsesAccounts(candidates)
 	}
 	if requireCompact {
 		candidates = prioritizeOpenAICompactAccounts(candidates)

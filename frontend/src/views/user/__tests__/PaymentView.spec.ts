@@ -1136,6 +1136,19 @@ describe('PaymentView instance recharge terms', () => {
     expect(text).toContain(formatPaymentAmount(2040, 'CNY'))
   })
 
+  it('shows the built-in recharge workspace without shop purchase controls', async () => {
+    const wrapper = await mountRechargeConfirm()
+    expect(wrapper.get('.signal-payment').attributes('data-payment-mode')).toBe('internal')
+    expect(wrapper.get('h1').text()).toBe('purchase.title')
+    expect(wrapper.get('.signal-payment-channel').text()).toBe('purchase.internalChannel')
+    expect(wrapper.find('.signal-recharge-fields').exists()).toBe(true)
+    expect(wrapper.find('.signal-checkout-action').exists()).toBe(true)
+    expect(wrapper.findComponent(ExternalShopRecharge).exists()).toBe(false)
+    expect(wrapper.find('.shop-summary').exists()).toBe(false)
+    expect(wrapper.get('.signal-balance-block').text()).toContain('purchase.balanceUsd')
+    wrapper.unmount()
+  })
+
   it('shows credited balance from the selected provider multiplier when global multiplier is 1', async () => {
     const wrapper = await mountRechargeConfirm({
       checkout: { balance_recharge_multiplier: 1, recharge_fee_rate: 0 },
@@ -1195,6 +1208,13 @@ describe('PaymentView external shop initialization', () => {
     expect(wrapper.find('input').exists()).toBe(false)
     expect(wrapper.find('iframe').exists()).toBe(false)
     expect(wrapper.find('[href="/orders"]').exists()).toBe(false)
+    expect(wrapper.get('.signal-payment').attributes('data-payment-mode')).toBe('external')
+    expect(wrapper.get('.signal-payment').classes()).toContain('signal-payment--shop')
+    expect(wrapper.findComponent(ConsoleTabs).exists()).toBe(false)
+    expect(wrapper.find('.signal-checkout-summary').exists()).toBe(false)
+    expect(wrapper.find('.signal-checkout-action').exists()).toBe(false)
+    expect(wrapper.find('.recharge-center-shell').exists()).toBe(false)
+    expect(wrapper.get('.shop-reference--empty').text()).toBe('purchase.chooseAmount')
     expect(wrapper.get('.shop-summary button').attributes('disabled')).toBeDefined()
     await wrapper.get('.shop-tier').trigger('click')
     await wrapper.get('.shop-summary button').trigger('click')
@@ -1206,6 +1226,41 @@ describe('PaymentView external shop initialization', () => {
     expect(fetchActiveSubscriptions).not.toHaveBeenCalled()
     expect(routerReplace).not.toHaveBeenCalled()
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toBe('legacy-order')
+    wrapper.unmount()
+    open.mockRestore()
+  })
+
+  it('prioritizes the self-contained shop when built-in payments are also enabled', async () => {
+    publicSettingsState.cachedPublicSettings.payment_enabled = true
+    const wrapper = await mountShop()
+    const vm = wrapper.vm as unknown as { activeTab: string }
+    vm.activeTab = 'rechargeCenter'
+    await flushPromises()
+    expect(wrapper.findComponent(ExternalShopRecharge).exists()).toBe(true)
+    expect(wrapper.get('.signal-payment').classes()).toContain('max-w-5xl')
+    expect(wrapper.get('.signal-payment').classes()).not.toContain('max-w-[1440px]')
+    expect(wrapper.findComponent(ConsoleTabs).exists()).toBe(false)
+    expect(wrapper.find('.signal-recharge-layout').exists()).toBe(false)
+    expect(wrapper.find('iframe').exists()).toBe(false)
+    expect(getCheckoutInfo).not.toHaveBeenCalled()
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toBe('legacy-order')
+    wrapper.unmount()
+  })
+
+  it('returns to the empty summary when the selected shop URL is removed', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wrapper = await mountShop()
+    await wrapper.get('.shop-tier').trigger('click')
+    const vm = wrapper.vm as unknown as { appStore: { cachedPublicSettings: { purchase_subscription_products: Record<string, string> } } }
+    vm.appStore.cachedPublicSettings.purchase_subscription_products = {}
+    await flushPromises()
+    expect(wrapper.get('.shop-reference--empty').text()).toBe('purchase.chooseAmount')
+    expect(wrapper.get('.shop-summary button').attributes('disabled')).toBeDefined()
+    await wrapper.get('.shop-summary button').trigger('click')
+    expect(open).not.toHaveBeenCalled()
+    expect(wrapper.get('[href="/redeem"]').exists()).toBe(true)
+    expect(createOrder).not.toHaveBeenCalled()
     wrapper.unmount()
     open.mockRestore()
   })
@@ -1230,7 +1285,8 @@ describe('PaymentView external shop initialization', () => {
     expect(publicSettingsState.fetchPublicSettings).toHaveBeenCalledOnce()
     expect(getCheckoutInfo).not.toHaveBeenCalled()
     // The API populates the same reactive cached object as the real app store.
-    publicSettingsState.cachedPublicSettings.purchase_subscription_enabled = true
+    const vm = wrapper.vm as unknown as { appStore: { cachedPublicSettings: { purchase_subscription_enabled: boolean } } }
+    vm.appStore.cachedPublicSettings.purchase_subscription_enabled = true
     resolveSettings()
     await flushPromises()
     expect(wrapper.findComponent(ExternalShopRecharge).exists()).toBe(true)

@@ -8,13 +8,6 @@
         <p class="shop-description">{{ t('purchase.shopDescription') }}</p>
       </div>
     </header>
-    <div class="shop-account">
-      <div class="shop-account__identity">
-        <span class="shop-account__icon" aria-hidden="true"><Icon name="userCircle" size="lg" /></span>
-        <div class="shop-account__name"><p class="shop-kicker">{{ t('payment.rechargeAccount') }}</p><strong>{{ username }}</strong></div>
-      </div>
-      <div class="shop-balance"><span>{{ t('purchase.balanceUsd') }}</span><strong>${{ balance.toFixed(2) }}<small aria-hidden="true">USD</small></strong></div>
-    </div>
     <div class="shop-layout">
       <section class="shop-amount">
         <div class="shop-section-heading">
@@ -30,13 +23,22 @@
             <small v-if="!safeProducts[tier]">{{ t('purchase.tierNotConfigured') }}</small>
           </button>
         </div>
+        <p class="shop-value-hint"><Icon name="infoCircle" size="sm" aria-hidden="true" />{{ t('purchase.codeValueHint') }}</p>
         <section class="shop-guide" :aria-label="t('purchase.howItWorks')">
           <h3><Icon name="arrowRight" size="sm" aria-hidden="true" />{{ t('purchase.howItWorks') }}</h3>
           <ol>
-            <li><span class="shop-guide__number" aria-hidden="true">1</span><div><strong>{{ t('purchase.stepSelectTitle') }}</strong><p>{{ t('purchase.stepSelectDescription') }}</p></div></li>
-            <li><span class="shop-guide__number" aria-hidden="true">2</span><div><strong>{{ t('purchase.stepBuyTitle') }}</strong><p>{{ t('purchase.stepBuyDescription') }}</p></div></li>
-            <li><span class="shop-guide__number" aria-hidden="true">3</span><div><strong>{{ t('purchase.stepRedeemTitle') }}</strong><p>{{ t('purchase.stepRedeemDescription') }}</p></div></li>
+            <li><span class="shop-guide__number" aria-hidden="true">1</span><strong>{{ t('purchase.stepSelectTitle') }}</strong></li>
+            <li><span class="shop-guide__number" aria-hidden="true">2</span><strong>{{ t('purchase.stepBuyTitle') }}</strong></li>
+            <li><span class="shop-guide__number" aria-hidden="true">3</span><strong>{{ t('purchase.stepRedeemTitle') }}</strong></li>
           </ol>
+        </section>
+        <section class="shop-account" :aria-label="t('purchase.balanceUsd')">
+          <div class="shop-account__identity">
+            <span class="shop-account__icon" aria-hidden="true"><Icon name="userCircle" size="lg" /></span>
+            <div class="shop-account__name"><p class="shop-kicker">{{ t('payment.rechargeAccount') }}</p><strong>{{ username }}</strong></div>
+          </div>
+          <div class="shop-balance"><span>{{ t('purchase.balanceUsd') }}</span><strong>${{ balance.toFixed(2) }}<small aria-hidden="true">USD</small></strong></div>
+          <p class="shop-purchase-hint"><Icon name="infoCircle" size="sm" aria-hidden="true" />{{ t('purchase.redemptionRequired') }}</p>
         </section>
         <details class="shop-faq">
           <summary><span><Icon name="questionCircle" size="sm" aria-hidden="true" />{{ t('purchase.faqTitle') }}</span><Icon name="chevronDown" size="sm" aria-hidden="true" /></summary>
@@ -57,20 +59,18 @@
           <div><dt>{{ t('purchase.productType') }}</dt><dd>{{ t('purchase.codeProduct') }}</dd></div>
           <div><dt>{{ t('purchase.creditMethod') }}</dt><dd>{{ t('purchase.manualRedemption') }}</dd></div>
         </dl>
-        <p class="shop-value-hint"><Icon name="infoCircle" size="sm" aria-hidden="true" />{{ t('purchase.codeValueHint') }}</p>
         <p v-if="!Object.keys(safeProducts).length" role="status" class="shop-warning">{{ t('purchase.invalidShopUrl') }}</p>
         <button type="button" class="shop-purchase" :disabled="!canPurchase" @click="openShop">
           {{ t('purchase.goToShop') }} <Icon name="externalLink" size="sm" aria-hidden="true" />
         </button>
-        <p class="shop-purchase-hint"><Icon name="externalLink" size="xs" aria-hidden="true" />{{ t('purchase.redemptionRequired') }}</p>
-        <details class="shop-reminders">
-          <summary><span><Icon name="shield" size="sm" aria-hidden="true" />{{ t('purchase.remindersTitle') }}</span><Icon name="chevronDown" size="sm" aria-hidden="true" /></summary>
+        <section class="shop-reminders" :aria-label="t('purchase.remindersTitle')">
+          <h3><Icon name="shield" size="sm" aria-hidden="true" />{{ t('purchase.remindersTitle') }}</h3>
           <ul>
             <li><Icon name="creditCard" size="sm" aria-hidden="true" /><span>{{ t('purchase.reminderProduct') }}</span></li>
             <li><Icon name="userCircle" size="sm" aria-hidden="true" /><span>{{ t('purchase.reminderAccount') }}</span></li>
             <li><Icon name="lock" size="sm" aria-hidden="true" /><span>{{ t('purchase.reminderCode') }}</span></li>
           </ul>
-        </details>
+        </section>
         <div class="shop-redeem">
           <span>{{ t('purchase.haveCode') }}</span>
           <RouterLink to="/redeem"><span><Icon name="gift" size="sm" aria-hidden="true" />{{ t('purchase.redeemCode') }}</span><Icon name="arrowRight" size="sm" aria-hidden="true" /></RouterLink>
@@ -133,22 +133,22 @@ function openShop() {
 </script>
 
 <style scoped>
-.external-shop { display: grid; grid-template-rows: auto auto 1fr; gap: 20px; min-width: 0; container-type: inline-size; }
-.shop-heading { display: flex; align-items: center; gap: 14px; padding-bottom: 20px; border-bottom: 1px solid var(--payment-line); }
+.external-shop { display: grid; grid-template-rows: auto 1fr; gap: 20px; min-width: 0; container-type: inline-size; }
+.shop-heading { display: flex; align-items: center; gap: 14px; }
 .shop-heading__icon { display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center; border: 1px solid var(--payment-line); border-radius: 14px; color: var(--payment-accent); background: var(--payment-surface); box-shadow: 0 3px 8px #20242605; }
 .shop-heading__copy { min-width: 0; }
 .shop-heading h1 { margin: 3px 0 6px; font-size: 29px; font-weight: 700; line-height: 1.2; }
 .shop-kicker { margin: 0; color: var(--payment-muted); font-size: 11px; font-weight: 600; line-height: 1.5; }
 .shop-description { margin: 0; color: var(--payment-muted); font-size: 13px; line-height: 1.6; }
-.shop-account { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 20px; min-width: 0; padding: 18px 24px; border: 1px solid var(--payment-line); border-radius: 14px; background: var(--payment-surface); box-shadow: var(--signal-shadow, none); }
+.shop-account { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 20px; min-width: 0; margin-top: 24px; padding: 22px; border: 1px solid var(--payment-line); border-radius: 14px; background: var(--payment-accent-soft); }
 .shop-account::before { position: absolute; inset: 24px auto 24px -1px; width: 3px; border-radius: 2px; background: var(--payment-accent); content: ''; }
 .shop-account__identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .shop-account__icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: var(--payment-accent); background: var(--payment-accent-soft); }
 .shop-account__name { min-width: 0; }
 .shop-account__name strong { display: block; margin-top: 3px; font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
-.shop-balance { display: grid; gap: 3px; flex: 0 0 auto; padding-left: 24px; border-left: 1px solid var(--payment-line); text-align: right; }
+.shop-balance { display: grid; gap: 3px; min-width: 0; padding-left: 24px; border-left: 1px solid var(--payment-line); text-align: right; }
 .shop-balance > span, .shop-reference > span { color: var(--payment-muted); font-size: 12px; }
-.shop-balance strong { color: var(--payment-text); font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.shop-balance strong { color: var(--payment-text); font-size: 36px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.3; overflow-wrap: anywhere; }
 .shop-balance small, .shop-reference small { margin-left: 7px; color: var(--payment-muted); font-size: 11px; font-weight: 500; }
 .shop-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(288px, 320px); align-items: stretch; gap: 20px; }
 .shop-amount, .shop-summary { min-width: 0; padding: 22px; border: 1px solid var(--payment-line); border-radius: 16px; background: var(--payment-surface); box-shadow: var(--signal-shadow, none); }
@@ -166,16 +166,15 @@ function openShop() {
 .shop-tier:disabled { cursor: not-allowed; color: var(--payment-muted); background: var(--payment-bg); border-style: dashed; }
 .shop-tier small { display: block; margin-top: 5px; font-size: 10px; font-weight: 400; overflow-wrap: anywhere; }
 .shop-tier:focus-visible, .shop-purchase:focus-visible, .shop-redeem a:focus-visible { outline: 2px solid var(--payment-accent); outline-offset: 3px; }
-.shop-guide { display: flex; flex: 1; flex-direction: column; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--payment-line); }
+.shop-guide { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--payment-line); }
 .shop-guide h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 16px; color: var(--payment-text); font-size: 13px; font-weight: 600; }
 .shop-guide h3 :deep(svg) { color: var(--payment-muted); }
-.shop-guide ol { display: grid; flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.shop-guide li { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; min-width: 0; padding: 18px 14px; border: 1px solid var(--payment-line); border-radius: 12px; background: var(--payment-bg); }
+.shop-guide ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.shop-guide li { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px 10px; border: 1px solid var(--payment-line); border-radius: 10px; background: var(--payment-bg); }
 .shop-guide__number { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid var(--payment-line); border-radius: 50%; color: var(--payment-accent); background: var(--payment-surface); font-size: 12px; font-weight: 650; }
-.shop-guide li:not(:last-child)::after { position: absolute; top: 33px; left: calc(100% - 10px); z-index: 1; width: 32px; border-top: 1px dashed var(--signal-control-line, var(--payment-line)); content: ''; }
-.shop-guide strong { font-size: 13px; font-weight: 600; }
-.shop-guide p { margin: 7px 0 0; color: var(--payment-muted); font-size: 12px; line-height: 1.7; }
-.shop-faq { padding-top: 16px; }
+.shop-guide li:not(:last-child)::after { position: absolute; top: 50%; left: calc(100% + 1px); width: 12px; border-top: 1px dashed var(--signal-control-line, var(--payment-line)); content: ''; }
+.shop-guide strong { min-width: 0; font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.shop-faq { margin-top: auto; padding-top: 16px; }
 .shop-faq dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 10px 0 0; }
 .shop-faq dl > div { min-width: 0; padding-left: 12px; border-left: 2px solid var(--payment-line); }
 .shop-faq dt { color: var(--payment-text); font-size: 12px; font-weight: 600; line-height: 1.7; }
@@ -186,25 +185,27 @@ function openShop() {
 .shop-reference { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--payment-line); border-radius: 12px; background: var(--payment-accent-soft); }
 .shop-reference strong { min-width: 0; color: var(--payment-accent); font-size: 40px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.2; }
 .shop-reference .shop-reference--empty { padding: 5px 0; color: var(--payment-muted); font-size: 22px; font-weight: 500; }
-.shop-order-details { display: grid; gap: 9px; margin: 0; padding: 3px 0 12px; border-bottom: 1px dashed var(--signal-control-line, var(--payment-line)); font-size: 12px; }
+.shop-order-details { display: grid; gap: 8px; margin: 0; padding: 3px 0 10px; border-bottom: 1px dashed var(--signal-control-line, var(--payment-line)); font-size: 12px; }
 .shop-order-details > div { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
 .shop-order-details dt { color: var(--payment-muted); }
 .shop-order-details dd { min-width: 0; margin: 0; color: var(--payment-text); text-align: right; overflow-wrap: anywhere; }
 .shop-value-hint, .shop-purchase-hint { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--payment-muted); font-size: 12px; line-height: 1.6; }
 .shop-value-hint :deep(svg), .shop-purchase-hint :deep(svg) { flex: 0 0 auto; margin-top: 2px; }
-.shop-purchase-hint { margin-top: -5px; font-size: 11px; }
+.shop-value-hint { margin-top: 12px; }
+.shop-purchase-hint { grid-column: 1 / -1; padding-top: 12px; border-top: 1px solid var(--payment-line); font-size: 12px; }
 .shop-warning { margin: 0; color: var(--payment-amber); font-size: 12px; line-height: 1.6; }
 .shop-purchase { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 48px; padding: 12px 16px; border: 1px solid var(--payment-accent); border-radius: 10px; color: var(--signal-on-accent, #fff); background: var(--payment-accent); font-size: 14px; font-weight: 600; transition: box-shadow 140ms ease, filter 140ms ease; }
 .shop-purchase:not(:disabled):hover { filter: brightness(.94); box-shadow: 0 4px 12px #007db520; }
 .shop-purchase:disabled { border-color: var(--payment-line); color: var(--payment-muted); background: var(--payment-bg); cursor: not-allowed; }
-.shop-reminders { margin-top: auto; padding: 0 12px; border: 1px solid var(--payment-line); border-radius: 12px; background: var(--payment-bg); }
-.shop-faq > summary, .shop-reminders > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; border-radius: 6px; color: var(--payment-text); font-size: 13px; font-weight: 600; list-style: none; cursor: pointer; }
-.shop-faq > summary::-webkit-details-marker, .shop-reminders > summary::-webkit-details-marker { display: none; }
-.shop-faq > summary > span, .shop-reminders > summary > span { display: flex; align-items: center; gap: 7px; }
-.shop-faq > summary :deep(svg), .shop-reminders > summary :deep(svg) { flex: 0 0 auto; color: var(--payment-muted); }
-.shop-faq[open] > summary > :deep(svg), .shop-reminders[open] > summary > :deep(svg) { transform: rotate(180deg); }
-.shop-faq > summary:focus-visible, .shop-reminders > summary:focus-visible { outline: 2px solid var(--payment-accent); outline-offset: 3px; }
-.shop-reminders ul { display: grid; align-content: start; gap: 10px; margin: 0 0 12px; padding: 0; color: var(--payment-muted); font-size: 12px; line-height: 1.7; list-style: none; }
+.shop-reminders { margin-top: auto; padding: 14px; border: 1px solid var(--payment-line); border-radius: 12px; background: var(--payment-bg); }
+.shop-reminders h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; font-size: 13px; font-weight: 600; line-height: 1.5; }
+.shop-faq > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; border-radius: 6px; color: var(--payment-text); font-size: 13px; font-weight: 600; list-style: none; cursor: pointer; }
+.shop-faq > summary::-webkit-details-marker { display: none; }
+.shop-faq > summary > span { display: flex; align-items: center; gap: 7px; }
+.shop-faq > summary :deep(svg), .shop-reminders h3 :deep(svg) { flex: 0 0 auto; color: var(--payment-muted); }
+.shop-faq[open] > summary > :deep(svg) { transform: rotate(180deg); }
+.shop-faq > summary:focus-visible { outline: 2px solid var(--payment-accent); outline-offset: 3px; }
+.shop-reminders ul { display: grid; align-content: start; gap: 10px; margin: 0; padding: 0; color: var(--payment-muted); font-size: 12px; line-height: 1.7; list-style: none; }
 .shop-reminders li { display: flex; align-items: flex-start; gap: 9px; }
 .shop-reminders li :deep(svg) { flex: 0 0 auto; margin-top: 2px; }
 .shop-redeem { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding: 9px 14px; border: 1px solid var(--payment-line); border-radius: 10px; background: var(--payment-surface); }
@@ -212,17 +213,6 @@ function openShop() {
 .shop-redeem a { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; border-radius: 4px; color: var(--payment-accent); font-size: 13px; font-weight: 600; }
 .shop-redeem a > span { display: inline-flex; align-items: center; gap: 8px; }
 .shop-redeem a:hover { text-decoration: underline; text-underline-offset: 3px; }
-/* Share the top row on desktops instead of spending a second row on account details. */
-@media (min-width: 1280px) {
-  .external-shop { grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto 1fr; }
-  .shop-heading { padding-bottom: 0; border-bottom: 0; }
-  .shop-account { padding: 14px 18px; gap: 12px; }
-  .shop-account__icon { width: 32px; height: 32px; }
-  .shop-account__identity { gap: 8px; }
-  .shop-balance { padding-left: 14px; }
-  .shop-balance strong { font-size: 24px; }
-  .shop-layout { grid-column: 1 / -1; }
-}
 /* Compact short/zoomed desktop windows without clipping or disabling page scrolling. */
 @media (min-width: 1280px) and (max-height: 850px) {
   .external-shop, .shop-layout { gap: 16px; }
@@ -232,32 +222,61 @@ function openShop() {
   .shop-tier { min-height: 64px; padding: 12px 5px; font-size: 22px; }
   .shop-guide { margin-top: 18px; padding-top: 16px; }
   .shop-guide h3 { margin-bottom: 12px; }
-  .shop-guide li { gap: 10px; padding: 14px; }
+  .shop-guide li { gap: 8px; padding: 10px 8px; }
+  .shop-guide__number { width: 24px; height: 24px; }
+  .shop-account { margin-top: 18px; padding: 18px; gap: 14px; }
+  .shop-balance { padding-left: 16px; }
+  .shop-balance strong { font-size: 30px; }
   .shop-summary { gap: 8px; }
   .shop-reference { gap: 6px; padding: 12px 16px; }
   .shop-reference strong { font-size: 34px; }
   .shop-reference .shop-reference--empty { font-size: 20px; }
   .shop-redeem { padding: 6px 12px; }
 }
-@media (min-width: 1280px) and (max-height: 700px) {
+@media (min-width: 1280px) and (max-height: 780px) {
+  .external-shop, .shop-layout { gap: 14px; }
   .shop-amount, .shop-summary { padding: 16px; }
+  .shop-amount-hint { margin: 4px 0 10px; }
+  .shop-tier { min-height: 56px; padding-block: 8px; }
+  .shop-value-hint { margin-top: 8px; }
   .shop-summary { gap: 6px; }
   .shop-reference { gap: 4px; padding-block: 10px; }
   .shop-reference strong { font-size: 30px; }
   .shop-reference .shop-reference--empty { font-size: 20px; }
   .shop-redeem { padding-block: 4px; }
-  .shop-guide li { gap: 8px; padding: 12px; }
+  .shop-guide { margin-top: 12px; padding-top: 10px; }
+  .shop-guide h3 { margin-bottom: 8px; }
+  .shop-guide li { padding-block: 6px; }
+  .shop-account { margin-top: 12px; padding: 12px; gap: 8px; }
+  .shop-account__icon { width: 32px; height: 32px; }
+  .shop-account__identity { gap: 8px; }
+  .shop-balance strong { font-size: 26px; }
+  .shop-purchase-hint { padding-top: 8px; }
+  .shop-faq { padding-top: 8px; }
+  .shop-reminders { padding: 10px 12px; }
+  .shop-reminders h3 { margin-bottom: 8px; }
+  .shop-reminders ul { gap: 6px; line-height: 1.6; }
 }
-@container (max-width: 740px) { .shop-layout { grid-template-columns: minmax(0, 1fr); } }
-@container (max-width: 900px) {
-  .shop-guide ol, .shop-faq dl { grid-template-columns: minmax(0, 1fr); }
-  .shop-guide li { flex-direction: row; gap: 12px; padding: 14px; }
+@media (min-width: 1280px) and (max-height: 700px) {
+  .shop-heading h1 { margin-bottom: 3px; font-size: 22px; }
+  .shop-account { padding: 10px; gap: 6px; }
+  .shop-guide { margin-top: 10px; padding-top: 8px; }
+  .shop-order-details { gap: 6px; padding-bottom: 8px; }
+}
+@container (max-width: 740px) {
+  .shop-layout { grid-template-columns: minmax(0, 1fr); }
+  .shop-faq dl { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 480px) {
+  .shop-guide ol { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .shop-guide li:not(:last-child)::after { display: none; }
+  .shop-account { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .shop-balance { padding: 12px 0 0; border-top: 1px solid var(--payment-line); border-left: 0; text-align: left; }
+  .shop-tiers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@container (max-width: 480px) { .shop-tiers { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 767px) {
   .external-shop { gap: 16px; }
-  .shop-heading { flex-wrap: wrap; gap: 12px; padding-bottom: 16px; }
+  .shop-heading { flex-wrap: wrap; gap: 12px; }
   .shop-heading__copy { flex: 1 1 calc(100% - 60px); }
   .shop-heading h1 { font-size: 23px; }
   .shop-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -266,8 +285,6 @@ function openShop() {
   .shop-tier { min-height: 70px; padding: 18px 5px; font-size: 22px; }
 }
 @media (max-width: 374px) {
-  .shop-account { flex-wrap: wrap; gap: 14px; }
-  .shop-balance { width: 100%; padding: 12px 0 0; border-top: 1px solid var(--payment-line); border-left: 0; text-align: left; }
   .shop-account__icon { display: none; }
   .shop-tier { font-size: 19px; }
 }

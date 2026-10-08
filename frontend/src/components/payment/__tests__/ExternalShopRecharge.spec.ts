@@ -14,15 +14,20 @@ function mountShop(config: Record<string, string> = products) {
 afterEach(() => vi.restoreAllMocks())
 
 describe('ExternalShopRecharge', () => {
-  it('keeps optional help in collapsed native disclosures while purchase and redemption remain exposed', () => {
+  it('keeps purchase reminders visible and only FAQ in a collapsed native disclosure', () => {
     const wrapper = mountShop()
-    for (const [selector, title] of [['.shop-faq', 'purchase.faqTitle'], ['.shop-reminders', 'purchase.remindersTitle']] as const) {
-      const disclosure = wrapper.get(selector)
-      expect(disclosure.element.tagName).toBe('DETAILS')
-      expect(disclosure.attributes('open')).toBeUndefined()
-      expect(disclosure.get('summary').text()).toBe(title)
-      expect(disclosure.get('summary').attributes('tabindex')).not.toBe('-1')
-    }
+    const disclosure = wrapper.get('.shop-faq')
+    expect(disclosure.element.tagName).toBe('DETAILS')
+    expect(disclosure.attributes('open')).toBeUndefined()
+    expect(disclosure.get('summary').text()).toBe('purchase.faqTitle')
+    expect(disclosure.get('summary').attributes('tabindex')).not.toBe('-1')
+    const reminders = wrapper.get('.shop-reminders')
+    expect(reminders.element.tagName).toBe('SECTION')
+    expect(reminders.attributes('aria-label')).toBe('purchase.remindersTitle')
+    expect(reminders.get('h3').text()).toBe('purchase.remindersTitle')
+    expect(reminders.find('summary').exists()).toBe(false)
+    expect(reminders.findAll('li')).toHaveLength(3)
+    expect(wrapper.findAll('details')).toHaveLength(1)
     expect(wrapper.get('.shop-summary button').exists()).toBe(true)
     expect(wrapper.get('[href="/redeem"]').exists()).toBe(true)
     wrapper.unmount()
@@ -60,6 +65,22 @@ describe('ExternalShopRecharge', () => {
     ])
     expect(wrapper.findAll('.shop-summary button')).toHaveLength(1)
     expect(wrapper.get('[href="/redeem"]').text()).toContain('purchase.redeemCode')
+    wrapper.unmount()
+  })
+
+  it('relocates the single reactive wallet into the left column without changing account data', async () => {
+    const wrapper = mountShop()
+    expect(wrapper.findAll('.shop-account')).toHaveLength(1)
+    expect(wrapper.find('.external-shop > .shop-account').exists()).toBe(false)
+    expect(wrapper.get('.shop-amount .shop-account').exists()).toBe(true)
+    expect(wrapper.get('.shop-account').attributes('aria-label')).toBe('purchase.balanceUsd')
+    expect(wrapper.get('.shop-account .shop-purchase-hint').text()).toBe('purchase.redemptionRequired')
+    expect(wrapper.find('.shop-guide p').exists()).toBe(false)
+    await wrapper.setProps({ username: 'changed-buyer', balance: 557.43 })
+    expect(wrapper.get('.shop-account__name strong').text()).toBe('changed-buyer')
+    expect(wrapper.get('.shop-balance').text()).toContain('$557.43')
+    expect(wrapper.get('.shop-balance').text()).toContain('USD')
+    expect(wrapper.emitted('update:balance')).toBeUndefined()
     wrapper.unmount()
   })
 

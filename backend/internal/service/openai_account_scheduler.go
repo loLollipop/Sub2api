@@ -2615,6 +2615,7 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 	if openAIPreferNativeResponses(ctx) {
 		ctx = context.WithValue(ctx, openAIStickyNativeRequirementsContextKey{}, OpenAIAccountScheduleRequest{
 			RequiredTransport: requiredTransport, RequiredImageCapability: requiredImageCapability,
+			PreviousResponseID: previousResponseID, PreviousResponseCanMove: previousResponseCanMove,
 		})
 	}
 	preserveGuardianParentBinding := preserveOpenAIGuardianParentBinding(ctx, sessionHash)

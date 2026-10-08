@@ -1092,6 +1092,13 @@ func (s *OpenAIGatewayService) openAIConverterStickyHasNativeReplacement(ctx con
 	if requirements, ok := ctx.Value(openAIStickyNativeRequirementsContextKey{}).(OpenAIAccountScheduleRequest); ok {
 		req.RequiredTransport = requirements.RequiredTransport
 		req.RequiredImageCapability = requirements.RequiredImageCapability
+		req.PreviousResponseID = requirements.PreviousResponseID
+		req.PreviousResponseCanMove = requirements.PreviousResponseCanMove
+	}
+	// Legacy scheduling has no separate response-ID layer. Do not migrate its
+	// existing session binding when the caller cannot rebuild the continuation.
+	if strings.TrimSpace(req.PreviousResponseID) != "" && !req.PreviousResponseCanMove {
+		return false
 	}
 	req.Platform = NormalizeOpenAICompatiblePlatform(req.Platform)
 	req.RequirePrivacySet = req.RequirePrivacySet || s.openAIGroupRequiresPrivacySet(ctx, req.GroupID)

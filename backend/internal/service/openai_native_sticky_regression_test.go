@@ -146,26 +146,44 @@ func TestNativeResponsesStickyProbeHonorsTransport(t *testing.T) {
 }
 
 func TestNativeResponsesPreferencePreservesHardPreviousResponse(t *testing.T) {
-	sticky := nativeResponsesSchedulingTestAccount(1, 0, false)
-	sticky.Extra["openai_apikey_responses_websockets_v2_enabled"] = true
-	native := nativeResponsesSchedulingTestAccount(2, 10, true)
-	svc := nativeResponsesSchedulingTestService(t, []Account{sticky, native}, true, false, schedulerTestConcurrencyCache{})
-	svc.cfg.Gateway.OpenAIWS.Enabled = true
-	svc.cfg.Gateway.OpenAIWS.APIKeyEnabled = true
-	svc.cfg.Gateway.OpenAIWS.ResponsesWebsocketsV2 = true
-	svc.cfg.Gateway.OpenAIWS.StickyResponseIDTTLSeconds = 3600
-	ctx := WithOpenAIPreferNativeResponses(context.Background())
-	groupID := int64(1)
-	require.NoError(t, svc.getOpenAIWSStateStore().BindResponseAccount(ctx, groupID, "resp_native_pref_hard", 1, time.Hour))
-	selection, decision, err := svc.SelectAccountWithSchedulerForCapability(ctx, &groupID, "resp_native_pref_hard", "sticky", "gpt-test", nil,
-		OpenAIUpstreamTransportAny, OpenAIEndpointCapabilityChatCompletions, false, false, false)
-	require.NoError(t, err)
-	require.NotNil(t, selection)
-	require.Equal(t, sticky.ID, selection.Account.ID)
-	require.Equal(t, openAIAccountScheduleLayerPreviousResponse, decision.Layer)
-	require.True(t, decision.StickyPreviousHit)
-	if selection.ReleaseFunc != nil {
-		t.Cleanup(selection.ReleaseFunc)
+	for _, route := range []struct {
+		name            string
+		advanced, batch bool
+	}{
+		{name: "legacy_no_batch"},
+		{name: "legacy_batch", batch: true},
+		{name: "advanced", advanced: true},
+	} {
+		t.Run(route.name, func(t *testing.T) {
+			sticky := nativeResponsesSchedulingTestAccount(1, 0, false)
+			sticky.Extra["openai_apikey_responses_websockets_v2_enabled"] = true
+			native := nativeResponsesSchedulingTestAccount(2, 10, true)
+			native.Extra = map[string]any{"openai_apikey_responses_websockets_v2_enabled": true}
+			svc := nativeResponsesSchedulingTestService(t, []Account{sticky, native}, route.advanced, route.batch, schedulerTestConcurrencyCache{})
+			svc.cfg.Gateway.OpenAIWS.Enabled = true
+			svc.cfg.Gateway.OpenAIWS.APIKeyEnabled = true
+			svc.cfg.Gateway.OpenAIWS.ResponsesWebsocketsV2 = true
+			svc.cfg.Gateway.OpenAIWS.StickyResponseIDTTLSeconds = 3600
+			ctx := WithOpenAIPreferNativeResponses(context.Background())
+			groupID := int64(1)
+			require.NoError(t, svc.getOpenAIWSStateStore().BindResponseAccount(ctx, groupID, "resp_native_pref_hard", 1, time.Hour))
+			require.NoError(t, svc.setStickySessionAccountID(ctx, &groupID, "sticky", 1, openaiStickySessionTTL))
+			selection, decision, err := svc.SelectAccountWithSchedulerForCapability(ctx, &groupID, "resp_native_pref_hard", "sticky", "gpt-test", nil,
+				OpenAIUpstreamTransportResponsesWebsocketV2, OpenAIEndpointCapabilityChatCompletions, false, false, false)
+			require.NoError(t, err)
+			require.NotNil(t, selection)
+			require.Equal(t, sticky.ID, selection.Account.ID, "a hard continuation must not migrate to another WS-capable native account")
+			if route.advanced {
+				require.Equal(t, openAIAccountScheduleLayerPreviousResponse, decision.Layer)
+				require.True(t, decision.StickyPreviousHit)
+			}
+			bound, err := svc.getStickySessionAccountID(ctx, &groupID, "sticky")
+			require.NoError(t, err)
+			require.Equal(t, sticky.ID, bound)
+			if selection.ReleaseFunc != nil {
+				t.Cleanup(selection.ReleaseFunc)
+			}
+		})
 	}
 }
 

@@ -2,12 +2,12 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.0.63",
-  "imported_commit": "0710c3e6a7d39089b4edda5530ca5faf481ba3c1",
+  "imported_version": "2.0.65",
+  "imported_commit": "6278f0e2bd09d7710a96729a8adeb21ec788f249",
   "personal_baseline_commit": "b1c9de686ae9b9da61a02ba59fb7e3c8524644ec",
-  "latest_observed_version": "2.0.63",
-  "latest_observed_release_commit": "ad8de5545b176768c78a99c650a82006969f6fec",
-  "latest_observed_main_commit": "0710c3e6a7d39089b4edda5530ca5faf481ba3c1",
+  "latest_observed_version": "2.0.65",
+  "latest_observed_release_commit": "1557adff351fcafb02f78cae13c497b0a4aedfd1",
+  "latest_observed_main_commit": "6278f0e2bd09d7710a96729a8adeb21ec788f249",
   "sync_policy": "review-diff-then-squash",
   "deferred_changes": [
     {
@@ -19,6 +19,11 @@
       "feature": "plaintext-reasoning-request-history",
       "upstream_commits": ["009874ac5"],
       "reason": "The shared Chat-to-Responses converter sets store:false; summary-only reasoning items are not portable and the existing OpenAI normalizer removes them. Preserve assistant-message history and exact whitespace until destination support is verified. Output thinking separation and local_shell conversion are imported."
+    },
+    {
+      "feature": "deepseek-inline-dsml-and-global-analysis-summary-tags",
+      "upstream_commits": ["1d373770d", "c35492853", "1557adff3"],
+      "reason": "Defer the new parser, bridge and passthrough wiring together: truncated invocations and literal code examples synthesize executable tool calls; generated events violate sequence/index/identity, while partial tags bypass the buffer cap. The passthrough hook is unreachable for normal DeepSeek platform accounts and additionally breaks SSE frame boundaries, final output identities, and preauthorization observation. Preserve existing think/thinking conversion and native structured tools until provider-scoped parsing and real Forward-level streaming/billing regressions are available. The native-account session scheduling change is imported separately."
     }
   ],
   "deployment_repository": "loLollipop/Sub2api"

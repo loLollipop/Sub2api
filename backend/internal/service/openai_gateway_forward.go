@@ -1501,6 +1501,12 @@ func openAIPreferNativeResponses(ctx context.Context) bool {
 	return enabled
 }
 
+// A converter sticky yields only after the scheduler confirms an eligible native
+// replacement. A missing or failed candidate lookup must preserve the binding.
+func openAIStickyYieldsToNativeResponses(ctx context.Context, account *Account, eligibleNative bool) bool {
+	return eligibleNative && account != nil && openAIPreferNativeResponses(ctx) && !openAIAccountServesInboundResponsesNatively(account)
+}
+
 func shouldFallbackOpenAIResponsesToChatOnUnsupportedEndpoint(account *Account, c *gin.Context, status int) bool {
 	if isResponsesEndpointSupportedByStatus(status) {
 		return false

@@ -169,7 +169,7 @@ func TestNativeResponsesSelectionPreservesInitialPreferenceStickyAndExclusions(t
 			wantID        int64
 		}{
 			{name: "initial_native_before_priority", wantID: 2},
-			{name: "sticky_converter", session: "sticky", wantID: 1},
+			{name: "sticky_converter_yields_to_eligible_native", session: "sticky", wantID: 2},
 			{name: "excluded_native", excluded: map[int64]struct{}{2: {}}, wantID: 1},
 		} {
 			name := "legacy/" + tc.name

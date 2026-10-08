@@ -1068,11 +1068,69 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
 	}
+	if s.openAIConverterStickyHasNativeReplacement(ctx, account, OpenAIAccountScheduleRequest{
+		GroupID: groupID, Platform: platform, RequestedModel: requestedModel,
+		ExcludedIDs: excludedIDs, RequireCompact: requireCompact, RequiredCapability: requiredCapability,
+	}) {
+		return nil
+	}
 
 	// 刷新会话 TTL 并返回账号
 	// Refresh session TTL and return account
 	_ = s.refreshStickySessionTTL(ctx, groupID, sessionHash, openaiStickySessionTTL)
 	return account
+}
+
+// Legacy selectors receive transport/image requirements through the common
+// scheduler entry point, so the native probe cannot bypass its final gates.
+type openAIStickyNativeRequirementsContextKey struct{}
+
+func (s *OpenAIGatewayService) openAIConverterStickyHasNativeReplacement(ctx context.Context, sticky *Account, req OpenAIAccountScheduleRequest) bool {
+	if !openAIStickyYieldsToNativeResponses(ctx, sticky, true) {
+		return false
+	}
+	if requirements, ok := ctx.Value(openAIStickyNativeRequirementsContextKey{}).(OpenAIAccountScheduleRequest); ok {
+		req.RequiredTransport = requirements.RequiredTransport
+		req.RequiredImageCapability = requirements.RequiredImageCapability
+	}
+	req.Platform = NormalizeOpenAICompatiblePlatform(req.Platform)
+	req.RequirePrivacySet = req.RequirePrivacySet || s.openAIGroupRequiresPrivacySet(ctx, req.GroupID)
+	accounts, err := s.listSchedulableAccounts(ctx, req.GroupID, req.Platform)
+	if err != nil {
+		return false
+	}
+	accounts, _ = filterAccountsSupportingRequestedModel(accounts, req.RequestedModel)
+	accounts = applySchedulerFreshnessForRequest(ctx, s.accountRepo, s.schedulerSnapshot, accounts)
+	// Reuse the ordinary candidate and final admission checks, without acquiring
+	// a slot or rebinding the session during this existence probe.
+	scheduler := &defaultOpenAIAccountScheduler{service: s}
+	accounts = scheduler.filterGrokFreeQuotaAccounts(ctx, accounts)
+	if req.Platform == PlatformGrok {
+		now := time.Now()
+		accounts = filterGrokTeamModelRateLimitedAccounts(accounts, req.RequestedModel, now)
+		accounts = filterGrokModelQuotaBlockedAccounts(accounts, req.RequestedModel, now)
+	}
+	for i := range accounts {
+		candidate := &accounts[i]
+		if _, excluded := req.ExcludedIDs[candidate.ID]; excluded || !openAIAccountServesInboundResponsesNatively(candidate) {
+			continue
+		}
+		fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, candidate, req.Platform, req.RequestedModel, false, req.RequiredCapability)
+		if fresh == nil || !scheduler.isAccountRequestCompatible(ctx, fresh, req) || !scheduler.isAccountTransportCompatible(fresh, req.RequiredTransport) {
+			continue
+		}
+		fresh = s.recheckSelectedOpenAIAccountFromDB(ctx, fresh, req.GroupID, req.Platform, req.RequestedModel, req.RequireCompact, req.RequiredCapability)
+		if fresh == nil || !s.openAIAccountMatchesSchedulingGroup(fresh, req.GroupID) ||
+			!openAIAccountServesInboundResponsesNatively(fresh) || !scheduler.isAccountRequestCompatible(ctx, fresh, req) ||
+			!scheduler.isAccountTransportCompatible(fresh, req.RequiredTransport) {
+			continue
+		}
+		if req.RequireCompact && openAICompactSupportTier(fresh) < openAICompactSupportTier(sticky) {
+			continue
+		}
+		return openAIStickyYieldsToNativeResponses(ctx, sticky, true)
+	}
+	return false
 }
 
 // selectBestAccount 从候选账号中选择最佳账号（优先级 + LRU）。
@@ -1261,19 +1319,6 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		})
 	}
 
-	accounts, err := s.listSchedulableAccounts(ctx, groupID, platform)
-	if err != nil {
-		return nil, err
-	}
-	accounts, unsupported := filterAccountsSupportingRequestedModel(accounts, requestedModel)
-	if len(accounts) == 0 {
-		return nil, noAvailableAccountsDueToModelSupport(requestedModel, unsupported)
-	}
-	accounts = applySchedulerFreshnessForRequest(ctx, s.accountRepo, s.schedulerSnapshot, accounts)
-	if len(accounts) == 0 {
-		return nil, noAvailableOpenAISelectionError(requestedModel, false, openAISelectionFilterStats{}.summary("freshness_unavailable"))
-	}
-
 	isExcluded := func(accountID int64) bool {
 		if excludedIDs == nil {
 			return false
@@ -1306,6 +1351,11 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 					_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 				} else if !parentHealthyForShadow(account, s.parentAccountLookup(ctx)) {
 					_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+				} else if s.openAIConverterStickyHasNativeReplacement(ctx, account, OpenAIAccountScheduleRequest{
+					GroupID: groupID, Platform: platform, RequestedModel: requestedModel,
+					ExcludedIDs: excludedIDs, RequireCompact: requireCompact, RequiredCapability: requiredCapability,
+				}) {
+					// An eligible native replacement may supersede an ordinary converter sticky.
 				} else {
 					result, err := s.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
 					if err == nil && result != nil && result.Acquired {
@@ -1330,6 +1380,19 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				}
 			}
 		}
+	}
+
+	accounts, err := s.listSchedulableAccounts(ctx, groupID, platform)
+	if err != nil {
+		return nil, err
+	}
+	accounts, unsupported := filterAccountsSupportingRequestedModel(accounts, requestedModel)
+	if len(accounts) == 0 {
+		return nil, noAvailableAccountsDueToModelSupport(requestedModel, unsupported)
+	}
+	accounts = applySchedulerFreshnessForRequest(ctx, s.accountRepo, s.schedulerSnapshot, accounts)
+	if len(accounts) == 0 {
+		return nil, noAvailableOpenAISelectionError(requestedModel, false, openAISelectionFilterStats{}.summary("freshness_unavailable"))
 	}
 
 	// ============ Layer 2: Load-aware selection ============

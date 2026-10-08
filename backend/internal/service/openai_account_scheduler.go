@@ -574,6 +574,10 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 		clearBinding()
 		return nil, false, nil
 	}
+	if !req.PreserveStickyBinding && req.GuardianParentAccountID == 0 &&
+		s.service.openAIConverterStickyHasNativeReplacement(ctx, account, req) {
+		return nil, false, nil
+	}
 	escapeCfg := s.service.openAIStickyEscapeConfig()
 	if reason, errorRate, ttft, shouldEscape := s.shouldEscapeStickyAccount(accountID, escapeCfg); shouldEscape && !req.DisableStickyEscape {
 		slog.Info("sticky_escape_triggered",
@@ -2608,6 +2612,11 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 	}
 	platform = NormalizeOpenAICompatiblePlatform(platform)
 	decision := OpenAIAccountScheduleDecision{}
+	if openAIPreferNativeResponses(ctx) {
+		ctx = context.WithValue(ctx, openAIStickyNativeRequirementsContextKey{}, OpenAIAccountScheduleRequest{
+			RequiredTransport: requiredTransport, RequiredImageCapability: requiredImageCapability,
+		})
+	}
 	preserveGuardianParentBinding := preserveOpenAIGuardianParentBinding(ctx, sessionHash)
 	guardianParentAccountID := int64(0)
 	if strings.TrimSpace(previousResponseID) == "" {

@@ -5,6 +5,7 @@
 - Responses HTTP/WebSocket 请求优先选择无需提前转换为 Chat Completions 的账号；保留 sticky、compact、排除账号及既有调度开关。该优先级是上游行为调整，不启用实验调度器。
 - 导入前导 think/thinking 标签的流式与非流式分离及 local_shell_call 至 Anthropic 工具调用转换。补修双思考通道重复输出和 Anthropic 仅思考回复的可见文本降级；流式以首个实际输出的思考通道为准，同一首帧同时含两者时显式 reasoning 优先，后到的另一通道只移除标签，不重复输出。
 - 暂缓通用请求转换器的 summary-only 明文 reasoning 历史变更：转换器固定 store:false，而既有 OpenAI 规范化会删除没有 encrypted_content 的 reasoning item。保留之前的 assistant-message 历史和原始空白，避免未验证目的端兼容性的格式切换；此项单独列入 lock，输出思考分离已导入。
+- local_shell 的 action 只在 output_item.done 到达；按调用保存完整 action，并在终止事件或无终止事件的 finalize 中按 output_index 输出连续完整块，避免提前宣告关闭后再发参数，也不打断其他工具的参数流。双 shell、shell/function 交错和合成终止均有参数及块生命周期回归。
 - 补修上游 native 分类中的 Anthropic 误判、非 batch 选择中的映射排序覆盖，以及高级调度 fill 被外层 native 分区打乱的 Priority 层次；增加真实选择器与 fill 回归。
 - 保留五档独立小铺商品链接、模型广场透传展示修复和滚动时显示的滚动条。无数据库迁移、依赖或部署脚本变化；不修改客户余额、倍率、账号归属及小铺配置。Grok 拒答计费仍暂缓。
 - 此记录描述源码同步；运行检查、发布和生产验收证据保存在本次运维目录。

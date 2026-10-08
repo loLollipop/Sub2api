@@ -147,3 +147,79 @@ func TestLocalShellAnthropicActualWireLifecycle(t *testing.T) {
 	require.Equal(t, 1, arguments)
 	require.Equal(t, 1, ends)
 }
+
+func TestLocalShellAnthropicInterleavedCallsKeepArgumentsAndLifecycle(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  []string
+		want map[string]string
+	}{
+		{"two shells", []string{
+			`{"type":"response.output_item.added","output_index":0,"item":{"type":"local_shell_call","call_id":"call_a"}}`,
+			`{"type":"response.output_item.added","output_index":1,"item":{"type":"local_shell_call","call_id":"call_b"}}`,
+			`{"type":"response.output_item.done","output_index":0,"item":{"type":"local_shell_call","call_id":"call_a","action":{"type":"exec","command":["pwd"]}}}`,
+			`{"type":"response.output_item.done","output_index":1,"item":{"type":"local_shell_call","call_id":"call_b","action":{"type":"exec","command":["ls"]}}}`,
+		}, map[string]string{"call_a": `{"type":"exec","command":["pwd"]}`, "call_b": `{"type":"exec","command":["ls"]}`}},
+		{"shell done during function arguments", []string{
+			`{"type":"response.output_item.added","output_index":0,"item":{"type":"local_shell_call","call_id":"call_a"}}`,
+			`{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","call_id":"call_b","name":"lookup"}}`,
+			`{"type":"response.function_call_arguments.delta","output_index":1,"delta":"{\"x\":"}`,
+			`{"type":"response.output_item.done","output_index":0,"item":{"type":"local_shell_call","call_id":"call_a","action":{"type":"exec","command":["pwd"]}}}`,
+			`{"type":"response.function_call_arguments.delta","output_index":1,"delta":"1}"}`,
+			`{"type":"response.function_call_arguments.done","output_index":1,"arguments":"{\"x\":1}"}`,
+			`{"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","call_id":"call_b","name":"lookup","arguments":"{\"x\":1}"}}`,
+		}, map[string]string{"call_a": `{"type":"exec","command":["pwd"]}`, "call_b": `{"x":1}`}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, syntheticEnd := range []bool{false, true} {
+				state := NewResponsesEventToAnthropicState()
+				var events []AnthropicStreamEvent
+				created := &ResponsesStreamEvent{Type: "response.created"}
+				events = append(events, ResponsesEventToAnthropicEvents(created, state)...)
+				for _, raw := range tc.raw {
+					var event ResponsesStreamEvent
+					require.NoError(t, json.Unmarshal([]byte(raw), &event))
+					events = append(events, ResponsesEventToAnthropicEvents(&event, state)...)
+				}
+				if syntheticEnd {
+					events = append(events, FinalizeResponsesAnthropicStream(state)...)
+				} else {
+					completed := &ResponsesStreamEvent{Type: "response.completed", Response: &ResponsesResponse{Status: "completed"}}
+					events = append(events, ResponsesEventToAnthropicEvents(completed, state)...)
+				}
+				open := map[int]bool{}
+				ids := map[int]string{}
+				args := map[string]string{}
+				stopped := false
+				for _, event := range events {
+					require.False(t, stopped, "no events after message_stop")
+					switch event.Type {
+					case "content_block_start":
+						require.Empty(t, open, "Anthropic blocks must remain sequential")
+						idx := *event.Index
+						open[idx] = true
+						ids[idx] = event.ContentBlock.ID
+						args[ids[idx]] = ""
+					case "content_block_delta":
+						require.True(t, open[*event.Index], "delta must target an open block")
+						if event.Delta.Type == "input_json_delta" {
+							args[ids[*event.Index]] += event.Delta.PartialJSON
+						}
+					case "content_block_stop":
+						require.True(t, open[*event.Index])
+						delete(open, *event.Index)
+					case "message_stop":
+						stopped = true
+					}
+				}
+				require.Empty(t, open)
+				require.True(t, stopped)
+				require.Len(t, args, len(tc.want))
+				for id, want := range tc.want {
+					require.JSONEq(t, want, args[id], id)
+				}
+				require.Empty(t, FinalizeResponsesAnthropicStream(state))
+			}
+		})
+	}
+}

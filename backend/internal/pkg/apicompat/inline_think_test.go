@@ -219,6 +219,7 @@ func TestResponsesEventToAnthropic_LocalShellCallCarriesAction(t *testing.T) {
 		{Type: "response.output_item.done", OutputIndex: 0, Item: &ResponsesOutput{Type: "local_shell_call", CallID: "call_sh", Name: "local_shell", Arguments: `{"command":["pwd"]}`, Status: "completed"}},
 	}
 	var sawName, sawArgs bool
+	incoming = append(incoming, ResponsesStreamEvent{Type: "response.completed", Response: &ResponsesResponse{Status: "completed"}})
 	for _, evt := range incoming {
 		for _, out := range ResponsesEventToAnthropicEvents(&evt, state) {
 			if out.ContentBlock != nil && out.ContentBlock.Type == "tool_use" {

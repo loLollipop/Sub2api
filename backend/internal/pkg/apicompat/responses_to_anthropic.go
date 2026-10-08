@@ -3,6 +3,7 @@ package apicompat
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -205,6 +206,9 @@ type ResponsesEventToAnthropicState struct {
 
 	// OutputIndexToBlockIdx maps Responses output_index → Anthropic content block index.
 	OutputIndexToBlockIdx map[int]int
+	// Shell actions arrive only on item.done and may overlap other tools.
+	// Emit them as complete sequential blocks at termination, after live blocks.
+	pendingLocalShell map[int]ResponsesOutput
 
 	InputTokens              int
 	OutputTokens             int
@@ -268,12 +272,13 @@ func ResponsesEventToAnthropicEvents(
 // FinalizeResponsesAnthropicStream emits synthetic termination events if the
 // stream ended without a proper completion event.
 func FinalizeResponsesAnthropicStream(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	if !state.MessageStartSent || state.MessageStopSent {
+	if state.MessageStopSent || (!state.MessageStartSent && len(state.pendingLocalShell) == 0) {
 		return nil
 	}
 
 	var events []AnthropicStreamEvent
 	events = append(events, closeCurrentBlock(state)...)
+	events = append(events, resToAnthFlushLocalShell(state)...)
 
 	stopReason := "end_turn"
 	if state.HasToolCall {
@@ -353,7 +358,10 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 	switch evt.Item.Type {
 	// function_call 与 custom_tool_call（custom/freeform 工具，如新版 apply_patch）
 	// 同样映射为 Anthropic 的 tool_use 块。
-	case "function_call", "custom_tool_call", "local_shell_call":
+	case "local_shell_call":
+		state.HasToolCall = true
+		return nil
+	case "function_call", "custom_tool_call":
 		var events []AnthropicStreamEvent
 		events = append(events, closeCurrentBlock(state)...)
 
@@ -362,9 +370,6 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 		state.ContentBlockOpen = true
 		state.CurrentBlockType = "tool_use"
 		name := evt.Item.Name
-		if evt.Item.Type == "local_shell_call" && name == "" {
-			name = defaultLocalShellToolName
-		}
 		state.CurrentToolName = name
 		state.CurrentToolArgs = ""
 		state.CurrentToolHadDelta = false
@@ -591,40 +596,58 @@ func resToAnthHandleOutputItemDone(evt *ResponsesStreamEvent, state *ResponsesEv
 	return nil
 }
 
-// resToAnthFinishLocalShell emits the shell action on output_item.done.
-// Chat-bridged local_shell_call does not stream function_call_arguments deltas.
+// resToAnthFinishLocalShell saves each completed action independently. Announcing
+// shell blocks early would close a previous block before its arguments arrive.
 func resToAnthFinishLocalShell(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if state.MessageStopSent {
+		return nil
+	}
+	if _, emitted := state.OutputIndexToBlockIdx[evt.OutputIndex]; emitted {
+		return nil
+	}
+	if state.pendingLocalShell == nil {
+		state.pendingLocalShell = make(map[int]ResponsesOutput)
+	}
+	state.pendingLocalShell[evt.OutputIndex] = *evt.Item
+	state.HasToolCall = true
+	return nil
+}
+
+func resToAnthFlushLocalShell(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if len(state.pendingLocalShell) == 0 {
+		return nil
+	}
 	var events []AnthropicStreamEvent
-	if _, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]; !ok {
-		events = append(events, resToAnthHandleOutputItemAdded(evt, state)...)
+	events = append(events, closeCurrentBlock(state)...)
+	events = append(events, resToAnthHandleCreated(&ResponsesStreamEvent{}, state)...)
+	indices := make([]int, 0, len(state.pendingLocalShell))
+	for index := range state.pendingLocalShell {
+		indices = append(indices, index)
 	}
-	if !state.ContentBlockOpen || state.CurrentBlockType != "tool_use" || state.CurrentToolHadDelta {
-		events = append(events, closeCurrentBlock(state)...)
-		return events
-	}
-	raw := "{}"
-	if evt.Item != nil && strings.TrimSpace(evt.Item.Arguments) != "" {
-		raw = evt.Item.Arguments
-	}
-	name := state.CurrentToolName
-	if name == "" {
-		name = defaultLocalShellToolName
-	}
-	if raw != "{}" {
-		blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]
-		if !ok {
-			blockIdx = state.ContentBlockIndex
+	sort.Ints(indices)
+	for _, index := range indices {
+		item := state.pendingLocalShell[index]
+		delete(state.pendingLocalShell, index)
+		item.Type = "function_call"
+		if item.Name == "" {
+			item.Name = defaultLocalShellToolName
 		}
+		events = append(events, resToAnthHandleOutputItemAdded(&ResponsesStreamEvent{OutputIndex: index, Item: &item}, state)...)
+		raw := item.Arguments
+		if strings.TrimSpace(raw) == "" {
+			raw = "{}"
+		}
+		blockIdx := state.OutputIndexToBlockIdx[index]
 		events = append(events, AnthropicStreamEvent{
 			Type:  "content_block_delta",
 			Index: &blockIdx,
 			Delta: &AnthropicDelta{
 				Type:        "input_json_delta",
-				PartialJSON: string(sanitizeAnthropicToolUseInput(name, raw)),
+				PartialJSON: string(sanitizeAnthropicToolUseInput(item.Name, raw)),
 			},
 		})
+		events = append(events, closeCurrentBlock(state)...)
 	}
-	events = append(events, closeCurrentBlock(state)...)
 	return events
 }
 
@@ -696,6 +719,7 @@ func resToAnthHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 		}
 	}
 	events = append(events, closeCurrentBlock(state)...)
+	events = append(events, resToAnthFlushLocalShell(state)...)
 
 	stopReason := "end_turn"
 	if evt.Usage != nil {

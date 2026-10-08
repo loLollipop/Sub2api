@@ -1,6 +1,7 @@
 <template>
   <AppLayout>
-    <div :class="['signal-payment mx-auto w-full', activeTab === 'rechargeCenter' ? 'max-w-[1440px]' : 'max-w-5xl']">
+    <div :class="['signal-payment mx-auto w-full', externalShopEnabled ? 'signal-payment--shop max-w-5xl' : activeTab === 'rechargeCenter' ? 'max-w-[1440px]' : 'max-w-5xl']"
+      :data-payment-mode="externalShopEnabled ? 'external' : 'internal'">
       <div v-if="loading" class="flex items-center justify-center py-20">
         <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
       </div>
@@ -13,7 +14,8 @@
           </div>
           <div class="min-w-0">
             <p class="signal-payment-heading__index" aria-hidden="true">04 / BILLING</p>
-            <h1>{{ t('nav.buySubscription') }}</h1>
+            <div class="signal-payment-title"><h1>{{ t('purchase.title') }}</h1><span class="signal-payment-channel">{{ t('purchase.internalChannel') }}</span></div>
+            <p>{{ t('purchase.internalDescription') }}</p>
           </div>
           <RouterLink to="/orders" class="signal-payment-orders btn btn-secondary">
             <Icon name="clock" size="sm" />{{ t('payment.orders.title') }}
@@ -87,10 +89,10 @@
                 <div class="signal-account-strip">
                   <div class="min-w-0">
                     <p class="signal-kicker">{{ t('payment.rechargeAccount') }}</p>
-                    <p class="signal-account-name">{{ user?.username || '' }}</p>
+                    <p class="signal-account-name" :title="user?.username || ''">{{ user?.username || '' }}</p>
                   </div>
                   <div class="signal-balance-block">
-                    <span>{{ t('payment.currentBalance') }}</span>
+                    <span>{{ t('purchase.balanceUsd') }}</span>
                     <strong>${{ user?.balance?.toFixed(2) || '0.00' }}</strong>
                   </div>
                 </div>
@@ -1411,20 +1413,27 @@ onUnmounted(() => {
 }
 
 .signal-payment {
-  --payment-bg: var(--signal-bg, #f5f6f5);
+  --payment-bg: var(--signal-bg, #f2f2f7);
   --payment-surface: var(--signal-surface, #ffffff);
-  --payment-line: var(--signal-line, #dce2df);
-  --payment-text: var(--signal-text, #202423);
-  --payment-muted: var(--signal-muted, #65716a);
-  --payment-accent: var(--signal-accent, #087f68);
-  --payment-accent-soft: var(--signal-accent-soft, #e5f3ee);
+  --payment-line: var(--signal-line, #dedee4);
+  --payment-text: var(--signal-text, #1c1c1e);
+  --payment-muted: var(--signal-muted, #63636c);
+  --payment-accent: var(--signal-accent, #0066d6);
+  --payment-accent-soft: var(--signal-accent-soft, #e3efff);
   --payment-amber: var(--signal-amber, #a86610);
   display: grid;
-  gap: 18px;
+  gap: 20px;
   min-width: 0;
   color: var(--payment-text);
   letter-spacing: 0;
 }
+
+.signal-payment--shop { max-width: 1024px; }
+@media (min-width: 1024px) {
+  .signal-payment--shop { min-height: calc(100dvh - var(--signal-shell-header-height, 64px) - 48px); }
+}
+.signal-payment-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.signal-payment-channel { padding: 4px 9px; border: 1px solid var(--payment-line); border-radius: 999px; color: var(--payment-accent); background: var(--payment-surface); font-size: 11px; font-weight: 600; }
 
 .signal-payment-heading {
   display: flex;
@@ -1437,12 +1446,12 @@ onUnmounted(() => {
 
 .signal-payment-heading__icon {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   flex: 0 0 auto;
   place-items: center;
   border: 1px solid var(--payment-line);
-  border-radius: 6px;
+  border-radius: 12px;
   color: var(--payment-accent);
   background: var(--payment-surface);
 }
@@ -1460,7 +1469,7 @@ onUnmounted(() => {
 .signal-payment-heading h1 {
   margin: 2px 0 0;
   color: var(--payment-text);
-  font-size: 24px;
+  font-size: 27px;
   font-weight: 700;
   line-height: 1.2;
 }
@@ -1473,9 +1482,9 @@ onUnmounted(() => {
 }
 
 .signal-payment-orders { flex: 0 0 auto; margin-left: auto; gap: 8px; }
-.signal-payment-flow { padding-top: 14px; }
-.signal-payment-step { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; font-size: 15px; font-weight: 600; }
-.signal-payment-step > span { font-size: 11px; color: var(--payment-muted); font-variant-numeric: tabular-nums; }
+.signal-payment-flow { padding-top: 4px; }
+.signal-payment-step { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 15px; font-weight: 650; }
+.signal-payment-step > span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 6px; background: var(--payment-accent-soft); font-size: 11px; color: var(--payment-accent); font-variant-numeric: tabular-nums; }
 .signal-payment-section :deep(.payment-amount-input__entry > span:first-child),
 .signal-payment-section :deep(.payment-method-selector > label) { display: none; }
 
@@ -1512,7 +1521,7 @@ onUnmounted(() => {
 }
 
 .signal-balance-block strong {
-  color: var(--payment-accent);
+  color: var(--payment-text);
   font-size: 16px;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
@@ -1521,30 +1530,30 @@ onUnmounted(() => {
 .signal-recharge-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
-  gap: 40px;
+  gap: 20px;
   align-items: start;
 }
 
 .signal-recharge-fields {
   display: grid;
-  gap: 24px;
+  gap: 18px;
   min-width: 0;
 }
 
 .signal-checkout-summary,
 .signal-empty-state {
   border: 1px solid var(--payment-line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--payment-surface);
 }
 
 .signal-payment-section {
   min-width: 0;
-}
-
-.signal-payment-section + .signal-payment-section {
-  padding-top: 24px;
-  border-top: 1px solid var(--payment-line);
+  padding: 20px;
+  border: 1px solid var(--payment-line);
+  border-radius: 12px;
+  background: var(--payment-surface);
+  box-shadow: var(--signal-shadow, none);
 }
 
 .signal-empty-state {
@@ -1562,16 +1571,17 @@ onUnmounted(() => {
   position: sticky;
   top: 82px;
   overflow: hidden;
+  box-shadow: var(--signal-shadow, none);
 }
 
 .signal-checkout-summary__header {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
-  padding: 22px 18px;
+  gap: 9px;
+  padding: 18px;
   border-bottom: 1px solid var(--payment-line);
-  background: var(--payment-bg);
+  background: var(--payment-accent-soft);
 }
 
 .signal-checkout-summary__header span {
@@ -1608,6 +1618,9 @@ onUnmounted(() => {
   color: var(--payment-text);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .signal-rate-note {
@@ -1703,7 +1716,7 @@ onUnmounted(() => {
 }
 
 .signal-payment :deep(.payment-method-selector__option) {
-  min-height: 66px;
+  min-height: 58px;
   height: auto;
   padding: 12px 46px 12px 16px;
   border-radius: 6px;
@@ -1810,7 +1823,7 @@ onUnmounted(() => {
   }
 
   .signal-payment:has(.signal-checkout-action) { padding-bottom: 98px; }
-  .signal-payment :is(input, .payment-method-selector__option) { scroll-margin-bottom: 110px; }
+  .signal-payment:has(.signal-checkout-action) :is(input, .payment-method-selector__option) { scroll-margin-bottom: 110px; }
   .signal-payment-orders { font-size: 12px; }
   .signal-checkout-action { position: fixed; bottom: 0; left: 0; right: 0; z-index: 25; display: flex; align-items: center; gap: 16px; padding: 14px 16px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--payment-line); background: var(--payment-surface); box-shadow: 0 -6px 24px #0000000a; }
   .signal-checkout-action > .btn { flex: 1; min-width: 0; width: auto; font-size: 14px; }
@@ -1853,4 +1866,6 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 }
+
+@media (prefers-reduced-motion: reduce) { .signal-tool-button { transition: none; } }
 </style>

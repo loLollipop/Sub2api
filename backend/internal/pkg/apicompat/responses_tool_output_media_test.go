@@ -114,3 +114,72 @@ func TestLiftResponsesToolOutputMediaKeepsParallelBatchContiguous(t *testing.T) 
 		require.Equal(t, text, contentPart["text"])
 	}
 }
+
+func TestDedupeResponsesCallIDs(t *testing.T) {
+	var input any
+	require.NoError(t, json.Unmarshal([]byte(`[
+		{"type":"custom_tool_call","call_id":"call_00_Q5acE0gqo6rWTzjZrAce4855","name":"apply_patch"},
+		{"type":"custom_tool_call","call_id":"call_00_Q5acE0gqo6rWTzjZrAce4855","name":"apply_patch"},
+		{"type":"custom_tool_call_output","call_id":"call_00_Q5acE0gqo6rWTzjZrAce4855","output":"ok"},
+		{"type":"custom_tool_call_output","call_id":"call_00_Q5acE0gqo6rWTzjZrAce4855","output":"fail"},
+		{"type":"message","role":"user","content":"next"}
+	]`), &input))
+	out, changed := DedupeResponsesCallIDs(input)
+	require.True(t, changed)
+	items, ok := out.([]any)
+	require.True(t, ok)
+	require.Len(t, items, 3)
+	require.Equal(t, "call_00_Q5acE0gqo6rWTzjZrAce4855", responseItemField(t, items, 0, "call_id"))
+	require.Equal(t, "apply_patch", responseItemField(t, items, 0, "name"))
+	require.Equal(t, "ok", responseItemField(t, items, 1, "output"))
+	require.Equal(t, "next", responseItemField(t, items, 2, "content"))
+
+	same, changed := DedupeResponsesCallIDs(out)
+	require.False(t, changed)
+	require.Equal(t, out, same)
+}
+
+func responseItemField(t *testing.T, items []any, index int, key string) any {
+	t.Helper()
+	item, ok := items[index].(map[string]any)
+	require.True(t, ok)
+	return item[key]
+}
+
+func TestDedupeChatToolCallIDs(t *testing.T) {
+	var messages any
+	require.NoError(t, json.Unmarshal([]byte(`[
+		{"role":"assistant","tool_calls":[{"id":"call_a","type":"function"},{"id":"call_a","type":"function"}]},
+		{"role":"tool","tool_call_id":"call_a","content":"one"},
+		{"role":"tool","tool_call_id":"call_a","content":"two"}
+	]`), &messages))
+	out, changed := DedupeChatToolCallIDs(messages)
+	require.True(t, changed)
+	items, ok := out.([]any)
+	require.True(t, ok)
+	first, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	calls, ok := first["tool_calls"].([]any)
+	require.True(t, ok)
+	call0, ok := calls[0].(map[string]any)
+	require.True(t, ok)
+	require.Len(t, calls, 1)
+	require.Equal(t, "call_a", call0["id"])
+	require.Len(t, items, 2)
+	require.Equal(t, "one", responseItemField(t, items, 1, "content"))
+}
+
+func TestDedupeChatToolCallIDsSingleAssistantMessage(t *testing.T) {
+	var messages any
+	require.NoError(t, json.Unmarshal([]byte(`[{"role":"assistant","content":"keep","tool_calls":[{"id":"call_a","type":"function"},{"id":"call_a","type":"function"},{"id":"call_b","type":"function"}]}]`), &messages))
+	out, changed := DedupeChatToolCallIDs(messages)
+	require.True(t, changed)
+	items := out.([]any)
+	require.Len(t, items, 1)
+	msg := items[0].(map[string]any)
+	require.Equal(t, "keep", msg["content"])
+	calls := msg["tool_calls"].([]any)
+	require.Len(t, calls, 2)
+	require.Equal(t, "call_a", calls[0].(map[string]any)["id"])
+	require.Equal(t, "call_b", calls[1].(map[string]any)["id"])
+}

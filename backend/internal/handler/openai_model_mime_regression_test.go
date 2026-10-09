@@ -110,3 +110,18 @@ func TestOpenAIResponsesWebSocket_ConflictingModelsRejectedWithAllowlistDisabled
 		})
 	}
 }
+
+func TestOpenAIResponsesWebSocket_DeepSeekDedupeDoesNotHideConflictingModels(t *testing.T) {
+	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeDedicated} {
+		t.Run(mode, func(t *testing.T) {
+			runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+				firstPayload:            `{"type":"response.create","model":"gpt-5.4","stream":false}`,
+				secondPayload:           `{"type":"response.create","model":"deepseek-v4","model":"deepseek-v3","stream":false,"input":[{"type":"function_call","call_id":"call_a","name":"do","arguments":"{}"},{"type":"function_call","call_id":"call_a","name":"do","arguments":"{}"}]}`,
+				group:                   wsAllowlistGroup(false, "gpt-5.4"),
+				ingressMode:             mode,
+				expectedCloseReason:     service.ErrDuplicateModelField.Error(),
+				secondTurnCloseExpected: true,
+			})
+		})
+	}
+}

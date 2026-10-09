@@ -165,3 +165,118 @@ func isResponsesToolOutputItem(item map[string]any) bool {
 		return false
 	}
 }
+
+// DedupeResponsesCallIDs drops a repeated call_id. The first tool call and
+// its first output stay. Later copies are the same call, not a second one.
+func DedupeResponsesCallIDs(input any) (any, bool) {
+	items, ok := input.([]any)
+	if !ok || len(items) < 2 {
+		return input, false
+	}
+	seenCall := make(map[string]struct{}, len(items))
+	seenOut := make(map[string]struct{}, len(items))
+	out := make([]any, 0, len(items))
+	changed := false
+	for _, raw := range items {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			out = append(out, raw)
+			continue
+		}
+		callID, slot, tracked := responsesCallIDSlot(item)
+		if !tracked {
+			out = append(out, raw)
+			continue
+		}
+		seen := seenCall
+		if slot == "output" {
+			seen = seenOut
+		}
+		if _, dup := seen[callID]; dup {
+			changed = true
+			continue
+		}
+		seen[callID] = struct{}{}
+		out = append(out, raw)
+	}
+	if !changed {
+		return input, false
+	}
+	return out, true
+}
+
+// DedupeChatToolCallIDs drops a repeated chat tool id. The first assistant
+// tool_calls entry and the first tool message keep it.
+func DedupeChatToolCallIDs(messages any) (any, bool) {
+	items, ok := messages.([]any)
+	if !ok || len(items) == 0 {
+		return messages, false
+	}
+	seenCall := make(map[string]struct{}, len(items))
+	seenOut := make(map[string]struct{}, len(items))
+	out := make([]any, 0, len(items))
+	changed := false
+	for _, raw := range items {
+		msg, ok := raw.(map[string]any)
+		if !ok {
+			out = append(out, raw)
+			continue
+		}
+		if calls, ok := msg["tool_calls"].([]any); ok {
+			kept := make([]any, 0, len(calls))
+			for _, rawCall := range calls {
+				call, ok := rawCall.(map[string]any)
+				if !ok {
+					kept = append(kept, rawCall)
+					continue
+				}
+				callID := strings.TrimSpace(stringValue(call["id"]))
+				if callID == "" {
+					kept = append(kept, rawCall)
+					continue
+				}
+				if _, dup := seenCall[callID]; dup {
+					changed = true
+					continue
+				}
+				seenCall[callID] = struct{}{}
+				kept = append(kept, rawCall)
+			}
+			if len(kept) != len(calls) {
+				if len(kept) == 0 {
+					delete(msg, "tool_calls")
+				} else {
+					msg["tool_calls"] = kept
+				}
+			}
+		}
+		callID := strings.TrimSpace(stringValue(msg["tool_call_id"]))
+		if callID != "" {
+			if _, dup := seenOut[callID]; dup {
+				changed = true
+				continue
+			}
+			seenOut[callID] = struct{}{}
+		}
+		out = append(out, msg)
+	}
+	if !changed {
+		return messages, false
+	}
+	return out, true
+}
+
+func responsesCallIDSlot(item map[string]any) (callID, slot string, ok bool) {
+	callID = strings.TrimSpace(stringValue(item["call_id"]))
+	if callID == "" {
+		return "", "", false
+	}
+	itemType := strings.TrimSpace(stringValue(item["type"]))
+	if itemType == "" || itemType == "message" {
+		return "", "", false
+	}
+	if strings.Contains(itemType, "output") {
+		return callID, "output", true
+	}
+	return callID, "call", true
+}

@@ -861,6 +861,60 @@ func TestNormalizeDeepSeekResponsesRequestBody(t *testing.T) {
 	require.Equal(t, string(body), string(normalizeDeepSeekResponsesRequestBody(openai, body)))
 }
 
+func TestRewriteInboundDeepSeekCallIDsPreservesScopeAndNumbers(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"model":"deepseek-v4","sequence_number":9007199254740993,"input":[{"type":"function_call","call_id":"call_a","name":"do","arguments":"{}"},{"type":"function_call","call_id":"call_a","name":"do","arguments":"{}"}]}`)
+	normalized := RewriteInboundDeepSeekCallIDs(PlatformOpenAI, "deepseek-v4", body)
+	require.Len(t, gjson.GetBytes(normalized, "input").Array(), 1)
+	require.Equal(t, "9007199254740993", gjson.GetBytes(normalized, "sequence_number").Raw)
+	require.Equal(t, string(normalized), string(RewriteInboundDeepSeekCallIDs(PlatformDeepseek, "alias", normalized)))
+	require.Equal(t, string(body), string(RewriteInboundDeepSeekCallIDs(PlatformKimi, "kimi-k2", body)))
+	invalid := []byte(`{"input":`)
+	require.Equal(t, string(invalid), string(RewriteInboundDeepSeekCallIDs(PlatformDeepseek, "alias", invalid)))
+}
+
+func TestNormalizeDeepSeekResponsesRequestBodyDropsDuplicateMediaBeforeLifting(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"model":"alias","input":[{"type":"function_call","call_id":"call_a","name":"view_image","arguments":"{}"},{"type":"function_call_output","call_id":"call_a","output":[{"type":"input_image","image_url":"data:image/png;base64,QQ=="}]},{"type":"function_call_output","call_id":"call_a","output":[{"type":"input_image","image_url":"data:image/png;base64,Qg=="}]}]}`)
+	account := &Account{Platform: PlatformDeepseek, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_protocol": APIProtocolResponses}}
+	normalized := normalizeDeepSeekResponsesRequestBody(account, body)
+	require.Len(t, gjson.GetBytes(normalized, "input").Array(), 3)
+	require.Equal(t, "function_call_output", gjson.GetBytes(normalized, "input.1.type").String())
+	require.Equal(t, "data:image/png;base64,QQ==", gjson.GetBytes(normalized, "input.2.content.1.image_url").String())
+	require.NotContains(t, string(normalized), "data:image/png;base64,Qg==")
+}
+
+func TestNormalizeDeepSeekResponsesRequestBodyDropsDuplicateCallID(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"model":"alias-without-prefix","store":true,"input":[{"type":"custom_tool_call","call_id":"call_00_Q5acE0gqo6rWTzjZrAce4855","name":"apply_patch"},{"type":"custom_tool_call","call_id":"call_00_Q5acE0gqo6rWTzjZrAce4855","name":"apply_patch"},{"type":"custom_tool_call_output","call_id":"call_00_Q5acE0gqo6rWTzjZrAce4855","output":"ok"},{"type":"custom_tool_call_output","call_id":"call_00_Q5acE0gqo6rWTzjZrAce4855","output":"fail"}]}`)
+	account := &Account{
+		Platform: PlatformDeepseek, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_protocol": APIProtocolResponses},
+	}
+	normalized := normalizeDeepSeekResponsesRequestBody(account, body)
+	require.Equal(t, 2, len(gjson.GetBytes(normalized, "input").Array()))
+	require.Equal(t, "call_00_Q5acE0gqo6rWTzjZrAce4855", gjson.GetBytes(normalized, "input.0.call_id").String())
+	require.Equal(t, "custom_tool_call", gjson.GetBytes(normalized, "input.0.type").String())
+	require.Equal(t, "ok", gjson.GetBytes(normalized, "input.1.output").String())
+	require.False(t, gjson.GetBytes(normalized, "input.2").Exists())
+
+	byModel := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	modelBody := []byte(`{"model":"deepseek-v4.1-flash","input":[{"type":"function_call","call_id":"call_a","name":"do"},{"type":"function_call","call_id":"call_a","name":"do"},{"type":"function_call_output","call_id":"call_a","output":"1"}]}`)
+	modelNormalized := normalizeDeepSeekResponsesRequestBody(byModel, modelBody)
+	require.Equal(t, 2, len(gjson.GetBytes(modelNormalized, "input").Array()))
+	require.Equal(t, "call_a", gjson.GetBytes(modelNormalized, "input.0.call_id").String())
+	require.Equal(t, "1", gjson.GetBytes(modelNormalized, "input.1.output").String())
+	require.True(t, gjson.GetBytes(modelNormalized, "store").Exists() == false || gjson.GetBytes(modelNormalized, "store").Raw == "")
+
+	kimi := &Account{
+		Platform: PlatformKimi, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_protocol": APIProtocolResponses},
+	}
+	kimiBody := []byte(`{"model":"kimi-k2","store":true,"input":[{"type":"function_call","call_id":"call_a","name":"do"},{"type":"function_call","call_id":"call_a","name":"do"}]}`)
+	kimiNormalized := normalizeDeepSeekResponsesRequestBody(kimi, kimiBody)
+	require.Equal(t, 2, len(gjson.GetBytes(kimiNormalized, "input").Array()))
+}
+
 // TestGetAnthropicAPIKeyAuthScheme_CNProvider CN 账号可经 extra 覆写鉴权方案，
 // 默认保持 x-api-key。
 func TestGetAnthropicAPIKeyAuthScheme_CNProvider(t *testing.T) {

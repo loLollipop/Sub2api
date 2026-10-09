@@ -89,6 +89,10 @@ func (h *AsyncImageHandler) Submit(c *gin.Context) {
 		imageTaskJSONError(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
 		return
 	}
+	if openAIConflictingModels(c.GetHeader("Content-Type"), body) {
+		imageTaskJSONError(c, http.StatusBadRequest, "invalid_request_error", service.ErrDuplicateModelField.Error())
+		return
+	}
 	if asyncImageRequestStreams(c.GetHeader("Content-Type"), body) {
 		imageTaskJSONError(c, http.StatusBadRequest, "invalid_request_error", "streaming image requests cannot be submitted as asynchronous tasks")
 		return

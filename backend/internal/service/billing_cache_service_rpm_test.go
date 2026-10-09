@@ -225,7 +225,7 @@ func TestBillingCacheService_CheckRPM_NoLimitsConfiguredIsNoop(t *testing.T) {
 	require.EqualValues(t, 0, atomic.LoadInt32(&cache.userCalls))
 }
 
-func TestBillingCacheService_CheckRPM_RedisErrorFailOpen(t *testing.T) {
+func TestBillingCacheService_CheckRPM_RedisErrorFailClosed(t *testing.T) {
 	cache := &userRPMCacheStub{userGroupErr: errors.New("redis unavailable")}
 	repo := &rpmOverrideRepoStub{override: nil}
 	svc := newBillingServiceForRPM(t, cache, repo)
@@ -233,9 +233,24 @@ func TestBillingCacheService_CheckRPM_RedisErrorFailOpen(t *testing.T) {
 	user := &User{ID: 1, RPMLimit: 0}
 	group := &Group{ID: 10, RPMLimit: 5}
 
-	// Redis 故障时应 fail-open，不拒绝请求
-	require.NoError(t, svc.checkRPM(context.Background(), user, group))
+	require.ErrorIs(t, svc.checkRPM(context.Background(), user, group), ErrBillingServiceUnavailable)
 	require.EqualValues(t, 1, atomic.LoadInt32(&cache.userGroupCalls))
+}
+
+func TestBillingCacheService_CheckRPM_OverrideAndUserRedisErrorsFailClosed(t *testing.T) {
+	t.Run("override", func(t *testing.T) {
+		override := 5
+		cache := &userRPMCacheStub{userGroupErr: errors.New("redis unavailable")}
+		svc := newBillingServiceForRPM(t, cache, &rpmOverrideRepoStub{override: &override})
+		require.ErrorIs(t, svc.checkRPM(context.Background(), &User{ID: 1}, &Group{ID: 10}), ErrBillingServiceUnavailable)
+		require.EqualValues(t, 1, atomic.LoadInt32(&cache.userGroupCalls))
+	})
+	t.Run("user", func(t *testing.T) {
+		cache := &userRPMCacheStub{userErr: errors.New("redis unavailable")}
+		svc := newBillingServiceForRPM(t, cache, nil)
+		require.ErrorIs(t, svc.checkRPM(context.Background(), &User{ID: 1, RPMLimit: 5}, nil), ErrBillingServiceUnavailable)
+		require.EqualValues(t, 1, atomic.LoadInt32(&cache.userCalls))
+	})
 }
 
 func TestBillingCacheService_CheckRPM_NoGroupUsesUserOnly(t *testing.T) {
@@ -263,4 +278,30 @@ func TestBillingCacheService_CheckRPM_NilUserIsNoop(t *testing.T) {
 	require.EqualValues(t, 0, atomic.LoadInt32(&cache.userGroupCalls))
 	require.EqualValues(t, 0, atomic.LoadInt32(&cache.userCalls))
 	require.EqualValues(t, 0, atomic.LoadInt32(&repo.calls))
+}
+
+func TestBillingCacheService_CheckRPM_MissingRedisFailsClosedOnlyWithLimits(t *testing.T) {
+	override, zero := 5, 0
+	for _, tc := range []struct {
+		name      string
+		user      *User
+		group     *Group
+		wantError bool
+	}{
+		{"user", &User{ID: 1, RPMLimit: 5}, nil, true},
+		{"group", &User{ID: 1}, &Group{ID: 10, RPMLimit: 5}, true},
+		{"override", &User{ID: 1, UserGroupRPMOverride: &override}, &Group{ID: 10}, true},
+		{"exempt group", &User{ID: 1, UserGroupRPMOverride: &zero}, &Group{ID: 10, RPMLimit: 5}, false},
+		{"unlimited", &User{ID: 1}, &Group{ID: 10}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := newBillingServiceForRPM(t, nil, nil)
+			err := svc.checkRPM(context.Background(), tc.user, tc.group)
+			if tc.wantError {
+				require.ErrorIs(t, err, ErrBillingServiceUnavailable)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

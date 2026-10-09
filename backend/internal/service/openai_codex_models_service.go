@@ -1516,6 +1516,7 @@ func isRetryableCodexModelsManifestTransportError(err error) bool {
 	if errors.As(err, &dnsErr) {
 		return true
 	}
+	//nolint:staticcheck // Keep typed detection for legacy x/net transports; net/http uses the string fallback below.
 	var goAwayErr http2.GoAwayError
 	if errors.As(err, &goAwayErr) {
 		return true

@@ -23,10 +23,14 @@ type rateLimitLoadStub struct {
 	APIKeyRepository
 	calls atomic.Int64
 	delay time.Duration
+	err   error
 }
 
 func (s *rateLimitLoadStub) GetRateLimitData(ctx context.Context, keyID int64) (*APIKeyRateLimitData, error) {
 	s.calls.Add(1)
+	if s.err != nil {
+		return nil, s.err
+	}
 	select {
 	case <-time.After(s.delay):
 		started := time.Now().Add(-time.Minute)
@@ -199,4 +203,25 @@ func TestBillingCacheServiceRateLimitDBMissUsesSingleflight(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.Equal(t, int64(1), loader.calls.Load(), "并发 Redis miss 应合并为一次 rate-limit DB 回源")
+}
+
+func TestBillingCacheServiceRateLimitUnavailableFailsClosedOnlyWithLimits(t *testing.T) {
+	for _, withCache := range []bool{false, true} {
+		for _, withLoader := range []bool{false, true} {
+			var cache BillingCache
+			if withCache {
+				cache = &billingCacheWorkerStub{}
+			}
+			svc := &BillingCacheService{cache: cache}
+			if withLoader {
+				svc.apiKeyRateLimitLoader = &rateLimitLoadStub{err: errors.New("usage database unavailable")}
+			}
+			for _, key := range []*APIKey{{ID: 1, RateLimit5h: 10}, {ID: 1, RateLimit1d: 10}, {ID: 1, RateLimit7d: 10}} {
+				require.ErrorIs(t, svc.checkAPIKeyRateLimits(context.Background(), key), ErrBillingServiceUnavailable,
+					"cache=%v loader=%v", withCache, withLoader)
+			}
+			require.NoError(t, svc.checkAPIKeyRateLimits(context.Background(), &APIKey{ID: 1}),
+				"unlimited keys must not be rejected when usage cannot be loaded")
+		}
+	}
 }

@@ -328,6 +328,9 @@ func SetActualOpenAIUpstreamEndpoint(c *gin.Context, endpoint string) {
 	}
 	if endpoint = strings.TrimSpace(endpoint); endpoint != "" {
 		c.Set(openAIUpstreamEndpointContextKey, endpoint)
+		if c.Request != nil {
+			UpdateUsageInflight(c.Request.Context(), func(snap *UsageInflightSnapshot) { snap.UpstreamEndpoint = endpoint })
+		}
 	}
 }
 
@@ -339,6 +342,9 @@ func ClearActualOpenAIUpstreamEndpoint(c *gin.Context) {
 		return
 	}
 	c.Set(openAIUpstreamEndpointContextKey, "")
+	if c.Request != nil {
+		UpdateUsageInflight(c.Request.Context(), func(snap *UsageInflightSnapshot) { snap.UpstreamEndpoint = "" })
+	}
 }
 
 // GetActualOpenAIUpstreamEndpoint returns the endpoint recorded by the latest

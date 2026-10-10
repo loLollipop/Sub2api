@@ -273,6 +273,9 @@ func InboundEndpointMiddleware() gin.HandlerFunc {
 			path = c.FullPath()
 		}
 		c.Set(ctxKeyInboundEndpoint, NormalizeInboundEndpoint(path))
+		if c.Request != nil {
+			service.UpdateUsageInflight(c.Request.Context(), func(snap *service.UsageInflightSnapshot) { snap.InboundEndpoint = NormalizeInboundEndpoint(path) })
+		}
 		c.Next()
 	}
 }
@@ -338,6 +341,9 @@ func GetUpstreamEndpoint(c *gin.Context, platform string) string {
 func setActualUpstreamEndpoint(c *gin.Context, endpoint string) {
 	if c != nil {
 		c.Set(ctxKeyActualUpstreamEndpoint, strings.TrimSpace(endpoint))
+		if c.Request != nil {
+			service.UpdateUsageInflight(c.Request.Context(), func(snap *service.UsageInflightSnapshot) { snap.UpstreamEndpoint = strings.TrimSpace(endpoint) })
+		}
 	}
 }
 

@@ -1070,10 +1070,19 @@ func buildOpsErrorLogsWhere(filter *service.OpsErrorLogFilter) (string, []any) {
 		args = append(args, pq.Array(known))
 		clauses = append(clauses, "NOT (COALESCE(e.upstream_status_code, e.status_code, 0) = ANY($"+itoa(len(args))+"))")
 	}
-	// Exact correlation keys (preferred for request↔upstream linkage).
+	// Complete correlation identities; use the existing column indexes and
+	// accept the billing namespace without enabling unindexed fragment scans.
 	if rid := strings.TrimSpace(filter.RequestID); rid != "" {
-		args = append(args, rid)
-		clauses = append(clauses, "COALESCE(e.request_id,'') = $"+itoa(len(args)))
+		bare := rid
+		for _, prefix := range []string{"client:", "local:"} {
+			if strings.HasPrefix(rid, prefix) {
+				bare = strings.TrimPrefix(rid, prefix)
+				break
+			}
+		}
+		n := len(args) + 1
+		args = append(args, rid, bare)
+		clauses = append(clauses, fmt.Sprintf("(e.request_id IN ($%d, $%d) OR e.client_request_id IN ($%d, $%d))", n, n+1, n, n+1))
 	}
 	if crid := strings.TrimSpace(filter.ClientRequestID); crid != "" {
 		args = append(args, crid)

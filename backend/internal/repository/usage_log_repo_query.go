@@ -117,8 +117,11 @@ func (r *usageLogRepository) ListWithFilters(ctx context.Context, params paginat
 		args = append(args, filters.GroupID)
 	}
 	if requestID := strings.TrimSpace(filters.RequestID); requestID != "" {
-		conditions = append(conditions, fmt.Sprintf("request_id = $%d", len(args)+1))
-		args = append(args, requestID)
+		// Exact indexed identities until a safe fragment-search migration is
+		// available. Also accept raw client/local IDs without losing namespaces.
+		n := len(args) + 1
+		conditions = append(conditions, fmt.Sprintf("(request_id IN ($%d, $%d, $%d) OR upstream_request_id = $%d)", n, n+1, n+2, n))
+		args = append(args, requestID, "client:"+requestID, "local:"+requestID)
 	}
 	conditions, args = appendUsageLogModelWhereCondition(conditions, args, filters.Model, filters.ModelFilterSource)
 	conditions, args = appendRequestTypeOrStreamWhereCondition(conditions, args, filters.RequestType, filters.Stream)

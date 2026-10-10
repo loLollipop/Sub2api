@@ -202,6 +202,95 @@ describe('admin UsageView route filters', () => {
     vi.useRealTimers()
   })
 
+  it('keeps latest completed logs when an older silent response arrives', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    let resolveOld!: (value: unknown) => void
+    let oldSignal!: AbortSignal
+    list.mockImplementation((params, options) => {
+      if (params.inflight_only) return Promise.resolve({ items: [], total: 0 })
+      if (params.model === 'latest') return Promise.resolve({ items: [{ id: 2, request_id: 'latest' }], total: 1 })
+      oldSignal = options.signal
+      return new Promise(resolve => { resolveOld = resolve })
+    })
+    const vm = wrapper.vm as any
+    void vm.loadLogs(true)
+    vm.filters.model = 'latest'
+    vm.applyFilters()
+    await flushPromises()
+    resolveOld({ items: [{ id: 1, request_id: 'stale' }], total: 99 })
+    await flushPromises()
+    expect(oldSignal.aborted).toBe(false)
+    expect(vm.usageLogs.map((row: { request_id: string }) => row.request_id)).toEqual(['latest'])
+    expect(vm.pagination.total).toBe(1)
+    wrapper.unmount()
+  })
+
+  it('appends the next inflight page for unchanged filters', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    list.mockImplementation(params => {
+      if (!params.inflight_only) return Promise.resolve({ items: [], total: 0 })
+      return Promise.resolve({ items: [{ id: -params.page, request_id: `page-${params.page}` }], total: 2 })
+    })
+    const vm = wrapper.vm as any
+    vm.toggleInflight()
+    await flushPromises()
+    vm.loadMoreInflight()
+    await flushPromises()
+    expect(vm.inflightRows.map((row: { request_id: string }) => row.request_id)).toEqual(['page-1', 'page-2'])
+    expect(vm.inflightPage).toBe(2)
+    expect(vm.inflightHasMore).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('discards inflight responses from old filters and aborts their request', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    let resolveOld!: (value: unknown) => void
+    let oldSignal!: AbortSignal
+    list.mockImplementation((params, options) => {
+      if (!params.inflight_only) return Promise.resolve({ items: [], total: 0 })
+      if (params.model === 'latest') return Promise.resolve({ items: [{ id: -2, request_id: 'latest' }], total: 1 })
+      oldSignal = options.signal
+      return new Promise(resolve => { resolveOld = resolve })
+    })
+    const vm = wrapper.vm as any
+    vm.toggleInflight()
+    vm.filters.model = 'latest'
+    vm.applyFilters()
+    await flushPromises()
+    resolveOld({ items: [{ id: -1, request_id: 'stale' }], total: 1 })
+    await flushPromises()
+    expect(oldSignal.aborted).toBe(true)
+    expect(vm.inflightRows.map((row: { request_id: string }) => row.request_id)).toEqual(['latest'])
+    wrapper.unmount()
+  })
+
+  it('discards an old inflight append after refresh replaces the list', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    let resolveAppend!: (value: unknown) => void
+    let latest = false
+    list.mockImplementation(params => {
+      if (!params.inflight_only) return Promise.resolve({ items: [], total: 0 })
+      if (params.page === 2) return new Promise(resolve => { resolveAppend = resolve })
+      return Promise.resolve({ items: [{ id: latest ? -3 : -1, request_id: latest ? 'refreshed' : 'first' }], total: 20 })
+    })
+    const vm = wrapper.vm as any
+    vm.toggleInflight()
+    await flushPromises()
+    vm.loadMoreInflight()
+    latest = true
+    vm.refreshData()
+    await flushPromises()
+    resolveAppend({ items: [{ id: -2, request_id: 'stale-append' }], total: 20 })
+    await flushPromises()
+    expect(vm.inflightRows.map((row: { request_id: string }) => row.request_id)).toEqual(['refreshed'])
+    expect(vm.inflightPage).toBe(1)
+    wrapper.unmount()
+  })
+
   it('shows the routed user while applying user_id to usage requests', async () => {
     routeQuery.user_id = '42'
     getById.mockResolvedValue({ id: 42, email: 'route-user@test.com' })

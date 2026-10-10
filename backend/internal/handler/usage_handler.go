@@ -208,6 +208,7 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) 
 			UserID:             subject.UserID,
 			APIKeyID:           apiKeyID,
 			GroupID:            groupID,
+			RequestID:          strings.TrimSpace(c.Query("request_id")),
 			Model:              strings.TrimSpace(c.Query("model")),
 			ModelFilterSource:  usagestats.ModelSourceRequested,
 			RequestType:        requestType,
@@ -246,6 +247,11 @@ func (h *UsageHandler) List(c *gin.Context) {
 		SortOrder: c.DefaultQuery("sort_order", "desc"),
 	}
 
+	if queryInflightOnly(c) {
+		h.writeUserInflightOnly(c, parsed.Filters)
+		return
+	}
+
 	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, parsed.Filters)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -255,6 +261,23 @@ func (h *UsageHandler) List(c *gin.Context) {
 	out := make([]dto.UsageLog, 0, len(records))
 	for i := range records {
 		out = append(out, *dto.UsageLogFromService(&records[i]))
+	}
+	if page == 1 && service.QueryIncludesUsageInflight(c.Query("include_inflight")) {
+		finished := make(map[string]struct{}, len(out))
+		for i := range out {
+			if out[i].RequestID != "" {
+				finished[out[i].RequestID] = struct{}{}
+			}
+		}
+		now := time.Now()
+		live := service.VisibleUsageInflight(c.Request.Context(), parsed.Filters.UserID, parsed.Filters, finished)
+		if len(live) > 0 {
+			head := make([]dto.UsageLog, 0, len(live))
+			for _, row := range live {
+				head = append(head, dto.UsageLogFromInflight(row, now))
+			}
+			out = append(head, out...)
+		}
 	}
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
@@ -283,7 +306,7 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 		pageSize = 100
 	}
 
-	filter := &service.OpsErrorLogFilter{Page: page, PageSize: pageSize}
+	filter := &service.OpsErrorLogFilter{Page: page, PageSize: pageSize, RequestID: strings.TrimSpace(c.Query("request_id"))}
 
 	// Date range (half-open [start, end)), reuse usage-list semantics.
 	userTZ := c.Query("timezone")
@@ -721,4 +744,21 @@ func (h *UsageHandler) GetMyAPIKeyDailyUsage(c *gin.Context) {
 		"start_date": startTime.Format("2006-01-02"),
 		"end_date":   endTime.AddDate(0, 0, -1).Format("2006-01-02"),
 	})
+}
+
+func queryInflightOnly(c *gin.Context) bool {
+	value, err := strconv.ParseBool(strings.TrimSpace(c.Query("inflight_only")))
+	return err == nil && value
+}
+
+func (h *UsageHandler) writeUserInflightOnly(c *gin.Context, filters usagestats.UsageLogFilters) {
+	page, pageSize := response.ParsePagination(c)
+	now := time.Now()
+	live := service.VisibleUsageInflight(c.Request.Context(), filters.UserID, filters, nil)
+	pageRows, total := service.PageUsageInflight(live, page, pageSize)
+	out := make([]dto.UsageLog, 0, len(pageRows))
+	for _, row := range pageRows {
+		out = append(out, dto.UsageLogFromInflight(row, now))
+	}
+	response.Paginated(c, out, int64(total), page, 10)
 }

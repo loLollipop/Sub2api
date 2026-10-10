@@ -90,6 +90,8 @@ func TestKeyRouteBindingUsesSelectedPricingAndContext(t *testing.T) {
 	var guard *service.BalancePreauthorizationGuard
 	at := time.Unix(1000, 0)
 	selected.Group.ForceOpenAIFast = true
+	progress := service.NewUsageInflightProgress(service.UsageInflightSnapshot{GroupID: key.Group.ID})
+	c.Request = c.Request.WithContext(service.WithUsageInflightProgress(c.Request.Context(), progress))
 	err := bindSelectedKeyRoute(c, gateway, eligibility, preauthorizer, keyRouteBinding{
 		Previous: key, Selected: selected, Subscription: &subscription, Mapping: &mapping,
 		Guard: &guard, Body: []byte(`{"model":"gpt-5.1","input":"hello"}`), Model: "gpt-5.1", PricingAt: at,
@@ -111,6 +113,22 @@ func TestKeyRouteBindingUsesSelectedPricingAndContext(t *testing.T) {
 	require.Equal(t, 2.0, preauthorizer.captured.CostInput.RateMultiplier)
 	require.Equal(t, []int64{17}, eligibility.groups)
 	require.Equal(t, int64(9), key.Group.ID, "cached auth key must remain immutable")
+	require.Equal(t, selected.Group.ID, progress.Snapshot().GroupID, "inflight uses actual billing group")
+}
+
+func TestUsageInflightPublishesNonStreamingHandlerMetadata(t *testing.T) {
+	c, _, _ := routeBindingFixture()
+	progress := service.NewUsageInflightProgress(service.UsageInflightSnapshot{})
+	c.Request = c.Request.WithContext(service.WithUsageInflightProgress(c.Request.Context(), progress))
+	setOpsRequestContext(c, "public-model", false)
+	setOpsSelectedAccount(c, 45, service.PlatformOpenAI)
+	setActualUpstreamEndpoint(c, "/v1/chat/completions")
+	snap := progress.Snapshot()
+	require.Equal(t, "public-model", snap.Model)
+	require.Equal(t, int64(45), snap.AccountID)
+	require.False(t, snap.Stream)
+	require.Equal(t, "/v1/chat/completions", snap.UpstreamEndpoint)
+	require.False(t, c.Writer.Written(), "metadata is published before non-streaming response writes")
 }
 
 func TestKeyRouteBindingDefersOnlySmartKeyHoldUntilSelection(t *testing.T) {

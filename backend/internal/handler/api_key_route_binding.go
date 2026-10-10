@@ -165,6 +165,7 @@ func bindSelectedKeyRoute(c *gin.Context, gateway keyRouteBillingProvider, billi
 	c.Set(string(middleware.ContextKeyAPIKey), selected)
 	c.Set(string(middleware.ContextKeySubscription), subscription)
 	c.Request = c.Request.WithContext(ctx)
+	service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) { snap.GroupID = *selected.GroupID })
 	return nil
 }
 

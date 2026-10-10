@@ -159,7 +159,7 @@ describe('UsageFilters — user search dropdown', () => {
     const wrapper = mountFilters()
 
     // Trigger focus (sets showUserDropdown = true) then input (fires debounceUserSearch)
-    const input = wrapper.find('input[type="text"]')
+    const input = wrapper.get('[data-testid="usage-user-search"]')
     await input.trigger('focus')
     await input.setValue('test')
     await input.trigger('input')
@@ -211,7 +211,7 @@ describe('UsageFilters — user search dropdown', () => {
       .mockImplementationOnce(() => secondSearch.promise)
 
     const wrapper = mountFilters()
-    const input = wrapper.find('input[type="text"]')
+    const input = wrapper.get('[data-testid="usage-user-search"]')
     await input.trigger('focus')
 
     await input.setValue('a')
@@ -237,7 +237,7 @@ describe('UsageFilters — user search dropdown', () => {
     mockSearchUsers.mockImplementationOnce(() => pendingSearch.promise)
 
     const wrapper = mountFilters()
-    const input = wrapper.find('input[type="text"]')
+    const input = wrapper.get('[data-testid="usage-user-search"]')
     await input.trigger('focus')
 
     await input.setValue('stale')

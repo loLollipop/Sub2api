@@ -13,11 +13,23 @@
             @change="onDateRangeChange"
           />
         </div>
+        <div class="w-full sm:w-auto sm:min-w-[220px]">
+          <label class="input-label">{{ t('admin.usage.requestId') }}</label>
+          <input
+            v-model="filters.request_id"
+            type="text"
+            class="input"
+            :placeholder="t('usage.requestIdPlaceholder')"
+            @change="emitChange"
+            @keyup.enter="emitChange"
+          />
+        </div>
         <!-- User Search -->
         <div ref="userSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]">
           <label class="input-label">{{ t('admin.usage.userFilter') }}</label>
           <input
             v-model="userKeyword"
+            data-testid="usage-user-search"
             type="text"
             class="input pr-8"
             :placeholder="t('admin.usage.searchUserPlaceholder')"

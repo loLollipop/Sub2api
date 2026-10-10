@@ -7,6 +7,27 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
+func TestBuildOpsErrorLogsWhere_RequestIDMatchesEitherColumn(t *testing.T) {
+	where, args := buildOpsErrorLogsWhere(&service.OpsErrorLogFilter{RequestID: "fcfb9013"})
+	if !strings.Contains(where, "e.request_id IN ($1, $2)") || !strings.Contains(where, "e.client_request_id IN ($1, $2)") || strings.Contains(where, "ILIKE") {
+		t.Fatalf("request id search should hit both columns: %s", where)
+	}
+	if len(args) != 2 || args[0] != "fcfb9013" || args[1] != "fcfb9013" {
+		t.Fatalf("args %+v", args)
+	}
+}
+
+func TestBuildOpsErrorLogsWhere_CompleteRequestIDNamespaceAndLiteralWildcards(t *testing.T) {
+	for _, tc := range []struct{ input, bare string }{
+		{"client:abc", "abc"}, {"local:abc", "abc"}, {`100%_\x`, `100%_\x`},
+	} {
+		where, args := buildOpsErrorLogsWhere(&service.OpsErrorLogFilter{RequestID: tc.input})
+		if strings.Contains(where, "ILIKE") || len(args) != 2 || args[0] != tc.input || args[1] != tc.bare {
+			t.Fatalf("complete identity mismatch: %s %+v", where, args)
+		}
+	}
+}
+
 func TestBuildOpsErrorLogsWhere_UserScopedFilters(t *testing.T) {
 	uid := int64(42)
 	kid := int64(7)

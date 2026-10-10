@@ -65,11 +65,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Personal tags are deliberately published as stable GitHub Releases.
-          # Reject every other prerelease suffix so an rc/beta tag can never be
-          # promoted into /releases/latest by the GoReleaser configuration.
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-personal\.[1-9][0-9]*)?$ ]]; then
-            echo "::error::RELEASE_TAG must be vX.Y.Z or vX.Y.Z-personal.N"
+          # New releases use numeric version tags. Historical personal releases
+          # remain readable by the updater and rollback listing.
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::RELEASE_TAG must be vX.Y.Z"
             exit 1
           fi
 

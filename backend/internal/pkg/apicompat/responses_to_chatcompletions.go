@@ -31,6 +31,7 @@ func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatComp
 	}
 
 	var contentText string
+	var refusalText string
 	var reasoningText string
 	var toolCalls []ChatToolCall
 
@@ -38,8 +39,11 @@ func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatComp
 		switch item.Type {
 		case "message":
 			for _, part := range item.Content {
-				if part.Type == "output_text" && part.Text != "" {
+				switch {
+				case part.Type == "output_text" && part.Text != "":
 					contentText += part.Text
+				case part.Type == "refusal" && part.Refusal != "":
+					refusalText += part.Refusal
 				}
 			}
 		case "function_call":
@@ -62,7 +66,7 @@ func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatComp
 		}
 	}
 
-	msg := ChatMessage{Role: "assistant"}
+	msg := ChatMessage{Role: "assistant", Refusal: refusalText}
 	if len(toolCalls) > 0 {
 		msg.ToolCalls = toolCalls
 	}
@@ -123,6 +127,7 @@ type ResponsesEventToChatState struct {
 	SentRole                bool
 	SawToolCall             bool
 	SawText                 bool
+	SawRefusal              bool
 	Finalized               bool        // true after finish chunk has been emitted
 	NextToolCallIndex       int         // next sequential tool_call index to assign
 	OutputIndexToToolIndex  map[int]int // Responses output_index → Chat tool_calls index
@@ -154,6 +159,8 @@ func ResponsesEventToChatChunks(evt *ResponsesStreamEvent, state *ResponsesEvent
 		return resToChatHandleCreated(evt, state)
 	case "response.output_text.delta":
 		return resToChatHandleTextDelta(evt, state)
+	case "response.refusal.delta":
+		return resToChatHandleRefusalDelta(evt, state)
 	case "response.output_item.added":
 		return resToChatHandleOutputItemAdded(evt, state)
 	case "response.output_item.done":
@@ -253,6 +260,15 @@ func resToChatHandleTextDelta(evt *ResponsesStreamEvent, state *ResponsesEventTo
 	state.SawText = true
 	content := evt.Delta
 	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{Content: &content})}
+}
+
+func resToChatHandleRefusalDelta(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
+	if evt.Delta == "" {
+		return nil
+	}
+	refusal := evt.Delta
+	state.SawRefusal = true
+	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{Refusal: &refusal})}
 }
 
 func resToChatHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
@@ -423,6 +439,23 @@ func resToChatHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 			chunks = append(chunks, resToChatHandleTextDelta(&ResponsesStreamEvent{Delta: text}, state)...)
 		}
 	}
+	if !state.SawRefusal && evt.Response != nil {
+		var refusal strings.Builder
+		for _, item := range evt.Response.Output {
+			if item.Type != "message" {
+				continue
+			}
+			for _, part := range item.Content {
+				if part.Type == "refusal" {
+					_, _ = refusal.WriteString(part.Refusal)
+				}
+			}
+		}
+		if refusal.Len() > 0 {
+			chunks = append(chunks, resToChatHandleCreated(evt, state)...)
+			chunks = append(chunks, resToChatHandleRefusalDelta(&ResponsesStreamEvent{Delta: refusal.String()}, state)...)
+		}
+	}
 	chunks = append(chunks, makeChatFinishChunk(state, finishReason))
 
 	if state.IncludeUsage && state.Usage != nil {
@@ -581,6 +614,7 @@ type bufferedFuncCall struct {
 // (response.completed / response.done) carries an empty output array.
 type BufferedResponseAccumulator struct {
 	text                 strings.Builder
+	refusal              strings.Builder
 	reasoning            strings.Builder
 	funcCalls            []*bufferedFuncCall // pointers keep strings.Builder from being copied on growth
 	outputIndexToFuncIdx map[int]int
@@ -601,6 +635,10 @@ func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) 
 	case "response.output_text.delta":
 		if event.Delta != "" {
 			_, _ = a.text.WriteString(event.Delta)
+		}
+	case "response.refusal.delta":
+		if event.Delta != "" {
+			_, _ = a.refusal.WriteString(event.Delta)
 		}
 	case "response.output_item.added", "response.output_item.done":
 		if event.Item != nil && (event.Item.Type == "function_call" || event.Item.Type == "custom_tool_call") {
@@ -652,7 +690,7 @@ func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) 
 
 // HasContent reports whether any content has been accumulated.
 func (a *BufferedResponseAccumulator) HasContent() bool {
-	return a.text.Len() > 0 || len(a.funcCalls) > 0 || a.reasoning.Len() > 0
+	return a.text.Len() > 0 || a.refusal.Len() > 0 || len(a.funcCalls) > 0 || a.reasoning.Len() > 0
 }
 
 // BuildOutput constructs a []ResponsesOutput from the accumulated delta
@@ -671,14 +709,18 @@ func (a *BufferedResponseAccumulator) BuildOutput() []ResponsesOutput {
 		})
 	}
 
-	if a.text.Len() > 0 {
+	if a.text.Len() > 0 || a.refusal.Len() > 0 {
+		var content []ResponsesContentPart
+		if a.text.Len() > 0 {
+			content = append(content, ResponsesContentPart{Type: "output_text", Text: a.text.String()})
+		}
+		if a.refusal.Len() > 0 {
+			content = append(content, ResponsesContentPart{Type: "refusal", Refusal: a.refusal.String()})
+		}
 		out = append(out, ResponsesOutput{
-			Type: "message",
-			Role: "assistant",
-			Content: []ResponsesContentPart{{
-				Type: "output_text",
-				Text: a.text.String(),
-			}},
+			Type:    "message",
+			Role:    "assistant",
+			Content: content,
 		})
 	}
 

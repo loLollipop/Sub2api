@@ -50,7 +50,11 @@ func TestUsageInflightSnapshotIgnoresMutableGinRequestAndHeaders(t *testing.T) {
 	c.Set(string(ContextKeyAPIKey), &service.APIKey{ID: 4, UserID: 8})
 	stop := trackUsageInflight(c)
 	defer stop()
-	state := c.Writer.(*usageInflightWriter).state
+	writer, ok := c.Writer.(*usageInflightWriter)
+	if !ok {
+		t.Fatalf("unexpected writer type: %T", c.Writer)
+	}
+	state := writer.state
 	var workers sync.WaitGroup
 	workers.Add(1)
 	go func() {

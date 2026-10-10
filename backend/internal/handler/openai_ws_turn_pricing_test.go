@@ -78,7 +78,9 @@ func TestOpenAIWSTurnBillingRefreshPricesAndFallbacks(t *testing.T) {
 			require.Equal(t, 0.15, first.RateMultiplier)
 			if scenario == "repriced" {
 				require.Equal(t, 0.3, second.RateMultiplier, "later turn uses refreshed pricing")
-				require.Equal(t, 0.3, secondCtx.Value(ctxkey.Group).(*service.Group).RateMultiplier)
+				currentGroup, ok := secondCtx.Value(ctxkey.Group).(*service.Group)
+				require.True(t, ok, "turn context must contain its billing group")
+				require.Equal(t, 0.3, currentGroup.RateMultiplier)
 				require.NotSame(t, conn, secondKey)
 			} else {
 				require.Equal(t, 0.15, second.RateMultiplier)

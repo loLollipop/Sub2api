@@ -473,6 +473,13 @@ func setOpsRequestContext(c *gin.Context, model string, stream bool) {
 		ctx := context.WithValue(c.Request.Context(), ctxkey.Model, model)
 		c.Request = c.Request.WithContext(ctx)
 	}
+	if c.Request != nil {
+		publicModel := model
+		if requested, ok := service.RequestedPublicModelFromContext(c.Request.Context()); ok {
+			publicModel = requested
+		}
+		service.UpdateUsageInflight(c.Request.Context(), func(snap *service.UsageInflightSnapshot) { snap.Model, snap.Stream = publicModel, stream })
+	}
 }
 
 // setOpsEndpointContext stores upstream model and request type for ops error logging.
@@ -502,6 +509,7 @@ func setOpsSelectedAccount(c *gin.Context, accountID int64, platform ...string) 
 			}
 		}
 		c.Request = c.Request.WithContext(ctx)
+		service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) { snap.AccountID = accountID })
 	}
 }
 

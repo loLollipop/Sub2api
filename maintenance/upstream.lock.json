@@ -2,12 +2,12 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.0.68",
-  "imported_commit": "4dc2e58ffbeb3533a659f2de4d020bd362cfc4a6",
+  "imported_version": "2.1.3",
+  "imported_commit": "9bbe1e2bf249cdec2e77da9480d746ccb48bfff8",
   "personal_baseline_commit": "edf577657ac8d1b2d245e772a0172b550b9d7c53",
-  "latest_observed_version": "2.0.68",
-  "latest_observed_release_commit": "2b518c1eaacdcaa7039e4b318b6299f1510d2be2",
-  "latest_observed_main_commit": "4dc2e58ffbeb3533a659f2de4d020bd362cfc4a6",
+  "latest_observed_version": "2.1.3",
+  "latest_observed_release_commit": "9bbe1e2bf249cdec2e77da9480d746ccb48bfff8",
+  "latest_observed_main_commit": "9bbe1e2bf249cdec2e77da9480d746ccb48bfff8",
   "sync_policy": "review-diff-then-squash",
   "deferred_changes": [
     {
@@ -34,6 +34,26 @@
       "feature": "async-images-multi-group-entry-gate-relaxation",
       "upstream_commits": ["f075051a0"],
       "reason": "Submit still uses the primary group platform instead of ResolvedTargetPlatform, and a primary-group moderation completion marker can skip target-group policy. Preserve the existing entry platform and image-generation permission rejection until resolved-target authorization and auditing are covered; duplicate-model rejection is imported independently."
+    },
+    {
+      "feature": "cline-command-code-platforms",
+      "upstream_commits": ["14dc46aee"],
+      "reason": "Defer both platforms and migration 255 together: connection tests send their credentials to Anthropic and mapped Claude models select the wrong forwarding protocol. Accept the independent protocol compatibility fixes only, pending endpoint tests for credential destinations and mapped-model routing."
+    },
+    {
+      "feature": "honeypot-scanner-path-bans",
+      "upstream_commits": ["5705748d8"],
+      "reason": "Defer all honeypot detection, routes and ban wiring: the keyword heuristic rejects legitimate business queries. The 2.1.3 SigV4 correction does not fix other legitimate query-value false positives. In-flight usage tracking is imported independently with request-thread metadata publication, race-free snapshots, atomic Redis cleanup and stale-response protection. Authentication keeps its existing c.Next flow."
+    },
+    {
+      "feature": "usage-request-id-trigram-index-migrations",
+      "upstream_commits": ["5c031ae04"],
+      "reason": "Defer migrations 256a/256b and their binding test: pg_trgm creation may fail silently before unconditional index creation fails; interrupted CONCURRENTLY indexes have no invalid-index recovery. Without these indexes, defer contains-fragment searches too to avoid hot-table scans. Query exact complete request/upstream IDs with existing B-tree indexes, also accepting raw client/local IDs. This production release has no schema changes and retains validate mode."
+    },
+    {
+      "feature": "opus55-public-model-only-strict-validation",
+      "upstream_commits": ["66790d7ee"],
+      "reason": "Defer the new validator and both handler hooks: they check only the public model before channel/account mappings, allowing aliases mapped to Opus5.5 to bypass validation while rejecting Opus5.5 mapped to other models. Preserve existing validation until effective-model routing and original-body semantics are covered together."
     }
   ],
   "deployment_repository": "loLollipop/Sub2api"

@@ -55,6 +55,7 @@ case "$1" in
   show) [[ $3 == MainPID* ]] && cat "$state" ;;
   is-active) [[ $(<"$state") != 0 ]] ;;
   stop)
+    printf 'stop\n' >>"$MOCK_SERVICE_STOPS"
     [[ ${STOP_FAIL:-0} != 1 ]] || exit 1
     echo 0 >"$state"
     ;;
@@ -103,8 +104,9 @@ EOF
 chmod +x "$MOCK/bin"/*
 export PATH="$MOCK/bin:$PATH" MOCK_RELEASE="$MOCK/artifacts" MOCK_SYSTEMCTL_STATE="$TMP/pid"
 export MOCK_SYSTEMCTL_EXE="$TMP/running-exe" MOCK_SYSTEMCTL_NEXT_PID="$TMP/next-pid"
+export MOCK_CANDIDATE_EXECUTIONS="$TMP/candidate-executions" MOCK_SERVICE_STOPS="$TMP/service-stops"
 echo 123 >"$MOCK_SYSTEMCTL_STATE"
-printf '#!/bin/sh\n[ "$1" = -version ] || [ "$1" = -check-migrations ]\n' >"$MOCK/artifacts/sub2api"; chmod +x "$MOCK/artifacts/sub2api"
+printf '#!/bin/sh\nprintf "%%s\\n" "$1" >>"$MOCK_CANDIDATE_EXECUTIONS"\n[ "$1" = -version ] || [ "$1" = -check-migrations ]\n' >"$MOCK/artifacts/sub2api"; chmod +x "$MOCK/artifacts/sub2api"
 tar -czf "$MOCK/artifacts/package.tar.gz" -C "$MOCK/artifacts" sub2api
 sha256sum "$MOCK/artifacts/package.tar.gz" | sed "s#  .*#  sub2api_1.2.3-personal.2_linux_amd64.tar.gz#" >"$MOCK/artifacts/checksums.txt"
 printf '#!/bin/sh\nold\n' >"$TMP/old-sub2api"; chmod +x "$TMP/old-sub2api"
@@ -119,8 +121,42 @@ reset_run() {
   echo 123 >"$MOCK_SYSTEMCTL_STATE"
   printf '%s\n' "$MOCK_OLD_EXE" >"$MOCK_SYSTEMCTL_EXE"
   echo 124 >"$MOCK_SYSTEMCTL_NEXT_PID"
+  : >"$MOCK_CANDIDATE_EXECUTIONS"
+  : >"$MOCK_SERVICE_STOPS"
   unset MIGRATION_FAIL HEALTH_FAIL STOP_FAIL ATOMIC_COPY_FAIL
 }
+assert_candidate_not_run_and_service_not_stopped() {
+  [[ ! -s "$MOCK_CANDIDATE_EXECUTIONS" ]] || { echo 'rejected candidate was executed' >&2; exit 1; }
+  [[ ! -s "$MOCK_SERVICE_STOPS" ]] || { echo 'service was stopped for a rejected candidate' >&2; exit 1; }
+  [[ $(<"$MOCK_SYSTEMCTL_STATE") == 123 ]] || exit 1
+}
+reset_run
+expect_fail env SUB2API_UPDATER_LOCK_FD=8 "$UPDATER" latest
+assert_candidate_not_run_and_service_not_stopped
+# An inherited descriptor for a different file must never bypass the lock.
+touch "$TMP/state/update.lock"
+expect_fail env SUB2API_UPDATER_LOCK_FD=9 "$UPDATER" latest 9>"$TMP/wrong-lock"
+assert_candidate_not_run_and_service_not_stopped
+expect_fail "$UPDATER" v1.2.3-personal.2 --expected-binary-sha256 invalid
+assert_candidate_not_run_and_service_not_stopped
+expect_fail "$UPDATER" v1.2.3-personal.2 --expected-binary-sha256
+assert_candidate_not_run_and_service_not_stopped
+wrong_binary_hash=$(printf '%064d' 0)
+expect_fail "$UPDATER" v1.2.3-personal.2 --expected-binary-sha256 "$wrong_binary_hash"
+assert_candidate_not_run_and_service_not_stopped
+reset_run
+mkdir -p -- "$TMP/deployed/v1.2.3-personal.2"
+cp "$MOCK/artifacts/sub2api" "$TMP/deployed/v1.2.3-personal.2/sub2api"
+cp "$MOCK/artifacts/sub2api" "$MOCK/artifacts/sub2api.good"
+printf '# changed release asset\n' >>"$MOCK/artifacts/sub2api"
+tar -czf "$MOCK/artifacts/package.tar.gz" -C "$MOCK/artifacts" sub2api
+sha256sum "$MOCK/artifacts/package.tar.gz" | sed "s#  .*#  sub2api_1.2.3-personal.2_linux_amd64.tar.gz#" >"$MOCK/artifacts/checksums.txt"
+expect_fail "$UPDATER" v1.2.3-personal.2
+assert_candidate_not_run_and_service_not_stopped
+cp "$MOCK/artifacts/sub2api.good" "$MOCK/artifacts/sub2api"
+tar -czf "$MOCK/artifacts/package.tar.gz" -C "$MOCK/artifacts" sub2api
+sha256sum "$MOCK/artifacts/package.tar.gz" | sed "s#  .*#  sub2api_1.2.3-personal.2_linux_amd64.tar.gz#" >"$MOCK/artifacts/checksums.txt"
+reset_run
 sed "s/loLollipop\\/Sub2api/wrong\\/repo/" "$SUB2API_UPDATER_CONFIG" >"$TMP/bad-config"
 chmod 0600 "$TMP/bad-config"
 expect_fail env SUB2API_UPDATER_CONFIG="$TMP/bad-config" "$UPDATER" latest
@@ -148,8 +184,24 @@ grep -q 'ExecStart=.*/sub2api' "$DROPIN_PATH" || { echo 'failed atomic copy repl
 ! grep -q 'partial-copy' "$DROPIN_PATH" || { echo 'failed atomic copy published partial content' >&2; exit 1; }
 [[ -z $(find "$(dirname -- "$DROPIN_PATH")" -maxdepth 1 -name '.90-managed-release.conf.*' -print -quit) ]] || { echo 'failed atomic copy left a temporary drop-in' >&2; exit 1; }
 unset ATOMIC_COPY_FAIL HEALTH_FAIL
-reset_run; "$UPDATER" latest; grep -q 'ExecStart=.*/sub2api' "$DROPIN_PATH"; test -s "$TMP/state/last-good"
+expected_binary_hash=$(sha256sum "$MOCK/artifacts/sub2api" | awk '{print $1}')
+reset_run; "$UPDATER" --expected-binary-sha256 "${expected_binary_hash^^}" v1.2.3-personal.2; grep -q 'ExecStart=.*/sub2api' "$DROPIN_PATH"; test -s "$TMP/state/last-good"
+grep -qx -- '-version' "$MOCK_CANDIDATE_EXECUTIONS"
+grep -qx -- '-check-migrations' "$MOCK_CANDIDATE_EXECUTIONS"
 [[ -z $(find "$TMP/deployed" -maxdepth 1 -name '*.staging.*' -print -quit) ]] || { echo 'uncommitted staging directory remains' >&2; exit 1; }
 # Reusing an already committed immutable directory must remain idempotent.
 "$UPDATER" latest
+"$UPDATER" v1.2.3-personal.2 --expected-binary-sha256 "$expected_binary_hash"
+# Sharing the same locked open description allows outer verification to stay
+# protected, while a distinct opener must still fail the actual Linux flock.
+reset_run
+exec 9>"$TMP/state/update.lock"
+/usr/bin/flock -n 9
+expect_fail /usr/bin/flock -n "$TMP/state/update.lock" true
+expect_fail env FLOCK=/usr/bin/flock "$UPDATER" v1.2.3-personal.2
+assert_candidate_not_run_and_service_not_stopped
+FLOCK=/usr/bin/flock SUB2API_UPDATER_LOCK_FD=9 "$UPDATER" v1.2.3-personal.2 --expected-binary-sha256 "$expected_binary_hash"
+expect_fail /usr/bin/flock -n "$TMP/state/update.lock" true
+/usr/bin/flock -n 9
+exec 9>&-
 echo 'offline vps release updater tests passed'

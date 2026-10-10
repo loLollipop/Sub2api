@@ -80,6 +80,10 @@
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
             <div class="w-full sm:w-auto sm:min-w-[220px]">
+              <label class="input-label">{{ t('admin.usage.requestId') }}</label>
+              <input v-model="errorFilter.request_id" type="text" class="input" :placeholder="t('usage.requestIdPlaceholder')" @change="applyErrorFilters" @keyup.enter="applyErrorFilters" />
+            </div>
+            <div class="w-full sm:w-auto sm:min-w-[220px]">
               <label class="input-label">{{ t('usage.errors.keyName') }}</label>
               <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
             </div>
@@ -105,6 +109,10 @@
             </div>
           </div>
           <div v-else class="flex flex-1 flex-wrap items-end gap-4">
+            <div class="w-full sm:w-auto sm:min-w-[220px]">
+              <label class="input-label">{{ t('admin.usage.requestId') }}</label>
+              <input v-model="filters.request_id" type="text" class="input" :placeholder="t('usage.requestIdPlaceholder')" @change="applyFilters" @keyup.enter="applyFilters" />
+            </div>
             <div class="w-full sm:w-auto sm:min-w-[220px]">
               <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
               <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
@@ -189,6 +197,23 @@
       </div>
 
       <template v-if="activeTab === 'usage'">
+        <button type="button" class="mb-3 flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-left text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-100 dark:hover:bg-dark-700" @click="toggleInflight">
+          <Icon name="chevronDown" size="sm" :class="['text-gray-400 transition-transform', inflightOpen ? '' : '-rotate-90']" />
+          <span>{{ t('usage.inflightFold') }}</span>
+          <span v-if="inflightTotal" class="ml-auto text-xs font-normal text-gray-400">{{ inflightRows.length }}/{{ inflightTotal }}</span>
+        </button>
+        <UsageTable
+          v-if="inflightOpen"
+          class="mb-3"
+          :data="inflightRows"
+          :loading="inflightLoading"
+          :columns="visibleColumns"
+          :show-account-billing="false"
+          :show-upstream-endpoint="false"
+        />
+        <button v-if="inflightOpen && inflightHasMore" type="button" class="btn btn-secondary mb-4 w-full" :disabled="inflightLoading" @click="loadMoreInflight">
+          {{ inflightLoading ? t('common.loading') : t('usage.inflightMore') }}
+        </button>
         <UsageTable
           :data="usageLogs"
           :loading="loading"
@@ -299,11 +324,12 @@ const errorPageSize = ref(20)
 const errorSortBy = ref('created_at')
 const errorSortOrder = ref<'asc' | 'desc'>('desc')
 const errorTotal = ref(0)
-const errorFilter = ref<{ model: string | null; category: string; api_key_id: number | null; status_code: number | null }>({
+const errorFilter = ref<{ model: string | null; category: string; api_key_id: number | null; status_code: number | null; request_id: string }>({
   model: '',
   category: '',
   api_key_id: null,
   status_code: null,
+  request_id: '',
 })
 
 const errorKeyOptions = computed<SelectOption[]>(() => [
@@ -454,32 +480,105 @@ const buildUsageListParams = (page: number, pageSize: number): UsageQueryParams 
   page,
   page_size: pageSize,
   ...normalizedFilters.value,
+  request_id: filters.value.request_id?.trim() || undefined,
+  include_inflight: false,
   sort_by: sortState.sort_by,
   sort_order: sortState.sort_order,
 })
 
-const loadLogs = async () => {
-  abortController?.abort()
+let logsGeneration = 0
+const inflightOpen = ref(false)
+const inflightRows = ref<UsageLog[]>([])
+const inflightLoading = ref(false)
+const inflightPage = ref(1)
+const inflightTotal = ref(0)
+const inflightHasMore = computed(() => inflightRows.value.length < inflightTotal.value)
+let inflightController: AbortController | null = null
+let inflightGeneration = 0
+let inflightListVersion = 0
+let inflightFilterKey = ''
+const currentInflightFilterKey = () => JSON.stringify(buildUsageListParams(1, 10))
+const invalidateInflight = () => {
+  ++inflightGeneration
+  ++inflightListVersion
+  inflightController?.abort()
+  inflightController = null
+  inflightLoading.value = false
+  inflightRows.value = []
+  inflightTotal.value = 0
+  inflightPage.value = 1
+}
+const loadInflight = async (append = false) => {
+  const filterKey = currentInflightFilterKey()
+  if (append && inflightFilterKey !== filterKey) append = false
+  if (!append) invalidateInflight()
+  inflightController?.abort()
   const controller = new AbortController()
-  abortController = controller
-  loading.value = true
+  inflightController = controller
+  const generation = ++inflightGeneration
+  const listVersion = inflightListVersion
+  const logsVersion = logsGeneration
+  const page = append ? inflightPage.value + 1 : 1
+  inflightLoading.value = true
+  try {
+    const res = await usageAPI.query({
+      ...buildUsageListParams(page, 10),
+      page,
+      page_size: 10,
+      include_inflight: true,
+      inflight_only: true,
+    }, { signal: controller.signal })
+    if (controller.signal.aborted || generation !== inflightGeneration ||
+        listVersion !== inflightListVersion || logsVersion !== logsGeneration ||
+        filterKey !== currentInflightFilterKey()) return
+    const items = res.items || []
+    inflightRows.value = append ? inflightRows.value.concat(items) : items
+    inflightTotal.value = res.total || 0
+    inflightPage.value = page
+    inflightFilterKey = filterKey
+    ++inflightListVersion
+  } catch (error) {
+    if (!controller.signal.aborted) console.error('[UsageView] loadInflight failed:', error)
+  } finally {
+    if (inflightController === controller) inflightLoading.value = false
+  }
+}
+const loadMoreInflight = () => {
+  if (!inflightLoading.value && inflightHasMore.value) void loadInflight(true)
+}
+const toggleInflight = () => {
+  inflightOpen.value = !inflightOpen.value
+  if (inflightOpen.value) void loadInflight(false)
+  else invalidateInflight()
+}
+const loadLogs = async (silent = false) => {
+  if (silent && loading.value) return
+  const generation = ++logsGeneration
+  invalidateInflight()
+  if (inflightOpen.value) void loadInflight(false)
+  if (!silent) {
+    abortController?.abort()
+    abortController = new AbortController()
+    loading.value = true
+  }
+  const controller = silent ? new AbortController() : abortController!
   try {
     const res = await usageAPI.query(buildUsageListParams(pagination.page, pagination.page_size), {
       signal: controller.signal,
     })
+    if (generation !== logsGeneration) return
     if (!controller.signal.aborted) {
       usageLogs.value = res.items
       pagination.total = res.total
     }
   } catch (error: any) {
-    if (error?.name !== 'AbortError' && error?.code !== 'ERR_CANCELED') {
+    if (!silent && error?.name !== 'AbortError' && error?.code !== 'ERR_CANCELED') {
       appStore.showError(t('usage.failedToLoad'))
     }
   } finally {
-    if (abortController === controller) loading.value = false
+    if (!silent && abortController === controller) loading.value = false
   }
 }
-
 const loadStats = async () => {
   const seq = ++statsReqSeq
   endpointStatsLoading.value = true
@@ -587,7 +686,7 @@ const resetFilters = () => {
   granularity.value = getGranularityForRange(range.start, range.end)
   applyFilters()
   if (activeTab.value === 'errors') {
-    errorFilter.value = { model: '', category: '', api_key_id: null, status_code: null }
+    errorFilter.value = { model: '', category: '', api_key_id: null, status_code: null, request_id: '' }
     applyErrorFilters()
   }
 }
@@ -654,7 +753,7 @@ const exportToCSV = async () => {
   exporting.value = true
   appStore.showInfo(t('usage.preparingExport'))
   try {
-    const exportParams = buildUsageListParams(1, 100)
+    const exportParams = { ...buildUsageListParams(1, 100), include_inflight: false }
     const allLogs = await fetchPaginatedItems(
       (page, pageSize) => usageAPI.query({ ...exportParams, page, page_size: pageSize }), 100
     )
@@ -872,6 +971,7 @@ const loadErrors = async () => {
       category: errorFilter.value.category || undefined,
       api_key_id: errorFilter.value.api_key_id ?? undefined,
       status_code: errorFilter.value.status_code ?? undefined,
+      request_id: errorFilter.value.request_id.trim() || undefined,
       sort_by: errorSortBy.value,
       sort_order: errorSortOrder.value,
     })
@@ -917,6 +1017,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  ++logsGeneration
+  invalidateInflight()
   abortController?.abort()
   document.removeEventListener('click', handleColumnClickOutside)
 })

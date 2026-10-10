@@ -52,12 +52,42 @@ source "$CONFIG_FILE"
 mkdir -p -- "$STATE_DIR" "$RELEASES_DIR"
 chmod 700 -- "$STATE_DIR"
 LOCK_FILE=${LOCK_FILE:-$STATE_DIR/update.lock}
-exec 9>"$LOCK_FILE"
+if [[ ${SUB2API_UPDATER_LOCK_FD:-} == 9 ]]; then
+  # A controlled outer transaction can keep this same lock through its final
+  # verification/rollback. Never skip locking: verify the inherited descriptor
+  # names the configured lock inode, then flock that shared open description.
+  [[ -f "$LOCK_FILE" && ! -L "$LOCK_FILE" && \
+     $(stat -Lc '%d:%i' -- /proc/$$/fd/9) == "$(stat -Lc '%d:%i' -- "$LOCK_FILE")" ]] || {
+    die 'inherited lock descriptor does not match LOCK_FILE'; exit 1;
+  }
+elif [[ -n ${SUB2API_UPDATER_LOCK_FD:-} ]]; then
+  die 'only inherited lock descriptor 9 is supported'; exit 1
+else
+  exec 9>"$LOCK_FILE"
+fi
 "$FLOCK" -n 9 || { die 'another update is already running'; exit 1; }
 
-usage() { printf 'usage: %s <latest|tag>\n' "$0"; }
-requested=${1:-latest}
-[[ $# -le 1 ]] || { usage >&2; exit 2; }
+usage() { printf 'usage: %s [--expected-binary-sha256 <64hex>] [latest|tag]\n' "$0"; }
+requested=latest
+requested_set=0
+expected_binary_sha256=
+while (( $# )); do
+  case "$1" in
+    --expected-binary-sha256)
+      [[ $# -ge 2 && -z "$expected_binary_sha256" && "$2" =~ ^[0-9A-Fa-f]{64}$ ]] || {
+        die '--expected-binary-sha256 requires one 64-character hexadecimal SHA256'; exit 2;
+      }
+      expected_binary_sha256=${2,,}
+      shift 2
+      ;;
+    *)
+      (( requested_set == 0 )) || { usage >&2; exit 2; }
+      requested=$1
+      requested_set=1
+      shift
+      ;;
+  esac
+done
 if [[ "$requested" != latest && ! "$requested" =~ ^v?[0-9][0-9A-Za-z._-]*$ ]]; then
   die 'tag must contain only an optional v followed by version-safe characters'; exit 2
 fi
@@ -183,9 +213,11 @@ file_description=$("$FILE" -b -- "$source_binary")
 [[ "$file_description" == *ELF* && "$file_description" == *x86-64* ]] || {
   die "candidate is not an ELF Linux amd64 binary: $file_description"; exit 1;
 }
-"$source_binary" -version >/dev/null || { die 'candidate -version check failed'; exit 1; }
 source_binary_hash=$("$SHA256SUM" "$source_binary" | awk '{print tolower($1)}')
 [[ "$source_binary_hash" =~ ^[0-9a-f]{64}$ ]] || { die 'candidate binary hash is invalid'; exit 1; }
+[[ -z "$expected_binary_sha256" || "$source_binary_hash" == "$expected_binary_sha256" ]] || {
+  die 'candidate binary does not match --expected-binary-sha256'; exit 1;
+}
 
 release_dir="$RELEASES_DIR/$release_tag"
 candidate="$release_dir/sub2api"
@@ -197,7 +229,11 @@ if [[ -e "$release_dir" ]]; then
   [[ "$existing_binary_hash" == "$source_binary_hash" ]] || {
     die "existing release differs from the immutable GitHub asset: $release_dir"; exit 1;
   }
-else
+fi
+# Verify controlled deployment identity and any committed immutable release
+# before invoking even the candidate's version or migration checks.
+"$source_binary" -version >/dev/null || { die 'candidate -version check failed'; exit 1; }
+if [[ ! -e "$release_dir" ]]; then
   # Build the complete immutable release on the same filesystem, then publish
   # it with one rename. EXIT (including handled signals) removes only an
   # uncommitted staging directory.

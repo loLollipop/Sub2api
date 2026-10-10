@@ -40,6 +40,7 @@ func WithCompositeRouteDecision(ctx context.Context, decision CompositeRouteDeci
 		ctx = context.WithValue(ctx, ctxkey.ResolvedUpstreamModel, model)
 	}
 	if model := strings.TrimSpace(decision.PublicModel); model != "" {
+		UpdateUsageInflight(ctx, func(snap *UsageInflightSnapshot) { snap.Model = model })
 		ctx = context.WithValue(ctx, ctxkey.RequestedPublicModel, model)
 	}
 	if source := strings.TrimSpace(decision.Source); source != "" {

@@ -209,6 +209,11 @@ func (h *UsageHandler) List(c *gin.Context) {
 		ExactTotal:            exactTotal,
 	}
 
+	if adminInflightOnly(c) {
+		writeAdminInflightOnly(c, filters)
+		return
+	}
+
 	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, filters)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -218,6 +223,23 @@ func (h *UsageHandler) List(c *gin.Context) {
 	out := make([]dto.AdminUsageLog, 0, len(records))
 	for i := range records {
 		out = append(out, *dto.UsageLogFromServiceAdmin(&records[i]))
+	}
+	if page == 1 && service.QueryIncludesUsageInflight(c.Query("include_inflight")) {
+		finished := make(map[string]struct{}, len(out))
+		for i := range out {
+			if out[i].RequestID != "" {
+				finished[out[i].RequestID] = struct{}{}
+			}
+		}
+		now := time.Now()
+		live := service.VisibleUsageInflight(c.Request.Context(), filters.UserID, filters, finished)
+		if len(live) > 0 {
+			head := make([]dto.AdminUsageLog, 0, len(live))
+			for _, row := range live {
+				head = append(head, dto.AdminUsageLogFromInflight(row, now))
+			}
+			out = append(head, out...)
+		}
 	}
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
@@ -652,4 +674,21 @@ func (h *UsageHandler) CancelCleanupTask(c *gin.Context) {
 	}
 	logger.LegacyPrintf("handler.admin.usage", "[UsageCleanup] 清理任务已取消: task=%d operator=%d", taskID, subject.UserID)
 	response.Success(c, gin.H{"id": taskID, "status": service.UsageCleanupStatusCanceled})
+}
+
+func adminInflightOnly(c *gin.Context) bool {
+	value, err := strconv.ParseBool(strings.TrimSpace(c.Query("inflight_only")))
+	return err == nil && value
+}
+
+func writeAdminInflightOnly(c *gin.Context, filters usagestats.UsageLogFilters) {
+	page, pageSize := response.ParsePagination(c)
+	now := time.Now()
+	live := service.VisibleUsageInflight(c.Request.Context(), filters.UserID, filters, nil)
+	pageRows, total := service.PageUsageInflight(live, page, pageSize)
+	out := make([]dto.AdminUsageLog, 0, len(pageRows))
+	for _, row := range pageRows {
+		out = append(out, dto.AdminUsageLogFromInflight(row, now))
+	}
+	response.Paginated(c, out, int64(total), page, 10)
 }

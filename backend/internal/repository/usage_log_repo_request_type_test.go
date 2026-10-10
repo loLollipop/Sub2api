@@ -434,14 +434,47 @@ func TestUsageLogRepositoryListWithFiltersRequestID(t *testing.T) {
 
 	filters := usagestats.UsageLogFilters{RequestID: " req-0123 "}
 
-	mock.ExpectQuery("SELECT .* FROM usage_logs WHERE request_id = \\$1 ORDER BY id DESC LIMIT \\$2 OFFSET \\$3").
-		WithArgs("req-0123", 21, 0).
+	mock.ExpectQuery("SELECT .* FROM usage_logs WHERE \\(request_id IN \\(\\$1, \\$2, \\$3\\) OR upstream_request_id = \\$1\\) ORDER BY id DESC LIMIT \\$4 OFFSET \\$5").
+		WithArgs("req-0123", "client:req-0123", "local:req-0123", 21, 0).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
 	logs, page, err := repo.ListWithFilters(context.Background(), pagination.PaginationParams{Page: 1, PageSize: 20}, filters)
 	require.NoError(t, err)
 	require.Empty(t, logs)
 	require.NotNil(t, page)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUsageLogRepositoryListWithFiltersRequestIDTreatsWildcardsLiterally(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+
+	// Equality keeps wildcard-looking characters literal, without a table scan.
+	filters := usagestats.UsageLogFilters{RequestID: ` 100%_\x `}
+
+	mock.ExpectQuery("SELECT .* FROM usage_logs WHERE \\(request_id IN \\(\\$1, \\$2, \\$3\\) OR upstream_request_id = \\$1\\) ORDER BY id DESC LIMIT \\$4 OFFSET \\$5").
+		WithArgs(`100%_\x`, `client:100%_\x`, `local:100%_\x`, 21, 0).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+	_, page, err := repo.ListWithFilters(context.Background(), pagination.PaginationParams{Page: 1, PageSize: 20}, filters)
+	require.NoError(t, err)
+	require.NotNil(t, page)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUsageLogRepositoryListWithFiltersRequestIDPreservesClientPrefix(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+
+	// Preserve the supplied full namespace; bare client IDs are accepted too.
+	filters := usagestats.UsageLogFilters{RequestID: "client:0f3a"}
+
+	mock.ExpectQuery("SELECT .* FROM usage_logs WHERE \\(request_id IN \\(\\$1, \\$2, \\$3\\) OR upstream_request_id = \\$1\\) ORDER BY id DESC LIMIT \\$4 OFFSET \\$5").
+		WithArgs("client:0f3a", "client:client:0f3a", "local:client:0f3a", 21, 0).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+	_, _, err := repo.ListWithFilters(context.Background(), pagination.PaginationParams{Page: 1, PageSize: 20}, filters)
+	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

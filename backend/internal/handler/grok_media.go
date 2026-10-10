@@ -786,6 +786,7 @@ func (h *OpenAIGatewayHandler) restoreGrokVideoBillingRoute(
 	c.Set(string(middleware2.ContextKeyAPIKey), routed)
 	c.Set(string(middleware2.ContextKeySubscription), resolvedSubscription)
 	c.Request = c.Request.WithContext(ctx)
+	service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) { snap.GroupID = *routed.GroupID })
 	return routed, resolvedSubscription, pending, nil
 }
 

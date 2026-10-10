@@ -9,6 +9,7 @@ func ContextWithBalancePreauthorizationGuard(ctx context.Context, guard *Balance
 	if guard == nil {
 		return ctx
 	}
+	publishUsageInflightGuard(ctx, guard)
 	return context.WithValue(ctx, balancePreauthorizationContextKey{}, guard)
 }
 

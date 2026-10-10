@@ -187,89 +187,105 @@ func TestOpenAIGatewayService_Forward_HTTPIngressStaysHTTPWhenWSEnabled(t *testi
 }
 
 func TestOpenAIGatewayService_Forward_HTTPIngressRetriesInvalidEncryptedContentOnce(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	wsFallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.NotFound(w, r)
-	}))
-	defer wsFallbackServer.Close()
+	for _, tc := range []struct {
+		name, body string
+		retry      bool
+	}{
+		{"invalid_encrypted_content", `{"error":{"code":"invalid_encrypted_content","type":"invalid_request_error","message":"The encrypted content could not be verified."}}`, true},
+		{"thinking_signature_encrypted", `{"error":{"code":"thinking_signature_invalid","type":"invalid_request_error","message":"The encrypted content could not be verified: could not be decrypted or parsed"}}`, true},
+		{"unrelated_thinking_signature", `{"error":{"code":"thinking_signature_invalid","type":"invalid_request_error","message":"The thinking signature is invalid"}}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			wsFallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.NotFound(w, r)
+			}))
+			defer wsFallbackServer.Close()
 
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
-	c.Request.Header.Set("User-Agent", "custom-client/1.0")
-	SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
+			c.Request.Header.Set("User-Agent", "custom-client/1.0")
+			SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
 
-	upstream := &httpUpstreamSequenceRecorder{
-		responses: []*http.Response{
-			{
-				StatusCode: http.StatusBadRequest,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body: io.NopCloser(strings.NewReader(
-					`{"error":{"code":"invalid_encrypted_content","type":"invalid_request_error","message":"The encrypted content could not be verified."}}`,
-				)),
-			},
-			{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body: io.NopCloser(strings.NewReader(
-					`{"id":"resp_http_retry_ok","usage":{"input_tokens":1,"output_tokens":2,"input_tokens_details":{"cached_tokens":0}}}`,
-				)),
-			},
-		},
+			upstream := &httpUpstreamSequenceRecorder{
+				responses: []*http.Response{
+					{
+						StatusCode: http.StatusBadRequest,
+						Header:     http.Header{"Content-Type": []string{"application/json"}},
+						Body: io.NopCloser(strings.NewReader(
+							tc.body,
+						)),
+					},
+					{
+						StatusCode: http.StatusOK,
+						Header:     http.Header{"Content-Type": []string{"application/json"}},
+						Body: io.NopCloser(strings.NewReader(
+							`{"id":"resp_http_retry_ok","usage":{"input_tokens":1,"output_tokens":2,"input_tokens_details":{"cached_tokens":0}}}`,
+						)),
+					},
+				},
+			}
+
+			cfg := &config.Config{}
+			cfg.Security.URLAllowlist.Enabled = false
+			cfg.Security.URLAllowlist.AllowInsecureHTTP = true
+			cfg.Gateway.OpenAIWS.Enabled = true
+			cfg.Gateway.OpenAIWS.OAuthEnabled = true
+			cfg.Gateway.OpenAIWS.APIKeyEnabled = true
+			cfg.Gateway.OpenAIWS.ResponsesWebsocketsV2 = true
+
+			svc := &OpenAIGatewayService{
+				cfg:              cfg,
+				httpUpstream:     upstream,
+				openaiWSResolver: NewOpenAIWSProtocolResolver(cfg),
+			}
+
+			account := &Account{
+				ID:          102,
+				Name:        "openai-apikey",
+				Platform:    PlatformOpenAI,
+				Type:        AccountTypeAPIKey,
+				Concurrency: 1,
+				Credentials: map[string]any{
+					"api_key":  "sk-test",
+					"base_url": wsFallbackServer.URL,
+				},
+				Extra: map[string]any{
+					"responses_websockets_v2_enabled": true,
+				},
+			}
+
+			body := []byte(`{"model":"gpt-5.1","stream":false,"previous_response_id":"resp_http_retry","input":[{"type":"reasoning","encrypted_content":"gAAA","summary":[{"type":"summary_text","text":"keep me"}]},{"type":"input_text","text":"hello"}]}`)
+			result, err := svc.Forward(context.Background(), c, account, body)
+			if !tc.retry {
+				require.Error(t, err)
+				require.Equal(t, 1, upstream.callCount)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.False(t, result.OpenAIWSMode, "HTTP 入站应保持 HTTP 转发")
+			require.Equal(t, 2, upstream.callCount, "命中 invalid_encrypted_content 后应只在 HTTP 路径重试一次")
+			require.Len(t, upstream.bodies, 2)
+
+			firstBody := upstream.bodies[0]
+			secondBody := upstream.bodies[1]
+			require.Equal(t, "resp_http_retry", gjson.GetBytes(firstBody, "previous_response_id").String(), "API-key HTTP must preserve continuation on the first attempt")
+			require.True(t, gjson.GetBytes(firstBody, "input.0.encrypted_content").Exists(), "首次请求不应做发送前预清理")
+			require.Equal(t, "keep me", gjson.GetBytes(firstBody, "input.0.summary.0.text").String())
+
+			require.Equal(t, "resp_http_retry", gjson.GetBytes(secondBody, "previous_response_id").String(), "encrypted-content retry must preserve API-key continuation")
+			require.False(t, gjson.GetBytes(secondBody, "input.0.encrypted_content").Exists(), "精确重试应移除 reasoning.encrypted_content")
+			require.Equal(t, "keep me", gjson.GetBytes(secondBody, "input.0.summary.0.text").String(), "精确重试应保留有效 reasoning summary")
+			require.Equal(t, "input_text", gjson.GetBytes(secondBody, "input.1.type").String(), "非 reasoning input 应保持原样")
+
+			decision, _ := c.Get("openai_ws_transport_decision")
+			reason, _ := c.Get("openai_ws_transport_reason")
+			require.Equal(t, string(OpenAIUpstreamTransportHTTPSSE), decision)
+			require.Equal(t, "client_protocol_http", reason)
+		})
 	}
-
-	cfg := &config.Config{}
-	cfg.Security.URLAllowlist.Enabled = false
-	cfg.Security.URLAllowlist.AllowInsecureHTTP = true
-	cfg.Gateway.OpenAIWS.Enabled = true
-	cfg.Gateway.OpenAIWS.OAuthEnabled = true
-	cfg.Gateway.OpenAIWS.APIKeyEnabled = true
-	cfg.Gateway.OpenAIWS.ResponsesWebsocketsV2 = true
-
-	svc := &OpenAIGatewayService{
-		cfg:              cfg,
-		httpUpstream:     upstream,
-		openaiWSResolver: NewOpenAIWSProtocolResolver(cfg),
-	}
-
-	account := &Account{
-		ID:          102,
-		Name:        "openai-apikey",
-		Platform:    PlatformOpenAI,
-		Type:        AccountTypeAPIKey,
-		Concurrency: 1,
-		Credentials: map[string]any{
-			"api_key":  "sk-test",
-			"base_url": wsFallbackServer.URL,
-		},
-		Extra: map[string]any{
-			"responses_websockets_v2_enabled": true,
-		},
-	}
-
-	body := []byte(`{"model":"gpt-5.1","stream":false,"previous_response_id":"resp_http_retry","input":[{"type":"reasoning","encrypted_content":"gAAA","summary":[{"type":"summary_text","text":"keep me"}]},{"type":"input_text","text":"hello"}]}`)
-	result, err := svc.Forward(context.Background(), c, account, body)
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	require.False(t, result.OpenAIWSMode, "HTTP 入站应保持 HTTP 转发")
-	require.Equal(t, 2, upstream.callCount, "命中 invalid_encrypted_content 后应只在 HTTP 路径重试一次")
-	require.Len(t, upstream.bodies, 2)
-
-	firstBody := upstream.bodies[0]
-	secondBody := upstream.bodies[1]
-	require.Equal(t, "resp_http_retry", gjson.GetBytes(firstBody, "previous_response_id").String(), "API-key HTTP must preserve continuation on the first attempt")
-	require.True(t, gjson.GetBytes(firstBody, "input.0.encrypted_content").Exists(), "首次请求不应做发送前预清理")
-	require.Equal(t, "keep me", gjson.GetBytes(firstBody, "input.0.summary.0.text").String())
-
-	require.Equal(t, "resp_http_retry", gjson.GetBytes(secondBody, "previous_response_id").String(), "encrypted-content retry must preserve API-key continuation")
-	require.False(t, gjson.GetBytes(secondBody, "input.0.encrypted_content").Exists(), "精确重试应移除 reasoning.encrypted_content")
-	require.Equal(t, "keep me", gjson.GetBytes(secondBody, "input.0.summary.0.text").String(), "精确重试应保留有效 reasoning summary")
-	require.Equal(t, "input_text", gjson.GetBytes(secondBody, "input.1.type").String(), "非 reasoning input 应保持原样")
-
-	decision, _ := c.Get("openai_ws_transport_decision")
-	reason, _ := c.Get("openai_ws_transport_reason")
-	require.Equal(t, string(OpenAIUpstreamTransportHTTPSSE), decision)
-	require.Equal(t, "client_protocol_http", reason)
 }
 
 func TestOpenAIGatewayService_Forward_HTTPIngressRetriesWrappedInvalidEncryptedContentOnce(t *testing.T) {

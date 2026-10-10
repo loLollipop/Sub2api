@@ -410,6 +410,7 @@ func WithRequestedReasoningEffort(ctx context.Context, effort string) context.Co
 	if effort == "" {
 		return ctx
 	}
+	UpdateUsageInflight(ctx, func(snap *UsageInflightSnapshot) { snap.ReasoningEffort = effort })
 	return context.WithValue(ctx, requestedReasoningEffortContextKey{}, effort)
 }
 

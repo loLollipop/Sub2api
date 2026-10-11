@@ -2409,17 +2409,22 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			}
 			s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
 		}
+		terminalFrameComplete := line == "" && (sawDone || sawTerminalEvent) && terminalEventType != "error"
 		if line == "" {
 			pendingSSEEventType = ""
 			if suppressCurrentEvent {
 				suppressCurrentEvent = false
 				responseFailedPending = false
+				if terminalFrameComplete {
+					_ = resp.Body.Close()
+					break
+				}
 				continue
 			}
 		}
 
 		if !clientDisconnected && !failureDelivered && !suppressCurrentEvent {
-			if !clientOutputStarted && !lineStartsClientOutput {
+			if !clientOutputStarted && !lineStartsClientOutput && !terminalFrameComplete {
 				pendingLines = append(pendingLines, line)
 				continue
 			}
@@ -2430,6 +2435,10 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			}
 			if !clientOutputStarted && len(pendingLines) > 0 {
 				if !writePendingLines() {
+					if terminalFrameComplete {
+						_ = resp.Body.Close()
+						break
+					}
 					continue
 				}
 			}
@@ -2458,6 +2467,12 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 		if line == "" && responseFailedPending {
 			responseFailedPending = false
 			failureDelivered = true
+		}
+		// Final usage and the whole terminal frame have now been processed.
+		// Bare error preludes still wait for an authoritative response terminal.
+		if terminalFrameComplete {
+			_ = resp.Body.Close()
+			break
 		}
 	}
 	if ctx.Err() != nil || (c.Request != nil && c.Request.Context().Err() != nil) {

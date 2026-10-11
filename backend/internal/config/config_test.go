@@ -478,6 +478,23 @@ func TestValidateOpenAIFirstOutputTimeoutMinimum(t *testing.T) {
 	require.NoError(t, cfg.Validate())
 }
 
+func TestValidateStreamDataIntervalTimeoutBoundaries(t *testing.T) {
+	for _, seconds := range []int{0, 30, 300, 301, 3600, 29, 3601} {
+		t.Run(fmt.Sprint(seconds), func(t *testing.T) {
+			resetViperWithJWTSecret(t)
+			cfg, err := Load()
+			require.NoError(t, err)
+			cfg.Gateway.StreamDataIntervalTimeout = seconds
+			err = cfg.Validate()
+			if seconds == 29 || seconds == 3601 {
+				require.ErrorContains(t, err, "gateway.stream_data_interval_timeout")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestLoadDefaultOpenAIWSConfig(t *testing.T) {
 	resetViperWithJWTSecret(t)
 

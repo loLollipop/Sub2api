@@ -1,16 +1,19 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import Select from '@/components/common/Select.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import ScheduledTestsPanel from '../ScheduledTestsPanel.vue'
 
 enableAutoUnmount(afterEach)
 
-const { listByAccount, listResults, update } = vi.hoisted(() => ({
+const { listByAccount, listResults, create, update } = vi.hoisted(() => ({
   listByAccount: vi.fn(),
   listResults: vi.fn(),
+  create: vi.fn(),
   update: vi.fn(),
 }))
 
-vi.mock('@/api/admin', () => ({ adminAPI: { scheduledTests: { listByAccount, listResults, update } } }))
+vi.mock('@/api/admin', () => ({ adminAPI: { scheduledTests: { listByAccount, listResults, create, update } } }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...await importOriginal<typeof import('vue-i18n')>(),
@@ -18,6 +21,63 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 }))
 
 describe('ScheduledTestsPanel quality results', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('creates ordinary plans with quality checking off and resets after explicit opt-in', async () => {
+    listByAccount.mockResolvedValue([])
+    create.mockResolvedValue({ id: 1 })
+    const wrapper = mount(ScheduledTestsPanel, {
+      props: { show: false, accountId: 2, modelOptions: [{ value: 'gpt-test', label: 'gpt-test' }] },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' }, ConfirmDialog: true } },
+    })
+    await wrapper.setProps({ show: true }); await flushPromises()
+    const open = async () => {
+      await wrapper.findAll('button').find(button => button.text() === 'admin.scheduledTests.addPlan')!.trigger('click')
+      wrapper.getComponent(Select).vm.$emit('update:modelValue', 'gpt-test')
+      await flushPromises()
+    }
+    const quality = () => wrapper.findAllComponents(Toggle).find(toggle => toggle.element.closest('label')?.textContent?.includes('admin.scheduledTests.qualityCheck'))!
+    const save = async () => {
+      await wrapper.findAll('button').find(button => button.text() === 'common.save')!.trigger('click')
+      await flushPromises()
+    }
+    await open()
+    expect(quality().props('modelValue')).toBe(false)
+    expect(wrapper.find('[data-testid="scheduled-quality-config"]').exists()).toBe(false)
+    await save()
+    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ quality_check_enabled: false, quality_provider: 'chanshui' }))
+
+    await open()
+    await quality().trigger('click')
+    expect(wrapper.find('[data-testid="scheduled-quality-config"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('admin.scheduledTests.auditKeyNotice')
+    await save()
+    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ quality_check_enabled: true, quality_provider: 'chanshui' }))
+
+    await open()
+    expect(quality().props('modelValue')).toBe(false)
+    expect(wrapper.find('[data-testid="scheduled-quality-config"]').exists()).toBe(false)
+  })
+
+  it.each(['pelican', undefined])('does not turn a legacy %s plan into quality opt-in when edited', async provider => {
+    const plan = { id: 1, account_id: 2, model_id: 'gpt-test', cron_expression: '*/5 * * * *',
+      enabled: true, max_results: 20, auto_recover: false, quality_check_enabled: true, quality_provider: provider }
+    listByAccount.mockResolvedValue([plan])
+    update.mockResolvedValue({ ...plan, quality_provider: 'chanshui', quality_check_enabled: false })
+    const wrapper = mount(ScheduledTestsPanel, {
+      props: { show: false, accountId: 2, modelOptions: [] },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' }, ConfirmDialog: true } },
+    })
+    await wrapper.setProps({ show: true }); await flushPromises()
+    await wrapper.get('button[title="admin.scheduledTests.editPlan"]').trigger('click')
+    const quality = wrapper.findAllComponents(Toggle).find(toggle => toggle.element.closest('label')?.textContent?.includes('admin.scheduledTests.qualityCheck'))!
+    expect(quality.props('modelValue')).toBe(false)
+    expect(wrapper.find('[data-testid="scheduled-quality-config"]').exists()).toBe(false)
+    await wrapper.findAll('button').find(button => button.text() === 'common.save')!.trigger('click')
+    await flushPromises()
+    expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ quality_provider: 'chanshui', quality_check_enabled: false }))
+  })
+
   it('does not reload unchanged reports or poll while the page is hidden', async () => {
     vi.useFakeTimers()
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')

@@ -54,11 +54,6 @@
       "feature": "opus55-public-model-only-strict-validation",
       "upstream_commits": ["66790d7ee"],
       "reason": "Defer the new validator and both handler hooks: they check only the public model before channel/account mappings, allowing aliases mapped to Opus5.5 to bypass validation while rejecting Opus5.5 mapped to other models. Preserve existing validation until effective-model routing and original-body semantics are covered together."
-    },
-    {
-      "feature": "chanshui-extraction-and-pelican-removal",
-      "upstream_commits": ["95db8e604"],
-      "reason": "Defer this cohort: runtime dispatch sends legacy Pelican quality-enabled rows to Chanshui even though normalization disables only a copied plan; the copied disabled flag is ignored before credential-bearing POST. Removing exact-reason legacy pause recovery strands paused accounts. Preserve existing provider dispatch, local reviewer, credential consent and CAS recovery until upgrade fixtures cover zero external requests and safe legacy pause migration. The owned result-window guards and account owner isolation remain unchanged."
     }
   ],
   "deployment_repository": "loLollipop/Sub2api"

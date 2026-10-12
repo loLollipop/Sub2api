@@ -8,3 +8,7 @@
 - 无迁移及依赖变更；生产仍 validate/update disabled/preauthorization false。仅部署本仓库校验固定的数字版本制品；发布及数据一致性证明见本次 CI 和部署验收。
 - 独立审查补齐上游遗漏：客户端取消后的错误尾帧只保留已观测用量，不标记 provider SLA；嵌套 524 的返回错误使用已净化消息；HTTP 524 不再复用原始 JSON 提示。部署更新器的恢复/stop/reload 任一步失败均禁止 start，并停止未验证实例，新增故障注入回归。
 - 修复已有 AccountsView 全量选择测试的 debounce 清理：在 mocks 重置前结清 timer/request，并保证组件 unmount，避免全量 vitest 通过断言但因迟到 promise 拒绝失败；产品行为不变。
+
+## 2026-10-12 质量模块补同步
+
+后续按用户澄清导入上游 `95db8e604` 的完整质量模块设计，并补旧 provider 关闭与外发前授权检查。此前的暂缓是当时同步结果，不再表示这部分仍保留旧视觉检测；具体兼容边界和旧暂停人工恢复步骤见 [质量模块补同步记录](upstream-quality-default-off-20261012.md)。其他九项 deferred 保持不变。

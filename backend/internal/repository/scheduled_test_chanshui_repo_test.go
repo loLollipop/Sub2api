@@ -61,3 +61,43 @@ func TestScheduledChanshuiGateAndRetryAfterAreSharedAndPersistent(t *testing.T) 
 	require.NoError(t, repo.SetChanshuiAudit(context.Background(), 1, nil))
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestScheduledPlansReadLegacyQualityAsDisabled(t *testing.T) {
+	for _, provider := range []string{"pelican", "", "unknown-provider", "chanshui"} {
+		t.Run(provider, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = db.Close() })
+			repo := repository.NewScheduledTestPlanRepository(db)
+			now := time.Now().UTC()
+			columns := []string{"id", "account_id", "model_id", "prompt_text", "cron_expression", "enabled", "max_results", "auto_recover", "quality_check_enabled", "quality_provider", "quality_config", "quality_audit_state", "last_run_at", "next_run_at", "created_at", "updated_at"}
+			rows := func() *sqlmock.Rows {
+				return sqlmock.NewRows(columns).AddRow(1, 2, "gpt-test", "", "*/5 * * * *", true, 20, false, true, provider, `{}`, `{"id":"stored-audit","status":"running"}`, nil, now, now, now)
+			}
+			check := func(plan *service.ScheduledTestPlan) {
+				require.Equal(t, service.QualityProviderChanshui, plan.QualityProvider)
+				require.Equal(t, provider == "chanshui", plan.QualityCheckEnabled)
+				if provider == "chanshui" {
+					require.NotNil(t, plan.ActiveAudit)
+				} else {
+					require.Nil(t, plan.ActiveAudit)
+				}
+			}
+			mock.ExpectQuery("SELECT.*FROM scheduled_test_plans WHERE id").WithArgs(int64(1)).WillReturnRows(rows())
+			plan, err := repo.GetByID(context.Background(), 1)
+			require.NoError(t, err)
+			check(plan)
+			mock.ExpectQuery("SELECT.*FROM scheduled_test_plans WHERE account_id").WithArgs(int64(2)).WillReturnRows(rows())
+			plans, err := repo.ListByAccountID(context.Background(), 2)
+			require.NoError(t, err)
+			require.Len(t, plans, 1)
+			check(plans[0])
+			mock.ExpectQuery("SELECT.*FROM scheduled_test_plans.*WHERE enabled").WithArgs(now).WillReturnRows(rows())
+			plans, err = repo.ListDue(context.Background(), now)
+			require.NoError(t, err)
+			require.Len(t, plans, 1)
+			check(plans[0])
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}

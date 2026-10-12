@@ -100,7 +100,10 @@ const AccountTableFiltersStub = {
   template: '<button data-test="change-filter" @click="$emit(\'change\')">change filter</button>'
 }
 
-const mountView = () => mount(AccountsView, {
+const mountedViews: ReturnType<typeof mount>[] = []
+
+const mountView = () => {
+  const wrapper = mount(AccountsView, {
   global: {
     stubs: {
       AppLayout: { template: '<div><slot /></div>' },
@@ -139,10 +142,14 @@ const mountView = () => mount(AccountsView, {
       Icon: true
     }
   }
-})
+  })
+  mountedViews.push(wrapper)
+  return wrapper
+}
 
 describe('admin AccountsView select all filtered results', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     localStorage.clear()
     listAccounts.mockReset()
     listWithEtag.mockReset()
@@ -164,8 +171,20 @@ describe('admin AccountsView select all filtered results', () => {
     getAllGroups.mockResolvedValue([])
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
+  afterEach(async () => {
+    try {
+      // Settle debounced reloads while their request mocks still belong to this test.
+      await vi.runOnlyPendingTimersAsync()
+      await flushPromises()
+    } finally {
+      mountedViews.splice(0).forEach(wrapper => wrapper.unmount())
+      try {
+        expect(vi.getTimerCount()).toBe(0)
+      } finally {
+        vi.useRealTimers()
+        vi.restoreAllMocks()
+      }
+    }
   })
 
   it.each([
@@ -193,7 +212,6 @@ describe('admin AccountsView select all filtered results', () => {
       await flushPromises()
       expect(batchRefresh).toHaveBeenLastCalledWith(expectedIds)
     }
-    wrapper.unmount()
   })
 
   it('selects all matching IDs in one commit and clears the selection when filters change', async () => {
@@ -235,6 +253,13 @@ describe('admin AccountsView select all filtered results', () => {
 
     expect(wrapper.get('[data-test="selected-count"]').text()).toBe('0')
     expect(wrapper.get('[data-test="all-results-selected"]').text()).toBe('false')
+    expect(listAccounts).toHaveBeenCalledTimes(2)
+
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    expect(listAccounts).toHaveBeenCalledTimes(3)
+    expect(wrapper.get('[data-test="selected-count"]').text()).toBe('0')
   })
 
   it('keeps the original page selection when loading all results fails', async () => {

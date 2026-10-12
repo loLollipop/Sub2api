@@ -138,6 +138,7 @@
             :data="inflightRows"
             :loading="inflightLoading"
             :columns="visibleColumns"
+            @requestIdClick="handleRequestIdClick"
             :show-account-billing="true"
             :show-upstream-endpoint="true"
           />
@@ -149,6 +150,7 @@
             :data="usageLogs"
             :loading="loading"
             :columns="visibleColumns"
+            @requestIdClick="handleRequestIdClick"
             :server-side-sort="true"
             :default-sort-key="'created_at'"
             :default-sort-order="'desc'"
@@ -406,6 +408,7 @@ const buildUsageListParams = (
     page_size: pageSize,
     exact_total: exactTotal,
     ...filters.value,
+    request_id: filters.value.request_id?.trim() || undefined,
     stream: legacyStream === null ? undefined : legacyStream,
     sort_by: sortState.sort_by,
     sort_order: sortState.sort_order,
@@ -634,6 +637,11 @@ const applyFilters = () => {
   } else {
     errRows.value = []
   }
+}
+const handleRequestIdClick = (requestID: string) => {
+  filters.value.request_id = requestID
+  pagination.page = 1
+  loadLogs()
 }
 const refreshData = () => {
   invalidateModelStatsCache()

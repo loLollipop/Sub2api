@@ -60,6 +60,7 @@ case "$1" in
     echo 0 >"$state"
     ;;
   start)
+    printf 'start\n' >>"$MOCK_SERVICE_STARTS"
     # systemd start is a no-op while the service is active. This is important:
     # rollback must explicitly stop the failed candidate before starting old.
     [[ $(<"$state") == 0 ]] || exit 0
@@ -68,7 +69,10 @@ case "$1" in
     awk -F= '/^ExecStart=\/[^ ]/ {print $2; exit}' "$DROPIN_PATH" >"$exe_state"
     echo "$next" >"$state"
     ;;
-  daemon-reload) : ;;
+  daemon-reload)
+    printf 'reload\n' >>"$MOCK_SERVICE_RELOADS"
+    if [[ ${ROLLBACK_RELOAD_FAIL:-0} == 1 && $(wc -l <"$MOCK_SERVICE_RELOADS") -ge 2 ]]; then exit 1; fi
+    ;;
 esac
 EOF
 cat >"$MOCK/bin/systemd-run" <<'EOF'
@@ -105,6 +109,7 @@ chmod +x "$MOCK/bin"/*
 export PATH="$MOCK/bin:$PATH" MOCK_RELEASE="$MOCK/artifacts" MOCK_SYSTEMCTL_STATE="$TMP/pid"
 export MOCK_SYSTEMCTL_EXE="$TMP/running-exe" MOCK_SYSTEMCTL_NEXT_PID="$TMP/next-pid"
 export MOCK_CANDIDATE_EXECUTIONS="$TMP/candidate-executions" MOCK_SERVICE_STOPS="$TMP/service-stops"
+export MOCK_SERVICE_STARTS="$TMP/service-starts" MOCK_SERVICE_RELOADS="$TMP/service-reloads"
 echo 123 >"$MOCK_SYSTEMCTL_STATE"
 printf '#!/bin/sh\nprintf "%%s\\n" "$1" >>"$MOCK_CANDIDATE_EXECUTIONS"\n[ "$1" = -version ] || [ "$1" = -check-migrations ]\n' >"$MOCK/artifacts/sub2api"; chmod +x "$MOCK/artifacts/sub2api"
 tar -czf "$MOCK/artifacts/package.tar.gz" -C "$MOCK/artifacts" sub2api
@@ -123,7 +128,9 @@ reset_run() {
   echo 124 >"$MOCK_SYSTEMCTL_NEXT_PID"
   : >"$MOCK_CANDIDATE_EXECUTIONS"
   : >"$MOCK_SERVICE_STOPS"
-  unset MIGRATION_FAIL HEALTH_FAIL STOP_FAIL ATOMIC_COPY_FAIL
+  : >"$MOCK_SERVICE_STARTS"
+  : >"$MOCK_SERVICE_RELOADS"
+  unset MIGRATION_FAIL HEALTH_FAIL STOP_FAIL ATOMIC_COPY_FAIL ROLLBACK_RELOAD_FAIL
 }
 assert_candidate_not_run_and_service_not_stopped() {
   [[ ! -s "$MOCK_CANDIDATE_EXECUTIONS" ]] || { echo 'rejected candidate was executed' >&2; exit 1; }
@@ -184,6 +191,14 @@ grep -q 'ExecStart=.*/sub2api' "$DROPIN_PATH" || { echo 'failed atomic copy repl
 ! grep -q 'partial-copy' "$DROPIN_PATH" || { echo 'failed atomic copy published partial content' >&2; exit 1; }
 [[ -z $(find "$(dirname -- "$DROPIN_PATH")" -maxdepth 1 -name '.90-managed-release.conf.*' -print -quit) ]] || { echo 'failed atomic copy left a temporary drop-in' >&2; exit 1; }
 unset ATOMIC_COPY_FAIL HEALTH_FAIL
+[[ $(<"$MOCK_SYSTEMCTL_STATE") == 0 ]] || { echo 'failed restore left candidate running' >&2; exit 1; }
+[[ $(wc -l <"$MOCK_SERVICE_STARTS") == 1 ]] || { echo 'failed restore restarted unverified service' >&2; exit 1; }
+reset_run; mkdir -p -- "$(dirname -- "$DROPIN_PATH")"; printf '[Service]\nExecStart=%s\n' "$MOCK_OLD_EXE" >"$DROPIN_PATH"
+export ROLLBACK_RELOAD_FAIL=1 HEALTH_FAIL=1
+expect_fail "$UPDATER" latest
+[[ $(<"$MOCK_SYSTEMCTL_STATE") == 0 ]] || { echo 'failed reload left candidate running' >&2; exit 1; }
+[[ $(wc -l <"$MOCK_SERVICE_STARTS") == 1 ]] || { echo 'failed reload restarted unverified service' >&2; exit 1; }
+unset ROLLBACK_RELOAD_FAIL HEALTH_FAIL
 expected_binary_hash=$(sha256sum "$MOCK/artifacts/sub2api" | awk '{print $1}')
 reset_run; "$UPDATER" --expected-binary-sha256 "${expected_binary_hash^^}" v1.2.3-personal.2; grep -q 'ExecStart=.*/sub2api' "$DROPIN_PATH"; test -s "$TMP/state/last-good"
 grep -qx -- '-version' "$MOCK_CANDIDATE_EXECUTIONS"

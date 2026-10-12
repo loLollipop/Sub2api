@@ -17,6 +17,36 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func TestTrackUsageInflightCancellationReleasesTrackerBeforeHandlerReturns(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	reqCtx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(context.WithValue(reqCtx, ctxkey.ClientRequestID, "cancel-request"))
+	c.Set(string(ContextKeyAPIKey), &service.APIKey{ID: 4, UserID: 8})
+	stop := trackUsageInflight(c)
+	t.Cleanup(stop)
+	writer, ok := c.Writer.(*usageInflightWriter)
+	if !ok {
+		t.Fatal("inflight tracking did not wrap the response writer")
+	}
+	state := writer.state
+	cancel()
+	select {
+	case <-state.done:
+	case <-time.After(time.Second):
+		t.Fatal("canceled request retained its tracker until handler returned")
+	}
+	state.mu.Lock()
+	closed, persisted := state.closed, state.persisted
+	state.mu.Unlock()
+	if !closed || persisted {
+		t.Fatalf("canceled fast tracker: closed=%v persisted=%v", closed, persisted)
+	}
+	// Deferred handler cleanup must stay safe after cancellation already closed done.
+	stop()
+}
+
 func TestTrackUsageInflightSkipsRedisForFastRequests(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	server := miniredis.RunT(t)

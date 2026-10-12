@@ -26,7 +26,11 @@ func TestTrackUsageInflightCancellationReleasesTrackerBeforeHandlerReturns(t *te
 	c.Set(string(ContextKeyAPIKey), &service.APIKey{ID: 4, UserID: 8})
 	stop := trackUsageInflight(c)
 	t.Cleanup(stop)
-	state := c.Writer.(*usageInflightWriter).state
+	writer, ok := c.Writer.(*usageInflightWriter)
+	if !ok {
+		t.Fatal("inflight tracking did not wrap the response writer")
+	}
+	state := writer.state
 	cancel()
 	select {
 	case <-state.done:

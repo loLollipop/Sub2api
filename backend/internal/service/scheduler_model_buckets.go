@@ -7,9 +7,11 @@ import (
 )
 
 // accountsSupportingRequestedModel keeps mapped accounts that actually serve
-// the model. Empty-mapping accounts are used only when no mapped sibling in
-// this pool advertises the model. That stops an empty OpenAI mapping from
-// stealing traffic meant for a mapped Gemini/OpenAI-compat account.
+// the model. Ordinary empty-mapping accounts are used only when no mapped
+// sibling in this pool advertises the model. That stops an empty OpenAI mapping
+// from stealing traffic meant for a mapped Gemini/OpenAI-compat account.
+// Explicit OpenAI passthrough accounts stay eligible alongside mapped siblings:
+// their model semantics belong to the upstream, not a local mapping allowlist.
 //
 // Empty-mapping accounts still go through IsModelSupported: CN/OAuth defaults
 // may reject a foreign family even without an explicit mapping. Those accounts
@@ -21,6 +23,7 @@ func accountsSupportingRequestedModel(accounts []Account, requestedModel string)
 	}
 	matched := make([]Account, 0, len(accounts))
 	unmapped := make([]Account, 0)
+	hasMappedMatch := false
 	for _, account := range accounts {
 		mapping := account.GetModelMapping()
 		supported := account.IsModelSupported(requestedModel)
@@ -33,14 +36,18 @@ func accountsSupportingRequestedModel(accounts []Account, requestedModel string)
 		if len(mapping) == 0 {
 			if supported {
 				unmapped = append(unmapped, account)
+				if account.IsOpenAIPassthroughEnabled() {
+					matched = append(matched, account)
+				}
 			}
 			continue
 		}
 		if supported {
 			matched = append(matched, account)
+			hasMappedMatch = true
 		}
 	}
-	if len(matched) > 0 {
+	if hasMappedMatch {
 		return matched
 	}
 	return unmapped

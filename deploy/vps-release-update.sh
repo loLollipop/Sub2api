@@ -305,18 +305,25 @@ rollback() {
     log 'rollback failed: the candidate process is still running'
     rollback_failed=1
   }
-  "$SYSTEMCTL" daemon-reload || {
-    log 'rollback failed: systemd daemon-reload failed'
-    rollback_failed=1
-  }
-  "$SYSTEMCTL" start "$SERVICE_NAME" || {
-    log 'rollback failed: could not start the previous service'
-    rollback_failed=1
-  }
+  # Never start from an unverified drop-in or stale systemd configuration.
+  # A failed restore/stop/reload leaves the rejected candidate stopped.
+  if (( rollback_failed == 0 )); then
+    "$SYSTEMCTL" daemon-reload || {
+      log 'rollback failed: systemd daemon-reload failed'
+      rollback_failed=1
+    }
+  fi
+  if (( rollback_failed == 0 )); then
+    "$SYSTEMCTL" start "$SERVICE_NAME" || {
+      log 'rollback failed: could not start the previous service'
+      rollback_failed=1
+    }
+  fi
   if (( rollback_failed == 0 )); then
     wait_ready "$old_exe" "$old_hash" 'restored service' || rollback_failed=1
   fi
   if (( rollback_failed != 0 )); then
+    "$SYSTEMCTL" stop "$SERVICE_NAME" || log 'CRITICAL: could not stop the rejected service'
     log "rollback failed: previous executable $old_exe was not restored and verified"
   else
     log "rollback succeeded: restored $old_exe with sha256 $old_hash"

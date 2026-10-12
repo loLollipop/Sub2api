@@ -157,6 +157,7 @@ func TestOpenAIStreamTimeoutCanceledPreservesUsage(t *testing.T) {
 			require.Equal(t, 9, usage.InputTokens)
 			require.Equal(t, 2, usage.OutputTokens)
 			require.Equal(t, 7, usage.CacheReadInputTokens)
+			require.Empty(t, GetOpsStreamErrors(c), "canceled usage drain must not affect upstream SLA")
 		})
 	}
 }

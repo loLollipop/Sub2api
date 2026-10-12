@@ -2,12 +2,12 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.1.6",
-  "imported_commit": "f743ca8e23ff036f628010f4272ab13cbd7f61b1",
+  "imported_version": "2.1.9",
+  "imported_commit": "9e2f733aa93d95acee551a5cd272708c9ea544b5",
   "personal_baseline_commit": "edf577657ac8d1b2d245e772a0172b550b9d7c53",
-  "latest_observed_version": "2.1.6",
-  "latest_observed_release_commit": "f743ca8e23ff036f628010f4272ab13cbd7f61b1",
-  "latest_observed_main_commit": "f743ca8e23ff036f628010f4272ab13cbd7f61b1",
+  "latest_observed_version": "2.1.9",
+  "latest_observed_release_commit": "9e2f733aa93d95acee551a5cd272708c9ea544b5",
+  "latest_observed_main_commit": "9e2f733aa93d95acee551a5cd272708c9ea544b5",
   "sync_policy": "review-diff-then-squash",
   "deferred_changes": [
     {
@@ -47,13 +47,18 @@
     },
     {
       "feature": "usage-request-id-trigram-index-migrations",
-      "upstream_commits": ["5c031ae04"],
-      "reason": "Defer migrations 256a/256b and their binding test: pg_trgm creation may fail silently before unconditional index creation fails; interrupted CONCURRENTLY indexes have no invalid-index recovery. Without these indexes, defer contains-fragment searches too to avoid hot-table scans. Query exact complete request/upstream IDs with existing B-tree indexes, also accepting raw client/local IDs. This production release has no schema changes and retains validate mode."
+      "upstream_commits": ["5c031ae04", "980c14531", "756f7efd3"],
+      "reason": "Defer migrations 256a/256b and their binding test: pg_trgm creation may fail silently before unconditional index creation fails; interrupted CONCURRENTLY indexes have no invalid-index recovery. Defer contains and ILIKE-prefix searches without verified indexes, including Ops/user error endpoints lacking equivalent short-fragment guards. Preserve raw complete request/upstream ID exact matches on B-tree indexes, importing only ID-click filtering and Ops parameter forwarding from 2.1.7/8. No schema changes; retain validate mode."
     },
     {
       "feature": "opus55-public-model-only-strict-validation",
       "upstream_commits": ["66790d7ee"],
       "reason": "Defer the new validator and both handler hooks: they check only the public model before channel/account mappings, allowing aliases mapped to Opus5.5 to bypass validation while rejecting Opus5.5 mapped to other models. Preserve existing validation until effective-model routing and original-body semantics are covered together."
+    },
+    {
+      "feature": "chanshui-extraction-and-pelican-removal",
+      "upstream_commits": ["95db8e604"],
+      "reason": "Defer this cohort: runtime dispatch sends legacy Pelican quality-enabled rows to Chanshui even though normalization disables only a copied plan; the copied disabled flag is ignored before credential-bearing POST. Removing exact-reason legacy pause recovery strands paused accounts. Preserve existing provider dispatch, local reviewer, credential consent and CAS recovery until upgrade fixtures cover zero external requests and safe legacy pause migration. The owned result-window guards and account owner isolation remain unchanged."
     }
   ],
   "deployment_repository": "loLollipop/Sub2api"

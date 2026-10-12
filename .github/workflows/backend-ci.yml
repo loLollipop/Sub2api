@@ -46,9 +46,9 @@ jobs:
       - name: Codex ticket concurrency regression
         working-directory: backend
         run: go test -race -tags=unit ./internal/service -run 'Test.*CodexTicket' -count=1
-      - name: Terminal frame and Anthropic TTL concurrency regression
+      - name: Stream, Grok input and Anthropic TTL concurrency regression
         working-directory: backend
-        run: go test -race -p 1 -tags=unit ./internal/service -run 'Test(TerminalOpenBody|AnthropicCacheTTLBeta|RequestNeedsExtendedCacheTTLBeta|EnsureExtendedCacheTTLBeta|ApplyExtendedCacheTTLBetaHeader)' -count=1
+        run: go test -race -p 1 -tags=unit ./internal/service -run 'Test(TerminalOpenBody|OpenAIStream|OpenAIHTTP524|GrokSimpleMessages|AnthropicCacheTTLBeta|RequestNeedsExtendedCacheTTLBeta|EnsureExtendedCacheTTLBeta|ApplyExtendedCacheTTLBetaHeader)' -count=1
       - name: Custom usage and upstream error concurrency regression
         working-directory: backend
         run: go test -race -p 1 -tags=unit ./internal/service ./internal/handler ./internal/handler/admin ./internal/repository -run 'Test(CustomUsage|CrossCustomUsage|AccountCustomUsage|.*UpstreamFinancial|.*FinancialError|.*FinancialStream)' -count=1

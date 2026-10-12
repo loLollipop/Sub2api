@@ -15,7 +15,7 @@ import (
 // persist. Decisions use their own statuses and per-plan scheduling ownership.
 func (s *ScheduledTestRunnerService) runChanshuiPlan(ctx context.Context, plan *ScheduledTestPlan) (*ScheduledTestResult, time.Duration, error) {
 	if plan == nil || !plan.Enabled || !plan.QualityCheckEnabled || plan.QualityProvider != QualityProviderChanshui {
-		return nil, 0, fmt.Errorf("Chanshui quality checking is not explicitly enabled")
+		return nil, 0, fmt.Errorf("chanshui quality checking is not explicitly enabled")
 	}
 	repo, ok := s.planRepo.(ScheduledChanshuiRepository)
 	if !ok {
@@ -126,7 +126,7 @@ func (s *ScheduledTestRunnerService) runChanshuiPlan(ctx context.Context, plan *
 		return finish("unknown", err.Error(), nil, "")
 	}
 	if !copyPlan.QualityCheckEnabled {
-		return nil, 0, fmt.Errorf("Chanshui quality checking is not explicitly enabled")
+		return nil, 0, fmt.Errorf("chanshui quality checking is not explicitly enabled")
 	}
 	upstream, key, protocol, err := chanshuiUpstream(account, copyPlan.QualityConfig)
 	if err != nil {
@@ -201,7 +201,7 @@ func (s *ScheduledTestRunnerService) checkCurrentChanshuiConsent(ctx context.Con
 	if !current.Enabled || !current.QualityCheckEnabled || current.QualityProvider != QualityProviderChanshui ||
 		current.AccountID != plan.AccountID || !current.UpdatedAt.Equal(plan.UpdatedAt) ||
 		chanshuiDecisionConfigHash(current) != chanshuiDecisionConfigHash(plan) {
-		return fmt.Errorf("Chanshui consent was disabled or changed")
+		return fmt.Errorf("chanshui consent was disabled or changed")
 	}
 	return nil
 }

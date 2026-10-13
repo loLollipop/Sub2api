@@ -11,6 +11,15 @@ FRONTEND_CRITICAL_VITEST := \
 	src/composables/__tests__/useCustomUsage.spec.ts \
 	src/utils/__tests__/customUsage.spec.ts \
 	src/utils/__tests__/accountModelTest.spec.ts \
+	src/components/admin/account/__tests__/AccountModelTestPanel.spec.ts \
+	src/components/admin/account/__tests__/AccountModelTestPanel.focus.spec.ts \
+	src/components/admin/__tests__/ErrorPassthroughRulesModal.toggle.spec.ts \
+	src/components/admin/group/__tests__/GroupRateMultipliersModal.requests.spec.ts \
+	src/components/admin/group/__tests__/GroupRPMOverridesModal.edit.spec.ts \
+	src/views/admin/ops/components/__tests__/OpsSettingsDialog.loading.spec.ts \
+	src/components/admin/usage/__tests__/UsageTable.spec.ts \
+	src/components/keys/__tests__/UseKeyModal.spec.ts \
+	src/utils/__tests__/pricing.formatScaled.spec.ts \
 	src/i18n/__tests__/localeKeyCompleteness.spec.ts \
 	src/__tests__/xlsxWriteOnly.spec.ts \
 	src/api/__tests__/client.spec.ts \

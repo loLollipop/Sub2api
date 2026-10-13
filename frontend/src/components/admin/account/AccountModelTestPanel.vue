@@ -618,7 +618,8 @@ defineExpose({
 .model-test-filter { margin-left: auto; border: 1px solid transparent; }
 .model-test-filter[aria-pressed=true] { color: var(--test-failed); background: color-mix(in srgb, var(--test-failed) 7%, transparent); border-color: color-mix(in srgb, var(--test-failed) 18%, transparent); }
 .model-test :is(button, input):focus-visible { outline: 2px solid var(--test-accent); outline-offset: 3px; }
-.model-test-search:focus-visible { outline: none; }
+/* The rounded wrapper owns search focus; outrank the generic console/panel input outline. */
+.model-test .model-test-search-wrap .model-test-search:focus-visible { outline: none; }
 .model-test-progress { display: grid; gap: 9px; }
 .model-test-progress-bar { display: flex; height: 3px; overflow: hidden; border-radius: 99px; background: var(--signal-line); }
 .model-test-progress-bar span { display: block; height: 100%; transition: width 350ms cubic-bezier(.22, 1, .36, 1); }

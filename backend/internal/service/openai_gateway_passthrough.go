@@ -2633,7 +2633,6 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				clientOutputStarted = true
 				flushPending = true
 				if responseFailedPending {
-					responseFailedPending = false
 					failureDelivered = true
 				}
 				flushPendingOutput()

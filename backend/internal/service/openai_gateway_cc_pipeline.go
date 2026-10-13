@@ -147,7 +147,7 @@ func (s *OpenAIGatewayService) openAIChatCompletionsTargetURL(account *Account) 
 	}
 	if baseURL == "" {
 		if account.IsMixed() {
-			return "", fmt.Errorf("Mixed requires an explicit base_url")
+			return "", fmt.Errorf("mixed requires an explicit base_url")
 		}
 		baseURL = "https://api.openai.com"
 	}

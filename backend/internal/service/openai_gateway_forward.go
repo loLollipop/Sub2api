@@ -1589,7 +1589,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 		}
 		if baseURL == "" {
 			if account.IsMixed() {
-				return nil, fmt.Errorf("Mixed requires an explicit base_url")
+				return nil, fmt.Errorf("mixed requires an explicit base_url")
 			}
 			targetURL = openaiPlatformAPIURL
 		} else {

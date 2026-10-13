@@ -287,7 +287,7 @@ func (s *OpenAIGatewayService) forwardWithProtocolFallback(ctx context.Context, 
 		}
 		protocol = refusal.next
 	}
-	return nil, errors.New("Mixed protocol attempts exhausted")
+	return nil, errors.New("mixed protocol attempts exhausted")
 }
 
 func protocolUpstreamEndpoint(protocol string) string {

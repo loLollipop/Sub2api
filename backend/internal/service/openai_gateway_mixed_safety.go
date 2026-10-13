@@ -111,10 +111,11 @@ func writeMixedStreamFailure(c *gin.Context, protocol string, cause error) {
 	}
 	payload := map[string]any{"error": map[string]string{"type": "api_error", "message": message}}
 	prefix := ""
-	if protocol == APIProtocolAnthropic {
+	switch protocol {
+	case APIProtocolAnthropic:
 		payload["type"] = "error"
 		prefix = "event: error\n"
-	} else if protocol == APIProtocolResponses {
+	case APIProtocolResponses:
 		payload["type"] = "error"
 		payload["code"] = "upstream_error"
 		payload["message"] = message

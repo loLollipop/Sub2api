@@ -1880,7 +1880,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	}
 	// Completion evidence is independent of metering. Some compatible
 	// providers omit usage; preserve their valid result and existing warning.
-	if !usageOK && !(account != nil && account.IsMixed()) {
+	if !usageOK && (account == nil || !account.IsMixed()) {
 		if bodyLooksLikeSSE {
 			return s.handleSSEToJSON(resp, c, account, body, originalModel, mappedModel)
 		}

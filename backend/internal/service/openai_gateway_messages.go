@@ -33,6 +33,12 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	promptCacheKey string,
 	defaultMappedModel string,
 ) (*OpenAIForwardResult, error) {
+	return s.forwardWithProtocolFallback(ctx, c, account, body, APIProtocolAnthropic, promptCacheKey, defaultMappedModel, func(attemptCtx context.Context) (*OpenAIForwardResult, error) {
+		return s.forwardOpenAIAnthropic(attemptCtx, c, account, body, promptCacheKey, defaultMappedModel)
+	})
+}
+
+func (s *OpenAIGatewayService) forwardOpenAIAnthropic(ctx context.Context, c *gin.Context, account *Account, body []byte, promptCacheKey, defaultMappedModel string) (*OpenAIForwardResult, error) {
 	// Preserve the existing platform-scoped repairs for invalid tool schemas.
 	// This is shared validation, not protocol conversion; valid schemas and
 	// vendor-specific request fields remain unchanged on the native path.
@@ -72,7 +78,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 
 	// 固定 chat_completions 的 CN 账号，以及不支持 Responses 的其他 APIKey
 	// 账号，均将 Messages 转为 CC；固定 responses 的 CN 账号不受探针旧值覆盖。
-	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
+	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) && !forcedOpenAIResponsesProtocol(ctx) {
 		SetActualOpenAIUpstreamEndpoint(c, "/v1/chat/completions")
 		return s.forwardAnthropicViaRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}
@@ -86,14 +92,16 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 	anthropicDigestReq := cloneAnthropicRequestForDigest(&anthropicReq)
 	originalModel := anthropicReq.Model
-	applyOpenAICompatModelNormalization(&anthropicReq)
+	if !account.IsMixed() {
+		applyOpenAICompatModelNormalization(&anthropicReq)
+	}
 	normalizedModel := anthropicReq.Model
 	clientStream := anthropicReq.Stream // client's original stream preference
 
 	// 2. Model mapping
 	billingModel := resolveOpenAIForwardModel(account, normalizedModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil && !account.IsMixed() {
 		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
@@ -422,7 +430,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 				return nil, fmt.Errorf("build grok retry request: %w", err)
 			}
 		}
-		resp, err = s.doOpenAIUpstream(upstreamReq, proxyURL, account)
+		resp, err = s.doOpenAITextUpstream(ctx, c, upstreamReq, proxyURL, account)
 		if err != nil {
 			return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
 		}
@@ -461,7 +469,13 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 
 	// 8. Handle error response with failover
 	if resp.StatusCode >= 400 {
-		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		respBody, upstreamMsg, readErr := s.readOpenAIProtocolError(resp, account)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolResponses, resp.StatusCode, respBody, false); fallbackErr != nil {
+			return nil, fallbackErr
+		}
 		if !agentIdentityTaskRecoveryWasTried(ctx) && s.isAgentIdentityAccount(ctx, account) && isAgentIdentityTaskInvalidHTTPResponse(resp.StatusCode, respBody) {
 			expectedTaskID := account.GetCredential("task_id")
 			if err := s.recoverAgentIdentityTask(ctx, account, expectedTaskID); err != nil {
@@ -532,7 +546,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 
 	// Propagate ServiceTier and ReasoningEffort to result for billing
-	if handleErr == nil && result != nil {
+	if (handleErr == nil || account.IsMixed()) && result != nil {
 		if compatContinuationEnabled && promptCacheKey != "" && result.ResponseID != "" {
 			s.bindOpenAICompatSessionResponseID(ctx, c, account, promptCacheKey, result.ResponseID)
 		}
@@ -604,7 +618,14 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
 
-	finalResponse, usage, acc, err := s.readOpenAICompatBufferedTerminal(resp, c, "openai messages buffered", requestID)
+	finalResponse, usage, acc, err := s.readOpenAICompatBufferedTerminal(resp, c, "openai messages buffered", requestID, account.IsMixed())
+	if account.IsMixed() && (err != nil || finalResponse == nil || strings.TrimSpace(finalResponse.Status) == "failed") {
+		if err == nil {
+			err = fmt.Errorf("upstream Responses stream failed or ended without terminal response")
+		}
+		writeMixedStreamFailure(c, APIProtocolAnthropic, err)
+		return mixedPartialForwardResult(c, resp, usage, originalModel, billingModel, upstreamModel, false, startTime), err
+	}
 	if err != nil {
 		var readErr *openAICompatBufferedReadError
 		if errors.As(err, &readErr) && readErr != nil {
@@ -776,8 +797,10 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 	c *gin.Context,
 	logPrefix string,
 	requestID string,
+	mixed ...bool,
 ) (*apicompat.ResponsesResponse, OpenAIUsage, *apicompat.BufferedResponseAccumulator, error) {
 	acc := apicompat.NewBufferedResponseAccumulator()
+	strictCompletion := len(mixed) > 0 && mixed[0]
 	var usage OpenAIUsage
 	if resp == nil || resp.Body == nil {
 		return nil, usage, acc, errors.New("upstream response body is nil")
@@ -857,6 +880,9 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 					var event apicompat.ResponsesStreamEvent
 					if err := json.Unmarshal([]byte(payload), &event); err == nil {
 						s.parseSSEUsageBytesWithType([]byte(payload), event.Type, &usage)
+						if strictCompletion && mixedPayloadIsError([]byte(payload), event.Type) {
+							return nil, usage, acc, fmt.Errorf("upstream Responses stream failed")
+						}
 						acc.ProcessEvent(&event)
 						if response := openAICompatTerminalResponse(&event, []byte(payload)); isOpenAICompatResponsesTerminalEvent(event.Type) && response != nil {
 							if event.Usage != nil {
@@ -904,6 +930,9 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 				continue
 			}
 			s.parseSSEUsageBytesWithType([]byte(payload), event.Type, &usage)
+			if strictCompletion && mixedPayloadIsError([]byte(payload), event.Type) {
+				return nil, usage, acc, fmt.Errorf("upstream Responses stream failed")
+			}
 
 			acc.ProcessEvent(&event)
 
@@ -1036,6 +1065,11 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 		}
 		observer.ObserveOpenAI([]byte(payload), event.Type)
 		s.parseSSEUsageBytesWithType([]byte(payload), event.Type, &usage)
+		if account.IsMixed() && mixedPayloadIsError([]byte(payload), event.Type) {
+			streamNonFailoverErr = fmt.Errorf("upstream Responses stream failed")
+			writeMixedStreamFailure(c, APIProtocolAnthropic, streamNonFailoverErr)
+			return true
+		}
 
 		eventType := strings.TrimSpace(event.Type)
 		isBareErrorEvent := eventType == "error"
@@ -1195,6 +1229,10 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 	}
 	missingTerminalErr := func() (*OpenAIForwardResult, error) {
 		result := resultWithUsage()
+		if account.IsMixed() {
+			writeMixedStreamFailure(c, APIProtocolAnthropic, ErrOpenAIUpstreamStreamTruncated)
+			return result, ErrOpenAIUpstreamStreamTruncated
+		}
 		if clientDisconnected {
 			return result, fmt.Errorf("stream usage incomplete: missing terminal event")
 		}
@@ -1234,6 +1272,10 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 		}
 		if err := scanner.Err(); err != nil {
 			handleScanErr(err)
+			if account.IsMixed() {
+				writeMixedStreamFailure(c, APIProtocolAnthropic, err)
+				return resultWithUsage(), err
+			}
 			return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", err)
 		}
 		if frame, ok := parser.Finish(); ok {
@@ -1307,6 +1349,10 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 			}
 			if ev.err != nil {
 				handleScanErr(ev.err)
+				if account.IsMixed() {
+					writeMixedStreamFailure(c, APIProtocolAnthropic, ev.err)
+					return resultWithUsage(), ev.err
+				}
 				return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", ev.err)
 			}
 			lastDataAt = time.Now()
@@ -1326,6 +1372,11 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
 			if time.Since(lastRead) < streamInterval {
 				continue
+			}
+			if account.IsMixed() {
+				err := fmt.Errorf("stream data interval timeout")
+				writeMixedStreamFailure(c, APIProtocolAnthropic, err)
+				return resultWithUsage(), err
 			}
 			if clientDisconnected {
 				return resultWithUsage(), fmt.Errorf("stream usage incomplete after timeout")
@@ -1401,6 +1452,8 @@ func copyOpenAIUsageFromResponsesUsage(usage *apicompat.ResponsesUsage) OpenAIUs
 		InputTokens:              usage.InputTokens,
 		OutputTokens:             usage.OutputTokens,
 		CacheCreationInputTokens: usage.CacheCreationInputTokens,
+		CacheCreation5mTokens:    usage.CacheCreation5mTokens,
+		CacheCreation1hTokens:    usage.CacheCreation1hTokens,
 	}
 	if usage.InputTokensDetails != nil {
 		result.CacheReadInputTokens = usage.InputTokensDetails.CachedTokens

@@ -330,6 +330,29 @@ describe('EditAccountModal', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it('preserves Mixed Messages auth on edit and allows restoring x-api-key', async () => {
+    const account = buildAccount()
+    account.platform = 'mixed'
+    account.extra = { anthropic_apikey_auth_scheme: 'authorization_bearer', preserved_setting: true }
+    account.credentials = { api_key: 'sk-preserved', base_url: 'https://relay.example/v1', model_mapping: { alias: 'qwen3.8-27b' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    expect(wrapper.get<HTMLSelectElement>('[data-testid="anthropic-api-key-auth-scheme"]').element.value).toBe('authorization_bearer')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject({ anthropic_apikey_auth_scheme: 'authorization_bearer', preserved_setting: true })
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject(account.credentials)
+    await wrapper.get('[data-testid="anthropic-api-key-auth-scheme"]').setValue('x_api_key')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    const updated = updateAccountMock.mock.calls.at(-1)?.[1]
+    expect(updated.extra.anthropic_apikey_auth_scheme).toBeUndefined()
+    expect(updated.extra.preserved_setting).toBe(true)
+    expect(updated.extra.anthropic_passthrough).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('saves zero priority without the previous minimum-one restriction', async () => {
     const account = buildAccount()
     updateAccountMock.mockReset().mockResolvedValue(account)

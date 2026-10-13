@@ -43,6 +43,9 @@ jobs:
       - name: Integration tests
         working-directory: backend
         run: make test-integration
+      - name: Mixed protocol, cancellation and billing concurrency regression
+        working-directory: backend
+        run: go test -race -p 1 -tags=unit ./internal/service ./internal/handler ./migrations -run 'TestMixed' -count=1
       - name: Codex ticket concurrency regression
         working-directory: backend
         run: go test -race -tags=unit ./internal/service -run 'Test.*CodexTicket' -count=1

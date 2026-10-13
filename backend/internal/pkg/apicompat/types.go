@@ -163,12 +163,19 @@ type AnthropicPromptTokensDetails struct {
 	CachedTokens int `json:"cached_tokens,omitempty"`
 }
 
+// AnthropicCacheCreation preserves the provider's cache-write TTL buckets.
+type AnthropicCacheCreation struct {
+	Ephemeral5mInputTokens *int `json:"ephemeral_5m_input_tokens,omitempty"`
+	Ephemeral1hInputTokens *int `json:"ephemeral_1h_input_tokens,omitempty"`
+}
+
 // AnthropicUsage holds token counts in Anthropic format.
 type AnthropicUsage struct {
-	InputTokens              int `json:"input_tokens"`
-	OutputTokens             int `json:"output_tokens"`
-	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+	InputTokens              int                     `json:"input_tokens"`
+	OutputTokens             int                     `json:"output_tokens"`
+	CacheCreationInputTokens int                     `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int                     `json:"cache_read_input_tokens"`
+	CacheCreation            *AnthropicCacheCreation `json:"cache_creation,omitempty"`
 	// Anthropic-compatible providers can also expose their native OpenAI-style
 	// total/cache fields. Preserve them so callers can normalize provider totals
 	// into Anthropic's mutually-exclusive billing buckets.
@@ -596,6 +603,8 @@ type ResponsesUsage struct {
 	OutputTokens             int `json:"output_tokens"`
 	TotalTokens              int `json:"total_tokens"`
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
+	CacheCreation5mTokens    int `json:"cache_creation_5m_tokens,omitempty"`
+	CacheCreation1hTokens    int `json:"cache_creation_1h_tokens,omitempty"`
 
 	// Optional detailed breakdown
 	InputTokensDetails  *ResponsesInputTokensDetails  `json:"input_tokens_details,omitempty"`
@@ -619,6 +628,8 @@ func (u *ResponsesUsage) UnmarshalJSON(data []byte) error {
 		CacheReadInputTokens    int                           `json:"cache_read_input_tokens"`
 		CacheReadTokens         int                           `json:"cache_read_tokens"`
 		CachedTokens            int                           `json:"cached_tokens"`
+		PromptCacheHitTokens    *int                          `json:"prompt_cache_hit_tokens"`
+		CacheCreation           *AnthropicCacheCreation       `json:"cache_creation"`
 		PromptTokensDetails     *ResponsesInputTokensDetails  `json:"prompt_tokens_details,omitempty"`
 		CompletionTokensDetails *ResponsesOutputTokensDetails `json:"completion_tokens_details,omitempty"`
 	}
@@ -626,13 +637,30 @@ func (u *ResponsesUsage) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var nestedPresence struct {
-		InputTokensDetails  *cacheTokenPresence `json:"input_tokens_details"`
-		PromptTokensDetails *cacheTokenPresence `json:"prompt_tokens_details"`
+		InputTokensDetails       *cacheTokenPresence `json:"input_tokens_details"`
+		PromptTokensDetails      *cacheTokenPresence `json:"prompt_tokens_details"`
+		CacheReadInputTokens     json.RawMessage     `json:"cache_read_input_tokens"`
+		CacheReadTokens          json.RawMessage     `json:"cache_read_tokens"`
+		CachedTokens             json.RawMessage     `json:"cached_tokens"`
+		CacheCreationInputTokens json.RawMessage     `json:"cache_creation_input_tokens"`
+		CacheCreationTokens      json.RawMessage     `json:"cache_creation_tokens"`
+		CacheWriteInputTokens    json.RawMessage     `json:"cache_write_input_tokens"`
+		CacheWriteTokens         json.RawMessage     `json:"cache_write_tokens"`
+		CacheCreation5mTokens    json.RawMessage     `json:"cache_creation_5m_tokens"`
+		CacheCreation1hTokens    json.RawMessage     `json:"cache_creation_1h_tokens"`
 	}
 	if err := json.Unmarshal(data, &nestedPresence); err != nil {
 		return err
 	}
 	*u = ResponsesUsage(aux.responsesUsageAlias)
+	if aux.CacheCreation != nil {
+		if len(nestedPresence.CacheCreation5mTokens) == 0 && aux.CacheCreation.Ephemeral5mInputTokens != nil {
+			u.CacheCreation5mTokens = max(*aux.CacheCreation.Ephemeral5mInputTokens, 0)
+		}
+		if len(nestedPresence.CacheCreation1hTokens) == 0 && aux.CacheCreation.Ephemeral1hInputTokens != nil {
+			u.CacheCreation1hTokens = max(*aux.CacheCreation.Ephemeral1hInputTokens, 0)
+		}
+	}
 	if u.InputTokens == 0 && aux.PromptTokens != 0 {
 		u.InputTokens = aux.PromptTokens
 	}
@@ -671,6 +699,8 @@ func (u *ResponsesUsage) UnmarshalJSON(data []byte) error {
 		cacheReadTokens = aux.CacheReadTokens
 	case aux.CachedTokens > 0:
 		cacheReadTokens = aux.CachedTokens
+	case len(nestedPresence.CacheReadInputTokens) == 0 && len(nestedPresence.CacheReadTokens) == 0 && len(nestedPresence.CachedTokens) == 0 && aux.PromptCacheHitTokens != nil:
+		cacheReadTokens = max(*aux.PromptCacheHitTokens, 0)
 	}
 	if u.InputTokensDetails != nil {
 		u.InputTokensDetails.CachedTokens = cacheReadTokens
@@ -701,6 +731,8 @@ func (u *ResponsesUsage) UnmarshalJSON(data []byte) error {
 		if u.InputTokensDetails.CacheCreationTokens != 0 || !canonicalCacheWrite {
 			u.InputTokensDetails.CacheCreationTokens = u.CacheCreationInputTokens
 		}
+	} else if len(nestedPresence.CacheCreationInputTokens) == 0 && len(nestedPresence.CacheCreationTokens) == 0 && len(nestedPresence.CacheWriteInputTokens) == 0 && len(nestedPresence.CacheWriteTokens) == 0 {
+		u.CacheCreationInputTokens = max(u.CacheCreation5mTokens, 0) + max(u.CacheCreation1hTokens, 0)
 	}
 	if u.TotalTokens == 0 && (u.InputTokens != 0 || u.OutputTokens != 0) {
 		u.TotalTokens = u.InputTokens + u.OutputTokens

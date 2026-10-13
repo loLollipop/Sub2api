@@ -1309,6 +1309,10 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		return
 	}
 
+	if responsePlatform == service.PlatformMixed {
+		writeOpenAIModelsList(c, nil)
+		return
+	}
 	writeModelsListResponse(c, claude.DefaultModels)
 }
 
@@ -1500,7 +1504,7 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 }
 
 func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
-	if platform == service.PlatformOpenAI {
+	if platform == service.PlatformOpenAI || platform == service.PlatformMixed {
 		writeOpenAIModelsList(c, modelIDs)
 		return
 	}
@@ -1521,7 +1525,7 @@ func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
 }
 
 func writeAllowlistedModelsList(c *gin.Context, platform string, modelIDs []string) {
-	if platform == service.PlatformOpenAI {
+	if platform == service.PlatformOpenAI || platform == service.PlatformMixed {
 		writeOpenAIModelsList(c, modelIDs)
 		return
 	}

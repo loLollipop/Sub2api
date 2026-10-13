@@ -70,7 +70,7 @@ func (g *Group) IsGrokMessagesDispatchGroup() bool {
 }
 
 func (g *Group) ResolveMessagesDispatchModel(requestedModel string) string {
-	if g == nil {
+	if g == nil || g.Platform == PlatformMixed {
 		return ""
 	}
 	requestedModel = strings.TrimSpace(requestedModel)

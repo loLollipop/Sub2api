@@ -457,6 +457,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'kimi': return moonshotModels
     case 'doubao': return doubaoModels
     case 'minimax': return minimaxModels
+    case 'mixed': return []
     case 'baidu': return baiduModels
     case 'spark': return sparkModels
     case 'hunyuan': return hunyuanModels
@@ -467,6 +468,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
+  if (platform === 'mixed') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

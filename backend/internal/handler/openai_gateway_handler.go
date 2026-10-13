@@ -206,7 +206,7 @@ func resolveOpenAIMessagesDispatchMappedModel(c *gin.Context, apiKey *service.AP
 	// 默认值是 openai 专属,发给这些上游必错）,模型改写交给账号级 model_mapping。
 	if apiKey.Group.Platform == service.PlatformComposite && c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok &&
-			(platform == service.PlatformGrok || service.IsCNProvider(platform)) {
+			(platform == service.PlatformMixed || platform == service.PlatformGrok || service.IsCNProvider(platform)) {
 			return ""
 		}
 	}
@@ -327,7 +327,7 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 		return true
 	}
 	// grok/CN 仍豁免。其余分组关掉「允许 messages 分发」就 403。
-	if messagesDispatchExemptPlatform(apiKey.Group.Platform) {
+	if apiKey.Group.Platform == service.PlatformMixed || messagesDispatchExemptPlatform(apiKey.Group.Platform) {
 		return true
 	}
 	if apiKey.Group.IsGrokMessagesDispatchGroup() {
@@ -353,10 +353,15 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 	return apiKey.Group.AllowMessagesDispatch
 }
 
+func allowInitialOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKey) bool {
+	// The route iterator checks every concrete candidate's own permissions.
+	return len(apiKey.CandidateGroupIDs()) > 1 || allowOpenAICompatibleMessagesDispatch(c, apiKey)
+}
+
 func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
 	return compositeTargetPlatformAllowed(c, apiKey, model,
 		service.PlatformOpenAI, service.PlatformGrok,
-		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax)
+		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformMixed)
 }
 
 // isResponsesWebSocketCompositePlatform 限定 composite 分组在 Responses WebSocket
@@ -948,6 +953,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			})
 		}
 		if err != nil {
+			if service.IsMixedLocalRequestError(err) {
+				return
+			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
 			if result != nil && result.ClientDisconnect {
 				reqLog.Info("openai.client_disconnected",
@@ -1268,7 +1276,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	)
 
 	// 检查分组是否允许 /v1/messages 调度
-	if !allowOpenAICompatibleMessagesDispatch(c, apiKey) {
+	if !allowInitialOpenAICompatibleMessagesDispatch(c, apiKey) {
 		h.anthropicErrorResponse(c, http.StatusForbidden, "permission_error",
 			"This group does not allow /v1/messages dispatch")
 		return
@@ -1320,6 +1328,11 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	}
 	bindOpenAIReasoningEffortPolicyForMessagesRequest(c, apiKey, body)
 	routingModel := service.NormalizeOpenAICompatRequestedModel(reqModel)
+	if apiKey.Group != nil && apiKey.Group.Platform == service.PlatformMixed {
+		routingModel = reqModel
+	} else if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok && platform == service.PlatformMixed {
+		routingModel = reqModel
+	}
 	preferredMappedModel := resolveOpenAIMessagesDispatchMappedModel(c, apiKey, reqModel)
 	reqStream := gjson.GetBytes(body, "stream").Bool()
 
@@ -1453,6 +1466,11 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			requestPlatform,
 		)
 		if err == nil && routedKey != nil {
+			if !allowOpenAICompatibleMessagesDispatch(c, routedKey) {
+				releaseRejectedKeyRouteSelection(selection)
+				h.anthropicErrorResponse(c, http.StatusForbidden, "permission_error", "This group does not allow /v1/messages dispatch")
+				return
+			}
 			changed := keyRouteGroupChanged(apiKey, routedKey)
 			if bindErr := h.bindSelectedKeyRoute(c, keyRouteBinding{
 				Previous: apiKey, Selected: routedKey, Subscription: &subscription,
@@ -1606,6 +1624,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			})
 		}
 		if err != nil {
+			if service.IsMixedLocalRequestError(err) {
+				return
+			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
 			if result != nil && result.ImageCount > 0 {
 				reqLog.Warn("openai_messages.forward_partial_error_with_image_result",

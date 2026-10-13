@@ -1639,7 +1639,7 @@
 
         <!-- 跨协议转换开关：所有平台的分组都有（Anthropic 协议族 <-> OpenAI 协议族）。
              账号有原生端点时始终先走原生转发，开关只决定"没有原生端点时"能否转换兜底。 -->
-        <div class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4">
+        <div v-if="createForm.platform !== 'mixed'" class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4">
           <div class="flex items-center justify-between">
             <label class="text-sm text-gray-600 dark:text-gray-400">{{
               t("admin.groups.openaiMessages.crossProtocolEnabled")
@@ -3303,7 +3303,7 @@
 
         <!-- 跨协议转换开关：所有平台的分组都有（Anthropic 协议族 <-> OpenAI 协议族）。
              账号有原生端点时始终先走原生转发，开关只决定"没有原生端点时"能否转换兜底。 -->
-        <div class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4">
+        <div v-if="editForm.platform !== 'mixed'" class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4">
           <div class="flex items-center justify-between">
             <label class="text-sm text-gray-600 dark:text-gray-400">{{
               t("admin.groups.openaiMessages.crossProtocolEnabled")

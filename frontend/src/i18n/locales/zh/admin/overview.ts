@@ -915,6 +915,7 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         minimax: 'MiniMax',
+        mixed: '混合平台',
         composite: 'Composite',
       },
       saving: '保存中...',

@@ -78,7 +78,7 @@ func IsOpenAICompatibleUpstreamPlatform(platform string) bool {
 
 func isOpenAICompatibleUpstreamPlatform(platform string) bool {
 	switch strings.TrimSpace(platform) {
-	case PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax:
+	case PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed:
 		return true
 	default:
 		return false
@@ -151,7 +151,7 @@ func GroupCatalogPlatforms() []string {
 func groupCatalogPlatforms() []string {
 	return []string{
 		PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
-		PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax,
+		PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed,
 	}
 }
 
@@ -318,18 +318,21 @@ func (s *GatewayService) UpstreamPlatformForModel(ctx context.Context, apiKey *A
 	if s == nil || apiKey == nil {
 		return "", false
 	}
+	if apiKey.Group != nil && apiKey.Group.Platform == PlatformMixed && !apiKey.UsesRequestTargetPlatform() {
+		return PlatformMixed, true
+	}
 	ids := apiKey.CandidateGroupIDs()
 	if len(ids) == 0 && apiKey.Group != nil && apiKey.Group.ID > 0 {
 		ids = []int64{apiKey.Group.ID}
 	}
 	detected, detectedOK := DetectModelPlatform(model)
 	prefer := []string{
-		PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax,
+		PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed,
 		PlatformAnthropic, PlatformGemini, PlatformAntigravity,
 	}
 	if detectedOK && detected == PlatformGrok {
 		prefer = []string{
-			PlatformGrok, PlatformOpenAI, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax,
+			PlatformGrok, PlatformOpenAI, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed,
 			PlatformAnthropic, PlatformGemini, PlatformAntigravity,
 		}
 	}

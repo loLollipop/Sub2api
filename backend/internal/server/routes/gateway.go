@@ -53,7 +53,7 @@ func RegisterGatewayRoutes(
 
 	isOpenAIResponsesCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		switch getGroupPlatform(c) {
-		case service.PlatformOpenAI, service.PlatformGrok,
+		case service.PlatformOpenAI, service.PlatformMixed, service.PlatformGrok,
 			service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax:
 			// 国产 OpenAI 兼容供应商与 openai/grok 一样经 OpenAI 网关转发。
 			return true
@@ -65,7 +65,7 @@ func RegisterGatewayRoutes(
 		switch getGroupPlatform(c) {
 		case service.PlatformOpenAI, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax:
 			h.OpenAIGateway.CountTokens(c)
-		case service.PlatformGrok:
+		case service.PlatformGrok, service.PlatformMixed:
 			h.OpenAIGateway.GrokCountTokens(c)
 		default:
 			h.Gateway.CountTokens(c)
@@ -82,7 +82,7 @@ func RegisterGatewayRoutes(
 		h.Gateway.Models(c)
 	}
 	isOpenAIOnlyEndpointGatewayPlatform := func(c *gin.Context) bool {
-		return isOpenAIResponsesCompatibleGatewayPlatform(c)
+		return getGroupPlatform(c) != service.PlatformMixed && isOpenAIResponsesCompatibleGatewayPlatform(c)
 	}
 	imagesHandler := func(c *gin.Context) {
 		switch getGroupPlatform(c) {

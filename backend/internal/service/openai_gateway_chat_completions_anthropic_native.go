@@ -117,14 +117,20 @@ func (s *OpenAIGatewayService) forwardChatCompletionsViaNativeAnthropic(
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
 
-	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
+	resp, err := s.doOpenAITextUpstream(ctx, c, upstreamReq, proxyURL, account)
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, true)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
-		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		respBody, upstreamMsg, readErr := s.readOpenAIProtocolError(resp, account)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolAnthropic, resp.StatusCode, respBody, false); fallbackErr != nil {
+			return nil, fallbackErr
+		}
 		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
 			return nil, foErr
 		}
@@ -136,9 +142,9 @@ func (s *OpenAIGatewayService) forwardChatCompletionsViaNativeAnthropic(
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, billingModel)
 
 	if clientStream {
-		return s.handleCCStreamingFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, includeUsage)
+		return s.handleCCStreamingFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, includeUsage, account.IsMixed())
 	}
-	return s.handleCCBufferedFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime)
+	return s.handleCCBufferedFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, account.IsMixed())
 }
 
 // handleCCBufferedFromNativeAnthropic reads Anthropic SSE events, assembles the
@@ -151,8 +157,10 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 	upstreamModel string,
 	reasoningEffort *string,
 	startTime time.Time,
+	mixed ...bool,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
+	strictCompletion := len(mixed) > 0 && mixed[0]
 
 	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
@@ -163,6 +171,12 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 
 	var finalResp *apicompat.AnthropicResponse
 	var usage ClaudeUsage
+	failMixed := func(cause error) (*OpenAIForwardResult, error) {
+		writeMixedStreamFailure(c, APIProtocolChatCompletions, cause)
+		result := s.nativeAnthropicStreamResult(c, resp, &usage, nil, false, originalModel, billingModel, upstreamModel, reasoningEffort, startTime)
+		result.Stream = false
+		return result, cause
+	}
 
 	// 读间隔上限：上游挂住 SSE 时中止组装（缓冲路径尚未提交响应头，可回 502）。
 	streamInterval := s.anthropicNativeStreamInterval()
@@ -179,6 +193,9 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 	}
 	onIdle := func() (*OpenAIForwardResult, error) {
 		_ = resp.Body.Close()
+		if strictCompletion {
+			return failMixed(errAnthropicNativeStreamIdle)
+		}
 		logger.L().Warn("openai cc via native anthropic buffered: data interval timeout",
 			zap.String("request_id", requestID),
 			zap.Duration("interval", streamInterval),
@@ -190,6 +207,9 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 	for {
 		line, rerr := pump.next()
 		if rerr != nil {
+			if strictCompletion {
+				return failMixed(mixedStreamReadFailure(rerr))
+			}
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
 				return onIdle()
 			}
@@ -198,12 +218,16 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 		}
 		// SSE 规范允许 `event:xxx`（冒号后无空格）：Kimi 等 Anthropic 兼容上游
 		// 返回紧凑格式，严格匹配 "event: " 会丢弃全部事件（#4653 同根因）。
-		if _, ok := extractOpenAISSEEventLine(line); !ok {
+		eventType, ok := extractOpenAISSEEventLine(line)
+		if !ok {
 			continue
 		}
 
 		dataLine, rerr := pump.next()
 		if rerr != nil {
+			if strictCompletion {
+				return failMixed(mixedStreamReadFailure(rerr))
+			}
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
 				return onIdle()
 			}
@@ -217,7 +241,16 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 
 		var event apicompat.AnthropicStreamEvent
 		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			if strictCompletion {
+				return failMixed(fmt.Errorf("invalid upstream Anthropic event: %w", err))
+			}
 			continue
+		}
+		if strictCompletion && mixedPayloadIsError([]byte(payload), eventType) {
+			if event.Usage != nil {
+				mergeAnthropicUsage(&usage, *event.Usage)
+			}
+			return failMixed(fmt.Errorf("upstream Anthropic stream failed"))
 		}
 
 		if event.Type == "message_start" && event.Message != nil {
@@ -248,9 +281,15 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 				}
 			}
 		}
+		if strictCompletion && event.Type == "message_stop" {
+			break
+		}
 	}
 
 	if finalResp == nil {
+		if strictCompletion {
+			return failMixed(ErrOpenAIUpstreamStreamTruncated)
+		}
 		writeChatCompletionsError(c, http.StatusBadGateway, "server_error", "Upstream stream ended without a response")
 		return nil, fmt.Errorf("upstream stream ended without response")
 	}
@@ -304,8 +343,10 @@ func (s *OpenAIGatewayService) handleCCStreamingFromNativeAnthropic(
 	reasoningEffort *string,
 	startTime time.Time,
 	includeUsage bool,
+	mixed ...bool,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
+	strictCompletion := len(mixed) > 0 && mixed[0]
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -350,6 +391,10 @@ func (s *OpenAIGatewayService) handleCCStreamingFromNativeAnthropic(
 			ClientDisconnect: clientDisconnected,
 		}
 	}
+	failMixed := func(cause error) (*OpenAIForwardResult, error) {
+		writeMixedStreamFailure(c, APIProtocolChatCompletions, cause)
+		return resultWithUsage(), cause
+	}
 
 	// 读间隔上限：上游挂住 SSE（不发数据也不断连）时结束排水。上游 ctx 为
 	// WithoutCancel 且 http.Client 无整体 Timeout，无此界限则客户端断开后
@@ -370,6 +415,9 @@ func (s *OpenAIGatewayService) handleCCStreamingFromNativeAnthropic(
 	// 返回——与 messages 主路径 "stream usage incomplete after timeout" 同语义。
 	onIdle := func() (*OpenAIForwardResult, error) {
 		_ = resp.Body.Close()
+		if strictCompletion {
+			return failMixed(errAnthropicNativeStreamIdle)
+		}
 		if !clientDisconnected {
 			logger.L().Warn("openai cc via native anthropic stream: data interval timeout",
 				zap.String("request_id", requestID),
@@ -432,18 +480,25 @@ func (s *OpenAIGatewayService) handleCCStreamingFromNativeAnthropic(
 	for {
 		line, rerr := pump.next()
 		if rerr != nil {
+			if strictCompletion {
+				return failMixed(mixedStreamReadFailure(rerr))
+			}
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
 				return onIdle()
 			}
 			logReadErr(rerr)
 			break
 		}
-		if _, ok := extractOpenAISSEEventLine(line); !ok {
+		eventType, ok := extractOpenAISSEEventLine(line)
+		if !ok {
 			continue
 		}
 
 		dataLine, rerr := pump.next()
 		if rerr != nil {
+			if strictCompletion {
+				return failMixed(mixedStreamReadFailure(rerr))
+			}
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
 				return onIdle()
 			}
@@ -458,11 +513,26 @@ func (s *OpenAIGatewayService) handleCCStreamingFromNativeAnthropic(
 
 		var event apicompat.AnthropicStreamEvent
 		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			if strictCompletion {
+				return failMixed(fmt.Errorf("invalid upstream Anthropic event: %w", err))
+			}
 			continue
+		}
+		if strictCompletion && mixedPayloadIsError([]byte(payload), eventType) {
+			if event.Usage != nil {
+				mergeAnthropicUsage(&usage, *event.Usage)
+			}
+			return failMixed(fmt.Errorf("upstream Anthropic stream failed"))
+		}
+		if strictCompletion && event.Type == "message_stop" && !anthState.CreatedSent {
+			return failMixed(ErrOpenAIUpstreamStreamTruncated)
 		}
 
 		if processAnthropicEvent(&event) {
 			return resultWithUsage(), nil
+		}
+		if strictCompletion && event.Type == "message_stop" {
+			break
 		}
 	}
 

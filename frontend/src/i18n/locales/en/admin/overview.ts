@@ -982,6 +982,7 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         minimax: 'MiniMax',
+        mixed: 'Mixed',
         composite: 'Composite',
       },
       deleteConfirm:

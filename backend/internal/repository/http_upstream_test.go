@@ -51,6 +51,42 @@ func TestHTTPUpstreamDoCanDisableRedirectsPerRequest(t *testing.T) {
 	require.Zero(t, redirectedCalls.Load())
 }
 
+func TestHTTPUpstreamMessages307And308NeverForwardAPIKey(t *testing.T) {
+	for _, status := range []int{http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			var redirectedCalls atomic.Int64
+			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				redirectedCalls.Add(1)
+				w.WriteHeader(http.StatusOK)
+			}))
+			t.Cleanup(target.Close)
+			redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, http.MethodPost, r.Method)
+				require.Equal(t, "test-secret", r.Header.Get("x-api-key"))
+				http.Redirect(w, r, target.URL+"/v1/messages", status)
+			}))
+			t.Cleanup(redirector.Close)
+			for _, withTLS := range []bool{false, true} {
+				req, err := http.NewRequestWithContext(service.WithHTTPUpstreamRedirectsDisabled(t.Context()), http.MethodPost,
+					redirector.URL+"/v1/messages", strings.NewReader(`{"model":"actual","messages":[]}`))
+				require.NoError(t, err)
+				req.Header.Set("x-api-key", "test-secret")
+				upstream := NewHTTPUpstream(nil)
+				var resp *http.Response
+				if withTLS {
+					resp, err = upstream.DoWithTLS(req, "", 1, 1, nil)
+				} else {
+					resp, err = upstream.Do(req, "", 1, 1)
+				}
+				require.NoError(t, err)
+				require.Equal(t, status, resp.StatusCode)
+				require.NoError(t, resp.Body.Close())
+				require.Zero(t, redirectedCalls.Load())
+			}
+		})
+	}
+}
+
 func TestHTTPUpstreamDoWithTLSPlainHTTPUsesConfiguredHTTPProxy(t *testing.T) {
 	var upstreamCalls atomic.Int64
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

@@ -327,7 +327,7 @@
         </div>
 
         <!-- Pool Mode Section -->
-        <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div v-if="account.platform !== 'mixed'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <div class="mb-3 flex items-center justify-between">
             <div>
               <label class="input-label mb-0">{{ t('admin.accounts.poolMode') }}</label>
@@ -1840,7 +1840,7 @@
       </div>
 
       <div
-        v-if="account?.platform === 'anthropic' && account?.type === 'apikey'"
+        v-if="(account?.platform === 'anthropic' || account?.platform === 'mixed') && account?.type === 'apikey'"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div class="flex items-center justify-between gap-4">
@@ -1850,7 +1850,7 @@
               {{ t('admin.accounts.anthropic.apiKeyAuthSchemeDesc') }}
             </p>
           </div>
-          <select v-model="anthropicAPIKeyAuthScheme" class="input w-52 text-sm">
+          <select v-model="anthropicAPIKeyAuthScheme" data-testid="anthropic-api-key-auth-scheme" class="input w-52 text-sm">
             <option value="x_api_key">{{ t('admin.accounts.anthropic.apiKeyAuthSchemeXApiKey') }}</option>
             <option value="authorization_bearer">{{ t('admin.accounts.anthropic.apiKeyAuthSchemeBearer') }}</option>
           </select>
@@ -3654,6 +3654,7 @@ const tempUnschedPresets = computed(() => [
 
 // Computed: default base URL based on platform
 const defaultBaseUrl = computed(() => {
+  if (props.account?.platform === 'mixed') return ''
   if (props.account?.platform === 'openai') return 'https://api.openai.com'
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
@@ -3910,6 +3911,11 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     if (compactMappings && typeof compactMappings === 'object') {
       openAICompactModelMappings.value = Object.entries(compactMappings).map(([from, to]) => ({ from, to }))
     }
+  }
+  if (newAccount.platform === 'mixed' && newAccount.type === 'apikey') {
+    anthropicAPIKeyAuthScheme.value = extra?.anthropic_apikey_auth_scheme === 'authorization_bearer'
+      ? 'authorization_bearer'
+      : 'x_api_key'
   }
   if (newAccount.platform === 'anthropic' && newAccount.type === 'apikey') {
     anthropicPassthroughEnabled.value = extra?.anthropic_passthrough === true
@@ -4787,6 +4793,10 @@ const handleSubmit = async () => {
     if (props.account.type === 'apikey' || props.account.type === 'cloudflare') {
       const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
       const newBaseUrl = editBaseUrl.value.trim() || defaultBaseUrl.value
+      if (props.account.platform === 'mixed' && !newBaseUrl) {
+        appStore.showError(t('admin.accounts.mixedBaseUrlRequired'))
+        return
+      }
       const shouldApplyModelMapping = !(props.account.platform === 'openai' && openaiPassthroughEnabled.value)
 
       // Always update credentials for apikey type to handle model mapping changes
@@ -5286,6 +5296,17 @@ const handleSubmit = async () => {
         delete newExtra.web_search_emulation
       } else {
         newExtra.web_search_emulation = webSearchEmulationMode.value
+      }
+      updatePayload.extra = newExtra
+    }
+
+    if (props.account.platform === 'mixed' && props.account.type === 'apikey') {
+      const currentExtra = (updatePayload.extra as Record<string, unknown>) || (props.account.extra as Record<string, unknown>) || {}
+      const newExtra: Record<string, unknown> = { ...currentExtra }
+      if (anthropicAPIKeyAuthScheme.value === 'authorization_bearer') {
+        newExtra.anthropic_apikey_auth_scheme = 'authorization_bearer'
+      } else {
+        delete newExtra.anthropic_apikey_auth_scheme
       }
       updatePayload.extra = newExtra
     }

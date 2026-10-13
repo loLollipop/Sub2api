@@ -79,8 +79,7 @@ func TestMixedBillingResponsesUpstreamUsageAcrossIngress(t *testing.T) {
 			for _, stream := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/%s/stream=%t", tc.name, protocol, stream), func(t *testing.T) {
 					logs := &openAIRecordUsageLogRepoStub{inserted: true}
-					svc := newOpenAIRecordUsageServiceForTest(logs, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
-					svc.cfg = rawChatCompletionsTestConfig()
+					svc := newOpenAIRecordUsageServiceForTest(logs, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil, rawChatCompletionsTestConfig())
 					svc.resolver = NewModelPricingResolver(nil, svc.billingService)
 					responses := []*http.Response{mixedRefusal(APIProtocolChatCompletions)}
 					if protocol == APIProtocolAnthropic {

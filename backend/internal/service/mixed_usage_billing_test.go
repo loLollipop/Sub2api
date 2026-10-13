@@ -135,8 +135,7 @@ func TestMixedBillingDeepSeekStandardAndVendorUsageAcrossIngress(t *testing.T) {
 				} {
 					logs := &openAIRecordUsageLogRepoStub{inserted: true}
 					users := &openAIRecordUsageUserRepoStub{}
-					svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil)
-					svc.cfg = rawChatCompletionsTestConfig()
+					svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil, rawChatCompletionsTestConfig())
 					upstream := &httpUpstreamRecorder{resp: mixedBillingChatResponse("deepseek-v4-flash", usage, stream)}
 					svc.httpUpstream = upstream
 					account := mixedTestAccount()
@@ -185,8 +184,7 @@ func TestMixedBillingAnthropicCacheBreakdownAcrossIngressAndRefusal(t *testing.T
 			t.Run(fmt.Sprintf("%s/stream=%t", protocol, stream), func(t *testing.T) {
 				logs := &openAIRecordUsageLogRepoStub{inserted: true}
 				users := &openAIRecordUsageUserRepoStub{}
-				svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil)
-				svc.cfg = rawChatCompletionsTestConfig()
+				svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil, rawChatCompletionsTestConfig())
 				responses := []*http.Response{mixedRefusal(APIProtocolChatCompletions)}
 				if protocol != APIProtocolAnthropic {
 					responses = append(responses, mixedRefusal(APIProtocolResponses))

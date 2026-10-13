@@ -21,6 +21,9 @@ func applyCodexToolCapabilities(dst, src map[string]json.RawMessage, overwrite b
 		if len(value) == 0 {
 			continue
 		}
+		if field == "service_tiers" && bytes.Equal(value, []byte("null")) {
+			value = []byte("[]")
+		}
 		// These Codex fields are nullable booleans or strings, never arbitrary objects.
 		if !bytes.Equal(value, []byte("null")) {
 			if field == "service_tiers" {
@@ -280,6 +283,8 @@ func intersectUpstreamModelMetadata(modelID string, candidates []UpstreamModelMe
 			fallback := json.RawMessage("null")
 			if field == "supports_search_tool" || field == "use_responses_lite" {
 				fallback = json.RawMessage("false")
+			} else if field == "service_tiers" {
+				fallback = json.RawMessage("[]")
 			}
 			result.CodexToolCapabilities[field] = fallback
 		}

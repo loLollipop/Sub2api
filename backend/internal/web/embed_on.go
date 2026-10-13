@@ -501,13 +501,22 @@ func shouldBypassEmbeddedFrontend(path string) bool {
 		trimmed == "/health" ||
 		trimmed == "/readyz" ||
 		trimmed == "/models" ||
+		strings.HasPrefix(trimmed, "/models/") ||
 		trimmed == "/responses" ||
 		strings.HasPrefix(trimmed, "/responses/") ||
 		trimmed == "/alpha/search" ||
+		trimmed == "/web_search" ||
+		trimmed == "/x_search" ||
+		trimmed == "/tts" ||
+		trimmed == "/stt" ||
+		trimmed == "/realtime" ||
+		trimmed == "/custom-voices" ||
+		strings.HasPrefix(trimmed, "/custom-voices/") ||
 		strings.HasPrefix(trimmed, "/chat/completions") ||
 		strings.HasPrefix(trimmed, "/messages") ||
 		strings.HasPrefix(trimmed, "/embeddings") ||
 		strings.HasPrefix(trimmed, "/images/") ||
+		trimmed == "/videos" ||
 		strings.HasPrefix(trimmed, "/videos/") ||
 		trimmed == "/canvas" ||
 		strings.HasPrefix(trimmed, "/canvas/")

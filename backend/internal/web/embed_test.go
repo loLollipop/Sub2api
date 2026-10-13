@@ -701,17 +701,29 @@ func TestFrontendServer_Middleware(t *testing.T) {
 
 func TestEmbeddedFrontendBypassesBareVideoAPIRoutes(t *testing.T) {
 	for _, path := range []string{
+		"/videos",
 		"/videos/generations",
 		"/videos/edits",
 		"/videos/extensions",
 		"/videos/request-123",
 		"/models",
+		"/models/model-id",
+		"/web_search",
+		"/x_search",
+		"/tts",
+		"/stt",
+		"/realtime",
+		"/custom-voices",
+		"/custom-voices/voice-id/audio",
 		"/chat/completions",
 		"/messages",
 		"/embeddings",
 		"/responses",
 	} {
 		require.True(t, shouldBypassEmbeddedFrontend(path), "path=%s", path)
+	}
+	for _, path := range []string{"/dashboard", "/admin/accounts", "/models-plaza", "/custom-voices-help", "/videos-editor"} {
+		require.False(t, shouldBypassEmbeddedFrontend(path), "UI path=%s", path)
 	}
 }
 

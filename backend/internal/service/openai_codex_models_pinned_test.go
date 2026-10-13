@@ -63,11 +63,17 @@ func TestMergeCodexModelsManifestBodiesHandlesSluglessEntries(t *testing.T) {
 }
 
 func TestMergeCodexModelsManifestBodiesSingleBody(t *testing.T) {
-	body := `{"models":[{"slug":"model-a"}]}`
+	body := `{ "unknown": true, "models": [ { "slug": "model-a" } ] }`
 
 	merged, err := mergeCodexModelsManifestBodies([][]byte{[]byte(body)})
 	require.NoError(t, err)
-	require.JSONEq(t, body, string(merged))
+	require.Equal(t, body, string(merged))
+}
+
+func TestMergeCodexModelsManifestBodiesSingleBodyDeduplicates(t *testing.T) {
+	merged, err := mergeCodexModelsManifestBodies([][]byte{[]byte(`{"models":[{"slug":"a"},{"slug":"a","extra":true}]}`)})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"models":[{"slug":"a"}]}`, string(merged))
 }
 
 func TestMergeCodexModelsManifestBodiesRejectsInvalidInput(t *testing.T) {

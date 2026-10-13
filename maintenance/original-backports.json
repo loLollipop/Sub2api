@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "source_repository": "Wei-Shaw/sub2api",
+  "source_releases": {
+    "v0.2.14": "0363b8cdba8cec3e2ba4b2dbd49c4481143fa55d",
+    "v0.2.15": "f2669c8cf62555cd92389b3f55920e9e6e7c6ff2"
+  },
+  "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
+  "selection_policy": "selective-behavior-backport-with-regression-tests",
+  "selected_fixes": [
+    { "commit": "6e315616e", "scope": "deployment-bootstrap-email", "note": "Remove deployment defaults that bypass the existing backend random email generator; existing users are unchanged." },
+    { "commit": "bbba01dae", "scope": "codex-api-key-model-discovery", "note": "Enable remote discovery in generated configurations only; local file mode remains unchanged." },
+    { "commit": "b6a157c19", "scope": "ws-passthrough-image-usage", "note": "Carry image input/output counters and hosted-tool fallback into per-turn and aggregate usage." },
+    { "commit": "15f469c86", "scope": "native-anthropic-buffered-index", "note": "Complete the two missing native-path lower bounds; shared gateway guards were already present." },
+    { "commit": "412718edf", "scope": "antigravity-thinking-signature", "note": "Complete the nonstream response wire shape; existing shared and streaming safeguards remain." },
+    { "commit": "c0e5a4670", "scope": "codex-service-tiers-array", "note": "Normalize null and conflicting declarations to an empty array." },
+    { "commit": "71e97d135", "scope": "remote-codex-account-mapping", "note": "Apply mappings to ordinary remote discovery and preserve unchanged bytes/validators; passthrough policy remains unchanged." },
+    { "commit": "abdfbb704", "scope": "embedded-bare-api-bypass", "note": "Only backport aliases registered in this fork; do not introduce upstream-only task routes." },
+    { "commit": "0173861a5", "scope": "zhipu-monitor-endpoint", "note": "Resolve official, Coding Plan and relay paths using escaped complete path suffixes, not substring matches." },
+    { "commit": "7cd3dc85c", "scope": "monitor-health-request-samples", "note": "Keep health unknown until the normalized total request threshold is reached." },
+    { "commit": "5ace0699b", "scope": "scaled-price-exponents" },
+    { "commit": "7d0bf9c87", "scope": "zero-user-rate-display" },
+    { "commit": "f022a0457", "scope": "saved-passthrough-rule-state" },
+    { "commit": "7b1aa9314", "scope": "integer-rpm-input" },
+    { "commit": "8811c125e", "scope": "group-rate-load-isolation", "note": "Also isolate stale save completion/errors from a switched or reopened dialog, and block edits before the initial load succeeds; keep pending writes serialized." },
+    { "commit": "81bd85ec5", "scope": "ops-settings-loaded-save-guard", "note": "Also isolate stale save completion/errors after closing or reopening; keep pending writes serialized." }
+  ],
+  "preserve_during_future_sync": [
+    "Existing 0.15 billing and fixed-price shop-link recharge customizations",
+    "Passthrough 429 and saturated-account failover",
+    "Default-off external quality detection and send-time authorization safeguards",
+    "Fork-specific total-duration and generated-token throughput semantics",
+    "Controlled release, migration-validation and disabled self-update deployment policy"
+  ],
+  "deferred": [
+    "Cline/CommandCode and provider-profile database/platform restructuring",
+    "Composite exact-alias model-catalog expansion",
+    "Additional unrelated frontend lifecycle/auth/dialog changes and built-in checkout lifecycle changes"
+  ]
+}

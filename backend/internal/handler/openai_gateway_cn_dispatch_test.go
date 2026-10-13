@@ -50,6 +50,17 @@ func TestAllowOpenAICompatibleMessagesDispatch_OpenAIGroupResolvedGrok(t *testin
 		"Claude Code 打 grok-* 时，OpenAI 平台的 Grok 分组不能再 403")
 }
 
+func TestMixedMessagesDispatchRequiresActualMixedGroup(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+	c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), service.PlatformMixed))
+	for _, platform := range []string{service.PlatformMixed, service.PlatformComposite, service.PlatformOpenAI} {
+		key := &service.APIKey{Group: &service.Group{Platform: platform}}
+		require.Equal(t, platform == service.PlatformMixed, allowOpenAICompatibleMessagesDispatch(c, key), platform)
+		require.Equal(t, platform == service.PlatformMixed, service.CrossProtocolConversionAllowed(key), platform)
+	}
+}
+
 func TestAllowOpenAICompatibleMessagesDispatch_CompositeResolvedTargets(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

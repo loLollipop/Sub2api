@@ -303,6 +303,8 @@ export default {
       apiKey: 'API Key',
       deleteConfirm: "确定要删除账号 '{name}' 吗？此操作无法撤销。",
       failedToClearRateLimit: '清除速率限制失败',
+      mixedBaseUrlRequired: '混合平台必须填写上游 Base URL',
+      mixedHint: '支持 Chat Completions、Responses 和 Messages 文本请求。',
       platforms: {
         claude: 'Claude',
         openai: 'OpenAI',
@@ -314,6 +316,7 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         minimax: 'MiniMax',
+        mixed: '混合平台',
       },
       cnProviders: {
         accountMode: {

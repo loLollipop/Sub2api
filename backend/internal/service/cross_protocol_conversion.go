@@ -42,7 +42,7 @@ func CrossProtocolConversionAllowed(apiKey *APIKey) bool {
 	if apiKey == nil || apiKey.Group == nil {
 		return true
 	}
-	return apiKey.Group.CrossProtocolConversionEnabled
+	return apiKey.Group.Platform == PlatformMixed || apiKey.Group.CrossProtocolConversionEnabled
 }
 
 // crossProtocolConversionAllowedFromContext 是 CrossProtocolConversionAllowed

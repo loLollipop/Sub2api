@@ -69,11 +69,11 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 
 	billingModel := resolveOpenAIForwardModel(account, originalModel, "")
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil && !account.IsMixed() {
 		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
-	if openai.IsGPT61SolModelSpelling(upstreamModel) && len(effectiveTools) > 0 {
+	if !account.IsMixed() && openai.IsGPT61SolModelSpelling(upstreamModel) && len(effectiveTools) > 0 {
 		err := fmt.Errorf("gpt-6.1-sol requires Responses for tool calls; this account only supports Chat Completions")
 		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
@@ -126,7 +126,13 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
-		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		respBody, upstreamMsg, readErr := s.readOpenAIProtocolError(resp, account)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolChatCompletions, resp.StatusCode, respBody, false); fallbackErr != nil {
+			return nil, fallbackErr
+		}
 		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
 			return nil, foErr
 		}
@@ -134,9 +140,9 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	}
 
 	if clientStream {
-		return s.streamChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, localShellTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+		return s.streamChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, localShellTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime, account.IsMixed())
 	}
-	return s.bufferChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, localShellTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+	return s.bufferChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, localShellTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime, account.IsMixed())
 }
 
 func (s *OpenAIGatewayService) bufferChatCompletionsAsResponses(
@@ -153,10 +159,14 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponses(
 	reasoningEffort *string,
 	serviceTier *string,
 	startTime time.Time,
+	mixed ...bool,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
-	ccResp, usage, err := s.readCCUpstreamJSONResponse(c, resp, writeOpenAIResponsesFallbackError)
+	ccResp, usage, err := s.readCCUpstreamJSONResponse(c, resp, writeOpenAIResponsesFallbackError, mixed...)
 	if err != nil {
+		if len(mixed) > 0 && mixed[0] {
+			return mixedPartialForwardResult(c, resp, usage, originalModel, billingModel, upstreamModel, false, startTime), err
+		}
 		return nil, err
 	}
 	responsesResp := apicompat.ChatCompletionsResponseToResponsesWithLocalShell(ccResp, originalModel, customTools, functionTools, toolSearch, namespaceTools, localShellTools)
@@ -196,7 +206,9 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	reasoningEffort *string,
 	serviceTier *string,
 	startTime time.Time,
+	mixedAccount ...bool,
 ) (*OpenAIForwardResult, error) {
+	mixed := len(mixedAccount) > 0 && mixedAccount[0]
 	requestID := resp.Header.Get("x-request-id")
 	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
 
@@ -234,13 +246,16 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 		c.Writer.Flush()
 	}
 
-	scan := s.scanCCStream(c, resp, "openai responses chat fallback", requestID, startTime, func(chunk *apicompat.ChatCompletionsChunk) {
+	scan := s.scanCCStream(c, resp, "openai responses chat fallback", requestID, startTime, mixed, func(chunk *apicompat.ChatCompletionsChunk) {
 		events := apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state)
 		s.cacheReasoningItemsFromEvents(events)
 		writeEvents(events)
 	})
 
 	if scan.Err != nil {
+		if mixed {
+			writeMixedStreamFailure(c, APIProtocolResponses, scan.Err)
+		}
 		return &OpenAIForwardResult{
 			RequestID:                   requestID,
 			UpstreamHeaders:             resp.Header,

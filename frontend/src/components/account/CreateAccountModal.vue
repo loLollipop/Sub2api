@@ -203,6 +203,20 @@
             <PlatformIcon platform="minimax" size="sm" />
             MiniMax
           </button>
+          <button
+            type="button"
+            data-testid="platform-mixed"
+            @click="form.platform = 'mixed'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'mixed'
+                ? 'bg-white text-violet-600 shadow-sm dark:bg-dark-600 dark:text-violet-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="mixed" size="sm" />
+            {{ t('admin.accounts.platforms.mixed') }}
+          </button>
         </div>
       </div>
 
@@ -1284,6 +1298,7 @@
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
           <input
             v-model="apiKeyBaseUrl"
+            :required="form.platform === 'mixed'"
             type="text"
             class="input"
             :placeholder="apiKeyBaseUrlPlaceholder"
@@ -1338,7 +1353,7 @@
 
         <!-- 上游倍率自动探测：Cloudflare 没有这套探测接口 -->
         <div
-          v-if="form.type !== 'cloudflare'"
+          v-if="form.type !== 'cloudflare' && form.platform !== 'mixed'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -1507,7 +1522,7 @@
         </div>
 
         <!-- Pool Mode Section -->
-        <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div v-if="form.platform !== 'mixed'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <div class="mb-3 flex items-center justify-between">
             <div>
               <label class="input-label mb-0">{{ t('admin.accounts.poolMode') }}</label>
@@ -3024,7 +3039,7 @@
       </div>
 
       <div
-        v-if="form.platform === 'anthropic' && accountCategory === 'apikey'"
+        v-if="(form.platform === 'anthropic' || form.platform === 'mixed') && accountCategory === 'apikey'"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div class="flex items-center justify-between gap-4">
@@ -3034,7 +3049,7 @@
               {{ t('admin.accounts.anthropic.apiKeyAuthSchemeDesc') }}
             </p>
           </div>
-          <select v-model="anthropicAPIKeyAuthScheme" class="input w-52 text-sm">
+          <select v-model="anthropicAPIKeyAuthScheme" data-testid="anthropic-api-key-auth-scheme" class="input w-52 text-sm">
             <option value="x_api_key">{{ t('admin.accounts.anthropic.apiKeyAuthSchemeXApiKey') }}</option>
             <option value="authorization_bearer">{{ t('admin.accounts.anthropic.apiKeyAuthSchemeBearer') }}</option>
           </select>
@@ -3865,6 +3880,7 @@ const withUpstreamRequestIdHeader = <T extends Record<string, unknown> | undefin
 }
 
 const baseUrlHint = computed(() => {
+  if (form.platform === 'mixed') return t('admin.accounts.mixedHint')
   if (isGeminiProtocolAccount.value) return t('admin.accounts.gemini.accountType.customProtocolHint')
   if (form.platform === 'openai') return t('admin.accounts.openai.baseUrlHint')
   if (form.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
@@ -3873,6 +3889,7 @@ const baseUrlHint = computed(() => {
 })
 
 const apiKeyHint = computed(() => {
+  if (form.platform === 'mixed') return ''
   if (form.type === 'cloudflare') return ''
   if (isGeminiProtocolAccount.value) return t('admin.accounts.openai.apiKeyHint')
   if (form.platform === 'openai') return t('admin.accounts.openai.apiKeyHint')
@@ -3887,6 +3904,8 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
     return defaultCNBaseUrl(form.platform, accountMode.value, apiProtocol.value) || 'https://your-upstream/v1'
   }
   switch (form.platform) {
+    case 'mixed':
+      return 'https://your-upstream/v1'
     case 'openai':
       return 'https://api.openai.com'
     case 'gemini':
@@ -3913,6 +3932,7 @@ const apiKeyValuePlaceholder = computed(() => {
     case 'deepseek':
       return 'sk-...'
     case 'minimax':
+    case 'mixed':
       return 'sk-...'
     default:
       return 'sk-ant-...'
@@ -4658,6 +4678,10 @@ watch(
 watch(
   [accountCategory, addMethod, antigravityAccountType, () => form.platform],
   ([category, method, agType]) => {
+    if (form.platform === 'mixed') {
+      form.type = 'apikey'
+      return
+    }
     // Antigravity upstream 类型（实际创建为 apikey）
     if (form.platform === 'antigravity' && agType === 'upstream') {
       form.type = 'apikey'
@@ -4740,6 +4764,13 @@ watch(
     }
     if (newPlatform !== 'openai' && accountCategory.value === 'cloudflare') {
       accountCategory.value = 'apikey'
+    }
+    if (newPlatform === 'mixed') {
+      accountCategory.value = 'apikey'
+      form.type = 'apikey'
+      apiKeyBaseUrl.value = ''
+      poolModeEnabled.value = false
+      upstreamBillingAutoProbeEnabled.value = false
     }
     // Reset Bedrock fields when switching platforms
     bedrockAccessKeyId.value = ''
@@ -5118,7 +5149,7 @@ const submitCreateAccount = async (payload: CreateAccountRequest) => {
       Object.values(modelMapping).some((target) =>
         typeof target === 'string' && target.trim() !== '' && !target.includes('*')
       )
-    if (upstreamModelsPreviewed.value || hasConcreteMappedTarget) {
+    if (payload.platform !== 'mixed' && (upstreamModelsPreviewed.value || hasConcreteMappedTarget)) {
       try {
         const result = await adminAPI.accounts.syncUpstreamModels(account.id)
         const warnings = result.warnings ?? []
@@ -5373,6 +5404,15 @@ const buildOpenAICodexImportExtra = (): Record<string, unknown> | undefined => {
 }
 
 const buildAnthropicExtra = (base?: Record<string, unknown>): Record<string, unknown> | undefined => {
+  if (form.platform === 'mixed' && accountCategory.value === 'apikey') {
+    const extra: Record<string, unknown> = { ...(base || {}) }
+    if (anthropicAPIKeyAuthScheme.value === 'authorization_bearer') {
+      extra.anthropic_apikey_auth_scheme = 'authorization_bearer'
+    } else {
+      delete extra.anthropic_apikey_auth_scheme
+    }
+    return Object.keys(extra).length > 0 ? extra : undefined
+  }
   if (form.platform !== 'anthropic' || accountCategory.value !== 'apikey') {
     return base
   }
@@ -5665,7 +5705,11 @@ const handleSubmit = async () => {
   }
 
   // Determine default base URL based on platform
-  const defaultBaseUrl = form.platform === 'openai'
+  if (form.platform === 'mixed' && !apiKeyBaseUrl.value.trim()) {
+    appStore.showError(t('admin.accounts.mixedBaseUrlRequired'))
+    return
+  }
+  const defaultBaseUrl = form.platform === 'mixed' ? '' : form.platform === 'openai'
     ? 'https://api.openai.com'
     : form.platform === 'gemini'
       ? 'https://generativelanguage.googleapis.com'
@@ -5735,7 +5779,7 @@ const handleSubmit = async () => {
   }
 
   // Add pool mode if enabled
-  if (poolModeEnabled.value) {
+  if (form.platform !== 'mixed' && poolModeEnabled.value) {
     credentials.pool_mode = true
     credentials.pool_mode_retry_count = normalizePoolModeRetryCount(poolModeRetryCount.value)
     const parsedRetryStatusCodes = parsePoolModeRetryStatusCodes(poolModeRetryStatusCodesInput.value)

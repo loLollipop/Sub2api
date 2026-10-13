@@ -44,6 +44,7 @@ const (
 const (
 	PlatformAnthropic   = domain.PlatformAnthropic
 	PlatformOpenAI      = domain.PlatformOpenAI
+	PlatformMixed       = domain.PlatformMixed
 	PlatformGemini      = domain.PlatformGemini
 	PlatformAntigravity = domain.PlatformAntigravity
 	PlatformGrok        = domain.PlatformGrok
@@ -108,6 +109,7 @@ func IsCNProvider(platform string) bool {
 // ent/schema/user_platform_quota.go 的 Validate 函数独立维护（构建期约束），
 // 若新增平台需同步修改该 schema。
 var AllowedQuotaPlatforms = []string{
+	PlatformMixed,
 	PlatformAnthropic,
 	PlatformOpenAI,
 	PlatformGemini,

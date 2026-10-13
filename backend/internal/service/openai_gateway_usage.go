@@ -203,12 +203,14 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 
 	// Calculate cost
 	tokens := UsageTokens{
-		InputTokens:         actualInputTokens,
-		ImageInputTokens:    result.Usage.ImageInputTokens,
-		OutputTokens:        result.Usage.OutputTokens,
-		CacheCreationTokens: result.Usage.CacheCreationInputTokens,
-		CacheReadTokens:     result.Usage.CacheReadInputTokens,
-		ImageOutputTokens:   result.Usage.ImageOutputTokens,
+		InputTokens:           actualInputTokens,
+		ImageInputTokens:      result.Usage.ImageInputTokens,
+		OutputTokens:          result.Usage.OutputTokens,
+		CacheCreationTokens:   result.Usage.CacheCreationInputTokens,
+		CacheCreation5mTokens: result.Usage.CacheCreation5mTokens,
+		CacheCreation1hTokens: result.Usage.CacheCreation1hTokens,
+		CacheReadTokens:       result.Usage.CacheReadInputTokens,
+		ImageOutputTokens:     result.Usage.ImageOutputTokens,
 	}
 
 	// Get rate multiplier
@@ -248,6 +250,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		result.Model,
 	)
 	billingModels = s.filterCNProviderBillingModelCandidates(ctx, account, apiKey, billingModels)
+	billingModels = s.mixedUsageBillingModelCandidates(ctx, input, billingModels)
 	serviceTier := ""
 	if result.ServiceTier != nil {
 		serviceTier = strings.TrimSpace(*result.ServiceTier)
@@ -419,6 +422,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		InputTokens:              actualInputTokens,
 		OutputTokens:             result.Usage.OutputTokens,
 		CacheCreationTokens:      result.Usage.CacheCreationInputTokens,
+		CacheCreation5mTokens:    result.Usage.CacheCreation5mTokens,
+		CacheCreation1hTokens:    result.Usage.CacheCreation1hTokens,
 		CacheReadTokens:          result.Usage.CacheReadInputTokens,
 		ImageInputTokens:         result.Usage.ImageInputTokens,
 		ImageOutputTokens:        result.Usage.ImageOutputTokens,
@@ -570,6 +575,40 @@ func (s *OpenAIGatewayService) hasIdentifiedOpenAIResponsePricing(ctx context.Co
 		return true, true
 	}
 	return s.billingService.HasIdentifiedTokenPricing(model), false
+}
+
+// Mixed protocol conversion does not make the client's model alias a pricing
+// fallback. Only the actual upstream identity (and its existing normalized
+// aliases) may supply the default price; unknown identities retain zero-cost
+// usage recording. Explicit billing-source selections keep their old behavior.
+func (s *OpenAIGatewayService) mixedUsageBillingModelCandidates(ctx context.Context, input *OpenAIRecordUsageInput, candidates []string) []string {
+	if input.Account == nil || !input.Account.IsMixed() ||
+		(input.BillingModelSource != "" && input.BillingModelSource != BillingModelSourceUpstream) {
+		return candidates
+	}
+	result := input.Result
+	actualModel := firstNonEmpty(strings.TrimSpace(result.UpstreamModel), strings.TrimSpace(result.BillingModel), strings.TrimSpace(result.Model))
+	// usageBillingModelCandidates also expands substring-based Codex family
+	// guesses. Use only pricing normalization of this exact identity here.
+	actualCandidates := []string{actualModel}
+	if normalized := normalizeModelNameForPricing(strings.ToLower(lastSegment(actualModel))); normalized != actualModel {
+		// DeepSeek's existing official price/peak policy is keyed by its bare
+		// model identity. A provider prefix must not bypass that policy merely
+		// because the global catalog can resolve the last path segment.
+		// Explicit group/channel pricing for the original identity still wins.
+		if isDeepSeekModel(normalized) && s.resolveOpenAIChannelPricing(ctx, actualModel, input.APIKey) == nil {
+			actualCandidates = []string{normalized, actualModel}
+		} else {
+			actualCandidates = append(actualCandidates, normalized)
+		}
+	}
+	out := make([]string, 0, len(actualCandidates))
+	for _, candidate := range actualCandidates {
+		if identified, _ := s.hasIdentifiedOpenAIResponsePricing(ctx, candidate, input.APIKey); identified {
+			out = append(out, candidate)
+		}
+	}
+	return out
 }
 
 // openAILongContextBillingGate returns the per-account long-context opt-in.

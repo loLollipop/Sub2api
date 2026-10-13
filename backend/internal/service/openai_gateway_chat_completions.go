@@ -59,6 +59,12 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	promptCacheKey string,
 	defaultMappedModel string,
 ) (*OpenAIForwardResult, error) {
+	return s.forwardWithProtocolFallback(ctx, c, account, body, APIProtocolChatCompletions, promptCacheKey, defaultMappedModel, func(attemptCtx context.Context) (*OpenAIForwardResult, error) {
+		return s.forwardOpenAIChatCompletions(attemptCtx, c, account, body, promptCacheKey, defaultMappedModel)
+	})
+}
+
+func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context, c *gin.Context, account *Account, body []byte, promptCacheKey, defaultMappedModel string) (*OpenAIForwardResult, error) {
 	ctx = context.WithoutCancel(ctx)
 	beginUpstreamResponseModelObservation(c)
 	setCodexToolNameReverse(c, nil)
@@ -141,7 +147,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 
 	// 固定 chat_completions 的 CN 账号，以及强制或已探测确认不支持 Responses
 	// 的其他 APIKey 账号，均走 CC 直转。
-	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
+	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) && !forcedOpenAIResponsesProtocol(ctx) {
 		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}
 
@@ -159,7 +165,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	// derive a stable seed from the final upstream model family.
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil && !account.IsMixed() {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
@@ -351,7 +357,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
-	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
+	resp, err := s.doOpenAITextUpstream(ctx, c, upstreamReq, proxyURL, account)
 	if err != nil {
 		releaseUpstreamCtx()
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
@@ -363,7 +369,16 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 
 	// 8. Handle error response with failover
 	if resp.StatusCode >= 400 {
-		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		respBody, upstreamMsg, readErr := s.readOpenAIProtocolError(resp, account)
+		if readErr != nil {
+			return nil, readErr
+		}
+		legacyProtocolFallback := account.Type == AccountTypeAPIKey &&
+			openai_compat.ResolveResponsesSupport(account.Extra) == openai_compat.ResponsesSupportUnknown &&
+			!isResponsesEndpointSupportedByStatus(resp.StatusCode)
+		if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolResponses, resp.StatusCode, respBody, legacyProtocolFallback); fallbackErr != nil {
+			return nil, fallbackErr
+		}
 		if !agentIdentityTaskRecoveryWasTried(ctx) && s.isAgentIdentityAccount(ctx, account) && isAgentIdentityTaskInvalidHTTPResponse(resp.StatusCode, respBody) {
 			expectedTaskID := account.GetCredential("task_id")
 			if err := s.recoverAgentIdentityTask(ctx, account, expectedTaskID); err != nil {
@@ -371,9 +386,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 			}
 			return s.ForwardAsChatCompletions(markAgentIdentityTaskRecoveryTried(ctx), c, account, body, promptCacheKey, defaultMappedModel)
 		}
-		if account.Type == AccountTypeAPIKey &&
-			openai_compat.ResolveResponsesSupport(account.Extra) == openai_compat.ResponsesSupportUnknown &&
-			!isResponsesEndpointSupportedByStatus(resp.StatusCode) {
+		if openAIProtocolFallbackFromContext(ctx) == nil && legacyProtocolFallback {
 			logger.L().Info("openai chat_completions: /responses unsupported, falling back to raw chat completions",
 				zap.Int64("account_id", account.ID),
 				zap.Int("upstream_status", resp.StatusCode),
@@ -409,7 +422,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	// 计费 tier 优先采用上游回显值；上游未回显时回退到最终出站 body（经过
 	// fast policy filter/force 之后）里的 tier，policy filter 删掉字段后不再
 	// 按原请求 Fast 计费。
-	if handleErr == nil && result != nil {
+	if (handleErr == nil || account.IsMixed()) && result != nil {
 		if tier := resolvedOpenAIUpstreamServiceTier(c, extractOpenAIServiceTierFromBody(responsesBody)); tier != nil {
 			result.ServiceTier = tier
 		}
@@ -499,7 +512,14 @@ func (s *OpenAIGatewayService) handleChatBufferedStreamingResponse(
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
 
-	finalResponse, usage, acc, err := s.readOpenAICompatBufferedTerminal(resp, c, "openai chat_completions buffered", requestID)
+	finalResponse, usage, acc, err := s.readOpenAICompatBufferedTerminal(resp, c, "openai chat_completions buffered", requestID, account.IsMixed())
+	if account.IsMixed() && (err != nil || finalResponse == nil || strings.TrimSpace(finalResponse.Status) == "failed") {
+		if err == nil {
+			err = fmt.Errorf("upstream Responses stream failed or ended without terminal response")
+		}
+		writeMixedStreamFailure(c, APIProtocolChatCompletions, err)
+		return mixedPartialForwardResult(c, resp, usage, originalModel, billingModel, upstreamModel, false, startTime), err
+	}
 	if err != nil {
 		return nil, s.newOpenAICompatBufferedReadFailoverError(c, account, resp, requestID, upstreamModel, err)
 	}
@@ -749,6 +769,11 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		observer.ObserveOpenAI([]byte(payload), event.Type)
 		refusalDetector.ObservePayload([]byte(payload))
 		s.parseSSEUsageBytesWithType([]byte(payload), event.Type, &usage)
+		if account.IsMixed() && mixedPayloadIsError([]byte(payload), event.Type) {
+			streamNonFailoverErr = fmt.Errorf("upstream Responses stream failed")
+			writeMixedStreamFailure(c, APIProtocolChatCompletions, streamNonFailoverErr)
+			return true
+		}
 
 		isTerminalEvent := isOpenAICompatResponsesTerminalEvent(event.Type)
 		if isTerminalEvent {
@@ -939,6 +964,11 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		}
 		if !clientDisconnected && !clientOutputStarted {
 			if refusalDetector.IsSilentRefusal() {
+				if account.IsMixed() {
+					cause := fmt.Errorf("upstream Responses stream ended with an empty completion")
+					writeMixedStreamFailure(c, APIProtocolChatCompletions, cause)
+					return resultWithUsage(), cause
+				}
 				return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)
 			}
 			if len(pendingSSE) > 0 {
@@ -983,6 +1013,10 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		}
 	}
 	missingTerminalErr := func() (*OpenAIForwardResult, error) {
+		if account.IsMixed() {
+			writeMixedStreamFailure(c, APIProtocolChatCompletions, ErrOpenAIUpstreamStreamTruncated)
+			return resultWithUsage(), ErrOpenAIUpstreamStreamTruncated
+		}
 		return resultWithUsage(), fmt.Errorf("stream usage incomplete: missing terminal event")
 	}
 	processFrame := func(frame openAICompatSSEFrame) bool {
@@ -1017,6 +1051,10 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		}
 		if err := scanner.Err(); err != nil {
 			handleScanErr(err)
+			if account.IsMixed() {
+				writeMixedStreamFailure(c, APIProtocolChatCompletions, err)
+				return resultWithUsage(), err
+			}
 			if clientDisconnected || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", err)
 			}
@@ -1092,6 +1130,10 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 			}
 			if ev.err != nil {
 				handleScanErr(ev.err)
+				if account.IsMixed() {
+					writeMixedStreamFailure(c, APIProtocolChatCompletions, ev.err)
+					return resultWithUsage(), ev.err
+				}
 				if clientDisconnected || errors.Is(ev.err, context.Canceled) || errors.Is(ev.err, context.DeadlineExceeded) {
 					return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", ev.err)
 				}
@@ -1114,6 +1156,11 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
 			if time.Since(lastRead) < streamInterval {
 				continue
+			}
+			if account.IsMixed() {
+				err := fmt.Errorf("stream data interval timeout")
+				writeMixedStreamFailure(c, APIProtocolChatCompletions, err)
+				return resultWithUsage(), err
 			}
 			if clientDisconnected {
 				return resultWithUsage(), fmt.Errorf("stream usage incomplete after timeout")

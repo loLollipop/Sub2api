@@ -413,6 +413,9 @@ func normalizeOpenAILongContextBillingUpdateExtra(account *Account, input *Updat
 // Grok media eligibility helpers live in account_grok_media_eligibility.go.
 
 func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]any) (*Account, error) {
+	if err := validateMixedAccount(&Account{Platform: input.Platform, Type: input.Type, Credentials: input.Credentials}); err != nil {
+		return nil, err
+	}
 	if err := ValidateAccountSchedulingFields(&input.Concurrency, &input.Priority); err != nil {
 		return nil, err
 	}
@@ -539,6 +542,9 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		return nil, infraerrors.BadRequest("INVALID_CLOUDFLARE_ACCOUNT", err.Error())
 	}
 	if err := s.ValidateAccountGroupBindings(ctx, groupIDs); err != nil {
+		return nil, err
+	}
+	if err := validateMixedGroupBindings(ctx, s.groupRepo, account, groupIDs); err != nil {
 		return nil, err
 	}
 	if err := s.accountRepo.Create(ctx, account); err != nil {
@@ -856,6 +862,14 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 
 	billingSettingsAppliedAtomically := false
+	if err := validateMixedAccount(account); err != nil {
+		return nil, err
+	}
+	if input.GroupIDs != nil {
+		if err := validateMixedGroupBindings(ctx, s.groupRepo, account, *input.GroupIDs); err != nil {
+			return nil, err
+		}
+	}
 	updater := s.accountBillingRepo
 	if updater == nil {
 		// Unit tests and narrow internal callers may construct adminServiceImpl
@@ -1002,7 +1016,7 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	// 预取所有目标账号，供凭据守卫/代理守卫/混合渠道检查共用，避免多次 DB 查询。
 	_, _, scoped := AccountOwnerScopeDetail(ctx)
 	var cachedTargets []*Account
-	if scoped || len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
+	if scoped || len(input.Credentials) > 0 || input.GroupIDs != nil || input.ProxyID != nil || needMixedChannelCheck || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
 		loaded, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
 		if err != nil {
 			return nil, err
@@ -1117,6 +1131,31 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	// only when platform is known Grok — empty platform still strips password/*).
 	if input.Credentials != nil {
 		input.Credentials = SanitizeStoredCredentials("", input.Credentials)
+	}
+
+	// Validate Mixed constraints against the merged credentials before any write.
+	for _, account := range cachedTargets {
+		if account == nil {
+			continue
+		}
+		if account.IsMixed() && len(input.Credentials) > 0 {
+			candidate := *account
+			candidate.Credentials = make(map[string]any, len(account.Credentials)+len(input.Credentials))
+			for key, value := range account.Credentials {
+				candidate.Credentials[key] = value
+			}
+			for key, value := range input.Credentials {
+				candidate.Credentials[key] = value
+			}
+			if err := validateMixedAccount(&candidate); err != nil {
+				return nil, err
+			}
+		}
+		if input.GroupIDs != nil {
+			if err := validateMixedGroupBindings(ctx, s.groupRepo, account, *input.GroupIDs); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// Prepare bulk updates for columns and JSONB fields.

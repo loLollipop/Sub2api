@@ -290,6 +290,17 @@ func mergeAnthropicUsage(dst *ClaudeUsage, src apicompat.AnthropicUsage) {
 	if dst == nil {
 		return
 	}
+	if src.CacheCreation != nil {
+		if src.CacheCreation.Ephemeral5mInputTokens != nil {
+			dst.CacheCreation5mTokens = max(*src.CacheCreation.Ephemeral5mInputTokens, 0)
+		}
+		if src.CacheCreation.Ephemeral1hInputTokens != nil {
+			dst.CacheCreation1hTokens = max(*src.CacheCreation.Ephemeral1hInputTokens, 0)
+		}
+		if src.CacheCreationInputTokens == 0 {
+			src.CacheCreationInputTokens = dst.CacheCreation5mTokens + dst.CacheCreation1hTokens
+		}
+	}
 
 	// Some Anthropic-compatible providers retain OpenAI-style prompt/cache
 	// fields. Prefer those authoritative totals or hit/miss buckets over the
@@ -323,7 +334,7 @@ func mergeAnthropicUsage(dst *ClaudeUsage, src apicompat.AnthropicUsage) {
 		} else if src.CachedTokens > 0 {
 			dst.CacheReadInputTokens = src.CachedTokens
 		}
-		if src.CacheCreationInputTokens > 0 {
+		if src.CacheCreationInputTokens > 0 || src.CacheCreation != nil {
 			dst.CacheCreationInputTokens = src.CacheCreationInputTokens
 		}
 	}

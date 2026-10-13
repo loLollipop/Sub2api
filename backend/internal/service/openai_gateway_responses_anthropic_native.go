@@ -122,14 +122,20 @@ func (s *OpenAIGatewayService) forwardResponsesViaNativeAnthropic(
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
 
-	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
+	resp, err := s.doOpenAITextUpstream(ctx, c, upstreamReq, proxyURL, account)
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, true)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
-		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		respBody, upstreamMsg, readErr := s.readOpenAIProtocolError(resp, account)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolAnthropic, resp.StatusCode, respBody, false); fallbackErr != nil {
+			return nil, fallbackErr
+		}
 		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
 			return nil, foErr
 		}
@@ -138,9 +144,9 @@ func (s *OpenAIGatewayService) forwardResponsesViaNativeAnthropic(
 	}
 
 	if clientStream {
-		return s.handleResponsesStreamingFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, clientToolMapping)
+		return s.handleResponsesStreamingFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, clientToolMapping, account.IsMixed())
 	}
-	return s.handleResponsesBufferedFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, clientToolMapping)
+	return s.handleResponsesBufferedFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, clientToolMapping, account.IsMixed())
 }
 
 // handleResponsesBufferedFromNativeAnthropic reads Anthropic SSE events, assembles
@@ -154,8 +160,10 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 	reasoningEffort *string,
 	startTime time.Time,
 	clientToolMapping apicompat.ResponsesClientToolMapping,
+	mixed ...bool,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
+	strictCompletion := len(mixed) > 0 && mixed[0]
 
 	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
@@ -166,6 +174,12 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 
 	var finalResp *apicompat.AnthropicResponse
 	var usage ClaudeUsage
+	failMixed := func(cause error) (*OpenAIForwardResult, error) {
+		writeMixedStreamFailure(c, APIProtocolResponses, cause)
+		result := s.nativeAnthropicStreamResult(c, resp, &usage, nil, false, originalModel, billingModel, upstreamModel, reasoningEffort, startTime)
+		result.Stream = false
+		return result, cause
+	}
 
 	// 读间隔上限：上游挂住 SSE 时中止组装（缓冲路径尚未提交响应头，可回 502）。
 	streamInterval := s.anthropicNativeStreamInterval()
@@ -182,6 +196,9 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 	}
 	onIdle := func() (*OpenAIForwardResult, error) {
 		_ = resp.Body.Close()
+		if strictCompletion {
+			return failMixed(errAnthropicNativeStreamIdle)
+		}
 		logger.L().Warn("openai responses via native anthropic buffered: data interval timeout",
 			zap.String("request_id", requestID),
 			zap.Duration("interval", streamInterval),
@@ -193,6 +210,9 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 	for {
 		line, rerr := pump.next()
 		if rerr != nil {
+			if strictCompletion {
+				return failMixed(mixedStreamReadFailure(rerr))
+			}
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
 				return onIdle()
 			}
@@ -200,12 +220,16 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 			break
 		}
 		// SSE 规范允许 `event:xxx`（冒号后无空格）：Kimi 等上游返回紧凑格式。
-		if _, ok := extractOpenAISSEEventLine(line); !ok {
+		eventType, ok := extractOpenAISSEEventLine(line)
+		if !ok {
 			continue
 		}
 
 		dataLine, rerr := pump.next()
 		if rerr != nil {
+			if strictCompletion {
+				return failMixed(mixedStreamReadFailure(rerr))
+			}
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
 				return onIdle()
 			}
@@ -219,7 +243,16 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 
 		var event apicompat.AnthropicStreamEvent
 		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			if strictCompletion {
+				return failMixed(fmt.Errorf("invalid upstream Anthropic event: %w", err))
+			}
 			continue
+		}
+		if strictCompletion && mixedPayloadIsError([]byte(payload), eventType) {
+			if event.Usage != nil {
+				mergeAnthropicUsage(&usage, *event.Usage)
+			}
+			return failMixed(fmt.Errorf("upstream Anthropic stream failed"))
 		}
 
 		if event.Type == "message_start" && event.Message != nil {
@@ -250,9 +283,15 @@ func (s *OpenAIGatewayService) handleResponsesBufferedFromNativeAnthropic(
 				}
 			}
 		}
+		if strictCompletion && event.Type == "message_stop" {
+			break
+		}
 	}
 
 	if finalResp == nil {
+		if strictCompletion {
+			return failMixed(ErrOpenAIUpstreamStreamTruncated)
+		}
 		writeResponsesError(c, http.StatusBadGateway, "server_error", "Upstream stream ended without a response")
 		return nil, fmt.Errorf("upstream stream ended without response")
 	}
@@ -310,8 +349,10 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 	reasoningEffort *string,
 	startTime time.Time,
 	clientToolMapping apicompat.ResponsesClientToolMapping,
+	mixed ...bool,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
+	strictCompletion := len(mixed) > 0 && mixed[0]
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -354,6 +395,10 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 			ClientDisconnect: clientDisconnected,
 		}
 	}
+	failMixed := func(cause error) (*OpenAIForwardResult, error) {
+		writeMixedStreamFailure(c, APIProtocolResponses, cause)
+		return resultWithUsage(), cause
+	}
 
 	// 读间隔上限：上游挂住 SSE（不发数据也不断连）时结束转换循环。上游 ctx 为
 	// WithoutCancel 且 http.Client 无整体 Timeout，无此界限则 scanner.Scan()
@@ -372,6 +417,9 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 	}
 	onIdle := func() (*OpenAIForwardResult, error) {
 		_ = resp.Body.Close()
+		if strictCompletion {
+			return failMixed(errAnthropicNativeStreamIdle)
+		}
 		logger.L().Warn("openai responses via native anthropic stream: data interval timeout",
 			zap.String("request_id", requestID),
 			zap.Duration("interval", streamInterval),
@@ -427,18 +475,25 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 	for {
 		line, rerr := pump.next()
 		if rerr != nil {
+			if strictCompletion {
+				return failMixed(mixedStreamReadFailure(rerr))
+			}
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
 				return onIdle()
 			}
 			logReadErr(rerr)
 			break
 		}
-		if _, ok := extractOpenAISSEEventLine(line); !ok {
+		eventType, ok := extractOpenAISSEEventLine(line)
+		if !ok {
 			continue
 		}
 
 		dataLine, rerr := pump.next()
 		if rerr != nil {
+			if strictCompletion {
+				return failMixed(mixedStreamReadFailure(rerr))
+			}
 			if errors.Is(rerr, errAnthropicNativeStreamIdle) {
 				return onIdle()
 			}
@@ -452,10 +507,25 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 
 		var event apicompat.AnthropicStreamEvent
 		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			if strictCompletion {
+				return failMixed(fmt.Errorf("invalid upstream Anthropic event: %w", err))
+			}
 			continue
+		}
+		if strictCompletion && mixedPayloadIsError([]byte(payload), eventType) {
+			if event.Usage != nil {
+				mergeAnthropicUsage(&usage, *event.Usage)
+			}
+			return failMixed(fmt.Errorf("upstream Anthropic stream failed"))
+		}
+		if strictCompletion && event.Type == "message_stop" && !state.CreatedSent {
+			return failMixed(ErrOpenAIUpstreamStreamTruncated)
 		}
 
 		processAnthropicEvent(&event)
+		if strictCompletion && event.Type == "message_stop" {
+			break
+		}
 	}
 
 	// Finalize state machine（客户端已断开时仍推进，保证 usage 汇总完整；仅在

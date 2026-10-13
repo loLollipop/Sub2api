@@ -100,6 +100,8 @@ export default {
       schedulableDisabled: 'Scheduling disabled',
       failedToToggleSchedulable: 'Failed to toggle scheduling status',
       groupCountTotal: '{count} groups total',
+      mixedBaseUrlRequired: 'Mixed requires an explicit upstream Base URL',
+      mixedHint: 'Supports Chat Completions, Responses, and Messages text requests.',
       platforms: {
         anthropic: 'Anthropic',
         claude: 'Claude',
@@ -111,6 +113,7 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         minimax: 'MiniMax',
+        mixed: 'Mixed',
       },
       cnProviders: {
         accountMode: {

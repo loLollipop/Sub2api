@@ -289,6 +289,8 @@ func compositeRouteFromInput(groupID int64, input CompositeRouteInput) (*Composi
 
 func defaultModelsListCandidateIDs(platform string) []string {
 	switch platform {
+	case PlatformMixed:
+		return nil
 	case PlatformOpenAI:
 		return openai.DefaultModelIDs()
 	case PlatformGemini:
@@ -629,6 +631,12 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		MaxReasoningEffortOverLimit: maxReasoningEffortOverLimit,
 		ReasoningEffortMappings:     reasoningEffortMappings,
 	}
+	if group.Platform == PlatformMixed {
+		group.RequireOAuthOnly = false
+		group.RequirePrivacySet = false
+		group.AllowImageGeneration = false
+		group.AllowBatchImageGeneration = false
+	}
 	sanitizeGroupMessagesDispatchFields(group)
 	sanitizeGroupOpenAIFast(group)
 	if group.Platform != PlatformOpenAI && group.Platform != PlatformComposite {
@@ -776,6 +784,20 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 
 	// 渠道缓存里存了 groupID → platform 的映射，改了平台要让它失效（见函数末尾）
 	previousPlatform := group.Platform
+	if input.Platform != "" && input.Platform != previousPlatform && (input.Platform == PlatformMixed || previousPlatform == PlatformMixed) {
+		if s.accountRepo == nil {
+			return nil, errors.New("account repository not configured")
+		}
+		accounts, err := s.accountRepo.ListByGroup(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		for _, account := range accounts {
+			if (input.Platform == PlatformMixed && (!account.IsMixed() || account.Type != AccountTypeAPIKey)) || (account.IsMixed() && input.Platform != PlatformMixed && input.Platform != PlatformComposite) {
+				return nil, infraerrors.BadRequest("MIXED_PLATFORM_BINDING_MISMATCH", "Move incompatible accounts before changing a group to or from Mixed")
+			}
+		}
+	}
 
 	if input.Name != "" {
 		group.Name = input.Name
@@ -1049,6 +1071,12 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_REASONING_EFFORT_MAPPING", "%v", err)
 		}
 		group.ReasoningEffortMappings = reasoningEffortMappings
+	}
+	if group.Platform == PlatformMixed {
+		group.RequireOAuthOnly = false
+		group.RequirePrivacySet = false
+		group.AllowImageGeneration = false
+		group.AllowBatchImageGeneration = false
 	}
 	sanitizeGroupMessagesDispatchFields(group)
 	sanitizeGroupOpenAIFast(group)

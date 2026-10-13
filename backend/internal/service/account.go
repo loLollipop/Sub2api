@@ -334,7 +334,7 @@ func (a *Account) IsOpenAICompatible() bool {
 	if a == nil {
 		return false
 	}
-	if a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.IsCNProvider() {
+	if a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformMixed || a.IsCNProvider() {
 		return true
 	}
 	return a.IsGeminiOpenAIProtocol()
@@ -1194,6 +1194,9 @@ func (a *Account) IsCustomErrorCodesEnabled() bool {
 // IsPoolMode 检查 API Key 账号是否启用池模式。
 // 池模式下，上游错误不标记本地账号状态，而是在同一账号上重试。
 func (a *Account) IsPoolMode() bool {
+	if a.IsMixed() {
+		return false
+	}
 	if !a.IsAPIKeyOrBedrock() || a.Credentials == nil {
 		return false
 	}
@@ -1458,6 +1461,9 @@ func (a *Account) IsOpenAIApiKey() bool {
 // 适用 openai 与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）；grok 走 GetGrokBaseURL，
 // 此处对 grok 返回 "" 以保持原有行为。
 func (a *Account) GetOpenAIBaseURL() string {
+	if a.IsMixed() {
+		return normalizeMixedBaseURL(a.GetCredential("base_url"))
+	}
 	if !a.IsOpenAI() && !a.IsCNProvider() && !a.IsGeminiOpenAIProtocol() {
 		return ""
 	}
@@ -1875,7 +1881,7 @@ func (a *Account) GetOpenAIProtocolAPIKey() string {
 	if a.IsCloudflareOpenAI() {
 		return a.GetCredential("api_key")
 	}
-	if a.IsCNProvider() || a.IsGeminiOpenAIProtocol() {
+	if a.IsMixed() || a.IsCNProvider() || a.IsGeminiOpenAIProtocol() {
 		if a.Type != AccountTypeAPIKey {
 			return ""
 		}
@@ -1943,6 +1949,9 @@ func (a *Account) GetOpenAISessionID() string {
 func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapability) bool {
 	if a == nil {
 		return false
+	}
+	if a.IsMixed() {
+		return a.Type == AccountTypeAPIKey && (capability == "" || capability == OpenAIEndpointCapabilityChatCompletions || capability == OpenAIEndpointCapabilityResponses)
 	}
 	if capability == "" {
 		return true

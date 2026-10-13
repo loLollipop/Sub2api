@@ -253,6 +253,9 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 		Status:      StatusActive,
 		ExpiresAt:   req.ExpiresAt,
 	}
+	if err := validateMixedAccount(account); err != nil {
+		return nil, err
+	}
 	if err := validateCloudflareAccount(account); err != nil {
 		return nil, err
 	}
@@ -262,6 +265,9 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 		account.AutoPauseOnExpired = true
 	}
 
+	if err := validateMixedGroupBindings(ctx, s.groupRepo, account, req.GroupIDs); err != nil {
+		return nil, err
+	}
 	if err := s.accountRepo.Create(ctx, account); err != nil {
 		return nil, fmt.Errorf("create account: %w", err)
 	}
@@ -346,6 +352,9 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 	if req.Credentials != nil {
 		account.Credentials = SanitizeStoredCredentials(account.Platform, *req.Credentials)
 	}
+	if err := validateMixedAccount(account); err != nil {
+		return nil, err
+	}
 	if err := validateCloudflareAccount(account); err != nil {
 		return nil, err
 	}
@@ -393,6 +402,11 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 	}
 
 	// 执行更新
+	if req.GroupIDs != nil {
+		if err := validateMixedGroupBindings(ctx, s.groupRepo, account, *req.GroupIDs); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return nil, fmt.Errorf("update account: %w", err)
 	}

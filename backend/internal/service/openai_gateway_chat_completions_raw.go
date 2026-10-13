@@ -74,7 +74,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil && !account.IsMixed() {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
@@ -85,12 +85,12 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		// anchored to the client's stable conversation prefix.
 		grokCacheIdentity = resolveGrokCacheIdentity(c, body, "", upstreamModel)
 	}
-	if openai.IsGPT61SolModelSpelling(upstreamModel) && (len(gjson.GetBytes(body, "tools").Array()) > 0 || len(gjson.GetBytes(body, "functions").Array()) > 0) {
+	if !account.IsMixed() && openai.IsGPT61SolModelSpelling(upstreamModel) && (len(gjson.GetBytes(body, "tools").Array()) > 0 || len(gjson.GetBytes(body, "functions").Array()) > 0) {
 		err := fmt.Errorf("gpt-6.1-sol requires Responses for tool calls; this account only supports Chat Completions")
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
-	if openai.IsGPT6SolOrLunaModelSpelling(upstreamModel) && (len(gjson.GetBytes(body, "tools").Array()) > 0 || len(gjson.GetBytes(body, "functions").Array()) > 0) && gjson.GetBytes(body, "reasoning_effort").String() != "none" {
+	if !account.IsMixed() && openai.IsGPT6SolOrLunaModelSpelling(upstreamModel) && (len(gjson.GetBytes(body, "tools").Array()) > 0 || len(gjson.GetBytes(body, "functions").Array()) > 0) && gjson.GetBytes(body, "reasoning_effort").String() != "none" {
 		err := fmt.Errorf("%s requires Responses for tool calls with reasoning; this account only supports Chat Completions. Use reasoning_effort=none or a Responses-capable account", upstreamModel)
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
@@ -211,7 +211,13 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 
 	// 7. Handle error response with failover
 	if resp.StatusCode >= 400 {
-		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		respBody, upstreamMsg, readErr := s.readOpenAIProtocolError(resp, account)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolChatCompletions, resp.StatusCode, respBody, false); fallbackErr != nil {
+			return nil, fallbackErr
+		}
 		if account.Platform == PlatformGrok {
 			kind := "http_error"
 			if s.shouldFailoverGrokUpstreamError(resp.StatusCode, respBody) {
@@ -314,6 +320,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	pendingLines := make([]string, 0, 8)
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 	var terminal openAIRawStreamTerminalState
+	var mixedStreamErr error
 
 	writeLine := func(line string) {
 		if clientDisconnected {
@@ -347,8 +354,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	processLine := func(line string) {
 		refusalDetector.ObserveSSELine(line)
 		if payload, ok := extractOpenAISSEDataLine(line); ok {
 			trimmedPayload := strings.TrimSpace(payload)
@@ -373,13 +379,51 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 			if !clientDisconnected && clientOutputStarted {
 				c.Writer.Flush()
 			}
-			if account != nil && account.IsGrok() && terminal.sawDone {
+			return
+		}
+		if !clientDisconnected && clientOutputStarted {
+			c.Writer.Flush()
+		}
+	}
+	processMixedFrame := func(frame openAICompatSSEFrame) bool {
+		payload := strings.TrimSpace(frame.Data)
+		if u := extractCCStreamUsage(payload); u != nil {
+			usage = *u
+		}
+		if mixedPayloadIsError([]byte(payload), frame.EventType) || payload != "[DONE]" && !gjson.Valid(payload) {
+			mixedStreamErr = errors.New("upstream Chat Completions SSE error")
+			return false
+		}
+		if frame.EventType != "" {
+			processLine("event: " + frame.EventType)
+		}
+		// Valid JSON's physical newlines are whitespace, not string contents.
+		// Normalize multi-data frames so observer/detector see the full chunk.
+		processLine("data: " + strings.ReplaceAll(payload, "\n", ""))
+		processLine("")
+		return true
+	}
+	var mixedParser openAICompatSSEFrameParser
+	for scanner.Scan() {
+		line := scanner.Text()
+		if account.IsMixed() {
+			if frame, ok := mixedParser.AddLine(line); ok && !processMixedFrame(frame) {
 				break
 			}
 			continue
 		}
-		if !clientDisconnected && clientOutputStarted {
-			c.Writer.Flush()
+		processLine(line)
+		if line == "" && account.IsGrok() && terminal.sawDone {
+			break
+		}
+	}
+	if account.IsMixed() && mixedStreamErr == nil {
+		if frame, ok := mixedParser.Finish(); ok {
+			if scanner.Err() == nil {
+				processMixedFrame(frame)
+			} else if u := extractCCStreamUsage(frame.Data); u != nil {
+				usage = *u
+			}
 		}
 	}
 
@@ -403,6 +447,18 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	}
 
 	scanErr := scanner.Err()
+	if account.IsMixed() {
+		if mixedStreamErr == nil {
+			mixedStreamErr = scanErr
+		}
+		if mixedStreamErr == nil && !terminal.sawDone && !terminal.sawFinishReason {
+			mixedStreamErr = ErrOpenAIUpstreamStreamTruncated
+		}
+		if mixedStreamErr != nil {
+			writeMixedStreamFailure(c, APIProtocolChatCompletions, mixedStreamErr)
+			return resultWithUsage(), newOpenAIUpstreamStreamReadError(mixedStreamErr)
+		}
+	}
 	if scanErr != nil && !errors.Is(scanErr, context.Canceled) && !errors.Is(scanErr, context.DeadlineExceeded) {
 		logger.L().Warn("openai chat_completions raw: stream read error",
 			zap.Error(scanErr),
@@ -441,6 +497,11 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 
 	if scanErr == nil && !clientDisconnected && !clientOutputStarted {
 		if refusalDetector.IsSilentRefusal() {
+			if account.IsMixed() {
+				cause := fmt.Errorf("upstream Chat Completions stream ended with an empty completion")
+				writeMixedStreamFailure(c, APIProtocolChatCompletions, cause)
+				return resultWithUsage(), cause
+			}
 			return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)
 		}
 		if len(pendingLines) > 0 {
@@ -515,7 +576,24 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
 
-	respBody, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
+	var respBody []byte
+	var err error
+	if account.IsMixed() {
+		respBody, err = s.readMixedUpstreamBody(resp)
+		usage := OpenAIUsage{}
+		if parsed, ok := extractOpenAIUsageFromJSONBytes(respBody); ok {
+			usage = parsed
+		}
+		if err == nil && mixedCCBufferedIncomplete(respBody) {
+			err = fmt.Errorf("upstream Chat Completions response failed or incomplete")
+		}
+		if err != nil {
+			writeMixedStreamFailure(c, APIProtocolChatCompletions, err)
+			return mixedPartialForwardResult(c, resp, usage, originalModel, billingModel, upstreamModel, false, startTime), err
+		}
+	} else {
+		respBody, err = ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
+	}
 	if err != nil {
 		if !errors.Is(err, ErrUpstreamResponseBodyTooLarge) {
 			writeChatCompletionsError(c, http.StatusBadGateway, "api_error", "Failed to read upstream response")

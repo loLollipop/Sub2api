@@ -28,6 +28,7 @@
               type="text"
               autocomplete="off"
               class="input w-full"
+              :disabled="!canEditDraft"
               :placeholder="t('admin.groups.searchUserPlaceholder')"
               @input="handleSearchUsers"
               @focus="showDropdown = true"
@@ -58,12 +59,13 @@
               autocomplete="off"
               class="hide-spinner input w-full"
               placeholder="1.0"
+              :disabled="!canEditDraft"
             />
           </div>
           <button
             type="button"
             class="btn btn-primary shrink-0"
-            :disabled="!selectedUser || !newRate"
+            :disabled="!canEditDraft || !selectedUser || !newRate"
             @click="handleAddLocal"
           >
             {{ t('common.add') }}
@@ -225,7 +227,7 @@
             v-if="isDirty"
             type="button"
             class="btn btn-primary btn-sm px-4 py-1.5"
-            :disabled="saving"
+            :disabled="loading || !entriesLoaded || saving"
             @click="handleSave"
           >
             <Icon v-if="saving" name="refresh" size="sm" class="mr-1 animate-spin" />
@@ -239,7 +241,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -266,6 +268,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const loading = ref(false)
+const entriesLoaded = ref(false)
 const saving = ref(false)
 const serverEntries = ref<GroupRateMultiplierEntry[]>([])
 const localEntries = ref<LocalEntry[]>([])
@@ -277,8 +280,28 @@ const newRate = ref<number | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const batchFactor = ref<number | null>(null)
+const canEditDraft = computed(() => props.show && !!props.group && entriesLoaded.value && !loading.value)
 
 let searchTimeout: ReturnType<typeof setTimeout>
+let loadVersion = 0
+let searchVersion = 0
+
+const resetDraft = () => {
+  loadVersion++
+  searchVersion++
+  clearTimeout(searchTimeout)
+  entriesLoaded.value = false
+  loading.value = false
+  serverEntries.value = []
+  localEntries.value = []
+  currentPage.value = 1
+  batchFactor.value = null
+  searchQuery.value = ''
+  searchResults.value = []
+  showDropdown.value = false
+  selectedUser.value = null
+  newRate.value = null
+}
 
 const platformColorClass = computed(() => {
   switch (props.group?.platform) {
@@ -318,19 +341,24 @@ const cloneEntries = (entries: GroupRateMultiplierEntry[]): LocalEntry[] => {
 }
 
 const loadEntries = async () => {
-  if (!props.group) return
+  if (!props.show || !props.group) return
+  const groupId = props.group.id
+  const version = loadVersion
   loading.value = true
   try {
-    const raw = await adminAPI.groups.getGroupRateMultipliers(props.group.id)
+    const raw = await adminAPI.groups.getGroupRateMultipliers(groupId)
+    if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
     // 仅显示已设置 rate_multiplier 的条目；rpm_override 在另一个弹窗管理，保留不动
     serverEntries.value = raw.filter(e => e.rate_multiplier != null)
     localEntries.value = cloneEntries(serverEntries.value)
+    entriesLoaded.value = true
     adjustPage()
   } catch (error) {
+    if (version !== loadVersion) return
     appStore.showError(t('admin.groups.failedToLoad'))
     console.error('Error loading group rate multipliers:', error)
   } finally {
-    loading.value = false
+    if (version === loadVersion) loading.value = false
   }
 }
 
@@ -341,17 +369,10 @@ const adjustPage = () => {
   }
 }
 
-watch(() => props.show, (val) => {
-  if (val && props.group) {
-    currentPage.value = 1
-    batchFactor.value = null
-    searchQuery.value = ''
-    searchResults.value = []
-    selectedUser.value = null
-    newRate.value = null
-    loadEntries()
-  }
-})
+watch([() => props.show, () => props.group?.id], ([show]) => {
+  resetDraft()
+  if (show && props.group) loadEntries()
+}, { immediate: true, flush: 'sync' })
 
 const handlePageSizeChange = (newSize: number) => {
   pageSize.value = newSize
@@ -360,24 +381,29 @@ const handlePageSizeChange = (newSize: number) => {
 
 const handleSearchUsers = () => {
   clearTimeout(searchTimeout)
+  const version = ++searchVersion
+  if (!canEditDraft.value) return
+  const query = searchQuery.value.trim()
   selectedUser.value = null
-  if (!searchQuery.value.trim()) {
+  if (!query) {
     searchResults.value = []
     showDropdown.value = false
     return
   }
   searchTimeout = setTimeout(async () => {
     try {
-      const res = await adminAPI.users.list(1, 10, { search: searchQuery.value.trim() })
+      const res = await adminAPI.users.list(1, 10, { search: query })
+      if (version !== searchVersion || !props.show) return
       searchResults.value = res.items
       showDropdown.value = true
     } catch {
-      searchResults.value = []
+      if (version === searchVersion) searchResults.value = []
     }
   }, 300)
 }
 
 const selectUser = (user: AdminUser) => {
+  if (!canEditDraft.value) return
   selectedUser.value = user
   searchQuery.value = user.email
   showDropdown.value = false
@@ -386,7 +412,7 @@ const selectUser = (user: AdminUser) => {
 
 // 本地添加（或覆盖已有用户）
 const handleAddLocal = () => {
-  if (!selectedUser.value || !newRate.value) return
+  if (!canEditDraft.value || !selectedUser.value || !newRate.value) return
   const user = selectedUser.value
   const idx = localEntries.value.findIndex(e => e.user_id === user.id)
   const entry: LocalEntry = {
@@ -453,7 +479,9 @@ const handleCancel = () => {
 
 // 保存：一次性提交所有数据（只提交 rate_multiplier；rpm_override 由独立弹窗管理）
 const handleSave = async () => {
-  if (!props.group) return
+  if (!props.show || !props.group || loading.value || !entriesLoaded.value || saving.value) return
+  const groupId = props.group.id
+  const version = loadVersion
   saving.value = true
   try {
     const entries = localEntries.value
@@ -462,23 +490,24 @@ const handleSave = async () => {
         user_id: e.user_id,
         rate_multiplier: e.rate_multiplier as number
       }))
-    await adminAPI.groups.batchSetGroupRateMultipliers(props.group.id, entries)
+    await adminAPI.groups.batchSetGroupRateMultipliers(groupId, entries)
+    if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
     appStore.showSuccess(t('admin.groups.rateSaved'))
     emit('success')
     emit('close')
   } catch (error) {
+    if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
     appStore.showError(t('admin.groups.failedToSave'))
     console.error('Error saving rate multipliers:', error)
   } finally {
+    // resetDraft deliberately retains this lock until the pending write settles.
     saving.value = false
   }
 }
 
 // 关闭时如果有未保存修改，先恢复
 const handleClose = () => {
-  if (isDirty.value) {
-    localEntries.value = cloneEntries(serverEntries.value)
-  }
+  resetDraft()
   emit('close')
 }
 
@@ -490,6 +519,12 @@ const handleClickOutside = () => {
 if (typeof document !== 'undefined') {
   document.addEventListener('click', handleClickOutside)
 }
+onUnmounted(() => {
+  resetDraft()
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('click', handleClickOutside)
+  }
+})
 </script>
 
 <style scoped>

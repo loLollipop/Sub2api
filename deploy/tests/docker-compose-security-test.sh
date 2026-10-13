@@ -39,6 +39,20 @@ for compose_file in \
   deploy/docker-compose.dev.yml
 do
   check_application_security_opt "$compose_file"
+  # An empty login email must reach the backend's random bootstrap generator.
+  # Compose still honors an explicitly configured email on fresh installations.
+  admin_email_count=$(grep -Fxc '      - ADMIN_EMAIL=${ADMIN_EMAIL:-}' "$compose_file" || true)
+  admin_email_total=$(grep -Ec '^[[:space:]]*-[[:space:]]*ADMIN_EMAIL=' "$compose_file" || true)
+  if [ "$admin_email_count" -ne 1 ] || [ "$admin_email_total" -ne 1 ]; then
+    printf '%s must pass ADMIN_EMAIL with an empty fallback exactly once\n' "$compose_file" >&2
+    exit 1
+  fi
 done
+
+if [ "$(grep -c '^ADMIN_EMAIL=' deploy/.env.example)" -ne 1 ] || \
+   ! grep -qx 'ADMIN_EMAIL=' deploy/.env.example; then
+  printf 'env example must leave ADMIN_EMAIL empty for randomized bootstrap\n' >&2
+  exit 1
+fi
 
 printf 'docker compose security test passed\n'

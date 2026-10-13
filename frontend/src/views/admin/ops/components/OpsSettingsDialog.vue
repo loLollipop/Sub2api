@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { opsAPI } from '@/api/admin/ops'
@@ -21,7 +21,9 @@ const emit = defineEmits<{
 }>()
 
 const loading = ref(false)
+const settingsLoaded = ref(false)
 const saving = ref(false)
+let loadVersion = 0
 
 // 运行时设置
 const runtimeSettings = ref<OpsAlertRuntimeSettings | null>(null)
@@ -39,6 +41,17 @@ const metricThresholds = ref<OpsMetricThresholds>({
 
 // 加载所有配置
 async function loadAllSettings() {
+  const version = ++loadVersion
+  settingsLoaded.value = false
+  runtimeSettings.value = null
+  emailConfig.value = null
+  advancedSettings.value = null
+  metricThresholds.value = {
+    sla_percent_min: 99.5,
+    ttft_p99_ms_max: 500,
+    request_error_rate_percent_max: 5,
+    upstream_error_rate_percent_max: 5
+  }
   loading.value = true
   try {
     const [runtime, email, advanced, thresholds] = await Promise.all([
@@ -47,6 +60,7 @@ async function loadAllSettings() {
       opsAPI.getAdvancedSettings(),
       opsAPI.getMetricThresholds()
     ])
+    if (version !== loadVersion || !props.show) return
     runtimeSettings.value = runtime
     emailConfig.value = email
     advancedSettings.value = advanced
@@ -63,11 +77,13 @@ async function loadAllSettings() {
           upstream_error_rate_percent_max: thresholds.upstream_error_rate_percent_max ?? 5
         }
     }
+    settingsLoaded.value = !!runtime && !!email && !!advanced && !!thresholds
   } catch (err: any) {
+    if (version !== loadVersion) return
     console.error('[OpsSettingsDialog] Failed to load settings', err)
     appStore.showError(err?.response?.data?.detail || t('admin.ops.settings.loadFailed'))
   } finally {
-    loading.value = false
+    if (version === loadVersion) loading.value = false
   }
 }
 
@@ -75,8 +91,26 @@ async function loadAllSettings() {
 watch(() => props.show, (show) => {
   if (show) {
     loadAllSettings()
+  } else {
+    invalidateLoad()
   }
-})
+}, { immediate: true, flush: 'sync' })
+
+function invalidateLoad() {
+  loadVersion++
+  settingsLoaded.value = false
+  loading.value = false
+  runtimeSettings.value = null
+  emailConfig.value = null
+  advancedSettings.value = null
+}
+
+function handleClose() {
+  invalidateLoad()
+  emit('close')
+}
+
+onUnmounted(invalidateLoad)
 
 // 邮件输入
 const alertRecipientInput = ref('')
@@ -197,11 +231,13 @@ const validation = computed(() => {
 
 // 保存所有配置
 async function saveAllSettings() {
+  if (!props.show || loading.value || !settingsLoaded.value || saving.value) return
   if (!validation.value.valid) {
     appStore.showError(validation.value.errors[0])
     return
   }
 
+  const version = loadVersion
   saving.value = true
   try {
     // 无收件人时自动禁用邮件通知
@@ -219,25 +255,28 @@ async function saveAllSettings() {
       advancedSettings.value ? opsAPI.updateAdvancedSettings(advancedSettings.value) : Promise.resolve(),
       opsAPI.updateMetricThresholds(metricThresholds.value)
     ])
+    if (version !== loadVersion || !props.show) return
     appStore.showSuccess(t('admin.ops.settings.saveSuccess'))
     emit('saved')
     emit('close')
   } catch (err: any) {
+    if (version !== loadVersion || !props.show) return
     console.error('[OpsSettingsDialog] Failed to save settings', err)
     appStore.showError(err?.response?.data?.message || err?.response?.data?.detail || t('admin.ops.settings.saveFailed'))
   } finally {
+    // Closing/reopening does not unlock a write that is still in flight.
     saving.value = false
   }
 }
 </script>
 
 <template>
-  <BaseDialog :show="show" :title="t('admin.ops.settings.title')" width="extra-wide" @close="emit('close')">
+  <BaseDialog :show="show" :title="t('admin.ops.settings.title')" width="extra-wide" @close="handleClose">
     <div v-if="loading" class="py-10 text-center text-sm text-gray-500">
       {{ t('common.loading') }}
     </div>
 
-    <div v-else-if="runtimeSettings && emailConfig && advancedSettings" class="space-y-6">
+    <div v-else-if="settingsLoaded && runtimeSettings && emailConfig && advancedSettings" class="space-y-6">
       <!-- 验证错误 -->
       <div v-if="!validation.valid" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
         <div class="font-bold">{{ t('admin.ops.settings.validation.title') }}</div>
@@ -640,8 +679,8 @@ async function saveAllSettings() {
 
     <template #footer>
       <div class="flex justify-end gap-2">
-        <button class="btn btn-secondary" @click="emit('close')">{{ t('common.cancel') }}</button>
-        <button class="btn btn-primary" :disabled="saving || !validation.valid" @click="saveAllSettings">
+        <button class="btn btn-secondary" @click="handleClose">{{ t('common.cancel') }}</button>
+        <button class="btn btn-primary" :disabled="loading || !settingsLoaded || saving || !validation.valid" @click="saveAllSettings">
           {{ saving ? t('common.saving') : t('common.save') }}
         </button>
       </div>

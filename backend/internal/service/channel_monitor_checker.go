@@ -297,7 +297,7 @@ func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt
 		return "", "", 0, err
 	}
 	headers := mergeHeaders(adapter.buildHeaders(apiKey), opts)
-	full := joinURL(endpoint, adapter.buildPath(model))
+	full := joinURL(endpoint, monitorRequestPath(provider, endpoint, adapter, model))
 	respBytes, status, err := postRawJSON(ctx, full, body, headers)
 	if err != nil {
 		return "", "", status, err
@@ -554,6 +554,35 @@ func postRawJSON(ctx context.Context, fullURL string, payload []byte, headers ma
 		return nil, resp.StatusCode, fmt.Errorf("read body: %w", err)
 	}
 	return respBody, resp.StatusCode, nil
+}
+
+// monitorRequestPath distinguishes official Zhipu endpoints from OpenAI-compatible relays.
+func monitorRequestPath(provider, endpoint string, adapter providerAdapter, model string) string {
+	if provider != MonitorProviderZhipu {
+		return adapter.buildPath(model)
+	}
+	u, err := url.Parse(strings.TrimSpace(endpoint))
+	if err != nil {
+		return providerOpenAIPath
+	}
+	path := strings.TrimRight(u.EscapedPath(), "/")
+	if strings.HasSuffix(path, "/paas/v4") || strings.HasSuffix(path, "/paas/v4/chat/completions") {
+		return "/chat/completions"
+	}
+	if isZhipuOfficialHost(u) {
+		return adapter.buildPath(model)
+	}
+	return providerOpenAIPath
+}
+
+func isZhipuOfficialHost(u *url.URL) bool {
+	host := strings.ToLower(u.Hostname())
+	for _, official := range []string{"bigmodel.cn", "z.ai"} {
+		if host == official || strings.HasSuffix(host, "."+official) {
+			return true
+		}
+	}
+	return false
 }
 
 // joinURL 保留 base 的上游路径前缀，并避免重复追加已有的 API 路径前缀。

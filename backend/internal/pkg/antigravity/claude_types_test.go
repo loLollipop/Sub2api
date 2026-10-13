@@ -1,6 +1,30 @@
 package antigravity
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestClaudeContentItem_ThinkingAlwaysHasSignature(t *testing.T) {
+	t.Parallel()
+	for _, thinking := range []string{"", "plan"} {
+		for _, signature := range []string{"", "signed"} {
+			data, err := json.Marshal(ClaudeContentItem{Type: "thinking", Thinking: thinking, Signature: signature})
+			require.NoError(t, err)
+			var item map[string]any
+			require.NoError(t, json.Unmarshal(data, &item))
+			require.Equal(t, map[string]any{"type": "thinking", "thinking": thinking, "signature": signature}, item)
+		}
+	}
+	data, err := json.Marshal(ClaudeContentItem{Type: "text", Text: "hi"})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"type":"text","text":"hi"}`, string(data))
+	data, err = json.Marshal(ClaudeContentItem{Type: "tool_use", ID: "tool-1", Name: "search", Input: map[string]any{"query": "test"}})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"type":"tool_use","id":"tool-1","name":"search","input":{"query":"test"}}`, string(data))
+}
 
 func TestDefaultModels_ContainsNewAndLegacyImageModels(t *testing.T) {
 	t.Parallel()

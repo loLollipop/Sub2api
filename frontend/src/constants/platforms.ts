@@ -1,4 +1,5 @@
 import type { AccountPlatform, GroupPlatform } from '@/types'
+import { i18n } from '@/i18n'
 
 export interface PlatformOption<T extends string = string> {
   value: T
@@ -20,7 +21,7 @@ export const CONCRETE_PLATFORM_OPTIONS = [
   { value: 'zhipu', label: 'Zhipu GLM' },
   { value: 'deepseek', label: 'DeepSeek' },
   { value: 'minimax', label: 'MiniMax' },
-  { value: 'mixed', label: 'Mixed' }
+  { value: 'mixed', get label() { return i18n.global.t('admin.accounts.platforms.mixed') } }
 ] as const satisfies readonly PlatformOption<AccountPlatform>[]
 
 /** Platforms that can own a group. */
@@ -28,3 +29,8 @@ export const GROUP_PLATFORM_OPTIONS = [
   ...CONCRETE_PLATFORM_OPTIONS,
   { value: 'composite', label: 'Composite' }
 ] as const satisfies readonly PlatformOption<GroupPlatform>[]
+
+// Preserve the full catalog for editing and filters of existing accounts/groups.
+export const GROUP_CREATION_PLATFORM_OPTIONS = GROUP_PLATFORM_OPTIONS.filter(
+  option => !['kimi', 'zhipu', 'deepseek', 'minimax'].includes(option.value)
+)

@@ -1267,7 +1267,7 @@ function generateRoutedCodexFiles(
     zhipu: 'Zhipu',
     deepseek: 'DeepSeek',
     minimax: 'MiniMax',
-    mixed: 'Mixed',
+    mixed: t('admin.accounts.platforms.mixed'),
     composite: 'Composite'
   }
   const label = labels[platform]

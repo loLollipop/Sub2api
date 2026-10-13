@@ -5,6 +5,8 @@
  * instead of defining their own color mappings.
  */
 
+import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
+
 export type Platform =
   | 'anthropic'
   | 'openai'
@@ -299,7 +301,7 @@ export function platformLabel(p: string): string {
   switch (p) {
     case 'anthropic': return 'Anthropic'
     case 'openai': return 'OpenAI'
-    case 'mixed': return 'Mixed'
+    case 'mixed': return CONCRETE_PLATFORM_OPTIONS.find(option => option.value === 'mixed')!.label
     case 'antigravity': return 'Antigravity'
     case 'gemini': return 'Gemini'
     case 'grok': return 'Grok'

@@ -44,6 +44,17 @@ type passthroughErrReadCloser struct {
 	err error
 }
 
+type passthroughCancelOnReadBody struct {
+	io.ReadCloser
+	beforeRead func()
+	once       sync.Once
+}
+
+func (b *passthroughCancelOnReadBody) Read(p []byte) (int, error) {
+	b.once.Do(b.beforeRead)
+	return b.ReadCloser.Read(p)
+}
+
 type passthroughCloseTrackingReadCloser struct {
 	io.Reader
 	closed bool
@@ -851,9 +862,9 @@ func TestOpenAIGatewayService_OAuthPassthrough_UpstreamRequestIgnoresClientCance
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	reqCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil)).WithContext(reqCtx)
 	c.Request.Header.Set("User-Agent", "codex_cli_rs/0.1.0")
-	cancel()
 
 	originalBody := []byte(`{"model":"gpt-5.2","stream":true,"store":true,"instructions":"local-test-instructions","input":[{"type":"text","text":"hi"}]}`)
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
@@ -866,6 +877,16 @@ func TestOpenAIGatewayService_OAuthPassthrough_UpstreamRequestIgnoresClientCance
 			"",
 		}, "\n"))),
 	}}
+	var upstreamContextErrAfterCancel error
+	upstream.resp.Body = &passthroughCancelOnReadBody{
+		ReadCloser: upstream.resp.Body,
+		beforeRead: func() {
+			// Cancel only after headers have arrived and the stream scanner has
+			// entered the response body, so the detached request must still drain.
+			cancel()
+			upstreamContextErrAfterCancel = upstream.lastReq.Context().Err()
+		},
+	}
 
 	svc := &OpenAIGatewayService{
 		cfg:          &config.Config{Gateway: config.GatewayConfig{ForceCodexCLI: false}},
@@ -888,7 +909,12 @@ func TestOpenAIGatewayService_OAuthPassthrough_UpstreamRequestIgnoresClientCance
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.NotNil(t, upstream.lastReq)
-	require.NoError(t, upstream.lastReq.Context().Err())
+	require.ErrorIs(t, reqCtx.Err(), context.Canceled)
+	require.NoError(t, upstreamContextErrAfterCancel)
+	require.True(t, result.ClientDisconnect)
+	require.Equal(t, 2, result.Usage.InputTokens)
+	require.Equal(t, 1, result.Usage.OutputTokens)
+	require.Len(t, upstream.requests, 1)
 }
 
 func TestOpenAIGatewayService_OAuthPassthrough_CodexMissingInstructionsGetsDefault(t *testing.T) {
@@ -2707,7 +2733,9 @@ func TestOpenAIGatewayService_OAuthPassthrough_InfoWhenStreamEndsWithoutDone(t *
 	}
 
 	_, err := svc.Forward(context.Background(), c, account, originalBody)
-	require.EqualError(t, err, "stream usage incomplete: missing terminal event")
+	require.EqualError(t, err, "upstream response failed: stream usage incomplete: missing terminal event")
+	require.Equal(t, 1, strings.Count(rec.Body.String(), `"type":"response.failed"`))
+	require.True(t, strings.HasSuffix(rec.Body.String(), "\n\n"))
 	require.True(t, logSink.ContainsMessage("上游流在未收到 [DONE] 时结束，疑似断流"))
 	require.True(t, logSink.ContainsMessageAtLevel("上游流在未收到 [DONE] 时结束，疑似断流", "info"))
 	require.True(t, logSink.ContainsFieldValue("upstream_request_id", "rid-truncate"))

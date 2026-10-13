@@ -47,6 +47,34 @@ func TestMixedBillingUnknownUpstreamNeverUsesClientAliasOrFamilyGuess(t *testing
 	}
 }
 
+func TestMixedDomesticAliasForwardsAndBillsUnchangedUpstreamTarget(t *testing.T) {
+	for _, upstreamModel := range []string{"deepseek-v4-flash", "unpriced-domestic-model"} {
+		account := mixedTestAccount()
+		account.Credentials["model_mapping"] = map[string]any{"deepseek-ai/deepseek-client-alias": upstreamModel}
+		upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, mixedChatToolJSON, false)}
+		forwarder := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+		body := []byte(strings.ReplaceAll(string(mixedClientBody(APIProtocolResponses, false)), `"alias"`, `"deepseek-client-alias"`))
+		result, _, _, err := mixedForward(t, forwarder, account, APIProtocolResponses, body)
+		require.NoError(t, err)
+		require.Equal(t, upstreamModel, result.UpstreamModel)
+		require.Equal(t, upstreamModel, gjson.GetBytes(upstream.lastBody, "model").String())
+		logs := &openAIRecordUsageLogRepoStub{inserted: true}
+		users := &openAIRecordUsageUserRepoStub{}
+		billing := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil)
+		input := mixedBillingInput(result, account)
+		require.NoError(t, billing.RecordUsage(context.Background(), input))
+		require.Equal(t, upstreamModel, *logs.lastLog.UpstreamModel)
+		require.Equal(t, 0.1, input.APIKey.Group.RateMultiplier)
+		if upstreamModel == "unpriced-domestic-model" {
+			require.Zero(t, logs.lastLog.ActualCost)
+			require.Zero(t, users.deductCalls)
+		} else {
+			expected := expectedOpenAICost(t, billing, upstreamModel, result.Usage, 0.1)
+			require.InDelta(t, canonicalUsageActualCost(expected), logs.lastLog.ActualCost, 1e-12)
+		}
+	}
+}
+
 func TestMixedBillingExplicitSourcesAndLegacyCandidatesPreserved(t *testing.T) {
 	for _, tt := range []struct{ platform, source, actual, response, want string }{
 		{PlatformMixed, BillingModelSourceRequested, "unknown-model", "", "gpt-5.1"},

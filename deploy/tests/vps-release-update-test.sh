@@ -31,8 +31,17 @@ EOF
 cat >"$MOCK/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 set -e
-out=; url=
-while (($#)); do case "$1" in --output) out=$2; shift 2;; --dump-header) shift 2;; *) url=$1; shift;; esac; done
+out=; url=; connect_timeout=; max_time=
+while (($#)); do case "$1" in
+  --output) out=$2; shift 2;;
+  --dump-header) shift 2;;
+  --connect-timeout) connect_timeout=$2; shift 2;;
+  --max-time) max_time=$2; shift 2;;
+  *) url=$1; shift;;
+esac; done
+if [[ $url == https://* ]]; then
+  [[ $connect_timeout == 10 && $max_time == 120 ]] || exit 1
+fi
 if [[ $url == http://127.0.0.1:* ]]; then
   [[ ${HEALTH_FAIL:-0} != 1 || $(<"$MOCK_SYSTEMCTL_EXE") == "$MOCK_OLD_EXE" ]]
 elif [[ $url == */releases/latest || $url == */releases/tags/* ]]; then
@@ -56,6 +65,10 @@ case "$1" in
   is-active) [[ $(<"$state") != 0 ]] ;;
   stop)
     printf 'stop\n' >>"$MOCK_SERVICE_STOPS"
+    # The second stop belongs to rollback after the failed candidate health check.
+    if [[ ${ROLLBACK_SECOND_SIGNAL:-0} == 1 && $(wc -l <"$MOCK_SERVICE_STOPS") -ge 2 ]]; then
+      kill -s TERM "$PPID"
+    fi
     [[ ${STOP_FAIL:-0} != 1 ]] || exit 1
     echo 0 >"$state"
     ;;
@@ -130,7 +143,7 @@ reset_run() {
   : >"$MOCK_SERVICE_STOPS"
   : >"$MOCK_SERVICE_STARTS"
   : >"$MOCK_SERVICE_RELOADS"
-  unset MIGRATION_FAIL HEALTH_FAIL STOP_FAIL ATOMIC_COPY_FAIL ROLLBACK_RELOAD_FAIL
+  unset MIGRATION_FAIL HEALTH_FAIL STOP_FAIL ATOMIC_COPY_FAIL ROLLBACK_RELOAD_FAIL ROLLBACK_SECOND_SIGNAL
 }
 assert_candidate_not_run_and_service_not_stopped() {
   [[ ! -s "$MOCK_CANDIDATE_EXECUTIONS" ]] || { echo 'rejected candidate was executed' >&2; exit 1; }
@@ -184,6 +197,14 @@ running_exe=$(<"$MOCK_SYSTEMCTL_EXE")
 [[ $(sha256sum "$running_exe" | awk '{print $1}') == $(sha256sum "$MOCK_OLD_EXE" | awk '{print $1}') ]] || { echo 'rollback restored wrong executable hash' >&2; exit 1; }
 [[ $(<"$MOCK_SYSTEMCTL_STATE") != 0 ]] || { echo 'rollback left service stopped' >&2; exit 1; }
 unset HEALTH_FAIL
+reset_run; mkdir -p -- "$(dirname -- "$DROPIN_PATH")"; printf '[Service]\nExecStart=%s\n' "$MOCK_OLD_EXE" >"$DROPIN_PATH"
+export HEALTH_FAIL=1 ROLLBACK_SECOND_SIGNAL=1
+expect_fail "$UPDATER" latest
+[[ $(<"$MOCK_SYSTEMCTL_EXE") == "$MOCK_OLD_EXE" && $(<"$MOCK_SYSTEMCTL_STATE") != 0 ]] || {
+  echo 'second signal interrupted verified rollback' >&2; exit 1;
+}
+[[ $(wc -l <"$MOCK_SERVICE_STOPS") -ge 2 ]] || { echo 'second-signal injection was not reached' >&2; exit 1; }
+unset HEALTH_FAIL ROLLBACK_SECOND_SIGNAL
 reset_run; mkdir -p -- "$(dirname -- "$DROPIN_PATH")"; printf '[Service]\nExecStart=%s\n' "$MOCK_OLD_EXE" >"$DROPIN_PATH"
 export ATOMIC_COPY_FAIL=1 HEALTH_FAIL=1
 expect_fail "$UPDATER" latest

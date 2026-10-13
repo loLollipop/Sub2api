@@ -100,8 +100,8 @@ export default {
       schedulableDisabled: 'Scheduling disabled',
       failedToToggleSchedulable: 'Failed to toggle scheduling status',
       groupCountTotal: '{count} groups total',
-      mixedBaseUrlRequired: 'Mixed requires an explicit upstream Base URL',
-      mixedHint: 'Supports Chat Completions, Responses, and Messages text requests.',
+      mixedBaseUrlRequired: 'Domestic Models requires an explicit upstream Base URL',
+      mixedHint: 'Connect Kimi, GLM, DeepSeek, MiniMax, MiMo, and other domestic models using an upstream Base URL and API key. Sync the upstream model catalog. Supports Chat Completions, Responses, and Messages text requests.',
       platforms: {
         anthropic: 'Anthropic',
         claude: 'Claude',
@@ -113,7 +113,7 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         minimax: 'MiniMax',
-        mixed: 'Mixed',
+        mixed: 'Domestic Models',
       },
       cnProviders: {
         accountMode: {

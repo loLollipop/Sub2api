@@ -214,7 +214,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
   afterEach(() => vi.useRealTimers())
 
-  it('creates Mixed only with an explicit URL and API key, without scans or OAuth settings', async () => {
+  it('creates Domestic with explicit credentials and persists previewed model metadata without billing scans', async () => {
     const wrapper = mountModal()
     await wrapper.get('[data-testid="platform-mixed"]').trigger('click')
     await flushPromises()
@@ -242,7 +242,8 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(payload.credentials.pool_mode).toBeUndefined()
     expect(payload.upstream_billing_probe_enabled).toBe(false)
     expect(probeUpstreamBillingMock).not.toHaveBeenCalled()
-    expect(syncUpstreamModelsMock).not.toHaveBeenCalled()
+    expect(syncUpstreamModelsMock).toHaveBeenCalledTimes(1)
+    expect(syncUpstreamModelsMock).toHaveBeenCalledWith(42)
     wrapper.unmount()
   })
 
@@ -261,6 +262,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(payload.extra.anthropic_apikey_auth_scheme).toBe('authorization_bearer')
     expect(payload.extra.anthropic_passthrough).toBeUndefined()
     expect(payload.extra.web_search_emulation).toBeUndefined()
+    expect(syncUpstreamModelsMock).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 
@@ -540,87 +542,19 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(payload?.credentials?.tier_id).toBeUndefined()
   })
 
-  it('submits adaptive Kimi protocol endpoints', async () => {
+  it('consolidates domestic account creation under the existing mixed platform', async () => {
     const wrapper = mountModal()
-    await selectButtonByText(wrapper, 'Kimi')
-    await wrapper.get('form#create-account-form input[type="text"]').setValue('Kimi adaptive')
-    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-kimi')
-
-    await wrapper.get('form#create-account-form').trigger('submit.prevent')
-    await flushPromises()
-
-    expect(createAccountMock).toHaveBeenCalledTimes(1)
-    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).toMatchObject({
-      account_mode: 'payg',
-      api_protocol: 'adaptive',
-      base_url: 'https://api.moonshot.cn/v1',
-      api_base_urls: {
-        chat_completions: 'https://api.moonshot.cn/v1',
-        anthropic: 'https://api.moonshot.cn/anthropic',
-        responses: 'https://api.moonshot.cn/v1'
-      }
-    })
-  })
-
-  it('submits adaptive Kimi Coding Plan Responses endpoint', async () => {
-    const wrapper = mountModal()
-    await selectButtonByText(wrapper, 'Kimi')
-    await selectButtonByText(wrapper, 'admin.accounts.cnProviders.accountMode.coding')
-    await wrapper.get('form#create-account-form input[type="text"]').setValue('Kimi coding')
-    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-kimi-coding')
-
-    await wrapper.get('form#create-account-form').trigger('submit.prevent')
-    await flushPromises()
-
-    expect(createAccountMock).toHaveBeenCalledTimes(1)
-    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).toMatchObject({
-      account_mode: 'coding',
-      api_protocol: 'adaptive',
-      base_url: 'https://api.kimi.com/coding/v1',
-      api_base_urls: {
-        chat_completions: 'https://api.kimi.com/coding/v1',
-        anthropic: 'https://api.kimi.com/coding',
-        responses: 'https://api.kimi.com/coding/v1'
-      }
-    })
-  })
-
-  it('submits adaptive MiniMax protocol endpoints', async () => {
-    const wrapper = mountModal()
-    await selectButtonByText(wrapper, 'MiniMax')
-    await wrapper.get('form#create-account-form input[type="text"]').setValue('MiniMax adaptive')
-    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-minimax')
-
-    await wrapper.get('form#create-account-form').trigger('submit.prevent')
-    await flushPromises()
-
-    expect(createAccountMock).toHaveBeenCalledTimes(1)
-    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).toMatchObject({
-      account_mode: 'payg',
-      api_protocol: 'adaptive',
-      base_url: 'https://api.minimaxi.com/v1',
-      api_base_urls: {
-        chat_completions: 'https://api.minimaxi.com/v1',
-        anthropic: 'https://api.minimaxi.com/anthropic',
-        responses: 'https://api.minimaxi.com/v1'
-      }
-    })
-  })
-
-  it('uses the edited adaptive Chat endpoint when previewing upstream models', async () => {
-    const wrapper = mountModal()
-    await selectButtonByText(wrapper, 'Kimi')
-    await wrapper
-      .get('[data-testid="cn-adaptive-base-url-chat_completions"]')
-      .setValue('https://relay.example.com/v1')
-    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-relay')
-
+    const labels = wrapper.findAll('button').map(button => button.text())
+    for (const provider of ['Kimi', 'Zhipu GLM', 'DeepSeek', 'MiniMax']) {
+      expect(labels).not.toContain(provider)
+    }
+    await wrapper.get('[data-testid="platform-mixed"]').trigger('click')
+    await wrapper.get('input[placeholder="https://your-upstream/v1"]').setValue('https://mimo.example/v1')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-domestic')
     expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('syncCredentials')).toMatchObject({
-      platform: 'kimi',
-      type: 'apikey',
-      base_url: 'https://relay.example.com/v1',
-      api_key: 'sk-relay'
+      platform: 'mixed', type: 'apikey', base_url: 'https://mimo.example/v1', api_key: 'sk-domestic'
     })
+    wrapper.unmount()
   })
 
   it('previews Gemini custom OpenAI-compatible upstreams as chat completions', async () => {

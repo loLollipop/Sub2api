@@ -25,10 +25,11 @@ const openAICompactSSEKeepaliveKey = "openai_compact_sse_keepalive"
 // 原 JSON+状态码链路（Codex 按 HTTP 状态码重试）；首拍之后状态码固化为 200，
 // 后续错误由写回方降级为 response.failed 流内终止事件。
 type openAICompactSSEKeepalive struct {
-	mu      sync.Mutex
-	writer  gin.ResponseWriter
-	started bool
-	stopped bool
+	mu          sync.Mutex
+	writer      gin.ResponseWriter
+	started     bool
+	stopped     bool
+	writeFailed bool
 	// bytes 是心跳已写出的注释字节数。心跳不构成语义响应，handler 的
 	// "Forward 期间是否已写响应"判定（failover 放弃换号的依据）必须扣除
 	// 这部分字节，见 OpenAICompactKeepaliveAdjustedWrittenSize。
@@ -123,7 +124,8 @@ func (k *openAICompactSSEKeepalive) beat() bool {
 	n, err := k.writer.Write([]byte(": keepalive\n\n"))
 	k.bytes += n
 	if err != nil {
-		k.stopped = true
+		k.writeFailed = true
+		k.markStoppedLocked()
 		return false
 	}
 	k.writer.Flush()
@@ -168,6 +170,7 @@ func WriteOpenAIStreamSSEHeartbeat(c *gin.Context, payload []byte) (written int,
 	}
 	written, err = k.writer.Write(payload)
 	if err != nil {
+		k.writeFailed = true
 		k.markStoppedLocked()
 		return written, err, true
 	}
@@ -213,12 +216,23 @@ func StopOpenAICompactSSEKeepaliveCommitted(c *gin.Context) bool {
 	return committed
 }
 
-// OpenAICompactKeepaliveAdjustedWrittenSize 返回排除 compact 心跳注释字节后
-// 的响应已写字节数；无心跳的请求等价于 c.Writer.Size()。心跳字节不构成语义
-// 响应——handler 以"Forward 前后 Size 是否变化"判定是否已向客户端写出响应
-// （变化则放弃 failover 换号），该判定不得被心跳污染，否则 compact 请求
-// 一旦在上游等待期间发过心跳，上游 429/5xx 就不再换号（#3887 加固审计）。
-// 仅心跳字节时归一化为 -1（gin 的"未写出"哨兵值），与提交前的快照可比。
+func openAIStreamHeaderKeepaliveFailed(c *gin.Context) bool {
+	value, ok := c.Get(openAICompactSSEKeepaliveKey)
+	if !ok {
+		return false
+	}
+	k, ok := value.(*openAICompactSSEKeepalive)
+	if !ok || k == nil {
+		return false
+	}
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.writeFailed
+}
+
+// OpenAICompactKeepaliveAdjustedWrittenSize excludes heartbeat comments, which
+// do not commit semantic output. Heartbeat-only responses retain Gin's -1
+// unwritten sentinel so safe pre-output failover compares equal snapshots.
 func OpenAICompactKeepaliveAdjustedWrittenSize(c *gin.Context) int {
 	if c == nil || c.Writer == nil {
 		return -1

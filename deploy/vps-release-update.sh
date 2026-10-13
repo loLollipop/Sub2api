@@ -138,7 +138,7 @@ download_github() {
     headers="$tmp_root/headers.$i"
     set +e
     http_code=$("$CURL" --proto '=https' --tlsv1.2 --silent --show-error \
-      --max-redirs 0 --dump-header "$headers" --output "$output" \
+      --connect-timeout 10 --max-time 120 --max-redirs 0 --dump-header "$headers" --output "$output" \
       --write-out '%{http_code}' "$url")
     code=$?
     set -e
@@ -281,9 +281,13 @@ TRANSACTION_ACTIVE=0
 ROLLING_BACK=0
 rollback() {
   local rc=$1 rollback_failed=0
+  # Install the repeat-signal shield before changing either transaction flag.
+  trap '' INT TERM HUP
   ROLLING_BACK=1
   TRANSACTION_ACTIVE=0
-  trap - ERR INT TERM HUP
+  trap - ERR
+  # Finish restoring and verifying the old instance even if cancellation is
+  # repeated. SIGKILL/host loss cannot be recovered by a shell trap.
   set +e
   log 'update failed; restoring the previous service instance'
   if [[ -f "$txn_dir/previous-dropin.state" && $(<"$txn_dir/previous-dropin.state") == present ]]; then

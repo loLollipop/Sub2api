@@ -119,7 +119,7 @@ func openAIProtocolFallbackEligible(c *gin.Context, account *Account, body []byt
 // Explicit text evidence is required for all new transitions. A status or
 // model_not_available code alone says nothing about a model's wire protocol.
 func protocolRefusalPattern(name string) *regexp.Regexp {
-	name = `(?:the\s+)?(?:openai\s+)?(?:` + name + `)(?:\s+(?:api|protocol|endpoint))?`
+	name = `(?:the\s+)?(?:openai[\s_]+)?(?:` + name + `)(?:\s+(?:api|protocol|endpoint))?`
 	end := `(?:\s*[.,:;!]|\s*$|\s+(?:for|by|on)\b)`
 	return regexp.MustCompile(`(?:does not support|doesn't support|not support|unsupported)\s+` + name + end + `|` + name + `\s+(?:is\s+)?(?:not supported|unsupported|not implemented)` + end)
 }
@@ -127,7 +127,7 @@ func protocolRefusalPattern(name string) *regexp.Regexp {
 var (
 	responsesProtocolRefusal = protocolRefusalPattern(`responses|/v1/responses|/responses`)
 	chatProtocolRefusal      = protocolRefusalPattern(`chat completions|chat_completions|(?:/v1/)?chat/completions`)
-	anthropicProtocolRefusal = protocolRefusalPattern(`anthropic(?: messages)?|messages|/v1/messages|/messages`)
+	anthropicProtocolRefusal = protocolRefusalPattern(`anthropic(?:[\s_]+messages)?|messages|/v1/messages|/messages`)
 )
 
 func isExplicitOpenAIProtocolRefusal(status int, body []byte, protocol string) bool {
@@ -172,7 +172,8 @@ func isExplicitOpenAIProtocolRefusal(status int, body []byte, protocol string) b
 func (s *OpenAIGatewayService) protocolRefusalFallback(ctx context.Context, c *gin.Context, account *Account, protocol string, status int, body []byte, legacy bool) error {
 	state := openAIProtocolFallbackFromContext(ctx)
 	if state == nil || state.clientCtx.Err() != nil || c == nil || c.Request == nil ||
-		c.Request.Context().Err() != nil || IsResponseCommitted(c) || c.Writer.Written() ||
+		c.Request.Context().Err() != nil || IsResponseCommitted(c) ||
+		openAIStreamClientOutputStarted(c, false) || openAIStreamHeaderKeepaliveFailed(c) ||
 		!isExplicitOpenAIProtocolRefusal(status, body, protocol) {
 		return nil
 	}
@@ -203,6 +204,11 @@ func forcedOpenAIResponsesProtocol(ctx context.Context) bool {
 func (s *OpenAIGatewayService) forwardWithProtocolFallback(ctx context.Context, c *gin.Context, account *Account, body []byte, clientProtocol, promptCacheKey, defaultMappedModel string, initial func(context.Context) (*OpenAIForwardResult, error)) (*OpenAIForwardResult, error) {
 	if !account.IsMixed() {
 		return initial(ctx)
+	}
+	requestedModel := gjson.GetBytes(body, "model").String()
+	upstreamModel := normalizeOpenAIModelForUpstream(account, resolveOpenAIForwardModel(account, requestedModel, defaultMappedModel))
+	if err := CheckModelScope(ctx, requestedModel, upstreamModel); err != nil {
+		return nil, err
 	}
 	if err := validateMixedAccount(account); err != nil {
 		return nil, err
@@ -269,6 +275,9 @@ func (s *OpenAIGatewayService) forwardWithProtocolFallback(ctx context.Context, 
 			}
 		}
 		SetActualOpenAIUpstreamEndpoint(c, protocolUpstreamEndpoint(protocol))
+		if errors.Is(err, ErrModelScopeDenied) {
+			return result, err
+		}
 		if clientErr := c.Request.Context().Err(); clientErr != nil {
 			if result != nil {
 				result.ClientDisconnect = true

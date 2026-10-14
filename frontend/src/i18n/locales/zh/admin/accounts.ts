@@ -303,9 +303,9 @@ export default {
       apiKey: 'API Key',
       deleteConfirm: "确定要删除账号 '{name}' 吗？此操作无法撤销。",
       failedToClearRateLimit: '清除速率限制失败',
-      mixedBaseUrlRequired: '国模必须填写上游 Base URL',
-      domesticCreateLabel: 'DeepSeek + Kimi + GLM + MiniMax + MiMo',
-      mixedHint: '统一接入 Kimi、GLM、DeepSeek、MiniMax、MiMo 等国产模型。填写上游 Base URL 和 API Key，可同步上游模型；支持 Chat Completions、Responses 和 Messages 文本请求。',
+      mixedBaseUrlRequired: 'Mixed Group 必须填写上游 Base URL',
+      domesticCreateLabel: 'Mixed Group',
+      mixedHint: '通用 API 接入入口：一个中转账号只需导入一次。填写上游 Base URL 和 API Key，同步千问、GLM、DeepSeek、Kimi 等模型；按上游支持的接口复用 Chat Completions、Responses 和 Anthropic Messages 文本与工具调用。',
       platforms: {
         claude: 'Claude',
         openai: 'OpenAI',
@@ -317,7 +317,7 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         minimax: 'MiniMax',
-        mixed: '国模',
+        mixed: 'Mixed Group',
       },
       cnProviders: {
         accountMode: {

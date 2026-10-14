@@ -21,8 +21,12 @@ type PlazaOfficialPricing struct {
 
 // PlazaModel 模型广场中单个模型条目：按实收口径合成的展示定价 + 官方参考价。
 type PlazaModel struct {
-	Name            string
-	Platform        string
+	Name     string
+	Platform string
+	// Mixed uses the priced model's absolute vendor rate, before a user override.
+	RateMultiplier  *float64
+	ModelVendor     string
+	BillingModel    string
 	Pricing         *ChannelModelPricing
 	OfficialPricing *PlazaOfficialPricing
 	// LongContextBasis 多档时的计价基准（整单 / 仅超出部分），单档为空。
@@ -206,10 +210,18 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 			return pg.Models[i].Platform < pg.Models[j].Platform
 		})
 		g := groupEnt[gid]
+		if g.Platform == PlatformMixed {
+			s.expandMixedBillingModels(ctx, pg, g)
+		}
 		for j := range pg.Models {
+			if g.Platform == PlatformMixed {
+				rate := g.RateMultiplierForModel(firstNonEmpty(pg.Models[j].BillingModel, pg.Models[j].Name))
+				pg.Models[j].RateMultiplier = &rate
+				pg.Models[j].ModelVendor = ModelVendor(firstNonEmpty(pg.Models[j].BillingModel, pg.Models[j].Name))
+			}
 			if pricingNeedsFallback(pg.Models[j].Pricing) {
 				one := []SupportedModel{{
-					Name:     pg.Models[j].Name,
+					Name:     firstNonEmpty(pg.Models[j].BillingModel, pg.Models[j].Name),
 					Platform: pg.Models[j].Platform,
 					Pricing:  pg.Models[j].Pricing,
 				}}
@@ -217,7 +229,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 				pg.Models[j].Pricing = one[0].Pricing
 			}
 			s.fillDisplayPricing(ctx, &pg.Models[j], g)
-			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, pg.Models[j].Name, officialMemo)
+			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, firstNonEmpty(pg.Models[j].BillingModel, pg.Models[j].Name), officialMemo)
 		}
 		out = append(out, *pg)
 	}
@@ -231,13 +243,47 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	return out, nil
 }
 
+func (s *ModelPlazaService) expandMixedBillingModels(ctx context.Context, pg *PlazaGroup, g *Group) {
+	catalog, ok := s.listedModels.(interface {
+		MixedBillingModels(context.Context, *Group, string) []string
+	})
+	if !ok {
+		return
+	}
+	models := make([]PlazaModel, 0, len(pg.Models))
+	for _, model := range pg.Models {
+		targets := catalog.MixedBillingModels(ctx, g, model.Name)
+		if len(targets) == 0 {
+			models = append(models, model)
+			continue
+		}
+		for _, target := range targets {
+			row := model
+			row.BillingModel = target
+			pricingCtx := WithResolvedTargetPlatform(ctx, model.Platform)
+			if s.resolver != nil {
+				// The public alias may carry a different token or media price.
+				// Resolve this candidate's own card rather than inheriting it.
+				row.Pricing = nil
+				p := s.resolver.Resolve(pricingCtx, PricingInput{Model: row.BillingModel, GroupID: &g.ID, Group: g})
+				if p != nil && p.channelPricing != nil {
+					cloned := p.channelPricing.Clone()
+					row.Pricing = &cloned
+				}
+			}
+			models = append(models, row)
+		}
+	}
+	pg.Models = models
+}
+
 // fillDisplayPricing 把模型的展示定价换成实收口径：
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
 // 图片/按次模型（或阶梯表不可用时）沿用渠道定价与分组图片档位价。
 func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) {
 	if s.billingService != nil && s.resolver != nil {
 		sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{
-			Model:    m.Name,
+			Model:    firstNonEmpty(m.BillingModel, m.Name),
 			Group:    g,
 			Platform: m.Platform,
 		})

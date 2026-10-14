@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 25 // v25: smart-routing + model_allowlist + restrict_public_groups
+const apiKeyAuthSnapshotVersion = 27 // v27: Mixed absolute provider rates
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -336,6 +336,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		return nil
 	}
 	snapshot := &APIKeyAuthSnapshot{
+		ModelScope:    apiKey.ModelScope,
 		Version:       apiKeyAuthSnapshotVersion,
 		APIKeyID:      apiKey.ID,
 		UserID:        apiKey.UserID,
@@ -400,6 +401,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			Status:                          apiKey.Group.Status,
 			SubscriptionType:                apiKey.Group.SubscriptionType,
 			RateMultiplier:                  apiKey.Group.RateMultiplier,
+			MixedProviderRateMultipliers:    CloneMixedProviderRateMultipliers(apiKey.Group.MixedProviderRateMultipliers),
 			DailyLimitUSD:                   apiKey.Group.DailyLimitUSD,
 			WeeklyLimitUSD:                  apiKey.Group.WeeklyLimitUSD,
 			MonthlyLimitUSD:                 apiKey.Group.MonthlyLimitUSD,
@@ -460,6 +462,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		return nil
 	}
 	apiKey := &APIKey{
+		ModelScope:    snapshot.ModelScope,
 		ID:            snapshot.APIKeyID,
 		UserID:        snapshot.UserID,
 		GroupID:       snapshot.GroupID,
@@ -508,6 +511,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			Hydrated:                        true,
 			SubscriptionType:                snapshot.Group.SubscriptionType,
 			RateMultiplier:                  snapshot.Group.RateMultiplier,
+			MixedProviderRateMultipliers:    CloneMixedProviderRateMultipliers(snapshot.Group.MixedProviderRateMultipliers),
 			DailyLimitUSD:                   snapshot.Group.DailyLimitUSD,
 			WeeklyLimitUSD:                  snapshot.Group.WeeklyLimitUSD,
 			MonthlyLimitUSD:                 snapshot.Group.MonthlyLimitUSD,

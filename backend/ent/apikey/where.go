@@ -75,6 +75,11 @@ func UserID(v int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldUserID, v))
 }
 
+// ModelScope applies equality check predicate on the "model_scope" field. It's identical to ModelScopeEQ.
+func ModelScope(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldModelScope, v))
+}
+
 // Key applies equality check predicate on the "key" field. It's identical to KeyEQ.
 func Key(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldKey, v))
@@ -313,6 +318,71 @@ func UserIDIn(vs ...int64) predicate.APIKey {
 // UserIDNotIn applies the NotIn predicate on the "user_id" field.
 func UserIDNotIn(vs ...int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotIn(FieldUserID, vs...))
+}
+
+// ModelScopeEQ applies the EQ predicate on the "model_scope" field.
+func ModelScopeEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldModelScope, v))
+}
+
+// ModelScopeNEQ applies the NEQ predicate on the "model_scope" field.
+func ModelScopeNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldModelScope, v))
+}
+
+// ModelScopeIn applies the In predicate on the "model_scope" field.
+func ModelScopeIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldModelScope, vs...))
+}
+
+// ModelScopeNotIn applies the NotIn predicate on the "model_scope" field.
+func ModelScopeNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldModelScope, vs...))
+}
+
+// ModelScopeGT applies the GT predicate on the "model_scope" field.
+func ModelScopeGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldModelScope, v))
+}
+
+// ModelScopeGTE applies the GTE predicate on the "model_scope" field.
+func ModelScopeGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldModelScope, v))
+}
+
+// ModelScopeLT applies the LT predicate on the "model_scope" field.
+func ModelScopeLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldModelScope, v))
+}
+
+// ModelScopeLTE applies the LTE predicate on the "model_scope" field.
+func ModelScopeLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldModelScope, v))
+}
+
+// ModelScopeContains applies the Contains predicate on the "model_scope" field.
+func ModelScopeContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldModelScope, v))
+}
+
+// ModelScopeHasPrefix applies the HasPrefix predicate on the "model_scope" field.
+func ModelScopeHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldModelScope, v))
+}
+
+// ModelScopeHasSuffix applies the HasSuffix predicate on the "model_scope" field.
+func ModelScopeHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldModelScope, v))
+}
+
+// ModelScopeEqualFold applies the EqualFold predicate on the "model_scope" field.
+func ModelScopeEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldModelScope, v))
+}
+
+// ModelScopeContainsFold applies the ContainsFold predicate on the "model_scope" field.
+func ModelScopeContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldModelScope, v))
 }
 
 // KeyEQ applies the EQ predicate on the "key" field.

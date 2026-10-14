@@ -48,6 +48,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetUserID(key.UserID).
 		SetKey(key.Key).
 		SetName(key.Name).
+		SetModelScope(service.NormalizeModelScope(key.ModelScope)).
 		SetStatus(key.Status).
 		SetNillableGroupID(key.GroupID).
 		SetNillableLastUsedAt(key.LastUsedAt).
@@ -137,6 +138,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldUserID,
 			apikey.FieldGroupID,
 			apikey.FieldName,
+			apikey.FieldModelScope,
 			apikey.FieldStatus,
 			apikey.FieldIPWhitelist,
 			apikey.FieldIPBlacklist,
@@ -185,6 +187,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldStatus,
 				group.FieldSubscriptionType,
 				group.FieldRateMultiplier,
+				group.FieldMixedProviderRateMultipliers,
 				group.FieldDailyLimitUsd,
 				group.FieldWeeklyLimitUsd,
 				group.FieldMonthlyLimitUsd,
@@ -268,6 +271,9 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 		SetUpdatedAt(now)
 	if fields.Name {
 		builder.SetName(key.Name)
+	}
+	if fields.ModelScope {
+		builder.SetModelScope(service.NormalizeModelScope(key.ModelScope))
 	}
 	if fields.Status {
 		builder.SetStatus(key.Status)
@@ -984,6 +990,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		RateLimit7d: m.RateLimit7d,
 
 		AnthropicCacheTTLMode: service.NormalizeAnthropicCacheTTLMode(m.AnthropicCacheTTLMode),
+		ModelScope:            m.ModelScope,
 		Usage5h:               m.Usage5h,
 		Usage1d:               m.Usage1d,
 		Usage7d:               m.Usage7d,
@@ -1065,6 +1072,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		Description:                     derefString(g.Description),
 		Platform:                        g.Platform,
 		RateMultiplier:                  g.RateMultiplier,
+		MixedProviderRateMultipliers:    service.CloneMixedProviderRateMultipliers(g.MixedProviderRateMultipliers),
 		IsExclusive:                     g.IsExclusive,
 		Status:                          g.Status,
 		Hydrated:                        true,

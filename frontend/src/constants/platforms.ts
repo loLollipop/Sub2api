@@ -27,7 +27,7 @@ export const CONCRETE_PLATFORM_OPTIONS = [
 /** Platforms that can own a group. */
 export const GROUP_PLATFORM_OPTIONS = [
   ...CONCRETE_PLATFORM_OPTIONS,
-  { value: 'composite', label: 'Composite' }
+  { value: 'composite', get label() { return i18n.global.t('admin.groups.platforms.composite') } }
 ] as const satisfies readonly PlatformOption<GroupPlatform>[]
 
 // Preserve the full catalog for editing and filters of existing accounts/groups.

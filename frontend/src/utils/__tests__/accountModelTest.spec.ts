@@ -152,6 +152,20 @@ describe('accountModelTest helpers', () => {
     expect(formatAccountModelTestDuration(1500)).toBe('1.50s')
   })
 
+  it('keeps protocol diagnostics out of model replies', () => {
+    const state = createAccountModelTestOutput()
+    applyAccountModelTestEvent(state, { type: 'status', text: 'Upstream: /v1/chat/completions' })
+    expect(state.output).toBe('')
+    expect(state.progressText).toBe('Upstream: /v1/chat/completions')
+    expect(state.success).toBeUndefined()
+    applyAccountModelTestEvent(state, { type: 'content', text: 'Hello' })
+    applyAccountModelTestEvent(state, { type: 'status', text: 'Verified /v1/messages' })
+    applyAccountModelTestEvent(state, { type: 'text', text: ' world' })
+    applyAccountModelTestEvent(state, { type: 'test_complete', success: true })
+    expect(state.output).toBe('Hello world')
+    expect(state.success).toBe(true)
+  })
+
   it.each(['null', '1', '[]', '{}', '{"type":"content","text":{}}', '{"type":"test_complete","success":"false"}', '[DONE]'])('ignores invalid SSE payload %s', (payload) => {
     expect(parseSSEDataLine('data: ' + payload)).toBeNull()
   })

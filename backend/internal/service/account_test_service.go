@@ -2888,18 +2888,33 @@ func (s *AccountTestService) processClaudeStream(c *gin.Context, body io.Reader)
 // processOpenAIChatCompletionsStream processes SSE chunks from the
 // OpenAI-compatible Chat Completions API.
 func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, body io.Reader) error {
+	return s.processOpenAIChatCompletionsStreamWithTextRequirement(c, body, false)
+}
+
+// Mixed text probes require visible reply text; ordinary tests keep their
+// existing completion semantics and endpoint status events.
+func (s *AccountTestService) processOpenAIChatCompletionsStreamWithTextRequirement(c *gin.Context, body io.Reader, requireText bool) error {
 	reader := bufio.NewReader(body)
 	seenJSON := false
 	seenFinish := false
+	seenText := false
+	complete := func() error {
+		if requireText && !seenText {
+			return s.sendErrorAndEnd(c, "Mixed model test returned no text content")
+		}
+		if !requireText {
+			s.sendEvent(c, TestEvent{Type: "status", Text: "已通过 /v1/chat/completions 验证"})
+		}
+		s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+		return nil
+	}
 
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
 				if seenFinish {
-					s.sendEvent(c, TestEvent{Type: "status", Text: "已通过 /v1/chat/completions 验证"})
-					s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-					return nil
+					return complete()
 				}
 				if seenJSON {
 					return s.sendErrorAndEnd(c, "Chat Completions stream from /v1/chat/completions ended before [DONE]")
@@ -2916,9 +2931,7 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 
 		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
 		if jsonStr == "[DONE]" {
-			s.sendEvent(c, TestEvent{Type: "status", Text: "已通过 /v1/chat/completions 验证"})
-			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-			return nil
+			return complete()
 		}
 
 		var data map[string]any
@@ -2937,20 +2950,33 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 
 		choices, ok := data["choices"].([]any)
 		if !ok {
+			if requireText && data["choices"] != nil {
+				return s.sendErrorAndEnd(c, "Invalid Chat Completions response: expected choices array")
+			}
 			continue
 		}
 		for _, choiceValue := range choices {
 			choice, ok := choiceValue.(map[string]any)
 			if !ok {
+				if requireText {
+					return s.sendErrorAndEnd(c, "Invalid Chat Completions response: expected choice object")
+				}
 				continue
 			}
-			if delta, ok := choice["delta"].(map[string]any); ok {
-				if text, ok := delta["content"].(string); ok && text != "" {
-					s.sendEvent(c, TestEvent{Type: "content", Text: text})
+			for _, field := range []string{"delta", "message"} {
+				message, ok := choice[field].(map[string]any)
+				if !ok {
+					if requireText && choice[field] != nil {
+						return s.sendErrorAndEnd(c, "Invalid Chat Completions response: expected message object")
+					}
+					continue
 				}
-			}
-			if message, ok := choice["message"].(map[string]any); ok {
-				if text, ok := message["content"].(string); ok && text != "" {
+				text, ok := message["content"].(string)
+				if requireText && !ok && message["content"] != nil {
+					return s.sendErrorAndEnd(c, "Invalid Chat Completions response: expected text content")
+				}
+				if ok && text != "" {
+					seenText = seenText || strings.TrimSpace(text) != ""
 					s.sendEvent(c, TestEvent{Type: "content", Text: text})
 				}
 			}

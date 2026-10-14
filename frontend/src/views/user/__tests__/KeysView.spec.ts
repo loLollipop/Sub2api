@@ -183,6 +183,7 @@ const DataTableStub = {
         </div>
         <slot name="cell-name" :value="row.name" :row="row" />
         <slot name="cell-actions" :row="row" />
+        <slot name="cell-group" :row="row" />
         <div data-test="current-concurrency">
           <slot name="cell-current_concurrency" :value="row.current_concurrency" :row="row" />
         </div>
@@ -228,7 +229,7 @@ const IconStub = {
   template: '<span data-test="icon">{{ name }}</span>',
 }
 
-const mountView = async () => {
+const mountView = async (renderSelectSlots = false) => {
   const wrapper = mount(KeysView, {
     global: {
       stubs: {
@@ -242,7 +243,10 @@ const mountView = async () => {
         },
         ConfirmDialog: true,
         EmptyState: true,
-        Select: SelectStub,
+        Select: renderSelectSlots ? {
+          ...SelectStub,
+          template: '<div><slot name="selected" :option="options?.find(option => option.value === modelValue)" /><slot v-for="option in options" name="option" :option="option" :selected="option.value === modelValue" /></div>',
+        } : SelectStub,
         SearchInput: SearchInputStub,
         Icon: IconStub,
         UseKeyModal: true,
@@ -347,7 +351,7 @@ describe('user KeysView column settings', () => {
     await wrapper.get('#key-form').trigger('submit')
     await flushPromises()
     expect(createKey).toHaveBeenCalledWith('Provider key', 3, undefined, [], [], 0, undefined,
-      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit')
+      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit', undefined, 'other')
     wrapper.unmount()
   })
 
@@ -363,9 +367,33 @@ describe('user KeysView column settings', () => {
     wrapper.unmount()
   })
 
-  it.each(['create', 'edit'])('categorizes mixed groups as domestic on %s and clears stale selections', async (mode) => {
+  it('does not inherit a stale key provider after cancelling deletion', async () => {
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), model_scope: 'cn' }], total: 1 })
+    getAvailableGroups.mockResolvedValue([{ id: 2, name: 'GPT', platform: 'openai' }])
+    const wrapper = await mountView()
+    await getButtonByText(wrapper, 'common.delete').trigger('click')
+    wrapper.findAllComponents({ name: 'ConfirmDialog' }).find((dialog) => dialog.props('title') === 'keys.deleteKey')!.vm.$emit('cancel')
+    await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+    expect((wrapper.get('input[name="key-provider"][value="openai"]').element as HTMLInputElement).checked).toBe(true)
+    wrapper.unmount()
+  })
+
+  it.each(['cn', 'all'])('filters quick group changes without changing the %s key scope', async (scope) => {
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 1, model_scope: scope }], total: 1 })
     getAvailableGroups.mockResolvedValue([
-      { id: 1, name: 'Domestic', platform: 'mixed' },
+      { id: 1, name: 'CN', platform: 'mixed', supported_key_providers: ['cn'] },
+      { id: 2, name: 'GPT', platform: 'openai' },
+    ])
+    const wrapper = await mountView()
+    await wrapper.get('button[title="Click to change group"]').trigger('click')
+    const names = wrapper.findAllComponents({ name: 'GroupOptionItem' }).map((item) => item.attributes('name'))
+    expect(names).toEqual(scope === 'cn' ? ['CN'] : ['CN', 'GPT'])
+    wrapper.unmount()
+  })
+
+  it.each(['create', 'edit'])('uses confirmed Mixed categories on %s and clears stale selections', async (mode) => {
+    getAvailableGroups.mockResolvedValue([
+      { id: 1, name: 'Domestic', platform: 'mixed', supported_key_providers: ['cn'] },
       { id: 2, name: 'Gemini', platform: 'gemini' },
       { id: 3, name: 'Grok', platform: 'grok' },
     ])
@@ -393,7 +421,60 @@ describe('user KeysView column settings', () => {
     await flushPromises()
     if (mode === 'edit') expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'Domestic key', group_id: 1 }))
     else expect(createKey).toHaveBeenCalledWith('Domestic key', 1, undefined, [], [], 0, undefined,
-      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit')
+      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit', undefined, 'cn')
+    wrapper.unmount()
+  })
+
+  it.each(['openai', 'anthropic', 'cn', 'other'])('creates a %s scoped key from the same four-family Mixed group', async (scope) => {
+    getAvailableGroups.mockResolvedValue([
+      { id: 1, name: 'Relay', platform: 'mixed', supported_key_providers: ['openai', 'anthropic', 'cn', 'other'] },
+      { id: 2, name: 'CN only', platform: 'mixed', supported_key_providers: ['cn'] },
+      { id: 3, name: 'Empty', platform: 'mixed', supported_key_providers: [] },
+    ])
+    const wrapper = await mountView()
+    await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+    await wrapper.get(`input[name="key-provider"][value="${scope}"]`).setValue()
+    const groupSelect = wrapper.getComponent('[data-tour="key-form-group"]')
+    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual(scope === 'cn' ? [1, 2] : [1])
+    groupSelect.vm.$emit('update:modelValue', 1)
+    await wrapper.get('[data-tour="key-form-name"]').setValue('Scoped')
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+    expect(createKey.mock.calls[0]?.[11]).toBe(scope)
+    wrapper.unmount()
+  })
+
+  it('preserves an existing all key scope when only its name is edited', async () => {
+    getAvailableGroups.mockResolvedValue([{ id: 1, name: 'Relay', platform: 'mixed', supported_key_providers: ['cn'] }])
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 1, model_scope: 'all' }], total: 1 })
+    const wrapper = await mountView()
+    await getButtonByText(wrapper, 'common.edit').trigger('click')
+    await wrapper.get('[data-tour="key-form-name"]').setValue('Rename only')
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+    expect(updateKey.mock.calls[0]?.[1]).not.toHaveProperty('model_scope')
+    wrapper.unmount()
+  })
+
+  it.each(['cn', 'openai', 'anthropic', 'other'])('keeps Mixed %s rates readable in options and after selection', async (scope) => {
+    getAvailableGroups.mockResolvedValue([{
+      id: 10, name: 'Vendor rates', platform: 'mixed', rate_multiplier: 9,
+      supported_key_providers: ['openai', 'anthropic', 'cn', 'other'],
+      supported_model_vendors: ['deepseek', 'kimi', 'openai', 'anthropic', 'gemini'],
+      mixed_provider_rate_multipliers: { deepseek: 0.2, kimi: 0, openai: 2, anthropic: 3, gemini: 4 },
+    }])
+    const wrapper = await mountView(true)
+    await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+    await wrapper.get(`input[name="key-provider"][value="${scope}"]`).setValue()
+    const groupSelect = wrapper.getComponent('[data-tour="key-form-group"]')
+    const expected = scope === 'cn' ? [{ vendor: 'deepseek', rate: 0.2 }, { vendor: 'kimi', rate: 0 }]
+      : [{ vendor: scope === 'other' ? 'gemini' : scope, rate: scope === 'openai' ? 2 : scope === 'anthropic' ? 3 : 4 }]
+    const option = wrapper.findAllComponents({ name: 'GroupOptionItem' }).find(item => item.props('name') === 'Vendor rates')!
+    expect(option.props('vendorRates')).toEqual(expected)
+    groupSelect.vm.$emit('update:modelValue', 10)
+    await nextTick()
+    const selected = wrapper.findAllComponents({ name: 'GroupBadge' }).find(item => item.props('name') === 'Vendor rates')!
+    expect(selected.props('vendorRates')).toEqual(expected)
     wrapper.unmount()
   })
 

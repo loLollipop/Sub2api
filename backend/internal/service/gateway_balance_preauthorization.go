@@ -60,7 +60,7 @@ func (s *GatewayService) BalancePreauthorizationCostInput(
 		multiplier = s.cfg.Default.RateMultiplier
 	}
 	if s != nil && apiKey != nil && apiKey.GroupID != nil && apiKey.Group != nil {
-		multiplier = s.ResolveUserGroupRateMultiplier(ctx, balancePreauthorizationAPIKeyUserID(apiKey), *apiKey.GroupID, apiKey.Group.RateMultiplier)
+		multiplier = s.ResolveUserGroupRateMultiplier(ctx, balancePreauthorizationAPIKeyUserID(apiKey), *apiKey.GroupID, apiKey.Group.RateMultiplierForModel(model))
 	}
 	multiplier, _ = computePeakAwareMultipliers(apiKey, multiplier, pricingAt)
 	return CostInput{
@@ -90,7 +90,7 @@ func (s *OpenAIGatewayService) BalancePreauthorizationCostInput(
 		multiplier = s.cfg.Default.RateMultiplier
 	}
 	if s != nil && apiKey != nil && apiKey.GroupID != nil && apiKey.Group != nil {
-		multiplier = s.ResolveUserGroupRateMultiplier(ctx, balancePreauthorizationAPIKeyUserID(apiKey), *apiKey.GroupID, apiKey.Group.RateMultiplier)
+		multiplier = s.ResolveUserGroupRateMultiplier(ctx, balancePreauthorizationAPIKeyUserID(apiKey), *apiKey.GroupID, apiKey.Group.RateMultiplierForModel(model))
 	}
 	multiplier, _ = computePeakAwareMultipliers(apiKey, multiplier, pricingAt)
 	return CostInput{

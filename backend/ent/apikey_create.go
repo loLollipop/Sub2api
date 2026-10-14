@@ -73,6 +73,20 @@ func (_c *APIKeyCreate) SetUserID(v int64) *APIKeyCreate {
 	return _c
 }
 
+// SetModelScope sets the "model_scope" field.
+func (_c *APIKeyCreate) SetModelScope(v string) *APIKeyCreate {
+	_c.mutation.SetModelScope(v)
+	return _c
+}
+
+// SetNillableModelScope sets the "model_scope" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableModelScope(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetModelScope(*v)
+	}
+	return _c
+}
+
 // SetKey sets the "key" field.
 func (_c *APIKeyCreate) SetKey(v string) *APIKeyCreate {
 	_c.mutation.SetKey(v)
@@ -397,6 +411,10 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.ModelScope(); !ok {
+		v := apikey.DefaultModelScope
+		_c.mutation.SetModelScope(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -450,6 +468,14 @@ func (_c *APIKeyCreate) check() error {
 	}
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "APIKey.user_id"`)}
+	}
+	if _, ok := _c.mutation.ModelScope(); !ok {
+		return &ValidationError{Name: "model_scope", err: errors.New(`ent: missing required field "APIKey.model_scope"`)}
+	}
+	if v, ok := _c.mutation.ModelScope(); ok {
+		if err := apikey.ModelScopeValidator(v); err != nil {
+			return &ValidationError{Name: "model_scope", err: fmt.Errorf(`ent: validator failed for field "APIKey.model_scope": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.Key(); !ok {
 		return &ValidationError{Name: "key", err: errors.New(`ent: missing required field "APIKey.key"`)}
@@ -548,6 +574,10 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.DeletedAt(); ok {
 		_spec.SetField(apikey.FieldDeletedAt, field.TypeTime, value)
 		_node.DeletedAt = &value
+	}
+	if value, ok := _c.mutation.ModelScope(); ok {
+		_spec.SetField(apikey.FieldModelScope, field.TypeString, value)
+		_node.ModelScope = value
 	}
 	if value, ok := _c.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)
@@ -766,6 +796,18 @@ func (u *APIKeyUpsert) SetUserID(v int64) *APIKeyUpsert {
 // UpdateUserID sets the "user_id" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateUserID() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldUserID)
+	return u
+}
+
+// SetModelScope sets the "model_scope" field.
+func (u *APIKeyUpsert) SetModelScope(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldModelScope, v)
+	return u
+}
+
+// UpdateModelScope sets the "model_scope" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateModelScope() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldModelScope)
 	return u
 }
 
@@ -1196,6 +1238,20 @@ func (u *APIKeyUpsertOne) SetUserID(v int64) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateUserID() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateUserID()
+	})
+}
+
+// SetModelScope sets the "model_scope" field.
+func (u *APIKeyUpsertOne) SetModelScope(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetModelScope(v)
+	})
+}
+
+// UpdateModelScope sets the "model_scope" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateModelScope() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateModelScope()
 	})
 }
 
@@ -1848,6 +1904,20 @@ func (u *APIKeyUpsertBulk) SetUserID(v int64) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateUserID() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateUserID()
+	})
+}
+
+// SetModelScope sets the "model_scope" field.
+func (u *APIKeyUpsertBulk) SetModelScope(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetModelScope(v)
+	})
+}
+
+// UpdateModelScope sets the "model_scope" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateModelScope() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateModelScope()
 	})
 }
 

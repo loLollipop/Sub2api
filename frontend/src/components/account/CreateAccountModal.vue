@@ -149,7 +149,7 @@
             Grok
           </button>
         </div>
-        <!-- Domestic providers share the existing API-key-only platform. -->
+        <!-- One generic entry for API-key relays with multiple model providers. -->
         <div class="mt-2 flex flex-wrap rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
           <button
             type="button"
@@ -163,12 +163,7 @@
                 : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
             ]"
           >
-            <span class="inline-flex items-center gap-1.5" aria-hidden="true">
-              <PlatformIcon platform="deepseek" size="sm" aria-hidden="true" />
-              <PlatformIcon platform="kimi" size="sm" aria-hidden="true" />
-              <PlatformIcon platform="zhipu" size="sm" aria-hidden="true" />
-              <PlatformIcon platform="minimax" size="sm" aria-hidden="true" />
-            </span>
+            <PlatformIcon platform="mixed" size="md" aria-hidden="true" />
             <span class="min-w-0 leading-5">{{ t('admin.accounts.domesticCreateLabel') }}</span>
           </button>
         </div>

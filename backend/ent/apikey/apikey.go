@@ -23,6 +23,8 @@ const (
 	FieldDeletedAt = "deleted_at"
 	// FieldUserID holds the string denoting the user_id field in the database.
 	FieldUserID = "user_id"
+	// FieldModelScope holds the string denoting the model_scope field in the database.
+	FieldModelScope = "model_scope"
 	// FieldKey holds the string denoting the key field in the database.
 	FieldKey = "key"
 	// FieldName holds the string denoting the name field in the database.
@@ -101,6 +103,7 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldDeletedAt,
 	FieldUserID,
+	FieldModelScope,
 	FieldKey,
 	FieldName,
 	FieldGroupID,
@@ -147,6 +150,10 @@ var (
 	DefaultUpdatedAt func() time.Time
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
 	UpdateDefaultUpdatedAt func() time.Time
+	// DefaultModelScope holds the default value on creation for the "model_scope" field.
+	DefaultModelScope string
+	// ModelScopeValidator is a validator for the "model_scope" field. It is called by the builders before save.
+	ModelScopeValidator func(string) error
 	// KeyValidator is a validator for the "key" field. It is called by the builders before save.
 	KeyValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
@@ -203,6 +210,11 @@ func ByDeletedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUserID orders the results by the user_id field.
 func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUserID, opts...).ToFunc()
+}
+
+// ByModelScope orders the results by the model_scope field.
+func ByModelScope(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldModelScope, opts...).ToFunc()
 }
 
 // ByKey orders the results by the key field.

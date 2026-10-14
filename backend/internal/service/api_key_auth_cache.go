@@ -4,6 +4,7 @@ import "time"
 
 // APIKeyAuthSnapshot API Key 认证缓存快照（仅包含认证所需字段）
 type APIKeyAuthSnapshot struct {
+	ModelScope    string                   `json:"model_scope"`
 	Version       int                      `json:"version"`
 	APIKeyID      int64                    `json:"api_key_id"`
 	UserID        int64                    `json:"user_id"`
@@ -73,6 +74,7 @@ type APIKeyAuthGroupSnapshot struct {
 	Status                          string                        `json:"status"`
 	SubscriptionType                string                        `json:"subscription_type"`
 	RateMultiplier                  float64                       `json:"rate_multiplier"`
+	MixedProviderRateMultipliers    map[string]float64            `json:"mixed_provider_rate_multipliers,omitempty"`
 	DailyLimitUSD                   *float64                      `json:"daily_limit_usd,omitempty"`
 	WeeklyLimitUSD                  *float64                      `json:"weekly_limit_usd,omitempty"`
 	MonthlyLimitUSD                 *float64                      `json:"monthly_limit_usd,omitempty"`

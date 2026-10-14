@@ -15,6 +15,13 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/admin/account/__tests__/AccountModelTestPanel.focus.spec.ts \
 	src/components/admin/__tests__/ErrorPassthroughRulesModal.toggle.spec.ts \
 	src/components/admin/group/__tests__/GroupRateMultipliersModal.requests.spec.ts \
+	src/components/admin/user/__tests__/UserAllowedGroupsModal.rates.spec.ts \
+	src/components/common/__tests__/MixedProviderRates.spec.ts \
+	src/components/common/__tests__/PlatformIcon.spec.ts \
+	src/utils/__tests__/mixed-provider-rates.spec.ts \
+	src/components/modelPlaza/__tests__/PlazaGroupSection.spec.ts \
+	src/components/modelPlaza/__tests__/PlazaModelPricingTable.spec.ts \
+	src/components/modelPlaza/__tests__/ModelPlazaContent.spec.ts \
 	src/components/admin/group/__tests__/GroupRPMOverridesModal.edit.spec.ts \
 	src/views/admin/ops/components/__tests__/OpsSettingsDialog.loading.spec.ts \
 	src/components/admin/usage/__tests__/UsageTable.spec.ts \

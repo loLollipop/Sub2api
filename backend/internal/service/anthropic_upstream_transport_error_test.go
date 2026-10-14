@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -32,6 +33,35 @@ func newAnthropicTransportErrorTestContext() (*gin.Context, *httptest.ResponseRe
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
 	return c, rec
+}
+
+func TestHandleAnthropicUpstreamTransportError_ModelScopeDenialHasNoFailureEffects(t *testing.T) {
+	for _, policyErr := range []error{ErrModelScopeDenied, fmt.Errorf("transport wrapper: %w", ErrModelScopeDenied)} {
+		c, rec := newAnthropicTransportErrorTestContext()
+		repo := &anthropicTransportErrorRepoStub{}
+		cache := &failedAffinityCacheStub{}
+		svc := &GatewayService{accountRepo: repo, cache: cache}
+		account := newAnthropicAPIKeyAccountForTest()
+		ctx := withUpstreamAttempts(context.Background())
+		err := svc.handleAnthropicUpstreamTransportError(ctx, c, account, "https://api.anthropic.com/v1/messages", true, policyErr)
+		require.Same(t, policyErr, err)
+		require.ErrorIs(t, err, ErrModelScopeDenied)
+		var failoverErr *UpstreamFailoverError
+		require.False(t, errors.As(err, &failoverErr))
+		require.Zero(t, repo.calls)
+		for _, key := range []string{OpsUpstreamStatusCodeKey, OpsUpstreamErrorMessageKey, OpsUpstreamErrorsKey} {
+			_, exists := c.Get(key)
+			require.False(t, exists, "local scope denial must not record an upstream failure")
+		}
+		svc.InvalidateUpstreamAffinity(ctx, nil, "session", account, err)
+		require.Empty(t, cache.invalidated)
+		require.Empty(t, ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts).failed)
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Empty(t, rec.Body.String())
+		// Denial must precede all service, health, and activity access.
+		var nilService *GatewayService
+		require.Same(t, policyErr, nilService.handleAnthropicUpstreamTransportError(nil, nil, account, "", false, policyErr))
+	}
 }
 
 func TestHandleAnthropicUpstreamTransportError_PersistentFailsOverAndUnschedules(t *testing.T) {

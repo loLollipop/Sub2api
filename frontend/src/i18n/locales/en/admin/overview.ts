@@ -982,8 +982,8 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         minimax: 'MiniMax',
-        mixed: 'Domestic Models',
-        composite: 'Composite',
+        mixed: 'Mixed Group',
+        composite: 'Composite (cross-platform routing)',
       },
       deleteConfirm:
         "Are you sure you want to delete '{name}'? All associated API keys will no longer belong to any group.",

@@ -218,7 +218,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if apiKey.GroupID != nil && apiKey.Group != nil {
+	if apiKey.GroupID != nil && apiKey.Group != nil && apiKey.Group.Platform != PlatformMixed {
 		multiplier = s.ResolveUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, apiKey.Group.RateMultiplier)
 	}
 	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。
@@ -251,6 +251,18 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	)
 	billingModels = s.filterCNProviderBillingModelCandidates(ctx, account, apiKey, billingModels)
 	billingModels = s.mixedUsageBillingModelCandidates(ctx, input, billingModels)
+	// Resolve each actual price candidate independently; no model-specific default
+	// is ever cached in the user/group override cache.
+	mixedRates := apiKey.GroupID != nil && apiKey.Group != nil && apiKey.Group.Platform == PlatformMixed
+	setMixedRate := func(model string) {
+		if !mixedRates {
+			return
+		}
+		baseMultiplier = s.ResolveUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, apiKey.Group.RateMultiplierForModel(model))
+		multiplier, imageMultiplier = computePeakAwareMultipliers(apiKey, baseMultiplier, pricingAt)
+		videoMultiplier = resolveVideoRateMultiplier(apiKey, baseMultiplier)
+	}
+	setMixedRate(firstUsageBillingModel(billingModels))
 	serviceTier := ""
 	if result.ServiceTier != nil {
 		serviceTier = strings.TrimSpace(*result.ServiceTier)
@@ -270,6 +282,13 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		longContextBillingGate,
 		pricingAt,
 	)
+	if err == nil && mixedRates && cost != nil && cost.billingModel != "" && cost.billingModel != firstUsageBillingModel(billingModels) {
+		// The token calculator can fall back to a later priced identity. Reprice
+		// only that successful candidate so the final rate and usage log agree.
+		billingModels = []string{cost.billingModel}
+		setMixedRate(cost.billingModel)
+		cost, err = s.calculateOpenAIRecordUsageCost(ctx, result, apiKey, billingModels, multiplier, imageMultiplier, videoMultiplier, baseMultiplier, tokens, serviceTier, longContextBillingGate, pricingAt)
+	}
 	if err != nil {
 		if !isUsagePricingUnavailableError(err) {
 			return err
@@ -299,6 +318,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	); responseModel != "" && !strings.EqualFold(responseModel, baselineBillingModel) {
 		if identified, responseChannelPriced := s.hasIdentifiedOpenAIResponsePricing(ctx, responseModel, apiKey); identified {
 			responseModels := s.filterCNProviderBillingModelCandidates(ctx, account, apiKey, usageBillingModelCandidates(responseModel))
+			previousBase, previousText, previousImage, previousVideo := baseMultiplier, multiplier, imageMultiplier, videoMultiplier
+			setMixedRate(responseModel)
 			responseCost, responseErr := s.calculateOpenAIRecordUsageCost(
 				ctx, result, apiKey, responseModels, multiplier, imageMultiplier,
 				videoMultiplier, baseMultiplier, tokens, serviceTier, longContextBillingGate, pricingAt,
@@ -312,6 +333,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 					baselineBillingModel, responseModel, cost, responseCost)
 				billingModels = responseModels
 				cost = responseCost
+			} else {
+				baseMultiplier, multiplier, imageMultiplier, videoMultiplier = previousBase, previousText, previousImage, previousVideo
 			}
 		}
 	}
@@ -693,6 +716,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 				longContextBillingGate,
 			)
 			if err == nil {
+				cost.billingModel = candidate
 				tokenCost = cost
 				break
 			}

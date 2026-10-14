@@ -39,6 +39,11 @@ func (s *GatewayService) handleAnthropicUpstreamTransportError(
 	passthrough bool,
 	err error,
 ) error {
+	// A local policy refusal never reached the upstream and must retain its
+	// 403 identity without recording an outage or starting account failover.
+	if errors.Is(err, ErrModelScopeDenied) {
+		return err
+	}
 	if err == nil {
 		return nil
 	}

@@ -67,9 +67,10 @@
                       <span>{{ config.platform }}</span>
                     </span>
                     <span class="text-gray-300 dark:text-dark-500">•</span>
-                    <span class="text-gray-500 dark:text-gray-400">
+                    <span v-if="config.platform !== 'mixed'" class="text-gray-500 dark:text-gray-400">
                       {{ t('admin.users.defaultRate') }}: <span class="font-medium text-gray-700 dark:text-gray-300">{{ config.defaultRate }}x</span>
                     </span>
+                    <span v-else class="text-gray-500 dark:text-gray-400">{{ t('common.mixedProviderRates') }}</span>
                   </div>
                 </div>
 
@@ -79,10 +80,11 @@
                   <input
                     type="number"
                     step="0.001"
-                    min="0.001"
+                    :min="config.platform === 'mixed' ? 0 : 0.001"
+                    max="999999.9999"
                     :value="config.customRate ?? ''"
                     @input="updateCustomRate(config.groupId, ($event.target as HTMLInputElement).value)"
-                    :placeholder="String(config.defaultRate)"
+                    :placeholder="config.platform === 'mixed' ? '' : String(config.defaultRate)"
                     class="hide-spinner w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
                   />
                 </div>
@@ -145,9 +147,10 @@
                       <span>{{ config.platform }}</span>
                     </span>
                     <span class="text-gray-300 dark:text-dark-500">•</span>
-                    <span class="text-gray-500 dark:text-gray-400">
+                    <span v-if="config.platform !== 'mixed'" class="text-gray-500 dark:text-gray-400">
                       {{ t('admin.users.defaultRate') }}: <span class="font-medium text-gray-700 dark:text-gray-300">{{ config.defaultRate }}x</span>
                     </span>
+                    <span v-else class="text-gray-500 dark:text-gray-400">{{ t('common.mixedProviderRates') }}</span>
                   </div>
                 </div>
 
@@ -157,10 +160,11 @@
                   <input
                     type="number"
                     step="0.001"
-                    min="0.001"
+                    :min="config.platform === 'mixed' ? 0 : 0.001"
+                    max="999999.9999"
                     :value="config.customRate ?? ''"
                     @input="updateCustomRate(config.groupId, ($event.target as HTMLInputElement).value)"
-                    :placeholder="String(config.defaultRate)"
+                    :placeholder="config.platform === 'mixed' ? '' : String(config.defaultRate)"
                     class="hide-spinner w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
                   />
                 </div>
@@ -309,14 +313,20 @@ const updateCustomRate = (groupId: number, value: string) => {
     if (value === '' || value === null || value === undefined) {
       config.customRate = null
     } else {
-      const numValue = parseFloat(value)
-      config.customRate = isNaN(numValue) ? null : numValue
+      config.customRate = Number(value)
     }
   }
 }
 
 const handleSave = async () => {
   if (!props.user) return
+  if (groupConfigs.value.some((c) => c.customRate !== null && (
+    !Number.isFinite(c.customRate) || c.customRate < 0 || c.customRate > 999999.9999 ||
+    (c.customRate === 0 && c.platform !== 'mixed')
+  ))) {
+    appStore.showError(t('admin.groups.failedToSave'))
+    return
+  }
   submitting.value = true
 
   try {

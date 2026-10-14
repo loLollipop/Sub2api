@@ -5,6 +5,8 @@ package ctxkey
 type Key string
 
 const (
+	// APIKeyModelScope is the credential's provider category, independent of routing.
+	APIKeyModelScope Key = "ctx_api_key_model_scope"
 	// ForcePlatform 强制平台（用于 /antigravity 路由），由 middleware.ForcePlatform 设置
 	ForcePlatform Key = "ctx_force_platform"
 

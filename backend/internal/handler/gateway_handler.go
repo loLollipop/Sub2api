@@ -415,6 +415,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				apiKey = routedKey
 			}
 			if err != nil {
+				if h.handleModelScopeError(c, err, streamStarted) {
+					return
+				}
 				if len(fs.FailedAccountIDs) == 0 {
 					cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, service.PlatformGemini)
 					cls = classifySelectionFailureErrorFromGin(c, err, cls)
@@ -643,6 +646,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				})
 			}
 			if err != nil {
+				if h.handleModelScopeError(c, err, streamStarted) {
+					return
+				}
 				h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionKey, account, err)
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
@@ -771,6 +777,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				currentAPIKey = routedKey
 			}
 			if err != nil {
+				if h.handleModelScopeError(c, err, streamStarted) {
+					return
+				}
 				if len(fs.FailedAccountIDs) == 0 {
 					cls := classifyNoAccountErrorFromGin(c, h.gatewayService, currentAPIKey, reqModel, reqModel, platform)
 					cls = classifySelectionFailureErrorFromGin(c, err, cls)
@@ -1087,6 +1096,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 
 			if err != nil {
+				if h.handleModelScopeError(c, err, streamStarted) {
+					return
+				}
 				h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account, err)
 				// Beta policy block: return 400 immediately, no failover
 				var betaBlockedErr *service.BetaBlockedError
@@ -1275,6 +1287,11 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	}
 
 	availableModels := h.availableModelsForAPIKey(c.Request.Context(), apiKey, forcedPlatform)
+	if apiKey != nil && service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll &&
+		!(responsePlatform == service.PlatformOpenAI && apiKey.Group != nil && apiKey.Group.CodexModelsManifestConfig.Enabled) {
+		writeModelsList(c, responsePlatform, availableModels)
+		return
+	}
 
 	// Custom list on the primary group only changes the OpenAI/Claude wire
 	// shape. Filtering already happened per bound group so a later group's
@@ -1342,14 +1359,29 @@ func (h *GatewayHandler) groupForModelsList(ctx context.Context, apiKey *service
 func (h *GatewayHandler) availableModelsForAPIKey(ctx context.Context, apiKey *service.APIKey, forcedPlatform string) []string {
 	groupIDs := apiKeyModelsListGroupIDs(apiKey)
 	if len(groupIDs) == 0 {
-		return h.modelsForGroupID(ctx, nil, nil, forcedPlatform, false)
+		models := h.modelsForGroupID(ctx, nil, nil, forcedPlatform, false)
+		if apiKey != nil {
+			models = service.FilterModelScope(apiKey.ModelScope, models)
+		}
+		return models
 	}
 	injectDefaults := len(groupIDs) > 1
 	var models []string
 	for _, id := range groupIDs {
 		gid := id
 		group := h.groupForModelsList(ctx, apiKey, gid)
-		models = mergeModelIDs(models, h.modelsForGroupID(ctx, &gid, group, forcedPlatform, injectDefaults))
+		groupModels := h.modelsForGroupID(ctx, &gid, group, forcedPlatform, injectDefaults)
+		if apiKey != nil && service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll {
+			if len(groupModels) == 0 && group != nil && group.Platform != service.PlatformMixed && !group.ModelAllowlistEnabled() {
+				groupModels = defaultModelIDsForPlatform(group.Platform)
+			}
+			if h.gatewayService != nil {
+				groupModels = h.gatewayService.FilterModelsForKeyScope(ctx, &gid, apiKey.ModelScope, groupModels)
+			} else {
+				groupModels = service.FilterModelScope(apiKey.ModelScope, groupModels)
+			}
+		}
+		models = mergeModelIDs(models, groupModels)
 	}
 	return models
 }
@@ -1415,6 +1447,7 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 	}
 	modelIDs := h.codexModelIDsForGroup(c.Request.Context(), apiKey.Group, forcedPlatform)
 	modelIDs = service.FilterCodexModelIDsForGroup(modelIDs, apiKey.Group)
+	modelIDs = h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, modelIDs)
 	body, err := h.gatewayService.BuildCodexModelsManifestForGroup(
 		c.Request.Context(),
 		apiKey.Group,
@@ -1423,6 +1456,11 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 	)
 	if err != nil {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to build Codex models manifest")
+		return
+	}
+	body, err = filterModelCatalogueForScope(body, apiKey.ModelScope)
+	if err != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to filter models manifest")
 		return
 	}
 	etag := service.CodexModelsManifestETag(body)
@@ -1711,6 +1749,24 @@ func (h *GatewayHandler) AntigravityModels(c *gin.Context) {
 		filtered := make([]antigravity.ClaudeModel, 0, len(models))
 		for _, model := range models {
 			if apiKey.Group.ModelAllowlist.Allows(model.ID) {
+				filtered = append(filtered, model)
+			}
+		}
+		models = filtered
+	}
+	if key, ok := middleware2.GetAPIKeyFromContext(c); ok && key != nil && service.NormalizeModelScope(key.ModelScope) != service.ModelScopeAll {
+		ids := make([]string, 0, len(models))
+		for _, model := range models {
+			ids = append(ids, model.ID)
+		}
+		allowed := h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), key.GroupID, key.ModelScope, ids)
+		allow := make(map[string]bool, len(allowed))
+		for _, id := range allowed {
+			allow[id] = true
+		}
+		filtered := make([]antigravity.ClaudeModel, 0, len(models))
+		for _, model := range models {
+			if allow[model.ID] {
 				filtered = append(filtered, model)
 			}
 		}

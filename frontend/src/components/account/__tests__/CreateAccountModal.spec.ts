@@ -216,16 +216,17 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
   afterEach(() => vi.useRealTimers())
 
-  it('labels the domestic creation button with brands and decorative existing icons', () => {
+  it('labels the generic creation entry Mixed Group with its own decorative logo', () => {
     for (const messages of [enAccountMessages, zhAccountMessages]) {
-      expect(messages.accounts.domesticCreateLabel).toBe('DeepSeek + Kimi + GLM + MiniMax + MiMo')
+      expect(messages.accounts.domesticCreateLabel).toBe('Mixed Group')
+      expect(messages.accounts.platforms.mixed).toBe('Mixed Group')
     }
     const wrapper = mountModal()
     const button = wrapper.get('[data-testid="platform-mixed"]')
     expect(button.text()).toContain('admin.accounts.domesticCreateLabel')
     expect(button.attributes('type')).toBe('button')
     expect(button.findAllComponents({ name: 'PlatformIcon' }).map((icon) => icon.props('platform')))
-      .toEqual(['deepseek', 'kimi', 'zhipu', 'minimax'])
+      .toEqual(['mixed'])
     expect(button.findAllComponents({ name: 'PlatformIcon' }).every((icon) => icon.attributes('aria-hidden') === 'true')).toBe(true)
     wrapper.unmount()
   })

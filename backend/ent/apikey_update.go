@@ -72,6 +72,20 @@ func (_u *APIKeyUpdate) SetNillableUserID(v *int64) *APIKeyUpdate {
 	return _u
 }
 
+// SetModelScope sets the "model_scope" field.
+func (_u *APIKeyUpdate) SetModelScope(v string) *APIKeyUpdate {
+	_u.mutation.SetModelScope(v)
+	return _u
+}
+
+// SetNillableModelScope sets the "model_scope" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableModelScope(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetModelScope(*v)
+	}
+	return _u
+}
+
 // SetKey sets the "key" field.
 func (_u *APIKeyUpdate) SetKey(v string) *APIKeyUpdate {
 	_u.mutation.SetKey(v)
@@ -559,6 +573,11 @@ func (_u *APIKeyUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *APIKeyUpdate) check() error {
+	if v, ok := _u.mutation.ModelScope(); ok {
+		if err := apikey.ModelScopeValidator(v); err != nil {
+			return &ValidationError{Name: "model_scope", err: fmt.Errorf(`ent: validator failed for field "APIKey.model_scope": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Key(); ok {
 		if err := apikey.KeyValidator(v); err != nil {
 			return &ValidationError{Name: "key", err: fmt.Errorf(`ent: validator failed for field "APIKey.key": %w`, err)}
@@ -605,6 +624,9 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(apikey.FieldDeletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ModelScope(); ok {
+		_spec.SetField(apikey.FieldModelScope, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)
@@ -877,6 +899,20 @@ func (_u *APIKeyUpdateOne) SetUserID(v int64) *APIKeyUpdateOne {
 func (_u *APIKeyUpdateOne) SetNillableUserID(v *int64) *APIKeyUpdateOne {
 	if v != nil {
 		_u.SetUserID(*v)
+	}
+	return _u
+}
+
+// SetModelScope sets the "model_scope" field.
+func (_u *APIKeyUpdateOne) SetModelScope(v string) *APIKeyUpdateOne {
+	_u.mutation.SetModelScope(v)
+	return _u
+}
+
+// SetNillableModelScope sets the "model_scope" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableModelScope(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetModelScope(*v)
 	}
 	return _u
 }
@@ -1381,6 +1417,11 @@ func (_u *APIKeyUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *APIKeyUpdateOne) check() error {
+	if v, ok := _u.mutation.ModelScope(); ok {
+		if err := apikey.ModelScopeValidator(v); err != nil {
+			return &ValidationError{Name: "model_scope", err: fmt.Errorf(`ent: validator failed for field "APIKey.model_scope": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Key(); ok {
 		if err := apikey.KeyValidator(v); err != nil {
 			return &ValidationError{Name: "key", err: fmt.Errorf(`ent: validator failed for field "APIKey.key": %w`, err)}
@@ -1444,6 +1485,9 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(apikey.FieldDeletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ModelScope(); ok {
+		_spec.SetField(apikey.FieldModelScope, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)

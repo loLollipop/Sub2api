@@ -50,6 +50,10 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 	if strings.TrimSpace(model) == "" {
 		model = "grok-voice-latest"
 	}
+	if !apiKey.AllowsModelScope(model) {
+		h.handleModelScopeError(c, service.ErrModelScopeDenied, false)
+		return
+	}
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
 	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, service.InflightEstimateRequest{Model: model, Kind: service.InflightEstimateAudio, AudioMode: "realtime", AudioUnits: 1})
 	if inflightErr != nil {
@@ -94,6 +98,9 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 			apiKey = routedKey
 		}
 		if selectErr != nil || candidate == nil || candidate.Account == nil {
+			if h.handleModelScopeError(c, selectErr, false) {
+				return
+			}
 			break
 		}
 		candidateSeen = true
@@ -119,6 +126,11 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 		candidateUpstream, openErr := h.gatewayService.OpenGrokRealtime(probeCtx, account, token, model)
 		cancelProbe()
 		if openErr != nil {
+			if errors.Is(openErr, service.ErrModelScopeDenied) {
+				release()
+				h.handleModelScopeError(c, openErr, false)
+				return
+			}
 			reqLog.Warn("grok_realtime.pre_accept_failed", zap.Int64("account_id", account.ID), zap.Error(openErr))
 			statusCode := http.StatusBadGateway
 			var dialErr *service.GrokRealtimeDialError
@@ -285,6 +297,9 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 			apiKey = routedKey
 		}
 		if selectErr != nil || selection == nil || selection.Account == nil {
+			if h.handleModelScopeError(c, selectErr, false) {
+				return
+			}
 			if last != nil {
 				h.handleFailoverExhausted(c, last, false)
 			} else if accountSlotBusySeen {

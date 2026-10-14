@@ -100,9 +100,9 @@ export default {
       schedulableDisabled: 'Scheduling disabled',
       failedToToggleSchedulable: 'Failed to toggle scheduling status',
       groupCountTotal: '{count} groups total',
-      mixedBaseUrlRequired: 'Domestic Models requires an explicit upstream Base URL',
-      domesticCreateLabel: 'DeepSeek + Kimi + GLM + MiniMax + MiMo',
-      mixedHint: 'Connect Kimi, GLM, DeepSeek, MiniMax, MiMo, and other domestic models using an upstream Base URL and API key. Sync the upstream model catalog. Supports Chat Completions, Responses, and Messages text requests.',
+      mixedBaseUrlRequired: 'Mixed Group requires an explicit upstream Base URL',
+      domesticCreateLabel: 'Mixed Group',
+      mixedHint: 'Generic API onboarding: import each relay account once using its upstream Base URL and API key. Sync Qwen, GLM, DeepSeek, Kimi, and other models; reuse Chat Completions, Responses, and Anthropic Messages text and tool-call handling through the interfaces supported by the upstream.',
       platforms: {
         anthropic: 'Anthropic',
         claude: 'Claude',
@@ -114,7 +114,7 @@ export default {
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
         minimax: 'MiniMax',
-        mixed: 'Domestic Models',
+        mixed: 'Mixed Group',
       },
       cnProviders: {
         accountMode: {

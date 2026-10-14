@@ -872,7 +872,7 @@ func NewGatewayService(
 		rateLimitService:      rateLimitService,
 		billingCacheService:   billingCacheService,
 		identityService:       identityService,
-		httpUpstream:          httpUpstream,
+		httpUpstream:          withModelScopeUpstream(httpUpstream),
 		deferredService:       deferredService,
 		claudeTokenProvider:   claudeTokenProvider,
 		sessionLimitCache:     sessionLimitCache,

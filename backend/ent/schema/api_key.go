@@ -34,6 +34,7 @@ func (APIKey) Mixin() []ent.Mixin {
 func (APIKey) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("user_id"),
+		field.String("model_scope").MaxLen(16).Default("all"),
 		field.String("key").
 			MaxLen(128).
 			NotEmpty().

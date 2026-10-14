@@ -12,6 +12,13 @@ type plazaGatewayModelCatalog struct {
 	gateway *GatewayService
 }
 
+func (c plazaGatewayModelCatalog) MixedBillingModels(ctx context.Context, group *Group, model string) []string {
+	if c.gateway == nil {
+		return nil
+	}
+	return c.gateway.mixedCatalogueBillingModels(ctx, group, model, c.gateway.ensureGroupModelsCatalog(ctx, &group.ID))
+}
+
 func (c plazaGatewayModelCatalog) GetAvailableModels(ctx context.Context, groupID *int64, platform string) []string {
 	if c.gateway == nil {
 		return nil

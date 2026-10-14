@@ -335,7 +335,7 @@ const statusLabel = (status: RowStatus) => {
 
 const resultPreview = (row: ModelTestRow) => {
   if (row.status === 'idle') return '-'
-  if (row.status === 'running') return summarizeAccountModelTestOutput(row) || t('admin.accounts.batchTest.running')
+  if (row.status === 'running') return summarizeAccountModelTestOutput(row) || row.progressText || t('admin.accounts.batchTest.running')
   if (row.status === 'skipped') return row.error || t('admin.accounts.batchTest.skipped')
   const summary = summarizeAccountModelTestOutput(row)
   if (summary) return summary
@@ -486,6 +486,7 @@ watch(includeMedia, () => {
 const resetOutput = (row: ModelTestRow) => {
   const fresh = createAccountModelTestOutput()
   row.output = fresh.output
+  row.progressText = undefined
   row.success = undefined
   row.error = ''
   row.images = []

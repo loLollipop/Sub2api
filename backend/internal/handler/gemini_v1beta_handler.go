@@ -100,12 +100,21 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 
 	// 分组级模型白名单启用时过滤 models[].name（含前缀 models/xxx）。
 	filterGeminiModels := func(models []gemini.Model) []gemini.Model {
-		if apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled() {
+		if (apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled()) && service.NormalizeModelScope(apiKey.ModelScope) == service.ModelScopeAll {
 			return models
 		}
 		filtered := make([]gemini.Model, 0, len(models))
+		ids := make([]string, 0, len(models))
 		for _, model := range models {
-			if apiKey.Group.ModelAllowlist.Allows(model.Name) {
+			ids = append(ids, model.Name)
+		}
+		allowed := h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, ids)
+		allow := make(map[string]bool, len(allowed))
+		for _, id := range allowed {
+			allow[id] = true
+		}
+		for _, model := range models {
+			if allow[model.Name] && (apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled() || apiKey.Group.ModelAllowlist.Allows(model.Name)) {
 				filtered = append(filtered, model)
 			}
 		}
@@ -172,6 +181,16 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		if filtered, dropped, ok := filterUpstreamGeminiModelsBody(res.Body, apiKey.Group.ModelAllowlist); ok && dropped {
 			res.Body = filtered
 		}
+	}
+	if service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll {
+		filtered, err := filterModelCatalogueForScope(res.Body, apiKey.ModelScope, func(models []string) []string {
+			return h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, models)
+		})
+		if err != nil {
+			googleError(c, http.StatusBadGateway, "Invalid model catalogue")
+			return
+		}
+		res.Body = filtered
 	}
 	writeUpstreamResponse(c, res)
 }
@@ -297,6 +316,14 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 	}
 	if resolvedModel, ok := service.ResolvedUpstreamModelFromContext(c.Request.Context()); ok && strings.TrimSpace(resolvedModel) != "" {
 		modelName = strings.TrimSpace(resolvedModel)
+	}
+	if !apiKey.AllowsModelScope(modelName) {
+		googleError(c, http.StatusNotFound, "Model is not available for this API key")
+		return
+	}
+	if service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll && len(h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, []string{modelName})) == 0 {
+		googleError(c, http.StatusNotFound, "Model is not available for this API key")
+		return
 	}
 
 	// 强制 antigravity 模式：返回 antigravity 模型信息
@@ -609,6 +636,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			modelName = openAIChannelForwardModel(channelMapping, reqModel)
 		}
 		if err != nil {
+			if handleGeminiModelScopeError(c, err, streamStarted) {
+				return
+			}
 			if len(fs.FailedAccountIDs) == 0 {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, modelName, modelName, service.PlatformGemini)
 				cls = classifySelectionFailureErrorFromGin(c, err, cls)
@@ -786,6 +816,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			})
 		}
 		if err != nil {
+			if handleGeminiModelScopeError(c, err, streamStarted) {
+				return
+			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionKey, account, err)
 			var failoverErr *service.UpstreamFailoverError
 			if result == nil && errors.As(err, &failoverErr) {

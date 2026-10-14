@@ -114,6 +114,7 @@ type APIKeyMutation struct {
 	created_at               *time.Time
 	updated_at               *time.Time
 	deleted_at               *time.Time
+	model_scope              *string
 	key                      *string
 	name                     *string
 	status                   *string
@@ -409,6 +410,42 @@ func (m *APIKeyMutation) OldUserID(ctx context.Context) (v int64, err error) {
 // ResetUserID resets all changes to the "user_id" field.
 func (m *APIKeyMutation) ResetUserID() {
 	m.user = nil
+}
+
+// SetModelScope sets the "model_scope" field.
+func (m *APIKeyMutation) SetModelScope(s string) {
+	m.model_scope = &s
+}
+
+// ModelScope returns the value of the "model_scope" field in the mutation.
+func (m *APIKeyMutation) ModelScope() (r string, exists bool) {
+	v := m.model_scope
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModelScope returns the old "model_scope" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldModelScope(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModelScope is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModelScope requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModelScope: %w", err)
+	}
+	return oldValue.ModelScope, nil
+}
+
+// ResetModelScope resets all changes to the "model_scope" field.
+func (m *APIKeyMutation) ResetModelScope() {
+	m.model_scope = nil
 }
 
 // SetKey sets the "key" field.
@@ -1569,7 +1606,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 25)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1581,6 +1618,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.user != nil {
 		fields = append(fields, apikey.FieldUserID)
+	}
+	if m.model_scope != nil {
+		fields = append(fields, apikey.FieldModelScope)
 	}
 	if m.key != nil {
 		fields = append(fields, apikey.FieldKey)
@@ -1658,6 +1698,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.DeletedAt()
 	case apikey.FieldUserID:
 		return m.UserID()
+	case apikey.FieldModelScope:
+		return m.ModelScope()
 	case apikey.FieldKey:
 		return m.Key()
 	case apikey.FieldName:
@@ -1715,6 +1757,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldDeletedAt(ctx)
 	case apikey.FieldUserID:
 		return m.OldUserID(ctx)
+	case apikey.FieldModelScope:
+		return m.OldModelScope(ctx)
 	case apikey.FieldKey:
 		return m.OldKey(ctx)
 	case apikey.FieldName:
@@ -1791,6 +1835,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUserID(v)
+		return nil
+	case apikey.FieldModelScope:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelScope(v)
 		return nil
 	case apikey.FieldKey:
 		v, ok := value.(string)
@@ -2148,6 +2199,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldUserID:
 		m.ResetUserID()
+		return nil
+	case apikey.FieldModelScope:
+		m.ResetModelScope()
 		return nil
 	case apikey.FieldKey:
 		m.ResetKey()
@@ -22142,6 +22196,7 @@ type GroupMutation struct {
 	description                             *string
 	rate_multiplier                         *float64
 	addrate_multiplier                      *float64
+	mixed_provider_rate_multipliers         *map[string]float64
 	peak_rate_enabled                       *bool
 	peak_start                              *string
 	peak_end                                *string
@@ -22614,6 +22669,55 @@ func (m *GroupMutation) AddedRateMultiplier() (r float64, exists bool) {
 func (m *GroupMutation) ResetRateMultiplier() {
 	m.rate_multiplier = nil
 	m.addrate_multiplier = nil
+}
+
+// SetMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field.
+func (m *GroupMutation) SetMixedProviderRateMultipliers(value map[string]float64) {
+	m.mixed_provider_rate_multipliers = &value
+}
+
+// MixedProviderRateMultipliers returns the value of the "mixed_provider_rate_multipliers" field in the mutation.
+func (m *GroupMutation) MixedProviderRateMultipliers() (r map[string]float64, exists bool) {
+	v := m.mixed_provider_rate_multipliers
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMixedProviderRateMultipliers returns the old "mixed_provider_rate_multipliers" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldMixedProviderRateMultipliers(ctx context.Context) (v map[string]float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMixedProviderRateMultipliers is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMixedProviderRateMultipliers requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMixedProviderRateMultipliers: %w", err)
+	}
+	return oldValue.MixedProviderRateMultipliers, nil
+}
+
+// ClearMixedProviderRateMultipliers clears the value of the "mixed_provider_rate_multipliers" field.
+func (m *GroupMutation) ClearMixedProviderRateMultipliers() {
+	m.mixed_provider_rate_multipliers = nil
+	m.clearedFields[group.FieldMixedProviderRateMultipliers] = struct{}{}
+}
+
+// MixedProviderRateMultipliersCleared returns if the "mixed_provider_rate_multipliers" field was cleared in this mutation.
+func (m *GroupMutation) MixedProviderRateMultipliersCleared() bool {
+	_, ok := m.clearedFields[group.FieldMixedProviderRateMultipliers]
+	return ok
+}
+
+// ResetMixedProviderRateMultipliers resets all changes to the "mixed_provider_rate_multipliers" field.
+func (m *GroupMutation) ResetMixedProviderRateMultipliers() {
+	m.mixed_provider_rate_multipliers = nil
+	delete(m.clearedFields, group.FieldMixedProviderRateMultipliers)
 }
 
 // SetPeakRateEnabled sets the "peak_rate_enabled" field.
@@ -26012,7 +26116,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 67)
+	fields := make([]string, 0, 68)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26030,6 +26134,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.rate_multiplier != nil {
 		fields = append(fields, group.FieldRateMultiplier)
+	}
+	if m.mixed_provider_rate_multipliers != nil {
+		fields = append(fields, group.FieldMixedProviderRateMultipliers)
 	}
 	if m.peak_rate_enabled != nil {
 		fields = append(fields, group.FieldPeakRateEnabled)
@@ -26234,6 +26341,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.Description()
 	case group.FieldRateMultiplier:
 		return m.RateMultiplier()
+	case group.FieldMixedProviderRateMultipliers:
+		return m.MixedProviderRateMultipliers()
 	case group.FieldPeakRateEnabled:
 		return m.PeakRateEnabled()
 	case group.FieldPeakStart:
@@ -26377,6 +26486,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldDescription(ctx)
 	case group.FieldRateMultiplier:
 		return m.OldRateMultiplier(ctx)
+	case group.FieldMixedProviderRateMultipliers:
+		return m.OldMixedProviderRateMultipliers(ctx)
 	case group.FieldPeakRateEnabled:
 		return m.OldPeakRateEnabled(ctx)
 	case group.FieldPeakStart:
@@ -26549,6 +26660,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRateMultiplier(v)
+		return nil
+	case group.FieldMixedProviderRateMultipliers:
+		v, ok := value.(map[string]float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMixedProviderRateMultipliers(v)
 		return nil
 	case group.FieldPeakRateEnabled:
 		v, ok := value.(bool)
@@ -27340,6 +27458,9 @@ func (m *GroupMutation) ClearedFields() []string {
 	if m.FieldCleared(group.FieldDescription) {
 		fields = append(fields, group.FieldDescription)
 	}
+	if m.FieldCleared(group.FieldMixedProviderRateMultipliers) {
+		fields = append(fields, group.FieldMixedProviderRateMultipliers)
+	}
 	if m.FieldCleared(group.FieldDuplicateOperationID) {
 		fields = append(fields, group.FieldDuplicateOperationID)
 	}
@@ -27419,6 +27540,9 @@ func (m *GroupMutation) ClearField(name string) error {
 		return nil
 	case group.FieldDescription:
 		m.ClearDescription()
+		return nil
+	case group.FieldMixedProviderRateMultipliers:
+		m.ClearMixedProviderRateMultipliers()
 		return nil
 	case group.FieldDuplicateOperationID:
 		m.ClearDuplicateOperationID()
@@ -27505,6 +27629,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldRateMultiplier:
 		m.ResetRateMultiplier()
+		return nil
+	case group.FieldMixedProviderRateMultipliers:
+		m.ResetMixedProviderRateMultipliers()
 		return nil
 	case group.FieldPeakRateEnabled:
 		m.ResetPeakRateEnabled()

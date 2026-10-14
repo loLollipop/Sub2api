@@ -1543,9 +1543,9 @@ func ApplyThinkingEnabledFallback(effort *string, body []byte, mappedModel strin
 
 // NormalizeGLMOpenAIReasoningEffort rewrites OpenAI Chat Completions
 // reasoning_effort values to the GLM native scale used by z.ai: high/max.
-// It only applies to glm-* mapped models and leaves all other providers untouched.
+// It only applies to bare or recognized provider-prefixed GLM mapped models.
 func NormalizeGLMOpenAIReasoningEffort(body []byte, mappedModel string) ([]byte, bool) {
-	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(mappedModel)), "glm-") {
+	if !strings.HasPrefix(glmModelFamilyName(mappedModel), "glm-") {
 		return body, false
 	}
 
@@ -1580,7 +1580,18 @@ func normalizeEffortToken(raw string) string {
 }
 
 func isGLM53Model(model string) bool {
-	return strings.EqualFold(strings.TrimSpace(model), "glm-5.3")
+	return glmModelFamilyName(model) == "glm-5.3"
+}
+
+// Recognize the same provider prefixes used by the existing catalog aliases.
+// This is for parameter adaptation only; never rewrite the upstream model ID.
+func glmModelFamilyName(model string) string {
+	model = strings.ToLower(strings.TrimSpace(model))
+	provider, family, prefixed := strings.Cut(model, "/")
+	if prefixed && (provider == "z-ai" || provider == "zhipuai") && !strings.Contains(family, "/") {
+		return family
+	}
+	return model
 }
 
 func normalizeGLMOpenAIReasoningEffort(raw string) string {

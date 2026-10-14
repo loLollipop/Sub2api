@@ -20,6 +20,7 @@ export interface AccountModelTestMedia {
 
 export interface AccountModelTestOutput {
   output: string
+  progressText?: string
   success?: boolean
   error?: string
   images: AccountModelTestMedia[]
@@ -127,9 +128,12 @@ export function applyAccountModelTestEvent(
 ): void {
   switch (event.type) {
     case 'content':
-    case 'status':
     case 'text':
       if (event.text) state.output += event.text
+      break
+    case 'status':
+      // Transport/progress diagnostics are not the model's answer.
+      state.progressText = event.text
       break
     case 'image':
       if (event.image_url) {

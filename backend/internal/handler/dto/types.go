@@ -54,6 +54,7 @@ type AdminUser struct {
 }
 
 type APIKey struct {
+	ModelScope  string     `json:"model_scope"`
 	ID          int64      `json:"id"`
 	UserID      int64      `json:"user_id"`
 	Key         string     `json:"key"`
@@ -94,13 +95,16 @@ type APIKey struct {
 }
 
 type Group struct {
-	ID             int64   `json:"id"`
-	Name           string  `json:"name"`
-	Description    string  `json:"description"`
-	Platform       string  `json:"platform"`
-	RateMultiplier float64 `json:"rate_multiplier"`
-	IsExclusive    bool    `json:"is_exclusive"`
-	Status         string  `json:"status"`
+	SupportedKeyProviders        []string           `json:"supported_key_providers"`
+	SupportedModelVendors        []string           `json:"supported_model_vendors"`
+	MixedProviderRateMultipliers map[string]float64 `json:"mixed_provider_rate_multipliers,omitempty"`
+	ID                           int64              `json:"id"`
+	Name                         string             `json:"name"`
+	Description                  string             `json:"description"`
+	Platform                     string             `json:"platform"`
+	RateMultiplier               float64            `json:"rate_multiplier"`
+	IsExclusive                  bool               `json:"is_exclusive"`
+	Status                       string             `json:"status"`
 
 	SubscriptionType          string   `json:"subscription_type"`
 	DailyLimitUSD             *float64 `json:"daily_limit_usd"`

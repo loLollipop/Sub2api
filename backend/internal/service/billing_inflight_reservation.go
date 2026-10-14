@@ -432,13 +432,13 @@ func inflightBillingModelCandidates(ctx context.Context, deps inflightEstimateDe
 	return primary, fallbacks, upstreamInput
 }
 
-func (d inflightEstimateDeps) rates(ctx context.Context, apiKey *APIKey) (text, image float64) {
+func (d inflightEstimateDeps) rates(ctx context.Context, apiKey *APIKey, model string) (text, image float64) {
 	rate := 1.0
 	if d.cfg != nil && d.cfg.Default.RateMultiplier > 0 {
 		rate = d.cfg.Default.RateMultiplier
 	}
 	if apiKey != nil && apiKey.GroupID != nil && apiKey.Group != nil {
-		rate = apiKey.Group.RateMultiplier
+		rate = apiKey.Group.RateMultiplierForModel(model)
 		if d.userGroupRate != nil && apiKey.User != nil {
 			rate = d.userGroupRate(ctx, apiKey.User.ID, *apiKey.GroupID, rate)
 		}
@@ -483,7 +483,7 @@ func maxPerRequestPrice(resolved *ResolvedPricing) float64 {
 func validCost(v float64) bool { return v > 0 && !math.IsNaN(v) && !math.IsInf(v, 0) }
 
 // estimateOne 估算单个候选计费模型（未乘倍率的 token 部分与按次部分分开返回，便于套用不同倍率）。
-func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, model string, req InflightEstimateRequest, textRate, imageRate float64) float64 {
+func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, model string, req InflightEstimateRequest, textRate, imageRate float64) (float64, bool) {
 	cfg := inflightReservationCfg(d.cfg)
 	units := req.Units
 	if units <= 0 {
@@ -500,6 +500,7 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 	}
 
 	inputTokens, outputTokens := tokenCounts(cfg, req.BodyBytes, req.MaxTokens)
+	priced := false
 	tokenCost := func() float64 {
 		var pricing *ModelPricing
 		if resolved != nil && (resolved.Mode == BillingModeToken || resolved.Mode == "") && d.resolver != nil {
@@ -511,11 +512,15 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 		if pricing == nil {
 			return 0
 		}
+		priced = true
 		return (float64(inputTokens)*pricing.InputPricePerToken + float64(outputTokens)*pricing.OutputPricePerToken) * textRate
 	}
 
 	var cost float64
 	perRequestMode := resolved != nil && (resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage || resolved.Mode == BillingModeVideo)
+	if perRequestMode {
+		priced = true
+	}
 	switch req.Kind {
 	case InflightEstimateImage:
 		if perRequestMode {
@@ -524,8 +529,11 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 		if d.billing != nil {
 			cfgImg := imagePriceConfigFromAPIKey(apiKey)
 			for _, tier := range []string{ImageBillingSize1K, ImageBillingSize2K, ImageBillingSize4K} {
-				if b := d.billing.CalculateImageCost(model, tier, units, cfgImg, imageRate); b != nil && b.ActualCost > cost {
-					cost = b.ActualCost
+				if b := d.billing.CalculateImageCost(model, tier, units, cfgImg, imageRate); b != nil {
+					priced = true
+					if b.ActualCost > cost {
+						cost = b.ActualCost
+					}
 				}
 			}
 		}
@@ -537,8 +545,11 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 			cost = maxPerRequestPrice(resolved) * float64(units) * math.Max(textRate, imageRate)
 		}
 		if d.billing != nil {
-			if b := d.billing.CalculateVideoCost(model, req.VideoResolution, units, req.VideoDurationSeconds, videoPriceConfigFromAPIKey(apiKey), math.Max(textRate, imageRate)); b != nil && b.ActualCost > cost {
-				cost = b.ActualCost
+			if b := d.billing.CalculateVideoCost(model, req.VideoResolution, units, req.VideoDurationSeconds, videoPriceConfigFromAPIKey(apiKey), math.Max(textRate, imageRate)); b != nil {
+				priced = true
+				if b.ActualCost > cost {
+					cost = b.ActualCost
+				}
 			}
 		}
 	case InflightEstimateAudio:
@@ -573,9 +584,9 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 		}
 	}
 	if !validCost(cost) {
-		return 0
+		return 0, priced
 	}
-	return cost
+	return cost, true
 }
 
 // estimate 返回保守的单请求费用（USD，已乘倍率）；无法定价返回 (0,false)。
@@ -587,36 +598,71 @@ func (d inflightEstimateDeps) estimate(ctx context.Context, apiKey *APIKey, req 
 		// 非计量请求（媒体状态查询、custom-voices 等）：无需预留，也不算「无法定价」。
 		return 0, true
 	}
-	textRate, imageRate := d.rates(ctx, apiKey)
-	if textRate <= 0 && imageRate <= 0 {
+	textRate, imageRate := d.rates(ctx, apiKey, req.Model)
+	mixed := apiKey.Group != nil && apiKey.Group.Platform == PlatformMixed
+	if textRate <= 0 && imageRate <= 0 && !mixed {
 		// 免费分组：不计费，也无需预留。
 		return 0, true
 	}
 	primary, fallbacks, upstreamInput := inflightBillingModelCandidates(ctx, d, apiKey, req.Model)
-	bestOf := func(models []string) float64 {
+	billingSource := ""
+	fixedChannelIdentity := false
+	if mixed && d.resolveMapping != nil && apiKey.GroupID != nil {
+		mapping := d.resolveMapping(ctx, *apiKey.GroupID, req.Model)
+		billingSource = mapping.BillingModelSource
+		fixedChannelIdentity = billingSource == BillingModelSourceChannelMapped && mapping.MappedModel != "" && mapping.MappedModel != req.Model
+		if fixedChannelIdentity {
+			primary = []string{mapping.MappedModel}
+		}
+	}
+	upstream := billingSource == "" || billingSource == BillingModelSourceUpstream
+	allCandidatesFree := true
+	bestOf := func(models []string) (float64, bool) {
 		best := 0.0
+		priced := false
 		for _, m := range models {
-			if c := d.estimateOne(ctx, apiKey, m, req, textRate, imageRate); c > best {
+			candidateText, candidateImage := textRate, imageRate
+			if mixed {
+				m = mixedBillingPricingIdentity(ctx, d.billing, d.resolver, apiKey.GroupID, apiKey.Group, m, upstream)
+				candidateText, candidateImage = d.rates(ctx, apiKey, m)
+			}
+			allCandidatesFree = allCandidatesFree && candidateText <= 0 && candidateImage <= 0
+			c, candidatePriced := d.estimateOne(ctx, apiKey, m, req, candidateText, candidateImage)
+			priced = priced || candidatePriced
+			if c > best {
 				best = c
 			}
 		}
-		return best
+		return best, priced
 	}
-	best := bestOf(primary)
+	best, priced := bestOf(primary)
+	// A priced explicit identity wins, even when its vendor is free. Do not
+	// reserve account targets that neither usage billing path will charge.
+	if mixed && (billingSource == BillingModelSourceRequested || fixedChannelIdentity) && priced {
+		return best, true
+	}
 	// composite 分组：计费侧除非别名有显式渠道价，否则按实际转发的具体模型计费；
 	// 别名本身可能命中家族模糊价（低估），因此与候选具体模型一起取最高。
 	composite := apiKey.Group != nil && apiKey.Group.Platform == PlatformComposite
-	if best <= 0 || composite {
+	if best <= 0 || composite || mixed {
 		// 与 billableModelWithFallback 同口径：首选模型无价时回退到实际转发模型。
-		if c := bestOf(fallbacks); c > best {
+		c, fallbackPriced := bestOf(fallbacks)
+		priced = priced || fallbackPriced
+		if c > best {
 			best = c
 		}
-		// 账号级映射候选（读调度器快照）仅在仍无法定价或 composite 时才查，已定价模型不触发。
-		if (best <= 0 || composite) && d.accountMappedModels != nil {
-			if c := bestOf(d.accountMappedModels(ctx, apiKey, upstreamInput)); c > best {
+		// Mixed rates may differ after account mapping, even if the public alias
+		// is priced. Read those candidates from the scheduler snapshot too.
+		if (best <= 0 || composite || mixed) && d.accountMappedModels != nil {
+			c, mappedPriced := bestOf(d.accountMappedModels(ctx, apiKey, upstreamInput))
+			priced = priced || mappedPriced
+			if c > best {
 				best = c
 			}
 		}
+	}
+	if mixed && (priced || allCandidatesFree) {
+		return best, true
 	}
 	if best <= 0 {
 		logInflightUnpriced(req.Model, apiKey.GroupID)

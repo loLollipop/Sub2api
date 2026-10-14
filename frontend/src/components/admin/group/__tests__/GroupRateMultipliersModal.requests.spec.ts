@@ -33,6 +33,37 @@ async function openGroup() {
 }
 
 describe('group rate multiplier request ownership', () => {
+  it('adds and saves an explicit Mixed zero override without showing a hidden total rate', async () => {
+    mocks.getGroupRateMultipliers.mockResolvedValue([])
+    const wrapper = await openGroup()
+    await wrapper.setProps({ group: { ...group(1), platform: 'mixed', rate_multiplier: 9 } })
+    await flushPromises()
+    const view = wrapper.vm as unknown as {
+      newRate: number
+      selectUser: (user: AdminUser) => void
+      handleAddLocal: () => void
+    }
+    view.selectUser({ id: 3, email: 'user3@example.com', status: 'active' } as AdminUser)
+    view.newRate = 0
+    await flushPromises()
+    expect(wrapper.findAll('button').find(button => button.text() === 'common.add')!.attributes('disabled')).toBeUndefined()
+    view.handleAddLocal()
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('9x')
+    await wrapper.findAll('button').find(button => button.text() === 'common.save')!.trigger('click')
+    expect(mocks.batchSetGroupRateMultipliers).toHaveBeenCalledWith(1, [{ user_id: 3, rate_multiplier: 0 }])
+  })
+
+  it.each([0, -1, 1000000, Number.NaN, Infinity])('blocks invalid ordinary rate %s before saving', async (rate) => {
+    mocks.getGroupRateMultipliers.mockResolvedValue(entries(1))
+    const wrapper = await openGroup()
+    await flushPromises()
+    const view = wrapper.vm as unknown as { localEntries: Array<{ rate_multiplier: number }>; handleSave: () => Promise<void> }
+    view.localEntries[0].rate_multiplier = rate
+    await view.handleSave()
+    expect(mocks.batchSetGroupRateMultipliers).not.toHaveBeenCalled()
+    expect(mocks.showError).toHaveBeenCalled()
+  })
   it('keeps group B when group A completes late without closing the dialog', async () => {
     const old = deferred()
     mocks.getGroupRateMultipliers.mockReturnValueOnce(old.promise).mockResolvedValueOnce(entries(2))

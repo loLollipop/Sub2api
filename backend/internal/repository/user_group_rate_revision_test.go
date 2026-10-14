@@ -100,7 +100,9 @@ func TestUserGroupRateRepositoryRevision_FailedWritesDoNotAdvance(t *testing.T) 
 					err = repo.SyncGroupRateMultipliers(context.Background(), 10, nil)
 				}
 				require.ErrorIs(t, err, writeErr)
-				require.Zero(t, repo.(service.UserGroupRateRevisionRepository).UserGroupRateRevision())
+				revision, ok := repo.(service.UserGroupRateRevisionRepository)
+				require.True(t, ok)
+				require.Zero(t, revision.UserGroupRateRevision())
 				require.NoError(t, mock.ExpectationsWereMet())
 			})
 		}
@@ -116,7 +118,9 @@ func TestUserGroupRateRepositoryRevision_FailedWritesDoNotAdvance(t *testing.T) 
 			err = repo.DeleteByUserID(context.Background(), 42)
 		}
 		require.ErrorIs(t, err, writeErr)
-		require.Zero(t, repo.(service.UserGroupRateRevisionRepository).UserGroupRateRevision())
+		revision, ok := repo.(service.UserGroupRateRevisionRepository)
+		require.True(t, ok)
+		require.Zero(t, revision.UserGroupRateRevision())
 		require.NoError(t, mock.ExpectationsWereMet())
 		_ = db.Close()
 	}

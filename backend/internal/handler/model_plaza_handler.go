@@ -69,6 +69,9 @@ type modelPlazaTimePricing struct {
 type modelPlazaModel struct {
 	Name            string                     `json:"name"`
 	Platform        string                     `json:"platform"`
+	RateMultiplier  *float64                   `json:"rate_multiplier,omitempty"`
+	ModelVendor     string                     `json:"model_vendor,omitempty"`
+	BillingModel    string                     `json:"billing_model,omitempty"`
 	Pricing         *userSupportedModelPricing `json:"pricing"`
 	OfficialPricing *modelPlazaOfficialPricing `json:"official_pricing"`
 	// LongContextBasis 多档时的计价基准："whole_request"（整单按档）| "marginal"（仅超出部分）。
@@ -207,6 +210,9 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64, qu
 		models = append(models, modelPlazaModel{
 			Name:             m.Name,
 			Platform:         m.Platform,
+			RateMultiplier:   m.RateMultiplier,
+			ModelVendor:      m.ModelVendor,
+			BillingModel:     m.BillingModel,
 			Pricing:          toUserPricing(m.Pricing),
 			OfficialPricing:  toModelPlazaOfficialPricing(m.OfficialPricing),
 			LongContextBasis: string(m.LongContextBasis),

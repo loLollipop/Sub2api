@@ -1,6 +1,20 @@
 package service
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"math"
+)
+
+// The durable rate column is DECIMAL(10,4).
+const maxUserGroupRateMultiplier = 999999.9999
+
+func validateUserGroupRateMultiplier(rate float64) error {
+	if math.IsNaN(rate) || math.IsInf(rate, 0) || rate < 0 || rate > maxUserGroupRateMultiplier {
+		return fmt.Errorf("rate_multiplier must be finite and between 0 and %.4f", maxUserGroupRateMultiplier)
+	}
+	return nil
+}
 
 // UserGroupRateEntry 分组下用户专属倍率/RPM 条目。
 // RateMultiplier 与 RPMOverride 均为指针以支持"未设置"语义（NULL）。
@@ -60,4 +74,11 @@ type UserGroupRateRepository interface {
 
 	// DeleteByUserID 删除指定用户的所有专属条目（用户删除时调用）
 	DeleteByUserID(ctx context.Context, userID int64) error
+}
+
+// UserGroupRateRevisionRepository optionally exposes a process-local revision
+// shared by every resolver using the same repository. It advances only after
+// durable rate writes, so checking it never requires another database read.
+type UserGroupRateRevisionRepository interface {
+	UserGroupRateRevision() uint64
 }

@@ -405,6 +405,9 @@ func ContextWithAPIKeyRoute(ctx context.Context, key *APIKey) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if key != nil && NormalizeModelScope(key.ModelScope) != ModelScopeAll {
+		ctx = ContextWithModelScope(ctx, key.ModelScope)
+	}
 	if key == nil || key.GroupID == nil || key.Group == nil || key.Group.ID != *key.GroupID {
 		return ctx
 	}
@@ -524,6 +527,14 @@ func (r *apiKeyRouteIterator) loadNext() bool {
 		model := mapping.MappedModel
 		if !mapping.Mapped && r.fallbackModel != nil {
 			model = r.fallbackModel(routeCtx, routed.Group, r.requestedModel)
+		}
+		// Capability-only selection uses an empty model placeholder. The actual
+		// Live/Realtime model is checked by its executor before upstream access.
+		if !ValidModelScope(routed.ModelScope) ||
+			(r.requestedModel != "" && (!routed.AllowsModelScope(r.requestedModel) || !routed.AllowsModelScope(model))) ||
+			(model != "" && !routed.AllowsModelScope(model)) {
+			r.err = ErrModelScopeDenied
+			continue
 		}
 		cat := r.catalog(routeCtx, routed.GroupID)
 		presence := catalogHasRequestedModel(cat, r.requestedModel)

@@ -32,7 +32,7 @@ func (u *mixedHandlerUpstream) Do(req *http.Request, _ string, _ int64, _ int) (
 	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"id":"cc_mixed","model":"gpt-5.1","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`))}, nil
 }
 
-func newMixedSafetyHandler(t *testing.T, primary, backup *service.Group, platform string) (*OpenAIGatewayHandler, *mixedHandlerUpstream, *service.APIKey) {
+func newMixedSafetyHandler(t *testing.T, primary, backup *service.Group, platform string, channels ...*service.ChannelService) (*OpenAIGatewayHandler, *mixedHandlerUpstream, *service.APIKey) {
 	t.Helper()
 	account := service.Account{ID: 1, Platform: platform, Type: service.AccountTypeAPIKey, Status: service.StatusActive, Schedulable: true, GroupIDs: []int64{backup.ID}, Credentials: map[string]any{"api_key": "test", "base_url": "https://upstream.invalid/v1", "model_mapping": map[string]any{"gpt-5.1": "gpt-5.1"}}}
 	cfg := &config.Config{RunMode: config.RunModeStandard}
@@ -47,7 +47,11 @@ func newMixedSafetyHandler(t *testing.T, primary, backup *service.Group, platfor
 	t.Cleanup(billingCache.Stop)
 	upstream := &mixedHandlerUpstream{}
 	usage := smartRouteHandlerUsage{logs: make(chan *service.UsageLog, 5)}
-	gateway := service.NewOpenAIGatewayService(accountRepo, usage, smartRouteHandlerBilling{}, nil, nil, nil, nil, cfg, snapshot, nil, service.NewBillingService(cfg, nil), nil, billingCache, upstream, &service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil)
+	var channel *service.ChannelService
+	if len(channels) > 0 {
+		channel = channels[0]
+	}
+	gateway := service.NewOpenAIGatewayService(accountRepo, usage, smartRouteHandlerBilling{}, nil, nil, nil, nil, cfg, snapshot, nil, service.NewBillingService(cfg, nil), nil, billingCache, upstream, &service.DeferredService{}, nil, nil, nil, channel, nil, nil, nil)
 	h := NewOpenAIGatewayHandler(gateway, service.NewConcurrencyService(nil), billingCache, &service.APIKeyService{}, nil, nil, nil, nil, cfg)
 	key := &service.APIKey{ID: 7, UserID: 42, User: &service.User{ID: 42, Status: service.StatusActive}, GroupID: &primary.ID, Group: primary, RouteGroupIDs: []int64{primary.ID, backup.ID}}
 	return h, upstream, key

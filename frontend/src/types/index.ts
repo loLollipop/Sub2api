@@ -563,6 +563,9 @@ export interface ReasoningEffortMapping {
 }
 
 export interface Group {
+  mixed_provider_rate_multipliers?: import('@/utils/mixed-provider-rates').MixedProviderRates | null
+  supported_model_vendors?: import('@/utils/mixed-provider-rates').MixedModelVendor[] | null
+  supported_key_providers?: Array<'openai' | 'anthropic' | 'cn' | 'other'>
   id: number
   name: string
   description: string | null
@@ -731,6 +734,7 @@ export interface CompositeRouteDecision {
 }
 
 export interface ApiKey {
+  model_scope?: 'all' | 'openai' | 'anthropic' | 'cn' | 'other'
   id: number
   user_id: number
   key: string
@@ -766,6 +770,7 @@ export interface ApiKey {
 }
 
 export interface CreateApiKeyRequest {
+  model_scope?: 'all' | 'openai' | 'anthropic' | 'cn' | 'other'
   name: string
   group_id?: number | null
   group_ids?: number[]
@@ -781,6 +786,7 @@ export interface CreateApiKeyRequest {
 }
 
 export interface UpdateApiKeyRequest {
+  model_scope?: 'all' | 'openai' | 'anthropic' | 'cn' | 'other'
   name?: string
   group_id?: number | null
   group_ids?: number[]
@@ -798,6 +804,7 @@ export interface UpdateApiKeyRequest {
 }
 
 export interface CreateGroupRequest {
+  mixed_provider_rate_multipliers?: import('@/utils/mixed-provider-rates').MixedProviderRates
   name: string
   description?: string | null
   platform?: GroupPlatform
@@ -864,6 +871,7 @@ export interface CreateGroupRequest {
 }
 
 export interface UpdateGroupRequest {
+  mixed_provider_rate_multipliers?: import('@/utils/mixed-provider-rates').MixedProviderRates
   name?: string
   description?: string | null
   platform?: GroupPlatform

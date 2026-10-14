@@ -186,6 +186,9 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 			apiKey = routedKey
 		}
 		if err != nil {
+			if h.handleModelScopeError(c, err, false) {
+				return
+			}
 			if failoverClientGone(c) {
 				reqLog.Info("openai_embeddings.account_select_aborted_client_disconnected", zap.Error(err))
 				return
@@ -261,6 +264,9 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 		service.SetOpsLatencyMs(c, service.OpsResponseLatencyMsKey, responseLatencyMs)
 
 		if err != nil {
+			if h.handleModelScopeError(c, err, false) {
+				return
+			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, "", account, err)
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {

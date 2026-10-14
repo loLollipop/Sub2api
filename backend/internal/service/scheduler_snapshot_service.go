@@ -997,6 +997,8 @@ func cloneSchedulerGroup(group *Group) *Group {
 	cp.FallbackGroupIDOnInvalidRequest = cloneGroupValuePointer(group.FallbackGroupIDOnInvalidRequest)
 	cp.ModelRouting = cloneGroupModelRouting(group.ModelRouting)
 	cp.VideoModelPrices = cloneGroupVideoModelPrices(group.VideoModelPrices)
+	cp.MixedProviderRateMultipliers = CloneMixedProviderRateMultipliers(group.MixedProviderRateMultipliers)
+	cp.SupportedModelVendors = append([]string(nil), group.SupportedModelVendors...)
 	cp.SupportedModelScopes = append([]string(nil), group.SupportedModelScopes...)
 	if group.ModelPricing != nil {
 		cp.ModelPricing = make([]ChannelModelPricing, len(group.ModelPricing))

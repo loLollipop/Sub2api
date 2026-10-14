@@ -118,6 +118,18 @@ func (_u *GroupUpdate) AddRateMultiplier(v float64) *GroupUpdate {
 	return _u
 }
 
+// SetMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field.
+func (_u *GroupUpdate) SetMixedProviderRateMultipliers(v map[string]float64) *GroupUpdate {
+	_u.mutation.SetMixedProviderRateMultipliers(v)
+	return _u
+}
+
+// ClearMixedProviderRateMultipliers clears the value of the "mixed_provider_rate_multipliers" field.
+func (_u *GroupUpdate) ClearMixedProviderRateMultipliers() *GroupUpdate {
+	_u.mutation.ClearMixedProviderRateMultipliers()
+	return _u
+}
+
 // SetPeakRateEnabled sets the "peak_rate_enabled" field.
 func (_u *GroupUpdate) SetPeakRateEnabled(v bool) *GroupUpdate {
 	_u.mutation.SetPeakRateEnabled(v)
@@ -1601,6 +1613,12 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AddedRateMultiplier(); ok {
 		_spec.AddField(group.FieldRateMultiplier, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.MixedProviderRateMultipliers(); ok {
+		_spec.SetField(group.FieldMixedProviderRateMultipliers, field.TypeJSON, value)
+	}
+	if _u.mutation.MixedProviderRateMultipliersCleared() {
+		_spec.ClearField(group.FieldMixedProviderRateMultipliers, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.PeakRateEnabled(); ok {
 		_spec.SetField(group.FieldPeakRateEnabled, field.TypeBool, value)
 	}
@@ -2326,6 +2344,18 @@ func (_u *GroupUpdateOne) SetNillableRateMultiplier(v *float64) *GroupUpdateOne 
 // AddRateMultiplier adds value to the "rate_multiplier" field.
 func (_u *GroupUpdateOne) AddRateMultiplier(v float64) *GroupUpdateOne {
 	_u.mutation.AddRateMultiplier(v)
+	return _u
+}
+
+// SetMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field.
+func (_u *GroupUpdateOne) SetMixedProviderRateMultipliers(v map[string]float64) *GroupUpdateOne {
+	_u.mutation.SetMixedProviderRateMultipliers(v)
+	return _u
+}
+
+// ClearMixedProviderRateMultipliers clears the value of the "mixed_provider_rate_multipliers" field.
+func (_u *GroupUpdateOne) ClearMixedProviderRateMultipliers() *GroupUpdateOne {
+	_u.mutation.ClearMixedProviderRateMultipliers()
 	return _u
 }
 
@@ -3841,6 +3871,12 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.AddedRateMultiplier(); ok {
 		_spec.AddField(group.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.MixedProviderRateMultipliers(); ok {
+		_spec.SetField(group.FieldMixedProviderRateMultipliers, field.TypeJSON, value)
+	}
+	if _u.mutation.MixedProviderRateMultipliersCleared() {
+		_spec.ClearField(group.FieldMixedProviderRateMultipliers, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.PeakRateEnabled(); ok {
 		_spec.SetField(group.FieldPeakRateEnabled, field.TypeBool, value)

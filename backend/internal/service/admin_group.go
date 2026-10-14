@@ -396,11 +396,17 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		normalizeCreateGroupInputForSimpleMode(input)
 	}
+	if NormalizeGroupPlatform(input.Platform) == PlatformMixed {
+		input.RateMultiplier = 1 // Mixed billing uses only absolute vendor rates.
+	}
 	if input.RateMultiplier <= 0 {
 		return nil, errors.New("rate_multiplier must be > 0")
 	}
 
 	platform := NormalizeGroupPlatform(input.Platform)
+	if err := ValidateMixedProviderRateMultipliers(input.MixedProviderRateMultipliers); err != nil {
+		return nil, err
+	}
 	// 固定账号 manifest 配置：账号绑定发生在创建之后，创建时无法校验成员关系，
 	// 拒绝开启并在创建后的编辑里配置。
 	if normalizeCodexModelsManifestConfig(platform, input.CodexModelsManifestConfig).Enabled {
@@ -572,6 +578,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		Description:                     input.Description,
 		Platform:                        platform,
 		RateMultiplier:                  input.RateMultiplier,
+		MixedProviderRateMultipliers:    CloneMixedProviderRateMultipliers(input.MixedProviderRateMultipliers),
 		IsExclusive:                     input.IsExclusive,
 		Status:                          StatusActive,
 		SubscriptionType:                subscriptionType,
@@ -808,11 +815,17 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.Platform != "" {
 		group.Platform = input.Platform
 	}
-	if input.RateMultiplier != nil {
+	if input.RateMultiplier != nil && group.Platform != PlatformMixed {
 		if *input.RateMultiplier <= 0 {
 			return nil, errors.New("rate_multiplier must be > 0")
 		}
 		group.RateMultiplier = *input.RateMultiplier
+	}
+	if input.MixedProviderRateMultipliers != nil {
+		if err := ValidateMixedProviderRateMultipliers(input.MixedProviderRateMultipliers); err != nil {
+			return nil, err
+		}
+		group.MixedProviderRateMultipliers = CloneMixedProviderRateMultipliers(input.MixedProviderRateMultipliers)
 	}
 	if input.IsExclusive != nil {
 		group.IsExclusive = *input.IsExclusive
@@ -1305,13 +1318,20 @@ func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, gro
 	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationMultiplier); err != nil {
 		return err
 	}
+	zeroValidated := false
+	for _, e := range entries {
+		if err := validateUserGroupRateMultiplier(e.RateMultiplier); err != nil {
+			return fmt.Errorf("%w (user_id=%d)", err, e.UserID)
+		}
+		if e.RateMultiplier == 0 && !zeroValidated {
+			if err := s.validateZeroUserGroupRate(ctx, groupID); err != nil {
+				return err
+			}
+			zeroValidated = true
+		}
+	}
 	if s.userGroupRateRepo == nil {
 		return nil
-	}
-	for _, e := range entries {
-		if e.RateMultiplier <= 0 {
-			return fmt.Errorf("rate_multiplier must be > 0 (user_id=%d)", e.UserID)
-		}
 	}
 	return s.userGroupRateRepo.SyncGroupRateMultipliers(ctx, groupID, entries)
 }

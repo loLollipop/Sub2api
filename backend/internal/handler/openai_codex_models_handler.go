@@ -38,6 +38,14 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 	}
 
 	ifNoneMatch := c.GetHeader("If-None-Match")
+	var discoveryAccount *service.Account
+	filterScope := func(models []string) []string {
+		models = h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, models)
+		return service.FilterModelsForAccountScope(apiKey.ModelScope, models, discoveryAccount)
+	}
+	if service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll {
+		ifNoneMatch = ""
+	}
 	// 固定账号分支：开启后只用选定账号拉取 manifest，不经过调度器；
 	// 全部不可用/全部失败时按 FallbackToScheduler 决定回退调度器或返回错误。
 	if apiKey.Group.Platform == service.PlatformOpenAI &&
@@ -61,6 +69,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			}
 			// 回退开启：跌入下方调度器循环。
 		} else {
+			discoveryAccount = pinnedAccount
 			// 让 ops 错误日志携带实际拉取成功的首个固定账号。
 			setOpsSelectedAccount(c, pinnedAccount.ID, pinnedAccount.Platform)
 			if err := h.gatewayService.MergeGroupConfiguredCodexModels(c.Request.Context(), apiKey.Group, pinnedManifest, ifNoneMatch); err != nil {
@@ -70,7 +79,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			if c.Request.Context().Err() != nil {
 				return
 			}
-			writeOpenAIModelsResponse(c, pinnedManifest)
+			writeOpenAIModelsResponse(c, pinnedManifest, filterScope)
 			return
 		}
 	}
@@ -89,7 +98,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			return
 		}
 		if configured {
-			writeOpenAIModelsResponse(c, configuredManifest)
+			writeOpenAIModelsResponse(c, configuredManifest, filterScope)
 			return
 		}
 	}
@@ -117,6 +126,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 		}
 		// 让 ops 错误日志携带实际选中的上游账号，便于定位失效账号（#4544）。
 		setOpsSelectedAccount(c, account.ID, account.Platform)
+		discoveryAccount = account
 
 		// The client ETag represents the final group-specific body, so fetch the
 		// source manifest before applying local filtering and alias metadata.
@@ -150,7 +160,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			return
 		}
 
-		writeOpenAIModelsResponse(c, manifest)
+		writeOpenAIModelsResponse(c, manifest, filterScope)
 		return
 	}
 }

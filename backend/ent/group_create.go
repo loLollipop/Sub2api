@@ -106,6 +106,12 @@ func (_c *GroupCreate) SetNillableRateMultiplier(v *float64) *GroupCreate {
 	return _c
 }
 
+// SetMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field.
+func (_c *GroupCreate) SetMixedProviderRateMultipliers(v map[string]float64) *GroupCreate {
+	_c.mutation.SetMixedProviderRateMultipliers(v)
+	return _c
+}
+
 // SetPeakRateEnabled sets the "peak_rate_enabled" field.
 func (_c *GroupCreate) SetPeakRateEnabled(v bool) *GroupCreate {
 	_c.mutation.SetPeakRateEnabled(v)
@@ -1490,6 +1496,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldRateMultiplier, field.TypeFloat64, value)
 		_node.RateMultiplier = value
 	}
+	if value, ok := _c.mutation.MixedProviderRateMultipliers(); ok {
+		_spec.SetField(group.FieldMixedProviderRateMultipliers, field.TypeJSON, value)
+		_node.MixedProviderRateMultipliers = value
+	}
 	if value, ok := _c.mutation.PeakRateEnabled(); ok {
 		_spec.SetField(group.FieldPeakRateEnabled, field.TypeBool, value)
 		_node.PeakRateEnabled = value
@@ -1965,6 +1975,24 @@ func (u *GroupUpsert) UpdateRateMultiplier() *GroupUpsert {
 // AddRateMultiplier adds v to the "rate_multiplier" field.
 func (u *GroupUpsert) AddRateMultiplier(v float64) *GroupUpsert {
 	u.Add(group.FieldRateMultiplier, v)
+	return u
+}
+
+// SetMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field.
+func (u *GroupUpsert) SetMixedProviderRateMultipliers(v map[string]float64) *GroupUpsert {
+	u.Set(group.FieldMixedProviderRateMultipliers, v)
+	return u
+}
+
+// UpdateMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateMixedProviderRateMultipliers() *GroupUpsert {
+	u.SetExcluded(group.FieldMixedProviderRateMultipliers)
+	return u
+}
+
+// ClearMixedProviderRateMultipliers clears the value of the "mixed_provider_rate_multipliers" field.
+func (u *GroupUpsert) ClearMixedProviderRateMultipliers() *GroupUpsert {
+	u.SetNull(group.FieldMixedProviderRateMultipliers)
 	return u
 }
 
@@ -3094,6 +3122,27 @@ func (u *GroupUpsertOne) AddRateMultiplier(v float64) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateRateMultiplier() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateRateMultiplier()
+	})
+}
+
+// SetMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field.
+func (u *GroupUpsertOne) SetMixedProviderRateMultipliers(v map[string]float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetMixedProviderRateMultipliers(v)
+	})
+}
+
+// UpdateMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateMixedProviderRateMultipliers() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateMixedProviderRateMultipliers()
+	})
+}
+
+// ClearMixedProviderRateMultipliers clears the value of the "mixed_provider_rate_multipliers" field.
+func (u *GroupUpsertOne) ClearMixedProviderRateMultipliers() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearMixedProviderRateMultipliers()
 	})
 }
 
@@ -4554,6 +4603,27 @@ func (u *GroupUpsertBulk) AddRateMultiplier(v float64) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateRateMultiplier() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateRateMultiplier()
+	})
+}
+
+// SetMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field.
+func (u *GroupUpsertBulk) SetMixedProviderRateMultipliers(v map[string]float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetMixedProviderRateMultipliers(v)
+	})
+}
+
+// UpdateMixedProviderRateMultipliers sets the "mixed_provider_rate_multipliers" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateMixedProviderRateMultipliers() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateMixedProviderRateMultipliers()
+	})
+}
+
+// ClearMixedProviderRateMultipliers clears the value of the "mixed_provider_rate_multipliers" field.
+func (u *GroupUpsertBulk) ClearMixedProviderRateMultipliers() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearMixedProviderRateMultipliers()
 	})
 }
 

@@ -151,9 +151,12 @@ func TestMixedFallbackOrderBoundedAndMapsOriginalOnce(t *testing.T) {
 func TestMixedExplicitProtocolRefusalStrict(t *testing.T) {
 	positive := []struct{ protocol, message string }{
 		{APIProtocolResponses, "model does not support openai responses protocol"},
+		{APIProtocolResponses, "qwen3.8-27b does not support openai_responses protocol"},
+		{APIProtocolChatCompletions, "qwen3.8-27b does not support openai_chat_completions protocol"},
 		{APIProtocolChatCompletions, "Chat Completions protocol is not supported for this model"},
 		{APIProtocolChatCompletions, "Cannot POST /v1/chat/completions"},
 		{APIProtocolAnthropic, "Anthropic messages protocol is not supported for this model"},
+		{APIProtocolAnthropic, "model does not support anthropic_messages protocol"},
 	}
 	for _, tt := range positive {
 		body, _ := json.Marshal(map[string]any{"error": map[string]string{"message": tt.message}})
@@ -399,7 +402,7 @@ func TestMixedAccountGroupBindings(t *testing.T) {
 }
 
 func TestMixedConnectivityTestUsesSameDispatcher(t *testing.T) {
-	upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(APIProtocolChatCompletions), mixedHTTPResponse(200, mixedResponsesToolSSE(), true)}}
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(APIProtocolChatCompletions), mixedHTTPResponse(200, mixedResponsesTextSSE(), true)}}
 	gateway := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 	svc := &AccountTestService{openaiGatewayService: gateway}
 	rec := httptest.NewRecorder()
@@ -407,7 +410,9 @@ func TestMixedConnectivityTestUsesSameDispatcher(t *testing.T) {
 	c.Request = httptest.NewRequest("POST", "/test", nil)
 	require.NoError(t, svc.testMixedAccountConnection(c, mixedTestAccount(), "alias", "Hi"))
 	require.Len(t, upstream.requests, 2)
-	require.Contains(t, rec.Body.String(), "/v1/responses")
+	require.Equal(t, "/v1/responses", upstream.lastReq.URL.Path)
+	require.Contains(t, rec.Body.String(), "Hello")
+	require.NotContains(t, rec.Body.String(), "/v1/")
 	require.Contains(t, rec.Body.String(), `"success":true`)
 }
 

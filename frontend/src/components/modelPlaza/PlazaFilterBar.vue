@@ -73,7 +73,7 @@ const props = defineProps<{
   /** 数据中出现的平台(去重排序后)。 */
   platforms: string[]
   /** 全量分组(含平台与生效倍率),三个维度的置灰联动由此推导。 */
-  groups: Array<{ id: number; name: string; platform: string; rate: number }>
+  groups: Array<{ id: number; name: string; platform: string; rate: number; rates?: number[] }>
   /** 全量生效倍率去重升序。 */
   rates: number[]
   platform: string
@@ -116,26 +116,30 @@ const rateSelectOptions = computed<SelectOption[]>(() => [
  * 三个维度互为约束(faceted):某选项可点 ⟺ 在「其他两维」当前选择下仍有分组命中。
  * 「全部」永远可点,作为解除本维约束的出口;可点项组合恒有结果,无需选择修正。
  */
+function matchesRate(g: { rate: number; rates?: number[] }, rate: number): boolean {
+  return (g.rates ?? [g.rate]).includes(rate)
+}
+
 function platformEnabled(p: string): boolean {
   return props.groups.some(
     (g) =>
       g.platform === p &&
       (props.groupId === 'all' || g.id === props.groupId) &&
-      (props.rate === 'all' || g.rate === props.rate)
+      (props.rate === 'all' || matchesRate(g, props.rate))
   )
 }
 
-function groupEnabled(g: { platform: string; rate: number }): boolean {
+function groupEnabled(g: { platform: string; rate: number; rates?: number[] }): boolean {
   return (
     (props.platform === 'all' || g.platform === props.platform) &&
-    (props.rate === 'all' || g.rate === props.rate)
+    (props.rate === 'all' || matchesRate(g, props.rate))
   )
 }
 
 function rateEnabled(r: number): boolean {
   return props.groups.some(
     (g) =>
-      g.rate === r &&
+      matchesRate(g, r) &&
       (props.platform === 'all' || g.platform === props.platform) &&
       (props.groupId === 'all' || g.id === props.groupId)
   )

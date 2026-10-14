@@ -29,11 +29,12 @@ func IsWindowExpired(windowStart *time.Time, duration time.Duration) bool {
 }
 
 type APIKey struct {
-	ID      int64
-	UserID  int64
-	Key     string
-	Name    string
-	GroupID *int64
+	ModelScope string
+	ID         int64
+	UserID     int64
+	Key        string
+	Name       string
+	GroupID    *int64
 	// RouteGroupIDs is the ordered smart-routing candidate list. Empty means
 	// fall back to GroupID only. Position 1 is also stored in GroupID.
 	RouteGroupIDs []int64

@@ -660,6 +660,16 @@ func RateMultiplierLTE(v float64) predicate.Group {
 	return predicate.Group(sql.FieldLTE(FieldRateMultiplier, v))
 }
 
+// MixedProviderRateMultipliersIsNil applies the IsNil predicate on the "mixed_provider_rate_multipliers" field.
+func MixedProviderRateMultipliersIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldMixedProviderRateMultipliers))
+}
+
+// MixedProviderRateMultipliersNotNil applies the NotNil predicate on the "mixed_provider_rate_multipliers" field.
+func MixedProviderRateMultipliersNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldMixedProviderRateMultipliers))
+}
+
 // PeakRateEnabledEQ applies the EQ predicate on the "peak_rate_enabled" field.
 func PeakRateEnabledEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldPeakRateEnabled, v))

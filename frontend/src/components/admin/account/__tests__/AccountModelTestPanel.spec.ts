@@ -83,6 +83,19 @@ describe('AccountModelTestPanel race regressions', () => {
     expect(wrapper.findAll('.model-test-selection button')).toHaveLength(2)
   })
 
+  it('shows progress while running without mixing status into the completed reply', async () => {
+    const stream = createAbortIgnoringStream([{ type: 'status', text: 'Polling upstream video...' }])
+    vi.mocked(fetch).mockResolvedValueOnce(stream.response)
+    const wrapper = mountPanel()
+    await flushPromises()
+    await wrapper.get('[data-test="row-test-11-gpt-one"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="test-output-11-gpt-one"]').text()).toBe('Polling upstream video...')
+    stream.finish([{ type: 'content', text: 'Actual reply' }, { type: 'test_complete', success: true }])
+    await flushPromises()
+    expect(wrapper.get('[data-test="test-output-11-gpt-one"]').text()).toBe('Actual reply')
+  })
+
   it.each([
     ['all', 'success'],
     ['all', 'error'],

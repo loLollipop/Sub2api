@@ -9,8 +9,8 @@
         </span>
         <span class="text-gray-400">|</span>
         <span class="font-medium text-gray-900 dark:text-white">{{ group.name }}</span>
-        <span class="text-gray-400">|</span>
-        <span class="text-gray-600 dark:text-gray-400">
+        <span v-if="group.platform !== 'mixed'" class="text-gray-400">|</span>
+        <span v-if="group.platform !== 'mixed'" class="text-gray-600 dark:text-gray-400">
           {{ t('admin.groups.columns.rateMultiplier') }}: {{ group.rate_multiplier }}x
         </span>
       </div>
@@ -55,7 +55,8 @@
               v-model.number="newRate"
               type="number"
               step="0.001"
-              min="0"
+              :min="group.platform === 'mixed' ? 0 : 0.001"
+              max="999999.9999"
               autocomplete="off"
               class="hide-spinner input w-full"
               placeholder="1.0"
@@ -65,7 +66,7 @@
           <button
             type="button"
             class="btn btn-primary shrink-0"
-            :disabled="!canEditDraft || !selectedUser || !newRate"
+            :disabled="!canEditDraft || !selectedUser || !validRate(newRate)"
             @click="handleAddLocal"
           >
             {{ t('common.add') }}
@@ -168,10 +169,11 @@
                       <input
                         type="number"
                         step="0.001"
-                        min="0.001"
+                        :min="group.platform === 'mixed' ? 0 : 0.001"
+                        max="999999.9999"
                         autocomplete="off"
                         :value="entry.rate_multiplier ?? ''"
-                        :placeholder="String(props.group?.rate_multiplier ?? 1)"
+                        :placeholder="group.platform === 'mixed' ? '' : String(props.group?.rate_multiplier ?? 1)"
                         class="hide-spinner w-20 rounded border border-gray-200 bg-white px-2 py-1 text-center text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
                         @change="updateLocalRate(entry.user_id, ($event.target as HTMLInputElement).value)"
                       />
@@ -281,6 +283,10 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const batchFactor = ref<number | null>(null)
 const canEditDraft = computed(() => props.show && !!props.group && entriesLoaded.value && !loading.value)
+
+const validRate = (rate: number | null | undefined): rate is number =>
+  typeof rate === 'number' && Number.isFinite(rate) && rate >= 0 && rate <= 999999.9999 &&
+  (rate !== 0 || props.group?.platform === 'mixed')
 
 let searchTimeout: ReturnType<typeof setTimeout>
 let loadVersion = 0
@@ -412,7 +418,7 @@ const selectUser = (user: AdminUser) => {
 
 // 本地添加（或覆盖已有用户）
 const handleAddLocal = () => {
-  if (!canEditDraft.value || !selectedUser.value || !newRate.value) return
+  if (!canEditDraft.value || !selectedUser.value || !validRate(newRate.value)) return
   const user = selectedUser.value
   const idx = localEntries.value.findIndex(e => e.user_id === user.id)
   const entry: LocalEntry = {
@@ -456,7 +462,11 @@ const removeLocal = (userId: number) => {
 
 // 批量乘数应用到本地
 const applyBatchFactor = () => {
-  if (!batchFactor.value || batchFactor.value <= 0) return
+  if (!batchFactor.value || !Number.isFinite(batchFactor.value) || batchFactor.value <= 0) return
+  if (localEntries.value.some(entry => entry.rate_multiplier != null && !validRate(entry.rate_multiplier * batchFactor.value!))) {
+    appStore.showError(t('admin.groups.failedToSave'))
+    return
+  }
   for (const entry of localEntries.value) {
     if (entry.rate_multiplier != null) {
       entry.rate_multiplier = parseFloat((entry.rate_multiplier * batchFactor.value).toFixed(6))
@@ -480,6 +490,10 @@ const handleCancel = () => {
 // 保存：一次性提交所有数据（只提交 rate_multiplier；rpm_override 由独立弹窗管理）
 const handleSave = async () => {
   if (!props.show || !props.group || loading.value || !entriesLoaded.value || saving.value) return
+  if (localEntries.value.some(entry => entry.rate_multiplier != null && !validRate(entry.rate_multiplier))) {
+    appStore.showError(t('admin.groups.failedToSave'))
+    return
+  }
   const groupId = props.group.id
   const version = loadVersion
   saving.value = true

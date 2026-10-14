@@ -16,9 +16,13 @@ import (
 
 func mixedBillingInput(result *OpenAIForwardResult, account *Account) *OpenAIRecordUsageInput {
 	groupID := int64(218)
+	rates := make(map[string]float64, len(mixedModelVendors))
+	for _, vendor := range mixedModelVendors {
+		rates[vendor] = 0.1
+	}
 	return &OpenAIRecordUsageInput{
 		Result: result, Account: account, User: &User{ID: 20},
-		APIKey:             &APIKey{ID: 10, GroupID: &groupID, Group: &Group{ID: groupID, Platform: PlatformMixed, RateMultiplier: 0.1}},
+		APIKey:             &APIKey{ID: 10, GroupID: &groupID, Group: &Group{ID: groupID, Platform: PlatformMixed, RateMultiplier: 0.1, MixedProviderRateMultipliers: rates}},
 		ChannelUsageFields: ChannelUsageFields{OriginalModel: result.Model},
 	}
 }

@@ -28,6 +28,8 @@ const (
 	FieldDescription = "description"
 	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
 	FieldRateMultiplier = "rate_multiplier"
+	// FieldMixedProviderRateMultipliers holds the string denoting the mixed_provider_rate_multipliers field in the database.
+	FieldMixedProviderRateMultipliers = "mixed_provider_rate_multipliers"
 	// FieldPeakRateEnabled holds the string denoting the peak_rate_enabled field in the database.
 	FieldPeakRateEnabled = "peak_rate_enabled"
 	// FieldPeakStart holds the string denoting the peak_start field in the database.
@@ -231,6 +233,7 @@ var Columns = []string{
 	FieldName,
 	FieldDescription,
 	FieldRateMultiplier,
+	FieldMixedProviderRateMultipliers,
 	FieldPeakRateEnabled,
 	FieldPeakStart,
 	FieldPeakEnd,

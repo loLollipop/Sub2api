@@ -75,7 +75,7 @@ func newOpenAIWSUnsupportedModelSwitchError(model string) error {
 }
 
 func shouldReportOpenAIWSProxyAccountFailure(err error) bool {
-	return err != nil && !errors.Is(err, errOpenAIWSUnsupportedModelSwitch) && !service.IsOpenAIWSSessionPreemptedError(err)
+	return err != nil && !errors.Is(err, service.ErrModelScopeDenied) && !errors.Is(err, errOpenAIWSUnsupportedModelSwitch) && !service.IsOpenAIWSSessionPreemptedError(err)
 }
 
 // openAIWSIngressEndedByClient reports whether a finished ingress WebSocket turn
@@ -779,6 +779,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			}
 		}
 		if err != nil {
+			if h.handleModelScopeError(c, err, streamStarted) {
+				return
+			}
 			if failoverClientGone(c) {
 				reqLog.Info("openai.account_select_aborted_client_disconnected", zap.Error(err))
 				return
@@ -954,6 +957,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		}
 		if err != nil {
 			if service.IsMixedLocalRequestError(err) {
+				return
+			}
+			if h.handleModelScopeError(c, err, streamStarted) {
 				return
 			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
@@ -1489,6 +1495,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			}
 		}
 		if err != nil {
+			if h.handleModelScopeError(c, err, streamStarted) {
+				return
+			}
 			if failoverClientGone(c) {
 				reqLog.Info("openai_messages.account_select_aborted_client_disconnected", zap.Error(err))
 				return
@@ -1625,6 +1634,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		}
 		if err != nil {
 			if service.IsMixedLocalRequestError(err) {
+				return
+			}
+			if h.handleModelScopeError(c, err, streamStarted) {
 				return
 			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
@@ -2364,7 +2376,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	// 必须在 ensureCompositeTargetPlatform（合成路由改写）之前执行。
 	// 与 HTTP 准入一致：帧内重复 model 键/大小写变体可能被上游按末值绑定，
 	// 全部候选值逐一校验，任一未命中即拒绝。
-	if blocked := blockedModelAllowlistCandidate(apiKey.Group, requestmodel.FromBodyCandidates("", "application/json", firstMessage)); blocked != "" {
+	firstModelCandidates := requestmodel.FromBodyCandidates("", "application/json", firstMessage)
+	firstModelCandidates = append(firstModelCandidates, requestmodel.FromBodyCandidates("/v1/live", "application/json", firstMessage)...)
+	if blocked := blockedAPIKeyModelCandidate(apiKey, firstModelCandidates); blocked != "" {
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalModelConfiguration)
 		middleware2.MarkIngressRejected(c, middleware2.IngressRejectModelNotAllowed)
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, fmt.Sprintf("Model %q is not available for this group", blocked))
@@ -2629,6 +2643,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			wsForwardModel = openAIChannelForwardModel(channelMappingWS, reqModel)
 		}
 		if err != nil {
+			if errors.Is(err, service.ErrModelScopeDenied) {
+				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
+				closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, service.ErrModelScopeDenied.Message)
+				return
+			}
 			reqLog.Warn("openai.websocket_account_select_failed",
 				zap.Error(openAICompatibleSelectionErrorForLog(err, requestPlatform)),
 				zap.Int("excluded_account_count", len(failedAccountIDs)),
@@ -2843,10 +2862,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				// 帧内重复 model 键/大小写变体/嵌套 session.model 额外逐一校验，
 				// 防止候选集非空时掩盖被轮换掉的禁用模型。
 				candidates := append([]string{model}, requestmodel.FromBodyCandidates("", "application/json", payload)...)
-				if blocked := blockedModelAllowlistCandidate(apiKey.Group, candidates); blocked != "" {
+				candidates = append(candidates, requestmodel.FromBodyCandidates("/v1/live", "application/json", payload)...)
+				if candidateErr := apiKeyModelCandidateCloseError(apiKey, candidates); candidateErr != nil {
 					service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalModelConfiguration)
 					middleware2.MarkIngressRejected(c, middleware2.IngressRejectModelNotAllowed)
-					return nil, service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, fmt.Sprintf("Model %q is not available for this group", blocked), nil)
+					return nil, candidateErr
 				}
 				// Validate the original model candidates before JSON rebuilding can
 				// collapse duplicate keys during DeepSeek tool deduplication.
@@ -2864,6 +2884,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				}
 				setOpsRequestContext(c, model, true)
 				mapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, model)
+				if !apiKey.AllowsModelScope(model) || !apiKey.AllowsModelScope(mapping.MappedModel) {
+					return "", service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, service.ErrModelScopeDenied.Message, service.ErrModelScopeDenied)
+				}
 				freshAccount, freshOK := h.gatewayService.RefreshSchedulerAccountFreshness(ctx, account, mapping.MappedModel)
 				if !freshOK {
 					return "", service.NewOpenAIWSClientCloseError(coderws.StatusTryAgainLater, "account is no longer schedulable for this model, please reconnect", nil)
@@ -3164,6 +3187,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			}
 
 			var closeErr *service.OpenAIWSClientCloseError
+			if errors.Is(err, service.ErrModelScopeDenied) {
+				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
+				closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, service.ErrModelScopeDenied.Message)
+				return
+			}
 			hasClientCloseErr := errors.As(err, &closeErr)
 			if openAIWSIngressEndedByClient(err) {
 				closedFields := []zap.Field{zap.Int64("account_id", account.ID)}
@@ -3882,6 +3910,29 @@ func blockedModelAllowlistCandidate(group *service.Group, candidates []string) s
 		}
 	}
 	return ""
+}
+
+func blockedAPIKeyModelCandidate(key *service.APIKey, candidates []string) string {
+	if key == nil {
+		return ""
+	}
+	for _, model := range candidates {
+		if !key.AllowsModelScope(model) {
+			return model
+		}
+	}
+	return blockedModelAllowlistCandidate(key.Group, candidates)
+}
+
+func apiKeyModelCandidateCloseError(key *service.APIKey, candidates []string) error {
+	blocked := blockedAPIKeyModelCandidate(key, candidates)
+	if blocked == "" {
+		return nil
+	}
+	if !key.AllowsModelScope(blocked) {
+		return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, service.ErrModelScopeDenied.Message, service.ErrModelScopeDenied)
+	}
+	return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, fmt.Sprintf("Model %q is not available for this group", blocked), nil)
 }
 
 func closeOpenAIClientWS(conn *coderws.Conn, status coderws.StatusCode, reason string) {

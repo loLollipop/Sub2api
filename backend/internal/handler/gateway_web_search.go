@@ -165,6 +165,9 @@ func (h *GatewayHandler) WebSearch(c *gin.Context) {
 			apiKey = routedKey
 		}
 		if selectErr != nil {
+			if h.handleModelScopeError(c, selectErr, false) {
+				return
+			}
 			if attempt == 0 {
 				c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{
 					"type":    "scheduling_error",

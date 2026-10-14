@@ -30,8 +30,14 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 	}
 }
 
+func ProvideAPIKeyHandler(apiKeyService *service.APIKeyService, catalogue *service.GatewayService) *APIKeyHandler {
+	apiKeyService.SetGroupCatalogue(catalogue)
+	return NewAPIKeyHandler(apiKeyService)
+}
+
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
+	ModelScope    string   `json:"model_scope"`
 	Name          string   `json:"name" binding:"required"`
 	GroupID       *int64   `json:"group_id"` // nullable
 	GroupIDs      []int64  `json:"group_ids"`
@@ -53,6 +59,7 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
+	ModelScope  *string   `json:"model_scope"`
 	Name        string    `json:"name"`
 	GroupID     *int64    `json:"group_id"`
 	GroupIDs    *[]int64  `json:"group_ids"`
@@ -228,6 +235,7 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		svcReq.RateLimit7d = *req.RateLimit7d
 	}
 	svcReq.AnthropicCacheTTLMode = req.AnthropicCacheTTLMode
+	svcReq.ModelScope = req.ModelScope
 
 	executeUserIdempotentJSON(c, "user.api_keys.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		key, err := h.apiKeyService.Create(ctx, subject.UserID, svcReq)
@@ -274,6 +282,7 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 		ResetRateLimitUsage: req.ResetRateLimitUsage,
 
 		AnthropicCacheTTLMode: req.AnthropicCacheTTLMode,
+		ModelScope:            req.ModelScope,
 	}
 	if req.Name != "" {
 		svcReq.Name = &req.Name
@@ -349,7 +358,13 @@ func (h *APIKeyHandler) GetAvailableGroups(c *gin.Context) {
 
 	out := make([]dto.Group, 0, len(groups))
 	for i := range groups {
-		out = append(out, *dto.GroupFromService(&groups[i]))
+		groupDTO := dto.GroupFromService(&groups[i])
+		groupDTO.SupportedKeyProviders = groups[i].SupportedKeyProviders
+		// Empty is meaningful for Mixed; it must not trigger platform fallback.
+		if groupDTO.SupportedKeyProviders == nil {
+			groupDTO.SupportedKeyProviders = []string{}
+		}
+		out = append(out, *groupDTO)
 	}
 	response.Success(c, out)
 }

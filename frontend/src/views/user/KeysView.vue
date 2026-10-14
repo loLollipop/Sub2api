@@ -154,6 +154,7 @@
                   :platform="row.group.platform"
                   :subscription-type="row.group.subscription_type"
                   :rate-multiplier="row.group.rate_multiplier"
+                  :vendor-rates="keyGroupVendorRates(row.group, row.model_scope)"
                   :user-rate-multiplier="userGroupRates[row.group.id]"
                   :peak-rate-enabled="row.group.peak_rate_enabled"
                   :peak-start="row.group.peak_start"
@@ -532,6 +533,7 @@
                   :platform="groupOptionById(groupId)!.platform"
                   :subscription-type="groupOptionById(groupId)!.subscriptionType"
                   :rate-multiplier="groupOptionById(groupId)!.rate"
+                  :vendor-rates="keyGroupVendorRates(groupOptionById(groupId)!.group, selectedBillingScope)"
                   :user-rate-multiplier="groupOptionById(groupId)!.userRate"
                   :peak-rate-enabled="groupOptionById(groupId)!.peakRateEnabled"
                   :peak-start="groupOptionById(groupId)!.peakStart"
@@ -551,7 +553,11 @@
               :searchable="true"
               :search-placeholder="t('keys.searchGroup')"
               @update:model-value="addSmartRoute"
-            />
+            >
+              <template #option="{ option, selected }">
+                <GroupOptionItem :name="(option as unknown as GroupOption).label" :platform="(option as unknown as GroupOption).platform" :subscription-type="(option as unknown as GroupOption).subscriptionType" :rate-multiplier="(option as unknown as GroupOption).rate" :user-rate-multiplier="(option as unknown as GroupOption).userRate" :vendor-rates="keyGroupVendorRates((option as unknown as GroupOption).group, activeKeyProvider)" :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled" :peak-start="(option as unknown as GroupOption).peakStart" :peak-end="(option as unknown as GroupOption).peakEnd" :peak-rate-multiplier="(option as unknown as GroupOption).peakRateMultiplier" :selected="selected" />
+              </template>
+            </Select>
             <p v-if="formData.group_ids.length === 0" class="text-xs text-gray-400">{{ t('keys.smartRoutingEmpty') }}</p>
           </div>
           <Select
@@ -570,6 +576,7 @@
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
+                :vendor-rates="keyGroupVendorRates((option as unknown as GroupOption).group, selectedBillingScope)"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
                 :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
                 :peak-start="(option as unknown as GroupOption).peakStart"
@@ -584,6 +591,7 @@
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
+                :vendor-rates="keyGroupVendorRates((option as unknown as GroupOption).group, activeKeyProvider)"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
                 :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
                 :peak-start="(option as unknown as GroupOption).peakStart"
@@ -1208,6 +1216,7 @@
               :platform="option.platform"
               :subscription-type="option.subscriptionType"
               :rate-multiplier="option.rate"
+              :vendor-rates="keyGroupVendorRates(option.group, selectedKeyForGroup?.model_scope)"
               :user-rate-multiplier="option.userRate"
               :peak-rate-enabled="option.peakRateEnabled"
               :peak-start="option.peakStart"
@@ -1255,6 +1264,7 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
+import { visibleMixedProviderRates, type ModelScope, type VendorRate } from '@/utils/mixed-provider-rates'
 	import PlatformIcon from '@/components/common/PlatformIcon.vue'
 	import type { ApiKey, CustomEndpoint, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'
 import type { Column } from '@/components/common/types'
@@ -1284,6 +1294,7 @@ const formatDateTimeLocal = (isoDate: string): string => {
 }
 
 interface GroupOption {
+  group: Group
   value: number
   label: string
   description: string | null
@@ -1568,9 +1579,15 @@ const onStatusFilterChange = (value: string | number | boolean | null) => {
 }
 
 // Convert groups to Select options format with rate multiplier and subscription type
+const keyGroupVendorRates = (group: Group, scope: ModelScope = 'all'): VendorRate[] | undefined => {
+  // List-key DTOs need not load a catalogue. Reuse the authorized group projection.
+  const available = groups.value.find(candidate => candidate.id === group.id)
+  return visibleMixedProviderRates(available ?? group, scope, userGroupRates.value[group.id])
+}
 const groupOptions = computed(() =>
   groups.value.map((group) => ({
     value: group.id,
+    group,
     label: group.name,
     description: group.description,
     rate: group.rate_multiplier,
@@ -1580,7 +1597,8 @@ const groupOptions = computed(() =>
     peakEnd: group.peak_end,
     peakRateMultiplier: group.peak_rate_multiplier,
     subscriptionType: group.subscription_type,
-    platform: group.platform
+    platform: group.platform,
+    providers: keyProvidersForGroup(group)
   }))
 )
 
@@ -1604,7 +1622,6 @@ const keyProviderForPlatform = (platform: GroupPlatform): KeyProvider => {
     case 'zhipu':
     case 'deepseek':
     case 'minimax':
-    case 'mixed':
       return 'cn'
     default:
       return 'other'
@@ -1612,17 +1629,30 @@ const keyProviderForPlatform = (platform: GroupPlatform): KeyProvider => {
 }
 
 const selectedKeyProvider = ref<KeyProvider | null>(null)
-const availableKeyProviders = computed(() => new Set(groups.value.map((group) => keyProviderForPlatform(group.platform))))
+const providerExplicitlyChanged = ref(false)
+const keyProvidersForGroup = (group: Pick<Group, 'platform' | 'supported_key_providers'>): KeyProvider[] => {
+  if (group.supported_key_providers != null) return group.supported_key_providers
+  // A Mixed group without a confirmed catalogue cannot advertise a category.
+  if (group.platform === 'mixed') return []
+  return [keyProviderForPlatform(group.platform)]
+}
+const availableKeyProviders = computed(() => new Set(groups.value.flatMap(keyProvidersForGroup)))
 const activeKeyProvider = computed(() => {
   if (selectedKeyProvider.value) return selectedKeyProvider.value
+  const scope = showEditModal.value ? selectedKey.value?.model_scope : undefined
+  if (scope && scope !== 'all') return scope
+  if (!showEditModal.value) return keyProviders.value.find((provider) => availableKeyProviders.value.has(provider.value))?.value ?? 'anthropic'
   const group = groupOptions.value.find((option) => option.value === formData.value.group_id)
-  const platform = group?.platform ?? selectedKey.value?.group?.platform
-  if (platform) return keyProviderForPlatform(platform)
+  if (group?.providers.length) return group.providers[0]!
+  const platform = group?.platform ?? (showEditModal.value ? selectedKey.value?.group?.platform : undefined)
+  if (platform && platform !== 'mixed') return keyProviderForPlatform(platform)
   return keyProviders.value.find((provider) => availableKeyProviders.value.has(provider.value))?.value ?? 'anthropic'
 })
-const providerGroupOptions = computed(() => groupOptions.value.filter((option) => keyProviderForPlatform(option.platform) === activeKeyProvider.value))
+const providerGroupOptions = computed(() => groupOptions.value.filter((option) => option.providers.includes(activeKeyProvider.value)))
+const selectedBillingScope = computed<ModelScope>(() => showEditModal.value && !providerExplicitlyChanged.value ? selectedKey.value?.model_scope ?? 'all' : activeKeyProvider.value)
 
 const selectKeyProvider = (provider: KeyProvider) => {
+  providerExplicitlyChanged.value = true
   selectedKeyProvider.value = provider
   if (!formData.value.smart_routing && !providerGroupOptions.value.some((option) => option.value === formData.value.group_id)) {
     formData.value.group_id = null
@@ -1676,9 +1706,13 @@ const moveSmartRoute = (index: number, delta: number) => {
 // Group dropdown search
 const groupSearchQuery = ref('')
 const filteredGroupOptions = computed(() => {
+  const scope = selectedKeyForGroup.value?.model_scope
+  const options = scope && scope !== 'all'
+    ? groupOptions.value.filter((option) => option.providers.includes(scope))
+    : groupOptions.value
   const query = groupSearchQuery.value.trim().toLowerCase()
-  if (!query) return groupOptions.value
-  return groupOptions.value.filter((opt) => {
+  if (!query) return options
+  return options.filter((opt) => {
     return opt.label.toLowerCase().includes(query) ||
       (opt.description && opt.description.toLowerCase().includes(query))
   })
@@ -2010,6 +2044,7 @@ const handleSubmit = async () => {
         rate_limit_7d: rateLimitData.rate_limit_7d,
         anthropic_cache_ttl_mode: formData.value.anthropic_cache_ttl_mode,
       }
+      if (providerExplicitlyChanged.value) updates.model_scope = activeKeyProvider.value
       if (shouldSubmitEditStatus(selectedKey.value, formData.value.status)) {
         updates.status = formData.value.status
       }
@@ -2027,7 +2062,9 @@ const handleSubmit = async () => {
         expiresInDays,
         rateLimitData,
         formData.value.smart_routing ? formData.value.group_ids : undefined,
-        formData.value.anthropic_cache_ttl_mode
+        formData.value.anthropic_cache_ttl_mode,
+        undefined,
+        activeKeyProvider.value
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
@@ -2067,6 +2104,7 @@ const handleDelete = async () => {
 }
 
 const closeModals = () => {
+  providerExplicitlyChanged.value = false
   selectedKeyProvider.value = null
   showCreateModal.value = false
   showEditModal.value = false

@@ -41,3 +41,30 @@ func TestGatewayModelsDomesticCatalogAliasesRespectGroupAllowlist(t *testing.T) 
 		}
 	}
 }
+
+func TestMixedKeyCatalogIncludesSingleRelayModels(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(218)
+	h := newGatewayModelsHandlerForTest(&gatewayModelsAccountRepoStub{byGroup: map[int64][]service.Account{
+		groupID: {{ID: 1271, Platform: service.PlatformMixed, Type: service.AccountTypeAPIKey,
+			Credentials: map[string]any{"model_mapping": map[string]any{
+				"qwen/qwen3.8-27b":            "qwen/qwen3.8-27b",
+				"z-ai/glm-5.3":                "z-ai/glm-5.3",
+				"deepseek-ai/deepseek-v4-pro": "deepseek-ai/deepseek-v4-pro",
+			}}}},
+	}})
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{GroupID: &groupID, Group: &service.Group{
+		ID: groupID, Platform: service.PlatformMixed,
+	}})
+	h.Models(c)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var result gatewayModelsResponseForTest
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &result))
+	require.ElementsMatch(t, []string{
+		"qwen/qwen3.8-27b", "qwen3.8-27b", "z-ai/glm-5.3", "glm-5.3",
+		"deepseek-ai/deepseek-v4-pro", "deepseek-v4-pro",
+	}, modelIDsForTest(result.Data), "one relay account exposes all mapped models and existing public aliases")
+}

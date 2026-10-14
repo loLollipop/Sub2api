@@ -17,6 +17,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmodel"
 	coderws "github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
@@ -120,6 +121,18 @@ func ValidateLiveCallRequest(request *LiveCallRequest) error {
 	return nil
 }
 
+func checkLiveCallModelScope(ctx context.Context, request *LiveCallRequest) error {
+	if request == nil {
+		return ErrModelScopeDenied
+	}
+	models := requestmodel.FromBodyCandidates("", "application/json", request.Session)
+	model := strings.TrimSpace(gjson.GetBytes(request.Session, "model").String())
+	if model == "" {
+		model = "gpt-live"
+	}
+	return CheckModelScope(ctx, append(models, model)...)
+}
+
 // CreateLiveCall 创建 Frameless 会话。调用方须在调用期间持有普通用户槽位；
 // 调度器持有的普通账号槽位会被同一个 Live 租约原子接替。
 func (s *OpenAIGatewayService) CreateLiveCall(
@@ -129,6 +142,10 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 	userMaxConcurrency int,
 ) (*LiveCallCreated, error) {
 	if err := ValidateLiveCallRequest(request); err != nil {
+		return nil, err
+	}
+	ctx = ContextWithAPIKeyRoute(ctx, identity.APIKey)
+	if err := checkLiveCallModelScope(ctx, request); err != nil {
 		return nil, err
 	}
 	if s == nil || s.cfg == nil || s.cfg.RunMode != config.RunModeSimple {
@@ -316,6 +333,9 @@ func sameLiveRouteGroupIDs(left, right []int64) bool {
 }
 
 func (s *OpenAIGatewayService) shouldFailoverLiveCreateError(account *Account, err error) bool {
+	if errors.Is(err, ErrModelScopeDenied) {
+		return false
+	}
 	var upstreamErr *UpstreamFailoverError
 	if !errors.As(err, &upstreamErr) {
 		// 凭证读取和网络传输错误都可能只影响当前账号或代理。
@@ -334,6 +354,9 @@ func (s *OpenAIGatewayService) createUpstreamLiveCall(
 	request *LiveCallRequest,
 	attestation string,
 ) (*LiveCallCreated, error) {
+	if err := checkLiveCallModelScope(ctx, request); err != nil {
+		return nil, err
+	}
 	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {
 		logLiveCreateStageFailure(ctx, account.ID, "access_token", err)
@@ -555,7 +578,52 @@ func (s *OpenAIGatewayService) GetLiveCallForIdentity(
 	if record.Controller == LiveControllerClosed {
 		return nil, ErrLiveCallNotFound
 	}
+	// Reauthentication can narrow a key after this call was created. The
+	// persisted call identity alone does not authorize its current model.
+	if !identity.APIKey.AllowsModelScope(record.Model) {
+		return nil, ErrModelScopeDenied
+	}
+	if err := CheckModelScope(ctx, record.Model); err != nil {
+		return nil, err
+	}
 	return record, nil
+}
+
+// Inspect every occurrence instead of choosing one JSON path: duplicate and
+// case-variant model fields must all remain inside the authenticated scope.
+// An omitted model keeps the previously admitted Live session unchanged.
+func checkLiveSidebandModelScope(ctx context.Context, payload []byte, sessionModel string) error {
+	if ModelScopeFromContext(ctx) == ModelScopeAll {
+		return nil
+	}
+	if err := CheckModelScope(ctx, sessionModel); err != nil {
+		return err
+	}
+	var scopeErr error
+	checkObject := func(object gjson.Result) {
+		object.ForEach(func(key, value gjson.Result) bool {
+			if strings.EqualFold(key.String(), "model") {
+				if value.Type != gjson.String {
+					scopeErr = ErrModelScopeDenied
+				} else {
+					scopeErr = CheckModelScope(ctx, value.String())
+				}
+			}
+			return scopeErr == nil
+		})
+	}
+	root := gjson.ParseBytes(payload)
+	checkObject(root)
+	if scopeErr != nil {
+		return scopeErr
+	}
+	root.ForEach(func(key, value gjson.Result) bool {
+		if value.IsObject() && (strings.EqualFold(key.String(), "session") || strings.EqualFold(key.String(), "response")) {
+			checkObject(value)
+		}
+		return scopeErr == nil
+	})
+	return scopeErr
 }
 
 // ProxyLiveSideband 让认证后的客户端接管控制连接；媒体始终不经过这里。
@@ -566,6 +634,9 @@ func (s *OpenAIGatewayService) ProxyLiveSideband(
 ) error {
 	if record == nil || downstream == nil {
 		return ErrLiveCallNotFound
+	}
+	if err := CheckModelScope(ctx, record.Model); err != nil {
+		return err
 	}
 	store, err := s.liveStore()
 	if err != nil {
@@ -601,6 +672,12 @@ func (s *OpenAIGatewayService) ProxyLiveSideband(
 				errCh <- readErr
 				return
 			}
+			if messageType == coderws.MessageText {
+				if scopeErr := checkLiveSidebandModelScope(proxyCtx, payload, record.Model); scopeErr != nil {
+					errCh <- scopeErr
+					return
+				}
+			}
 			if writeErr := upstream.WriteFrame(proxyCtx, messageType, payload); writeErr != nil {
 				errCh <- writeErr
 				return
@@ -630,6 +707,11 @@ func (s *OpenAIGatewayService) ProxyLiveSideband(
 
 	runErr := s.runLiveController(proxyCtx, record, upstream, errCh)
 	cancel()
+	if errors.Is(runErr, ErrModelScopeDenied) {
+		// Close reasons have a 123-byte protocol budget; the structured error
+		// includes metadata and exceeds it, preventing the close frame entirely.
+		_ = downstream.Close(coderws.StatusPolicyViolation, "MODEL_SCOPE_DENIED")
+	}
 	_, _ = store.ReleaseLiveController(context.Background(), record.CallHash, owner)
 	if liveSessionEnded(runErr) || !time.Now().Before(record.ExpiresAt) {
 		s.finalizeLiveCall(record)

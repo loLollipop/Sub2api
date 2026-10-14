@@ -189,6 +189,9 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 			}
 		}
 		if err != nil || selection == nil || selection.Account == nil {
+			if h.handleModelScopeError(c, err, streamStarted) {
+				return
+			}
 			if failoverClientGone(c) {
 				reqLog.Info("openai_alpha_search.account_select_aborted_client_disconnected", zap.Error(err))
 				return
@@ -241,6 +244,9 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 			return
 		}
 
+		if h.handleModelScopeError(c, err, false) {
+			return
+		}
 		h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
 		var failoverErr *service.UpstreamFailoverError
 		if !errors.As(err, &failoverErr) {

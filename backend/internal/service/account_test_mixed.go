@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tidwall/gjson"
 )
 
 // Connectivity tests use the live dispatcher and its bounded refusal policy.
@@ -24,13 +23,7 @@ func (s *AccountTestService) testMixedAccountConnection(c *gin.Context, account 
 	if s.openaiGatewayService == nil {
 		return s.sendErrorAndEnd(c, "Mixed gateway is unavailable")
 	}
-	if strings.TrimSpace(prompt) == "" {
-		prompt = "Hi"
-	}
-	body, err := json.Marshal(map[string]any{
-		"model": model, "stream": false, "max_tokens": 128,
-		"messages": []map[string]string{{"role": "user", "content": prompt}},
-	})
+	body, err := json.Marshal(createOpenAIChatCompletionsTestPayload(model, prompt))
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to build test request")
 	}
@@ -45,11 +38,5 @@ func (s *AccountTestService) testMixedAccountConnection(c *gin.Context, account 
 	if err != nil || result == nil || recorder.Code != http.StatusOK {
 		return s.sendErrorAndEnd(c, "Mixed model test failed at "+GetActualOpenAIUpstreamEndpoint(forwardContext))
 	}
-	s.sendEvent(c, TestEvent{Type: "content", Text: "Upstream: " + GetActualOpenAIUpstreamEndpoint(forwardContext) + "\n"})
-	text := gjson.GetBytes(recorder.Body.Bytes(), "choices.0.message.content").String()
-	if text != "" {
-		s.sendEvent(c, TestEvent{Type: "content", Text: text})
-	}
-	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-	return nil
+	return s.processOpenAIChatCompletionsStreamWithTextRequirement(c, recorder.Body, true)
 }

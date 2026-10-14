@@ -9,6 +9,7 @@
           :subscription-type="(group.subscription_type || 'standard') as SubscriptionType"
           :rate-multiplier="group.rate_multiplier"
           :user-rate-multiplier="group.user_rate_multiplier ?? null"
+          :vendor-rates="vendorRates"
           :peak-rate-enabled="group.peak_rate_enabled"
           :peak-start="group.peak_start"
           :peak-end="group.peak_end"
@@ -80,6 +81,7 @@ import type { ModelPlazaGroup } from '@/api/modelPlaza'
 import type { GroupPlatform, SubscriptionType } from '@/types'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { useAppStore } from '@/stores/app'
+import { mixedModelVendors, type VendorRate } from '@/utils/mixed-provider-rates'
 
 const props = defineProps<{
   group: ModelPlazaGroup
@@ -87,6 +89,20 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const appStore = useAppStore()
+
+/** Mixed 头部只展示当前可见模型的厂商倍率，不展示旧的分组总倍率。 */
+const vendorRates = computed<VendorRate[] | undefined>(() => {
+  if (props.group.platform !== 'mixed') return undefined
+  const entries = props.group.models.map((m) => ({
+    vendor: m.model_vendor ?? 'other',
+    rate: m.pricing?.billing_mode === 'image' && props.group.image_rate_independent
+      ? props.group.image_rate_multiplier ?? 1
+      : props.group.user_rate_multiplier ?? m.rate_multiplier ?? 1
+  } satisfies VendorRate))
+  return entries.filter((entry, index) =>
+    entries.findIndex((candidate) => candidate.vendor === entry.vendor && candidate.rate === entry.rate) === index
+  ).sort((a, b) => mixedModelVendors.indexOf(a.vendor) - mixedModelVendors.indexOf(b.vendor))
+})
 
 /** 高峰窗口描述(含倍率与服务器时区标注);分组未启用高峰为空串。 */
 const peakWindow = computed(() => {

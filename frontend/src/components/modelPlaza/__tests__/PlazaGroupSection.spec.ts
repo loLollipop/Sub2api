@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PlazaGroupSection from '../PlazaGroupSection.vue'
 import PlazaModelPricingTable from '../PlazaModelPricingTable.vue'
+import GroupBadge from '@/components/common/GroupBadge.vue'
 import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
 
 vi.mock('vue-i18n', async () => {
@@ -88,6 +89,38 @@ function mountSection(g: ModelPlazaGroup) {
 }
 
 const NOTE = 'modelPlaza.detail.longContextDisabledNote'
+
+describe('PlazaGroupSection Mixed rates', () => {
+  it('passes only visible vendor rates, deduplicated by vendor and rate', async () => {
+    const models: PlazaModel[] = [
+      { ...ladderModel(1), name: 'one', model_vendor: 'openai', rate_multiplier: 0.5 },
+      { ...ladderModel(1), name: 'two', model_vendor: 'openai', rate_multiplier: 0.5 },
+      { ...ladderModel(1), name: 'three', model_vendor: 'anthropic', rate_multiplier: 2 }
+    ]
+    const wrapper = mountSection(group({ platform: 'mixed', rate_multiplier: 9, models }))
+    expect(wrapper.findComponent(GroupBadge).props('vendorRates')).toEqual([
+      { vendor: 'openai', rate: 0.5 }, { vendor: 'anthropic', rate: 2 }
+    ])
+    await wrapper.setProps({ group: group({ platform: 'mixed', rate_multiplier: 9, user_rate_multiplier: 0, models: [models[0]] }) })
+    expect(wrapper.findComponent(GroupBadge).props('vendorRates')).toEqual([{ vendor: 'openai', rate: 0 }])
+  })
+
+  it('keeps ordinary group badges on their existing rate', () => {
+    expect(mountSection(group()).findComponent(GroupBadge).props('vendorRates')).toBeUndefined()
+  })
+
+  it('never uses the hidden total rate for an unconfigured Mixed model', () => {
+    const wrapper = mountSection(group({ platform: 'mixed', rate_multiplier: 9, models: [ladderModel(1)] }))
+    expect(wrapper.findComponent(GroupBadge).props('vendorRates')).toEqual([{ vendor: 'other', rate: 1 }])
+  })
+
+  it('uses independent image rates in the header even when the user override is zero', () => {
+    const image = { ...ladderModel(1), model_vendor: 'kimi' as const, rate_multiplier: 0.2 }
+    image.pricing!.billing_mode = 'image'
+    const wrapper = mountSection(group({ platform: 'mixed', rate_multiplier: 9, user_rate_multiplier: 0, image_rate_independent: true, image_rate_multiplier: 0.4, models: [image] }))
+    expect(wrapper.findComponent(GroupBadge).props('vendorRates')).toEqual([{ vendor: 'kimi', rate: 0.4 }])
+  })
+})
 
 describe('PlazaGroupSection 长上下文说明', () => {
   it('分组关闭阶梯且组内有官方阶梯模型时显示说明', () => {

@@ -58,9 +58,12 @@
           <input
             v-model="editBaseUrl"
             type="text"
+            :required="account.platform === 'mixed'"
             class="input"
             :placeholder="
-              account.platform === 'openai'
+              account.platform === 'mixed'
+                ? 'https://your-upstream/v1'
+                : account.platform === 'openai'
                 ? 'https://api.openai.com'
                 : account.platform === 'gemini'
                   ? 'https://generativelanguage.googleapis.com'
@@ -185,6 +188,8 @@
             :placeholder="
               account.type === 'cloudflare'
                 ? 'API Token'
+                : account.platform === 'mixed'
+                  ? 'your-api-key'
                 : account.platform === 'openai'
                 ? 'sk-proj-...'
                 : account.platform === 'gemini'
@@ -3000,6 +3005,7 @@ const handleOllamaCloudUsageUpdated = (state: OllamaCloudUsageState) => {
 // Platform-specific hint for Base URL
 const baseUrlHint = computed(() => {
   if (!props.account) return t('admin.accounts.baseUrlHint')
+  if (props.account.platform === 'mixed') return t('admin.accounts.mixedBaseUrlRequired')
   if (props.account.platform === 'openai') return t('admin.accounts.openai.baseUrlHint')
   if (props.account.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
   if (props.account.platform === 'grok') return ''
@@ -4101,7 +4107,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       }
     }
     const platformDefaultUrl =
-      newAccount.platform === 'openai'
+      newAccount.platform === 'mixed'
+        ? ''
+        : newAccount.platform === 'openai'
         ? 'https://api.openai.com'
         : newAccount.platform === 'gemini'
           ? 'https://generativelanguage.googleapis.com'

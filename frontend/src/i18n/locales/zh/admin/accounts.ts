@@ -304,6 +304,7 @@ export default {
       deleteConfirm: "确定要删除账号 '{name}' 吗？此操作无法撤销。",
       failedToClearRateLimit: '清除速率限制失败',
       mixedBaseUrlRequired: '国模必须填写上游 Base URL',
+      domesticCreateLabel: 'DeepSeek + Kimi + GLM + MiniMax + MiMo',
       mixedHint: '统一接入 Kimi、GLM、DeepSeek、MiniMax、MiMo 等国产模型。填写上游 Base URL 和 API Key，可同步上游模型；支持 Chat Completions、Responses 和 Messages 文本请求。',
       platforms: {
         claude: 'Claude',

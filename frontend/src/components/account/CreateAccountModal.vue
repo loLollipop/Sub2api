@@ -154,16 +154,22 @@
           <button
             type="button"
             data-testid="platform-mixed"
+            :aria-pressed="form.platform === 'mixed'"
             @click="form.platform = 'mixed'"
             :class="[
-              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              'flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-md px-3 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-700',
               form.platform === 'mixed'
                 ? 'bg-white text-violet-600 shadow-sm dark:bg-dark-600 dark:text-violet-400'
                 : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
             ]"
           >
-            <PlatformIcon platform="mixed" size="sm" />
-            {{ t('admin.accounts.platforms.mixed') }}
+            <span class="inline-flex items-center gap-1.5" aria-hidden="true">
+              <PlatformIcon platform="deepseek" size="sm" aria-hidden="true" />
+              <PlatformIcon platform="kimi" size="sm" aria-hidden="true" />
+              <PlatformIcon platform="zhipu" size="sm" aria-hidden="true" />
+              <PlatformIcon platform="minimax" size="sm" aria-hidden="true" />
+            </span>
+            <span class="min-w-0 leading-5">{{ t('admin.accounts.domesticCreateLabel') }}</span>
           </button>
         </div>
       </div>
@@ -3880,8 +3886,9 @@ const apiKeyValuePlaceholder = computed(() => {
     case 'deepseek':
       return 'sk-...'
     case 'minimax':
-    case 'mixed':
       return 'sk-...'
+    case 'mixed':
+      return 'your-api-key'
     default:
       return 'sk-ant-...'
   }

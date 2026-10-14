@@ -1604,6 +1604,7 @@ const keyProviderForPlatform = (platform: GroupPlatform): KeyProvider => {
     case 'zhipu':
     case 'deepseek':
     case 'minimax':
+    case 'mixed':
       return 'cn'
     default:
       return 'other'

@@ -168,7 +168,8 @@ func TestScopeSelectionLocalDenialPreservesAffinityAndScheduling(t *testing.T) {
 	err := fmt.Errorf("wrapped: %w", ErrModelScopeDenied)
 	invalidateUpstreamAffinity(ctx, cache, nil, []string{"session"}, account, err)
 	require.Empty(t, cache.invalidated)
-	state := ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts)
+	state, ok := ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts)
+	require.True(t, ok)
 	require.Empty(t, state.failed)
 	// A nil service would panic if the policy error reached any scheduler or
 	// account health operation; the refusal must return before those hooks.

@@ -1288,7 +1288,7 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 
 	availableModels := h.availableModelsForAPIKey(c.Request.Context(), apiKey, forcedPlatform)
 	if apiKey != nil && service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll &&
-		!(responsePlatform == service.PlatformOpenAI && apiKey.Group != nil && apiKey.Group.CodexModelsManifestConfig.Enabled) {
+		(responsePlatform != service.PlatformOpenAI || apiKey.Group == nil || !apiKey.Group.CodexModelsManifestConfig.Enabled) {
 		writeModelsList(c, responsePlatform, availableModels)
 		return
 	}

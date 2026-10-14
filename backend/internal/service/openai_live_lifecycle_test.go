@@ -375,7 +375,7 @@ func TestProxyLiveSidebandRejectsRecordScopeBeforeClaimOrDial(t *testing.T) {
 			result <- err
 			return
 		}
-		defer downstream.CloseNow()
+		defer func() { _ = downstream.CloseNow() }()
 		// A nil receiver proves denial precedes store/controller/dial access.
 		var svc *OpenAIGatewayService
 		result <- svc.ProxyLiveSideband(ContextWithModelScope(request.Context(), ModelScopeCN),
@@ -386,7 +386,7 @@ func TestProxyLiveSidebandRejectsRecordScopeBeforeClaimOrDial(t *testing.T) {
 	defer cancel()
 	client, _, err := coderws.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
 	require.NoError(t, err)
-	defer client.CloseNow()
+	defer func() { _ = client.CloseNow() }()
 	select {
 	case err := <-result:
 		require.ErrorIs(t, err, ErrModelScopeDenied)
@@ -444,7 +444,7 @@ func TestProxyLiveSidebandModelScopeRelay(t *testing.T) {
 					result <- err
 					return
 				}
-				defer downstream.CloseNow()
+				defer func() { _ = downstream.CloseNow() }()
 				result <- svc.ProxyLiveSideband(ContextWithModelScope(request.Context(), ModelScopeOpenAI), record, downstream)
 			}))
 			defer server.Close()
@@ -452,7 +452,7 @@ func TestProxyLiveSidebandModelScopeRelay(t *testing.T) {
 			defer cancel()
 			client, _, err := coderws.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
 			require.NoError(t, err)
-			defer client.CloseNow()
+			defer func() { _ = client.CloseNow() }()
 			for _, frame := range []liveTestFrame{
 				{messageType: coderws.MessageText, payload: []byte(`{"type":"session.update","session":{"MODEL":"gpt-live-test"}}`)},
 				{messageType: coderws.MessageText, payload: []byte(`{"type":"response.create","response":{}}`)},

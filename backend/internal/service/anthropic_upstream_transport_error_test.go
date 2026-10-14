@@ -55,12 +55,14 @@ func TestHandleAnthropicUpstreamTransportError_ModelScopeDenialHasNoFailureEffec
 		}
 		svc.InvalidateUpstreamAffinity(ctx, nil, "session", account, err)
 		require.Empty(t, cache.invalidated)
-		require.Empty(t, ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts).failed)
+		attempts, ok := ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts)
+		require.True(t, ok)
+		require.Empty(t, attempts.failed)
 		require.Equal(t, http.StatusOK, rec.Code)
 		require.Empty(t, rec.Body.String())
 		// Denial must precede all service, health, and activity access.
 		var nilService *GatewayService
-		require.Same(t, policyErr, nilService.handleAnthropicUpstreamTransportError(nil, nil, account, "", false, policyErr))
+		require.Same(t, policyErr, nilService.handleAnthropicUpstreamTransportError(context.Background(), nil, account, "", false, policyErr))
 	}
 }
 

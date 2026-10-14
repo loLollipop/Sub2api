@@ -46,7 +46,9 @@ func TestUserGroupRateRepositoryRevision_SuccessfulWrites(t *testing.T) {
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = db.Close() })
 			repo := NewUserGroupRateRepository(db)
-			revision = repo.(service.UserGroupRateRevisionRepository)
+			var ok bool
+			revision, ok = repo.(service.UserGroupRateRevisionRepository)
+			require.True(t, ok)
 			if tc.transaction {
 				mock.ExpectBegin()
 			}

@@ -101,6 +101,7 @@ export default {
       failedToToggleSchedulable: 'Failed to toggle scheduling status',
       groupCountTotal: '{count} groups total',
       mixedBaseUrlRequired: 'Domestic Models requires an explicit upstream Base URL',
+      domesticCreateLabel: 'DeepSeek + Kimi + GLM + MiniMax + MiMo',
       mixedHint: 'Connect Kimi, GLM, DeepSeek, MiniMax, MiMo, and other domestic models using an upstream Base URL and API key. Sync the upstream model catalog. Supports Chat Completions, Responses, and Messages text requests.',
       platforms: {
         anthropic: 'Anthropic',

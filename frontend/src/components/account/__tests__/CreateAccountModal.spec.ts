@@ -69,6 +69,8 @@ vi.mock('vue-i18n', async () => {
 })
 
 import CreateAccountModal from '../CreateAccountModal.vue'
+import enAccountMessages from '@/i18n/locales/en/admin/accounts'
+import zhAccountMessages from '@/i18n/locales/zh/admin/accounts'
 
 const BaseDialogStub = defineComponent({
   name: 'BaseDialog',
@@ -213,6 +215,20 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
   })
 
   afterEach(() => vi.useRealTimers())
+
+  it('labels the domestic creation button with brands and decorative existing icons', () => {
+    for (const messages of [enAccountMessages, zhAccountMessages]) {
+      expect(messages.accounts.domesticCreateLabel).toBe('DeepSeek + Kimi + GLM + MiniMax + MiMo')
+    }
+    const wrapper = mountModal()
+    const button = wrapper.get('[data-testid="platform-mixed"]')
+    expect(button.text()).toContain('admin.accounts.domesticCreateLabel')
+    expect(button.attributes('type')).toBe('button')
+    expect(button.findAllComponents({ name: 'PlatformIcon' }).map((icon) => icon.props('platform')))
+      .toEqual(['deepseek', 'kimi', 'zhipu', 'minimax'])
+    expect(button.findAllComponents({ name: 'PlatformIcon' }).every((icon) => icon.attributes('aria-hidden') === 'true')).toBe(true)
+    wrapper.unmount()
+  })
 
   it('creates Domestic with explicit credentials and persists previewed model metadata without billing scans', async () => {
     const wrapper = mountModal()

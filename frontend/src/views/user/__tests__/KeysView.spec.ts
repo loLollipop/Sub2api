@@ -363,6 +363,40 @@ describe('user KeysView column settings', () => {
     wrapper.unmount()
   })
 
+  it.each(['create', 'edit'])('categorizes mixed groups as domestic on %s and clears stale selections', async (mode) => {
+    getAvailableGroups.mockResolvedValue([
+      { id: 1, name: 'Domestic', platform: 'mixed' },
+      { id: 2, name: 'Gemini', platform: 'gemini' },
+      { id: 3, name: 'Grok', platform: 'grok' },
+    ])
+    if (mode === 'edit') listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 1 }], total: 1 })
+    const wrapper = await mountView()
+    if (mode === 'edit') await getButtonByText(wrapper, 'common.edit').trigger('click')
+    else await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+    expect((wrapper.get('input[name="key-provider"][value="cn"]').element as HTMLInputElement).checked).toBe(true)
+    const groupSelect = wrapper.getComponent('[data-tour="key-form-group"]')
+    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([1])
+    groupSelect.vm.$emit('update:modelValue', 1)
+    await nextTick()
+    await wrapper.get('input[name="key-provider"][value="other"]').setValue()
+    expect(groupSelect.props('modelValue')).toBeNull()
+    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([2, 3])
+    await wrapper.get('[data-tour="key-form-name"]').setValue('Domestic key')
+    await wrapper.get('#key-form').trigger('submit')
+    expect(createKey).not.toHaveBeenCalled()
+    expect(updateKey).not.toHaveBeenCalled()
+    expect(showError).toHaveBeenCalledWith('keys.groupRequired')
+    await wrapper.get('input[name="key-provider"][value="cn"]').setValue()
+    groupSelect.vm.$emit('update:modelValue', 1)
+    await nextTick()
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+    if (mode === 'edit') expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'Domestic key', group_id: 1 }))
+    else expect(createKey).toHaveBeenCalledWith('Domestic key', 1, undefined, [], [], 0, undefined,
+      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit')
+    wrapper.unmount()
+  })
+
   it('opens an existing key in its own provider and includes all Chinese platforms', async () => {
     getAvailableGroups.mockResolvedValue([
       { id: 1, name: 'GPT', platform: 'openai' },

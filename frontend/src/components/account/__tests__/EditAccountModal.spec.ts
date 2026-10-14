@@ -330,6 +330,48 @@ describe('EditAccountModal', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it('edits mixed model mappings with custom URL guidance while preserving identity and billing opt-in', async () => {
+    const account = buildAccount()
+    account.platform = 'mixed'
+    account.credentials = { api_key: 'nvapi-test', base_url: 'https://nvidia.example/v1', model_mapping: { alias: 'old-model' }, preserved_credential: 'keep' }
+    account.extra = { upstream_billing_probe_enabled: true, upstream_billing_rate_sync_enabled: false, preserved_setting: true }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const base = wrapper.get('input[placeholder="https://your-upstream/v1"]')
+    expect(base.attributes('required')).toBeDefined()
+    expect(wrapper.text()).toContain('admin.accounts.mixedBaseUrlRequired')
+    expect(wrapper.get('input[type="password"]').attributes('placeholder')).toBe('your-api-key')
+    const mapping = wrapper.findAll('input').find((input) => (input.element as HTMLInputElement).value === 'old-model')!
+    await mapping.setValue('new-model')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    const payload = updateAccountMock.mock.calls[0]?.[1]
+    expect(payload.credentials).toMatchObject({ ...account.credentials, model_mapping: { alias: 'new-model' } })
+    expect(payload.upstream_billing_probe_enabled).toBe(true)
+    expect(payload.upstream_billing_rate_sync_enabled).toBe(false)
+    expect(payload.extra).toMatchObject({ preserved_setting: true })
+    expect(payload.extra).not.toHaveProperty('upstream_billing_probe_enabled')
+    expect(payload.extra).not.toHaveProperty('upstream_billing_rate_sync_enabled')
+    expect(payload).not.toHaveProperty('type')
+    expect(payload).not.toHaveProperty('platform')
+    wrapper.unmount()
+  })
+
+  it.each([undefined, ''])('does not infer an Anthropic URL for a mixed account without a URL (%s)', async (baseUrl) => {
+    const account = buildAccount()
+    account.platform = 'mixed'
+    account.credentials = { api_key: 'nvapi-test', base_url: baseUrl }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    expect(wrapper.get<HTMLInputElement>('input[placeholder="https://your-upstream/v1"]').element.value).toBe('')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('preserves Mixed Messages auth on edit and allows restoring x-api-key', async () => {
     const account = buildAccount()
     account.platform = 'mixed'

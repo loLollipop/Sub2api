@@ -374,7 +374,11 @@ func (s *CNProviderQuotaService) setClineWalletLimit(ctx context.Context, accoun
 	}
 	replacement := &Account{}
 	setAccountModelRateLimitSnapshot(replacement, scope, until, reason, now)
-	next := replacement.Extra[modelRateLimitsKey].(map[string]any)[scope]
+	nextLimits, ok := replacement.Extra[modelRateLimitsKey].(map[string]any)
+	if !ok {
+		return
+	}
+	next := nextLimits[scope]
 	raw, err := json.Marshal(next)
 	if err != nil {
 		return

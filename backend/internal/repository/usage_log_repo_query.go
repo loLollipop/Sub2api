@@ -97,6 +97,9 @@ type UsageLogFilters = usagestats.UsageLogFilters
 
 // ListWithFilters lists usage logs with optional filters (for admin)
 func (r *usageLogRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters UsageLogFilters) ([]service.UsageLog, *pagination.PaginationResult, error) {
+	if err := usagestats.ValidateRequestIDSearch(filters.RequestID, filters.StartTime, filters.EndTime); err != nil {
+		return nil, nil, err
+	}
 	conditions := make([]string, 0, 9)
 	args := make([]any, 0, 9)
 
@@ -116,13 +119,7 @@ func (r *usageLogRepository) ListWithFilters(ctx context.Context, params paginat
 		conditions = append(conditions, fmt.Sprintf("group_id = $%d", len(args)+1))
 		args = append(args, filters.GroupID)
 	}
-	if requestID := strings.TrimSpace(filters.RequestID); requestID != "" {
-		// Exact indexed identities until a safe fragment-search migration is
-		// available. Also accept raw client/local IDs without losing namespaces.
-		n := len(args) + 1
-		conditions = append(conditions, fmt.Sprintf("(request_id IN ($%d, $%d, $%d) OR upstream_request_id = $%d)", n, n+1, n+2, n))
-		args = append(args, requestID, "client:"+requestID, "local:"+requestID)
-	}
+	conditions, args = appendRequestIDSearchCondition(conditions, args, filters.RequestID, "request_id", "upstream_request_id")
 	conditions, args = appendUsageLogModelWhereCondition(conditions, args, filters.Model, filters.ModelFilterSource)
 	conditions, args = appendRequestTypeOrStreamWhereCondition(conditions, args, filters.RequestType, filters.Stream)
 	conditions, args = appendNativeCompactionV2WhereCondition(conditions, args, filters.NativeCompactionV2, "")
@@ -162,6 +159,34 @@ func (r *usageLogRepository) ListWithFilters(ctx context.Context, params paginat
 		return nil, nil, err
 	}
 	return logs, page, nil
+}
+
+// Keep columns bare so equality uses btree indexes and ILIKE uses trigram indexes.
+func appendRequestIDSearchCondition(conditions []string, args []any, input string, columns ...string) ([]string, []any) {
+	search, err := usagestats.ParseRequestIDSearch(input)
+	if err != nil {
+		return append(conditions, "FALSE"), args
+	}
+	patterns := search.SQLPatterns()
+	if len(patterns) == 0 {
+		return conditions, args
+	}
+	positions := make([]string, len(patterns))
+	for i, pattern := range patterns {
+		args = append(args, pattern)
+		positions[i] = fmt.Sprintf("$%d", len(args))
+	}
+	parts := make([]string, 0, len(columns)*len(patterns))
+	for _, column := range columns {
+		if search.Mode == '=' {
+			parts = append(parts, column+" IN ("+strings.Join(positions, ", ")+")")
+		} else {
+			for _, position := range positions {
+				parts = append(parts, column+" ILIKE "+position)
+			}
+		}
+	}
+	return append(conditions, "("+strings.Join(parts, " OR ")+")"), args
 }
 
 func upstreamModelMismatchCondition(column string, mismatch bool) string {

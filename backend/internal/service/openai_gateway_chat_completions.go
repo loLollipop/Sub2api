@@ -65,6 +65,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 }
 
 func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context, c *gin.Context, account *Account, body []byte, promptCacheKey, defaultMappedModel string) (*OpenAIForwardResult, error) {
+	clientCtx := ctx // The legacy drain context below must not authorize replay.
 	ctx = context.WithoutCancel(ctx)
 	beginUpstreamResponseModelObservation(c)
 	setCodexToolNameReverse(c, nil)
@@ -104,51 +105,37 @@ func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context,
 	// accounts never forward the body unchanged to a Chat Completions endpoint.
 	isResponsesShape := !gjson.GetBytes(body, "messages").Exists() && gjson.GetBytes(body, "input").Exists()
 
-	// 自适应账号的标准 Chat Completions 入站使用供应商原生 CC 端点。
-	// Responses 形状下，DeepSeek / Kimi / Gemini 自定义上游继续走下方原生
-	// Responses 链；GLM 没有 Responses 端点，先转换成 Chat Completions 再直转。
-	if account.IsAdaptiveAPIProtocol() {
-		if !isResponsesShape {
-			return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
-		}
-		if !account.usesNativeResponsesUpstream() {
-			var responsesReq apicompat.ResponsesRequest
-			if err := json.Unmarshal(body, &responsesReq); err != nil {
-				return nil, fmt.Errorf("parse responses-shaped chat completions request: %w", err)
-			}
-			chatReq, err := apicompat.ResponsesToChatCompletionsRequestWithOptions(
-				&responsesReq,
-				&apicompat.ResponsesToChatOptions{ReasoningContentByID: s.reasoningContentByID},
-			)
-			if err != nil {
-				return nil, fmt.Errorf("convert responses-shaped chat completions request: %w", err)
-			}
-			chatBody, err := json.Marshal(chatReq)
-			if err != nil {
-				return nil, fmt.Errorf("marshal converted chat completions request: %w", err)
-			}
-			return s.forwardAsRawChatCompletions(ctx, c, account, chatBody, defaultMappedModel)
-		}
-		// DeepSeek / Kimi / Gemini 自定义上游的原生 Responses 请求继续走下方转换。
+	inbound := APIProtocolChatCompletions
+	if isResponsesShape {
+		inbound = APIProtocolResponses
 	}
-
-	// 入口分流（国产供应商 Anthropic 协议）：上游为供应商原生 Anthropic 端点，
-	// CC 入站请求经 CC→Responses→Anthropic 转换链直通该端点。必须先于
-	// ShouldUseResponsesAPI 分流：该类账号经 probe 落标
-	// openai_responses_supported=false，会先命中下方的 CC 直转分支。
-	if account.IsAnthropicProtocol() {
-		// OpenAI 协议族（CC 入站）跨到 Anthropic 协议族，受分组级跨协议转换开关约束。
+	convertResponsesShape := isResponsesShape && (account.routesByModel() || account.IsAdaptiveAPIProtocol())
+	routingModel := upstreamRoutingModel(account, body, defaultMappedModel)
+	switch s.resolveUpstreamProtocolFor(ctx, account, inbound, routingModel) {
+	case APIProtocolAnthropic:
 		if !crossProtocolConversionAllowedFromContext(c) {
 			writeChatCompletionsError(c, http.StatusBadRequest, crossProtocolDisabledCode, crossProtocolDisabledMessage)
 			return nil, CrossProtocolConversionError{}
 		}
+		if convertResponsesShape {
+			chatBody, err := s.convertResponsesShapedChatBody(body)
+			if err != nil {
+				return nil, err
+			}
+			return s.forwardChatCompletionsViaNativeAnthropic(ctx, c, account, chatBody, defaultMappedModel)
+		}
 		return s.forwardChatCompletionsViaNativeAnthropic(ctx, c, account, body, defaultMappedModel)
-	}
-
-	// 固定 chat_completions 的 CN 账号，以及强制或已探测确认不支持 Responses
-	// 的其他 APIKey 账号，均走 CC 直转。
-	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) && !forcedOpenAIResponsesProtocol(ctx) {
-		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
+	case APIProtocolChatCompletions:
+		if !forcedOpenAIResponsesProtocol(ctx) {
+			if convertResponsesShape {
+				chatBody, err := s.convertResponsesShapedChatBody(body)
+				if err != nil {
+					return nil, err
+				}
+				return s.forwardAsRawChatCompletions(ctx, c, account, chatBody, defaultMappedModel)
+			}
+			return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
+		}
 	}
 
 	startTime := time.Now()
@@ -205,6 +192,12 @@ func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("rewrite model in responses-shape body: %w", err)
 		}
+		// The existing Chat bridge consumes Responses SSE for both client modes.
+		// Keep clientStream above for downstream JSON/SSE conversion.
+		responsesBody, err = sjson.SetBytes(responsesBody, "stream", true)
+		if err != nil {
+			return nil, fmt.Errorf("enable streaming in responses-shape body: %w", err)
+		}
 		// Strip Responses API parameters that no Codex upstream accepts.
 		// Because this branch forwards the raw body (the normal path rebuilds
 		// it from ChatCompletionsRequest and drops unknown fields naturally),
@@ -232,7 +225,7 @@ func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context,
 	} else {
 		// Normal path: convert Chat Completions → Responses.
 		// ChatCompletionsToResponses always sets Stream=true (upstream always streams).
-		responsesReq, err = apicompat.ChatCompletionsToResponses(&chatReq)
+		responsesReq, err = chatCompletionsToResponses(s.cfg, &chatReq)
 		if err != nil {
 			return nil, fmt.Errorf("convert chat completions to responses: %w", err)
 		}
@@ -342,6 +335,10 @@ func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context,
 		releaseUpstreamCtx()
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
+	if err := s.repriceOpenAIFinalHTTPRequest(ctx, account, upstreamReq, billingModel, upstreamModel); err != nil {
+		releaseUpstreamCtx()
+		return nil, err
+	}
 
 	if promptCacheKey != "" {
 		apiKeyID := getAPIKeyIDFromContext(c)
@@ -369,11 +366,29 @@ func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context,
 
 	// 8. Handle error response with failover
 	if resp.StatusCode >= 400 {
-		respBody, upstreamMsg, readErr := s.readOpenAIProtocolError(resp, account)
+		responsesMode, _ := account.Extra[openai_compat.ExtraKeyResponsesMode].(string)
+		structuredInputRetryEligible := account.IsOpenAIApiKey() && !isResponsesShape &&
+			openai_compat.NormalizeResponsesSupportMode(responsesMode) == openai_compat.ResponsesSupportModeAuto &&
+			openai_compat.ResolveResponsesSupport(account.Extra) == openai_compat.ResponsesSupportYes
+		var respBody []byte
+		var upstreamMsg string
+		var readErr error
+		completeErrorBody := false
+		if structuredInputRetryEligible && resp.StatusCode == http.StatusBadRequest {
+			readCtx, cancelRead := context.WithCancel(clientCtx)
+			if c.Request != nil {
+				stopClient := context.AfterFunc(c.Request.Context(), cancelRead)
+				defer stopClient()
+			}
+			respBody, upstreamMsg, completeErrorBody = s.readOpenAIUpstreamErrorWithCompleteness(readCtx, resp)
+			cancelRead()
+		} else {
+			respBody, upstreamMsg, readErr = s.readOpenAIProtocolError(resp, account)
+		}
 		if readErr != nil {
 			return nil, readErr
 		}
-		legacyProtocolFallback := account.Type == AccountTypeAPIKey &&
+		legacyProtocolFallback := account.Type == AccountTypeAPIKey && !account.routesByModel() &&
 			openai_compat.ResolveResponsesSupport(account.Extra) == openai_compat.ResponsesSupportUnknown &&
 			!isResponsesEndpointSupportedByStatus(resp.StatusCode)
 		if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolResponses, resp.StatusCode, respBody, legacyProtocolFallback); fallbackErr != nil {
@@ -392,7 +407,18 @@ func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context,
 				zap.Int("upstream_status", resp.StatusCode),
 				zap.String("upstream_message", upstreamMsg),
 			)
-			return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
+			return s.forwardAsRawChatCompletionsWithStartTime(ctx, c, account, body, defaultMappedModel, startTime)
+		}
+		if structuredInputRetryEligible && clientCtx.Err() == nil &&
+			(c.Request == nil || c.Request.Context().Err() == nil) &&
+			!IsResponseCommitted(c) && !c.Writer.Written() &&
+			!openAIStreamHeaderKeepaliveFailed(c) && completeErrorBody &&
+			isConvertedResponsesInputStringRejection(resp.StatusCode, respBody) {
+			logger.L().Info("openai chat_completions: structured Responses input rejected, falling back to raw chat completions",
+				zap.Int64("account_id", account.ID),
+				zap.Int("upstream_status", resp.StatusCode),
+			)
+			return s.forwardAsRawChatCompletionsWithStartTime(ctx, c, account, body, defaultMappedModel, startTime)
 		}
 		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
 			return nil, foErr
@@ -426,10 +452,7 @@ func (s *OpenAIGatewayService) forwardOpenAIChatCompletions(ctx context.Context,
 		if tier := resolvedOpenAIUpstreamServiceTier(c, extractOpenAIServiceTierFromBody(responsesBody)); tier != nil {
 			result.ServiceTier = tier
 		}
-		if responsesReq.Reasoning != nil && responsesReq.Reasoning.Effort != "" {
-			re := responsesReq.Reasoning.Effort
-			result.ReasoningEffort = &re
-		}
+		result.ReasoningEffort = finalOpenAIAttemptReasoningEffort(responsesBody, upstreamModel, billingModel, originalModel)
 	}
 
 	// Extract and save Codex usage snapshot from response headers (for OAuth accounts).

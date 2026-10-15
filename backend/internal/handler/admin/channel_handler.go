@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"strconv"
 	"strings"
 
@@ -638,16 +639,9 @@ func (h *ChannelHandler) GetModelDefaultPricing(c *gin.Context) {
 
 // platformToLiteLLMProvider maps a channel platform name to the corresponding
 // LiteLLM provider string used as the key in the pricing catalog.
-var platformToLiteLLMProvider = map[string]string{
-	service.PlatformAnthropic:   "anthropic",
-	service.PlatformOpenAI:      "openai",
-	service.PlatformGemini:      "gemini",
-	service.PlatformAntigravity: "anthropic",
-	service.PlatformGrok:        "xai",
-	service.PlatformKimi:        "moonshot",
-	service.PlatformZhipu:       "zhipu",
-	service.PlatformDeepseek:    "deepseek",
-	service.PlatformMiniMax:     "minimax",
+func platformLiteLLMProvider(platform string) (string, bool) {
+	spec, ok := domain.LookupPlatform(platform)
+	return spec.LiteLLMProvider, ok && spec.LiteLLMProvider != ""
 }
 
 // SyncPricingModels 返回 LiteLLM 定价目录中指定平台的最新模型列表
@@ -660,7 +654,7 @@ func (h *ChannelHandler) SyncPricingModels(c *gin.Context) {
 		return
 	}
 
-	provider, ok := platformToLiteLLMProvider[platform]
+	provider, ok := platformLiteLLMProvider(platform)
 	if !ok {
 		response.ErrorFrom(c, infraerrors.BadRequest("UNSUPPORTED_PLATFORM",
 			fmt.Sprintf("unsupported platform: %s", platform)).

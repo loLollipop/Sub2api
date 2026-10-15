@@ -33,18 +33,60 @@ func (r *opsRepository) GetDashboardOverview(ctx context.Context, filter *servic
 		mode = service.OpsQueryModeRaw
 	}
 
+	var overview *service.OpsDashboardOverview
+	var err error
 	switch mode {
 	case service.OpsQueryModePreagg:
-		return r.getDashboardOverviewPreaggregated(ctx, filter)
+		overview, err = r.getDashboardOverviewPreaggregated(ctx, filter)
 	case service.OpsQueryModeAuto:
-		out, err := r.getDashboardOverviewPreaggregated(ctx, filter)
-		if err != nil && errors.Is(err, service.ErrOpsPreaggregatedNotPopulated) {
-			return r.getDashboardOverviewRaw(ctx, filter)
+		overview, err = r.getDashboardOverviewPreaggregated(ctx, filter)
+		if errors.Is(err, service.ErrOpsPreaggregatedNotPopulated) {
+			overview, err = r.getDashboardOverviewRaw(ctx, filter)
 		}
-		return out, err
 	default:
-		return r.getDashboardOverviewRaw(ctx, filter)
+		overview, err = r.getDashboardOverviewRaw(ctx, filter)
 	}
+	if err != nil {
+		return nil, err
+	}
+	// Never average hourly percentiles. Both overview modes use the same
+	// bounded raw request-level distribution over the requested window.
+	rateCtx, cancel := context.WithTimeout(ctx, opsRawLatencyQueryTimeout)
+	defer cancel()
+	overview.OutputTPS, err = r.queryOutputTPS(rateCtx, filter)
+	if err != nil && !isQueryTimeoutErr(err) {
+		return nil, err
+	}
+	return overview, nil
+}
+
+func (r *opsRepository) queryOutputTPS(ctx context.Context, filter *service.OpsDashboardFilter) (*service.OpsOutputTPS, error) {
+	if filter == nil || filter.StartTime.IsZero() || filter.EndTime.IsZero() {
+		return nil, fmt.Errorf("output TPS requires a time window")
+	}
+	join, where, args, _ := buildUsageWhere(filter, filter.StartTime.UTC(), filter.EndTime.UTC(), 1)
+	query := `SELECT
+ percentile_cont(0.05) WITHIN GROUP (ORDER BY output_tps),
+ percentile_cont(0.10) WITHIN GROUP (ORDER BY output_tps),
+ percentile_cont(0.50) WITHIN GROUP (ORDER BY output_tps),
+ AVG(output_tps), COUNT(*)
+FROM (
+ SELECT ul.output_tokens * 1000.0 / NULLIF(ul.duration_ms::bigint - ul.first_token_ms::bigint, 0) AS output_tps
+ FROM usage_logs ul ` + join + ` ` + where + `
+ AND ul.output_tokens >= 20 AND ul.first_token_ms >= 0
+ AND ul.duration_ms::bigint - ul.first_token_ms::bigint >= 1000
+ AND ul.image_count = 0 AND ul.image_output_tokens = 0
+ AND COALESCE(ul.billing_mode, '') NOT IN ('image', 'video')
+ ` + fmt.Sprintf("AND ul.request_type IN (%d, %d, %d)", service.RequestTypeSync, service.RequestTypeStream, service.RequestTypeWSV2) + `
+) rates`
+	var stats service.OpsOutputTPS
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&stats.P5, &stats.P10, &stats.P50, &stats.Avg, &stats.SampleCount); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		return nil, err
+	}
+	return &stats, nil
 }
 
 func (r *opsRepository) getDashboardOverviewRaw(ctx context.Context, filter *service.OpsDashboardFilter) (*service.OpsDashboardOverview, error) {

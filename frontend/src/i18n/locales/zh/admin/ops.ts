@@ -429,6 +429,7 @@ export default {
           time: '时间',
           kind: '类型',
           platform: '平台',
+            account: '账号',
           model: '模型',
           duration: '耗时',
           status: '状态码',
@@ -831,7 +832,10 @@ export default {
         unavailable: '不可用',
         accountError: '异常'
       },
+      outputTps: '单请求生成速度',
+      outputTpsSamples: '有效样本：{count}',
       tooltips: {
+        outputTps: '按输出 token ÷（总时长−首 token 延迟）计算单请求生成速度，不是全站吞吐。仅统计至少 20 个输出 token、生成窗口至少 1 秒的文本请求；P5/P10 可观察慢速尾部，P50 为中位数。缺失时长、图片/视频和极短请求不计入。',
         totalRequests: '当前时间窗口内的总请求数和Token消耗量。',
         throughputTrend: '当前窗口内的请求/QPS 与 token/TPS 趋势。',
         switchRateTrend: '近5小时内账号切换次数 / 请求总数的趋势（平均切换次数）。',

@@ -120,6 +120,22 @@ func TestEnsureCompositeTargetPlatformDoesNotGuessForSmartRoutingKey(t *testing.
 	require.False(t, ok)
 }
 
+func TestEnsureCompositeTargetPlatformPreservesExplicitRoute(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/openai/v1/responses", nil)
+	c.Request = c.Request.WithContext(service.WithCompositeRouteDecision(c.Request.Context(), service.CompositeRouteDecision{
+		Matched: true, TargetPlatform: service.PlatformGrok, PublicModel: "custom-alias", UpstreamModel: "grok-4.7",
+	}))
+	key := &service.APIKey{Group: &service.Group{Platform: service.PlatformComposite}}
+	ensureCompositeTargetPlatform(c, key, "gpt-5.1", &service.OpenAIGatewayService{})
+	platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context())
+	require.True(t, ok)
+	require.Equal(t, service.PlatformGrok, platform)
+	model, ok := service.ResolvedUpstreamModelFromContext(c.Request.Context())
+	require.True(t, ok)
+	require.Equal(t, "grok-4.7", model)
+}
+
 func TestOpenAIReasoningEffortPolicyForCompositeTarget(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	group := &service.Group{

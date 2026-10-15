@@ -9,6 +9,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmodel"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/typesafe"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -54,7 +55,7 @@ func RegisterGatewayRoutes(
 	isOpenAIResponsesCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		switch getGroupPlatform(c) {
 		case service.PlatformOpenAI, service.PlatformMixed, service.PlatformGrok,
-			service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax:
+			service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformCommandCode, service.PlatformCline:
 			// 国产 OpenAI 兼容供应商与 openai/grok 一样经 OpenAI 网关转发。
 			return true
 		default:
@@ -63,7 +64,7 @@ func RegisterGatewayRoutes(
 	}
 	countTokensHandler := func(c *gin.Context) {
 		switch getGroupPlatform(c) {
-		case service.PlatformOpenAI, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax:
+		case service.PlatformOpenAI, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformCommandCode, service.PlatformCline:
 			h.OpenAIGateway.CountTokens(c)
 		case service.PlatformGrok, service.PlatformMixed:
 			h.OpenAIGateway.GrokCountTokens(c)
@@ -200,6 +201,7 @@ func RegisterGatewayRoutes(
 	gateway.Use(compositeTarget)
 	gateway.Use(requireGroupAnthropic)
 	{
+		gateway.POST("/systemone", textBodyLimit, h.Gateway.SystemOne)
 		// /v1/messages: auto-route based on group platform
 		gateway.POST("/messages", func(c *gin.Context) {
 			if isOpenAIResponsesCompatibleGatewayPlatform(c) {
@@ -593,6 +595,21 @@ func compositeTargetPlatformMiddlewareResolved(resolver *service.CompositeRouteR
 			c.Next()
 			return
 		}
+		if rejectNonNativeSystemOneBeforeResolution(c, apiKey) {
+			return
+		}
+		if c.Request != nil && c.Request.URL.Path == "/v1/systemone" {
+			body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": "Failed to read native request"}})
+				return
+			}
+			if _, err := typesafe.ValidateSystemOneRequest(body); err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": "Invalid native System One request"}})
+				return
+			}
+			requestmodel.ResetRequestBody(c.Request, body)
+		}
 		if !apiKey.UsesRequestTargetPlatform() && upstream == nil {
 			c.Next()
 			return
@@ -640,6 +657,11 @@ func compositeTargetPlatformMiddlewareResolved(resolver *service.CompositeRouteR
 					c.Abort()
 					return
 				}
+				if decision.OAuthAmbiguous() {
+					service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalModelConfiguration)
+					c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": decision.AmbiguousMessage()}})
+					return
+				}
 				if decision.Matched {
 					c.Request = c.Request.WithContext(service.WithCompositeRouteDecision(c.Request.Context(), decision))
 					if upstreamModel := strings.TrimSpace(decision.UpstreamModel); upstreamModel != "" && upstreamModel != model && gjson.ValidBytes(body) {
@@ -661,6 +683,9 @@ func compositeTargetPlatformMiddlewareResolved(resolver *service.CompositeRouteR
 			}
 		}
 		requestmodel.ResetRequestBody(c.Request, body)
+		if rejectNonNativeSystemOne(c, apiKey) {
+			return
+		}
 		c.Next()
 	}
 }
@@ -674,6 +699,9 @@ func compositeGeminiTargetPlatformMiddleware(resolver *service.CompositeRouteRes
 			c.Request = c.Request.WithContext(service.WithSchedulerSnapshotOnly(c.Request.Context()))
 		}
 		apiKey, ok := middleware.GetAPIKeyFromContext(c)
+		if rejectNonNativeSystemOneBeforeResolution(c, apiKey) {
+			return
+		}
 		if ok && apiKey != nil && apiKey.Group != nil && apiKey.UsesRequestTargetPlatform() {
 			if apiKey.Group.Platform == service.PlatformComposite {
 				model := compositeGeminiModelFromParams(c)
@@ -695,8 +723,19 @@ func compositeGeminiTargetPlatformMiddleware(resolver *service.CompositeRouteRes
 				}
 			}
 			if _, resolved := service.ResolvedTargetPlatformFromContext(c.Request.Context()); !resolved {
-				c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), service.PlatformGemini))
+				target := service.PlatformGemini
+				// Smart multi-group keys do not pass through the composite resolver.
+				// Recognize native-only models before the Gemini default so they are
+				// rejected at this boundary, not sent to a protocol converter. An
+				// explicit route above remains authoritative.
+				if platform, ok := service.DetectModelPlatform(compositeGeminiModelFromParams(c)); ok && platform == service.PlatformTypeSafe {
+					target = platform
+				}
+				c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), target))
 			}
+		}
+		if rejectNonNativeSystemOne(c, apiKey) {
+			return
 		}
 		c.Next()
 	}
@@ -737,6 +776,8 @@ func compositeGeminiModelFromParams(c *gin.Context) string {
 
 func compositeRouteEndpointForPath(path string) string {
 	switch {
+	case path == "/v1/systemone":
+		return service.CompositeRouteEndpointSystemOne
 	case strings.Contains(path, "/messages/count_tokens"):
 		return service.CompositeRouteEndpointCountTokens
 	case strings.Contains(path, "/messages"):

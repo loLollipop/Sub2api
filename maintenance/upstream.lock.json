@@ -2,14 +2,70 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.1.9",
-  "imported_commit": "9e2f733aa93d95acee551a5cd272708c9ea544b5",
+  "imported_version": "2.1.16",
+  "imported_commit": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
   "personal_baseline_commit": "edf577657ac8d1b2d245e772a0172b550b9d7c53",
-  "latest_observed_version": "2.1.9",
-  "latest_observed_release_commit": "9e2f733aa93d95acee551a5cd272708c9ea544b5",
-  "latest_observed_main_commit": "9e2f733aa93d95acee551a5cd272708c9ea544b5",
-  "sync_policy": "review-diff-then-squash",
+  "latest_observed_version": "2.1.16",
+  "latest_observed_release_commit": "74f99b2c532007265f38d0515980b985e2de9462",
+  "latest_observed_main_commit": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
+  "observed_delta_review": {
+    "from_commit": "fec7f7fd3f9ad427499df61f19f5852868910bfb",
+    "to_commit": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
+    "status": "selective_argument_retention_backport_verified",
+    "behavior_commits": ["966016ebc3811ee24e327128fde2a1f0a9abc019", "b6251ba03c0fb64869fed172bc0e0e52c8033fbe"],
+    "scope": "Selectively adapted b6251ba03: duplicate SAME-ID function calls retain later complete real JSON arguments when the first is an empty shell. First call location, item ID, outputs and distinct-call identities are preserved; name/type conflicts never graft. Native Responses, passthrough, Chat fallback and live SSE identity regressions pass. Existing origin/scope and dedupe-before-image-lifting unchanged. Independent review complete with Chat negative coverage added. Full backend unit, vet and production build pass; WS parent repeated100 times each at GOMAXPROCS1 and4 passes after correcting only its cold-cache precondition. No DSML parser or live SSE ID rewrite imported; not a full v2.1.16 merge, billing change or release approval.",
+    "evidence": ".artifacts/full-upstream-implementation-20261015/secondary-v2.1.16-review.md"
+  },
+  "sync_policy": "review-diff-then-selective-behavior-backport",
+  "checkpoint_meaning": "Reviewed source history, not a complete merge. Cumulative synchronization is in development; feature status and outstanding verification are recorded below. Not release-approved.",
+  "cumulative_sync": {
+    "status": "in_progress_not_release_approved",
+    "source_head": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
+    "implemented_with_local_regression": [
+      "Cline/Command Code using shared provider registry; preserve Mixed and credential destinations",
+      "Gemini authorized model catalog and four exclusive API-key model scopes",
+      "Request-ID literal contains, =exact and ^prefix with short-query guards and append-only pg_trgm/index recovery migrations",
+      "Effective upstream-model Anthropic validation and strict no-replay compatibility boundaries",
+      "Shared glass modal appearance preserving local layers, Mixed/payment layouts and reduced motion",
+      "Mixed real HTTP/SSE native-dispatch parity, Responses-shaped Chat requests and output-token limits"
+    ],
+    "implemented_with_selected_regression": [
+      "TypeSafe moderation: default off, independent profiles/key health, frozen queue and uncached send-time authorization; optional safe model metadata, both-engine local image-identifier filtering, full skipped-image counts and score-preserving regressions"
+    ],
+    "partial_implementation_not_release_approved": ["Native System One forwarding/response decoding restored to the source implementation; local Mixed/scope/target-route adaptations remain. No bespoke native reconciliation or financial recovery subsystem; post-rollback selected backend regression, full TypeSafe package tests and server build passed"],
+    "reverted_local_mechanisms_by_user_request": ["Custom System One journal, manual resolution APIs, worker, migration267 and native-only hold markers", "Custom Gemini cache operation journal/migration262 and v2 frozen-price layer", "Experimental durable-image store and this continuation's Redis CAS/billing-recovery extensions"],
+    "excluded_by_user": ["LinuxDo OAuth referral propagation", "Multi-code affiliate expansion and per-code rebate statistics"],
+    "verification_limits": ["Full frontend387 files/3095 tests, typecheck/lint/build and Mixed1004 HTTP/SSE tests/subtests passed", "PostgreSQL16 production-schema-only rehearsal applied ten migrations twice; final backend/CI and live acceptance remain separate gates"],
+    "evidence": ".artifacts/source-sync-resume-20261015/notes.md"
+  },
+  "selected_fix_commits_since_2_1_9": ["850047604", "8d7b4b763", "d295fd925", "a20741493", "7435eebdd", "91db72e40", "b6251ba03"],
+  "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "deepseek-dsml-body-dedup-and-scope-expansion",
+      "upstream_commits": ["91db72e40", "8643e7ca9", "fec7f7fd3"],
+      "reason": "Shared normalizer wiring is imported; same-ID empty-shell argument retention from later b6251ba03 is now selectively adapted and regression-verified. Defer parser-dependent code, name-plus-arguments deduplication that can erase valid independent calls, and nested/item-ID rewrites with unresolved canonical-order/collision risks. No model-name or host substring scope expansion. The two older test-only followups apply to deferred code."
+    },
+    {
+      "feature": "affiliate-per-code-invite-and-rebate-statistics",
+      "upstream_commits": ["c696d2cbd"],
+      "reason": "Cancelled by user on 2026-10-15. Do not implement multi-code storage, APIs, UI, attribution or per-code statistics. Preserve the existing single-code and rebate behavior. LinuxDo OAuth referral propagation was also cancelled and its development changes removed."
+    },
+    {
+      "feature": "typesafe-systemone-affiliate-multicode-and-moderation-engines",
+      "upstream_commits": ["7435eebdd"],
+      "reason": "Moderation remains default off with selected privacy/metadata regressions. Native System One forwarding/decoder now use the source implementation with only fork routing/scope adaptations; the bespoke journal/manual-resolution/worker/hold-marker redesign was withdrawn by user request. Affiliate multi-code and LinuxDo referral additions remain cancelled. No production mutation or complete-feature claim."
+    },
+    {
+      "feature": "global-glass-modal-restyling",
+      "upstream_commits": ["77696f2ea"],
+      "reason": "Source modal appearance adapted and included in passing full frontend regression; customized Mixed/payment layouts, dialog layers and reduced-motion behavior preserved."
+    },
+    {
+      "feature": "gemini-group-openai-account-catalog-expansion",
+      "upstream_commits": ["7435eebdd"],
+      "reason": "Implemented through the local authorized dynamic catalog rather than the source static platform list; local catalog/scope regressions pass. Live native-provider verification remains outstanding. See cumulative_sync rather than treating the old deferral as unimplemented."
+    },
     {
       "feature": "grok-moderation-refusal-billing",
       "upstream_commits": ["8d487b465", "f0d3865f3", "8262ca158"],
@@ -38,7 +94,7 @@
     {
       "feature": "cline-command-code-platforms",
       "upstream_commits": ["14dc46aee"],
-      "reason": "Defer both platforms and migration 255 together: connection tests send their credentials to Anthropic and mapped Claude models select the wrong forwarding protocol. Accept the independent protocol compatibility fixes only, pending endpoint tests for credential destinations and mapped-model routing."
+      "reason": "Implemented with provider profiles, mapped-model endpoint and credential-destination regressions; local append-only migration258 preserves Mixed. Source migration255 was not imported. Real PostgreSQL upgrade verification remains outstanding."
     },
     {
       "feature": "honeypot-scanner-path-bans",
@@ -48,12 +104,12 @@
     {
       "feature": "usage-request-id-trigram-index-migrations",
       "upstream_commits": ["5c031ae04", "980c14531", "756f7efd3"],
-      "reason": "Defer migrations 256a/256b and their binding test: pg_trgm creation may fail silently before unconditional index creation fails; interrupted CONCURRENTLY indexes have no invalid-index recovery. Defer contains and ILIKE-prefix searches without verified indexes, including Ops/user error endpoints lacking equivalent short-fragment guards. Preserve raw complete request/upstream ID exact matches on B-tree indexes, importing only ID-click filtering and Ops parameter forwarding from 2.1.7/8. No schema changes; retain validate mode."
+      "reason": "Implemented via local append-only263/264, fail-closed extension/index validation, schema-aware invalid-index recovery and guarded literal search modes. SQL mock/unit/handler/UI regressions and static independent audit pass; opt-in local PostgreSQL fixtures exist but have not executed. Production retains validate mode, no schema migration performed."
     },
     {
       "feature": "opus55-public-model-only-strict-validation",
       "upstream_commits": ["66790d7ee"],
-      "reason": "Defer the new validator and both handler hooks: they check only the public model before channel/account mappings, allowing aliases mapped to Opus5.5 to bypass validation while rejecting Opus5.5 mapped to other models. Preserve existing validation until effective-model routing and original-body semantics are covered together."
+      "reason": "Adapted to validate the actual channel/account-resolved Anthropic model with original-body facts, not the source public-only gate. Local mapped/native/bridge regressions pass; no production verification performed."
     }
   ],
   "deployment_repository": "loLollipop/Sub2api"

@@ -8,11 +8,11 @@ import (
 )
 
 func TestBuildOpsErrorLogsWhere_RequestIDMatchesEitherColumn(t *testing.T) {
-	where, args := buildOpsErrorLogsWhere(&service.OpsErrorLogFilter{RequestID: "fcfb9013"})
-	if !strings.Contains(where, "e.request_id IN ($1, $2)") || !strings.Contains(where, "e.client_request_id IN ($1, $2)") || strings.Contains(where, "ILIKE") {
+	where, args := buildOpsErrorLogsWhere(&service.OpsErrorLogFilter{RequestID: "=fcfb9013"})
+	if !strings.Contains(where, "e.request_id IN ($1, $2, $3)") || !strings.Contains(where, "e.client_request_id IN ($1, $2, $3)") || strings.Contains(where, "ILIKE") {
 		t.Fatalf("request id search should hit both columns: %s", where)
 	}
-	if len(args) != 2 || args[0] != "fcfb9013" || args[1] != "fcfb9013" {
+	if len(args) != 3 || args[0] != "fcfb9013" || args[1] != "client:fcfb9013" || args[2] != "local:fcfb9013" {
 		t.Fatalf("args %+v", args)
 	}
 }
@@ -21,8 +21,8 @@ func TestBuildOpsErrorLogsWhere_CompleteRequestIDNamespaceAndLiteralWildcards(t 
 	for _, tc := range []struct{ input, bare string }{
 		{"client:abc", "abc"}, {"local:abc", "abc"}, {`100%_\x`, `100%_\x`},
 	} {
-		where, args := buildOpsErrorLogsWhere(&service.OpsErrorLogFilter{RequestID: tc.input})
-		if strings.Contains(where, "ILIKE") || len(args) != 2 || args[0] != tc.input || args[1] != tc.bare {
+		where, args := buildOpsErrorLogsWhere(&service.OpsErrorLogFilter{RequestID: "=" + tc.input})
+		if strings.Contains(where, "ILIKE") || len(args) != 3 || args[0] != tc.bare || args[1] != "client:"+tc.bare || args[2] != "local:"+tc.bare {
 			t.Fatalf("complete identity mismatch: %s %+v", where, args)
 		}
 	}

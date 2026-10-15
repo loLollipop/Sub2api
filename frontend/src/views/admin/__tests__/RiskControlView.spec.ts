@@ -10,6 +10,7 @@ const {
   getConfig,
   updateConfig,
   getStatus,
+  testAPIKeys,
   listLogs,
   getGroups,
   getProxies,
@@ -19,6 +20,7 @@ const {
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
   getStatus: vi.fn(),
+  testAPIKeys: vi.fn(),
   listLogs: vi.fn(),
   getGroups: vi.fn(),
   getProxies: vi.fn(),
@@ -33,7 +35,7 @@ vi.mock('@/api/admin', () => ({
       updateConfig,
       getStatus,
       listLogs,
-      testAPIKeys: vi.fn(),
+      testAPIKeys,
       deleteFlaggedHash: vi.fn(),
       clearFlaggedHashes: vi.fn(),
       unbanUser: vi.fn(),
@@ -195,6 +197,7 @@ describe('admin RiskControlView', () => {
     getConfig.mockReset()
     updateConfig.mockReset()
     getStatus.mockReset()
+    testAPIKeys.mockReset()
     listLogs.mockReset()
     getGroups.mockReset()
     showError.mockReset()
@@ -215,6 +218,71 @@ describe('admin RiskControlView', () => {
       api_key_masks: [],
       api_key_statuses: [],
     }))
+  })
+
+  it('keeps independent unsaved engine drafts and pending key deletions', async () => {
+    const wrapper = mount(RiskControlView, { global: { stubs: { AppLayout: AppLayoutStub, BaseDialog: BaseDialogStub, Icon: true, Select: true, Toggle: true, Pagination: true, ModelWhitelistSelector: ModelWhitelistSelectorStub, ProxySelector: true } } })
+    await flushPromises()
+    const vm = wrapper.vm.$.setupState as unknown as {
+      configForm: { engine: string; model: string; api_keys_text: string; thresholds: Record<string, number> }
+      pendingDeleteApiKeyHashes: string[]
+      switchEngine: (engine: string) => void
+    }
+    vm.configForm.model = 'unsaved-openai-model'
+    vm.configForm.api_keys_text = 'openai-draft-key'
+    vm.configForm.thresholds.sexual = 91
+    vm.pendingDeleteApiKeyHashes.push('openai-delete')
+    vm.switchEngine('typesafe')
+    expect(vm.configForm.model).toBe('jev-latest')
+    expect(vm.pendingDeleteApiKeyHashes).toEqual([])
+    vm.configForm.model = 'unsaved-typesafe-model'
+    vm.configForm.api_keys_text = 'typesafe-draft-key'
+    vm.configForm.thresholds.sexual = 83
+    vm.pendingDeleteApiKeyHashes.push('typesafe-delete')
+    vm.switchEngine('openai')
+    expect(vm.configForm.model).toBe('unsaved-openai-model')
+    expect(vm.configForm.api_keys_text).toBe('openai-draft-key')
+    expect(vm.configForm.thresholds.sexual).toBe(91)
+    expect(vm.pendingDeleteApiKeyHashes).toEqual(['openai-delete'])
+    vm.switchEngine('typesafe')
+    expect(vm.configForm.model).toBe('unsaved-typesafe-model')
+    expect(vm.configForm.api_keys_text).toBe('typesafe-draft-key')
+    expect(vm.configForm.thresholds.sexual).toBe(83)
+    expect(vm.pendingDeleteApiKeyHashes).toEqual(['typesafe-delete'])
+    wrapper.unmount()
+  })
+
+  it('ignores delayed test and status responses after switching engines', async () => {
+    const wrapper = mount(RiskControlView, { global: { stubs: { AppLayout: AppLayoutStub, BaseDialog: BaseDialogStub, Icon: true, Select: true, Toggle: true, Pagination: true, ModelWhitelistSelector: ModelWhitelistSelectorStub, ProxySelector: true } } })
+    await flushPromises()
+    const vm = wrapper.vm.$.setupState as unknown as {
+      configForm: { engine: string; api_keys_text: string; api_key_statuses: unknown[] }
+      moderationTestResult: unknown
+      testedApiKeyStatuses: unknown[]
+      switchEngine: (engine: string) => void
+      testApiKeys: (useInputKeys: boolean) => Promise<void>
+      loadStatus: () => Promise<void>
+    }
+    let finishTest!: (value: unknown) => void
+    let finishStatus!: (value: unknown) => void
+    testAPIKeys.mockImplementationOnce(() => new Promise(resolve => { finishTest = resolve }))
+    getStatus.mockImplementationOnce(() => new Promise(resolve => { finishStatus = resolve }))
+    vm.configForm.api_keys_text = 'openai-draft'
+    const oldTest = vm.testApiKeys(true)
+    const oldStatus = vm.loadStatus()
+    vm.switchEngine('typesafe')
+    vm.configForm.api_keys_text = 'typesafe-draft'
+    finishTest({ items: [{ key_hash: 'old-openai-hash', status: 'ok' }], audit_result: { flagged: true }, image_count: 0 })
+    finishStatus({ ...runtimeStatus(), engine: 'openai', api_key_statuses: [{ key_hash: 'old-openai-hash' }] })
+    await Promise.all([oldTest, oldStatus])
+    expect(vm.configForm.engine).toBe('typesafe')
+    expect(vm.configForm.api_keys_text).toBe('typesafe-draft')
+    expect(vm.configForm.api_key_statuses).toEqual([])
+    expect(vm.testedApiKeyStatuses).toEqual([])
+    expect(vm.moderationTestResult).toBeNull()
+    vm.switchEngine('openai')
+    expect(vm.configForm.api_key_statuses).toEqual([])
+    wrapper.unmount()
   })
 
   it('saves the selected model filter mode and models', async () => {

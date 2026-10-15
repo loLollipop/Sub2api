@@ -510,6 +510,10 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 	}
 
 	if isClaudeCodexModel(modelID) {
+		if isClaude55SignedThinkingModel(modelID) {
+			descriptor.ContextWindow = 1_000_000
+			descriptor.MaxContextWindow = 1_000_000
+		}
 		descriptor.DisplayName = claudeCodexDisplayName(modelID)
 		descriptor.Description = "Claude coding and reasoning model routed through Sub2API."
 		descriptor.SupportsParallelToolCalls = true
@@ -563,6 +567,9 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 		}
 		descriptor.Slug = modelID
 		descriptor.officialMetadata = openai.CodexGPT61SolMetadata
+		// The October 12, 2026 Codex/Work default increased to 500k after
+		// the bundled official snapshot. Explicit upstream metadata still wins.
+		descriptor.ContextWindow = 500_000
 	}
 
 	return descriptor
@@ -1068,7 +1075,7 @@ func uniqueCodexMappedModel(accounts []Account, platform string, modelID string)
 	targets := make(map[string]struct{})
 	for i := range accounts {
 		account := &accounts[i]
-		if account.Platform != platform {
+		if !codexAccountServesPlatformModel(account, platform, modelID) {
 			continue
 		}
 		mappedModel, matched := account.ResolveMappedModel(modelID)

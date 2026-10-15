@@ -6,7 +6,10 @@ import GroupRateMultipliersModal from '../GroupRateMultipliersModal.vue'
 const mocks = vi.hoisted(() => ({ getGroupRateMultipliers: vi.fn(), batchSetGroupRateMultipliers: vi.fn(), listUsers: vi.fn(), showError: vi.fn(), showSuccess: vi.fn() }))
 vi.mock('@/api/admin', () => ({ adminAPI: { groups: mocks, users: { list: mocks.listUsers } } }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: mocks.showError, showSuccess: mocks.showSuccess }) }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', async () => {
+  const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
+  return { ...actual, useI18n: () => ({ t: (key: string) => key }) }
+})
 enableAutoUnmount(afterEach)
 beforeEach(() => vi.resetAllMocks())
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers() })

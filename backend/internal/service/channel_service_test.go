@@ -2184,7 +2184,7 @@ func TestMatchingPlatforms(t *testing.T) {
 		{"gemini returns itself", PlatformGemini, []string{PlatformGemini}},
 		{"openai returns itself", PlatformOpenAI, []string{PlatformOpenAI}},
 		{"mixed returns itself only", PlatformMixed, []string{PlatformMixed}},
-		{"composite returns concrete platforms", PlatformComposite, []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed}},
+		{"composite returns concrete platforms", PlatformComposite, []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed, PlatformCommandCode, PlatformCline, PlatformTypeSafe}},
 	}
 
 	for _, tt := range tests {

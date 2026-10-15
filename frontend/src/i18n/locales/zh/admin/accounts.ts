@@ -2,6 +2,13 @@ import customUsage from './customUsage'
 
 export default {
     accounts: {
+    typesafeHint: '仅支持原生 System One：jev-latest，非流式，使用 API Key 凭据。',
+      providerRules: {
+        title: '模型协议分流',
+        hint: '自上而下第一条模型规则生效。也支持的入站协议直接透传；未命中时按上游模型目录选择协议，目录不可用时使用 Chat Completions。',
+        pattern: '模型匹配规则',
+        restore: '恢复默认'
+      },
       customUsage,
       title: '账号管理',
       description: '管理 AI 平台账号和 Cookie',
@@ -414,7 +421,7 @@ export default {
       tempUnschedulable: {
         title: '临时不可调度',
         statusTitle: '临时不可调度状态',
-        hint: '当错误码与关键词同时匹配时，账号会在指定时间内被临时禁用。',
+        hint: '当错误码与关键词同时匹配时，按规则范围暂停整个账号，或只冷却对应模型。',
         notice: '规则按顺序匹配，需同时满足错误码与关键词。',
         addRule: '添加规则',
         ruleOrder: '规则序号',
@@ -426,6 +433,12 @@ export default {
         errorCode: '错误码',
         errorCodePlaceholder: '例如 429',
         durationMinutes: '持续时间（分钟）',
+        scope: '作用范围',
+        scopeModel: '模型级',
+        scopeModelDesc: '只冷却本次请求的模型',
+        scopeAccount: '账号级',
+        scopeAccountDesc: '暂停整个账号的调度',
+        scopeHint: '无法识别请求模型时按账号级处理；凭据失效仍按账号认证错误处理。',
         durationPlaceholder: '例如 30',
         keywords: '关键词',
         keywordsPlaceholder: '例如 overloaded, too many requests',
@@ -628,10 +641,18 @@ export default {
       claudeConsole: 'Claude Console',
       bedrockLabel: 'AWS Bedrock',
       bedrockDesc: 'SigV4 / API Key',
-      vertexLabel: 'Vertex',
+      vertexLabel: 'Agent Platform (Vertex)',
       vertexDesc: 'Service Account',
-      vertexAnthropicHint: '使用 Google Cloud Service Account JSON 通过 Vertex AI 调用 Anthropic Claude。建议配置模型映射，将客户端 Claude 模型名映射到 Vertex 模型 ID。',
-      vertexGeminiHint: '使用 Google Cloud Service Account JSON 访问 Vertex AI Gemini。建议将 Vertex 账号放入独立分组，避免和 AI Studio/Gemini OAuth 同模型混调。',
+      vertexGeminiDesc: 'Service Account / API Key',
+      vertexAnthropicHint: '使用 Google Cloud Service Account JSON 通过 Agent Platform (Vertex) 调用 Anthropic Claude。建议配置模型映射，将客户端 Claude 模型名映射到 Agent Platform (Vertex) 模型 ID。',
+      vertexGeminiHint: '通过 Agent Platform (Vertex) 调用 Gemini，支持 Service Account JSON 或 API Key 认证。建议将此类账号放入独立分组，避免和 AI Studio/Gemini OAuth 同模型混调。',
+      vertexAuthMode: '认证方式',
+      vertexAuthModeServiceAccount: 'Service Account JSON',
+      vertexAuthModeApiKey: 'API Key',
+      vertexApiKeyHint: '在 Google Cloud 控制台 Agent Platform 的 API Keys 页面创建。Google 显式缓存接口不接受 API Key，此类账号不参与显式缓存与批量生图；隐式缓存正常生效。',
+      vertexApiKeyRequired: '请输入 API Key',
+      vertexApiKeyProjectIdPlaceholder: '可选',
+      vertexApiKeyProjectIdHint: '留空走 Express mode 全局端点（不区分 Location）；绑定 Service Account 的标准 API Key 可填写 Project ID，按 Project ID + Location 访问。',
       vertexSaJsonLabel: 'Service Account JSON',
       vertexSaJsonLoaded: '已读取 Service Account JSON',
       vertexSaJsonDrop: '拖入 Service Account JSON',
@@ -641,8 +662,8 @@ export default {
       vertexSaJsonUploadHint: '上传或拖入 JSON 后会自动读取 project_id，密钥内容仅用于创建账号提交。',
       vertexSaJsonEditHint: 'Service Account JSON 不在编辑页显示；需要更换 JSON 时请删除账号后重新创建。',
       vertexProjectIdPlaceholder: '从 JSON 自动读取',
-      vertexLocationHint: '不同 Vertex 模型可用 location 可能不同，这里选择账号默认 endpoint location。',
-      vertexLocationRequired: '请填写 Vertex location',
+      vertexLocationHint: '不同模型可用 location 可能不同，这里选择账号默认 endpoint location。',
+      vertexLocationRequired: '请选择 Location',
       vertexSaJsonMissingFields: 'Service Account JSON 缺少 project_id、client_email 或 private_key',
       vertexSaJsonMissingProjectId: 'Service Account JSON 缺少 project_id',
       vertexSaJsonMissingClientEmail: 'Service Account JSON 缺少 client_email',
@@ -1427,7 +1448,7 @@ export default {
         modelPassthrough: 'Gemini 直接转发模型',
         modelPassthroughDesc: '所有模型请求将直接转发至 Gemini API，不进行模型限制或映射。',
         baseUrlHint: '留空使用官方 Gemini API',
-        apiKeyHint: '您的 Gemini API Key（以 AIza 开头）',
+        apiKeyHint: 'AI Studio 新建的 Key 以 AQ. 开头（旧版以 AIza 开头）；第三方上游填写其提供的 Key',
         tier: {
           label: '账号等级',
           hint: '提示：系统会优先尝试自动识别账号等级；若自动识别不可用或失败，则使用你选择的等级作为回退（本地模拟配额）。',
@@ -1451,7 +1472,7 @@ export default {
           oauthTitle: 'OAuth 授权（Gemini）',
           oauthDesc: '使用 Google 账号授权，并选择 OAuth 子类型。',
           apiKeyTitle: 'API 密钥（AI Studio）',
-          apiKeyDesc: '最快接入方式，使用 AIza API Key。',
+          apiKeyDesc: '最快接入方式，使用 AI Studio Key（AQ. 或旧版 AIza）或第三方上游提供的 Key。',
           apiKeyNote: '适合轻量测试。免费层限流严格，数据可能用于训练。',
           apiKeyLink: '获取 API Key',
           quotaLink: '配额说明',
@@ -1514,7 +1535,7 @@ export default {
           docs: {
             codeAssist: 'Code Assist 配额',
             aiStudio: 'AI Studio 定价',
-            vertex: 'Vertex AI 配额'
+            vertex: 'Agent Platform (Vertex) 配额'
           },
           simulatedNote: '本地模拟配额，仅供参考',
           rows: {

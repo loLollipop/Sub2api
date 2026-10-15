@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+// AccountStatsPricingPolicy only affects the default model-card cost. Explicit
+// account rules and the channel's customer-price override retain their priority.
+type AccountStatsPricingPolicy struct {
+	LongContextBillingEnabled      *bool
+	DisableModelLongContextPricing bool
+}
+
 // resolveAccountStatsCost 计算账号统计定价费用。
 // 返回 nil 表示不覆盖，使用默认公式（total_cost × account_rate_multiplier）。
 //
@@ -32,6 +39,16 @@ func resolveAccountStatsCost(
 	totalCost float64,
 	serviceTier string,
 	pricingAt time.Time,
+	reasoningEfforts ...string,
+) *float64 {
+	return resolveAccountStatsCostWithPolicy(ctx, channelService, billingService, accountID, groupID,
+		upstreamModel, tokens, requestCount, totalCost, serviceTier, pricingAt, AccountStatsPricingPolicy{}, reasoningEfforts...)
+}
+
+func resolveAccountStatsCostWithPolicy(
+	ctx context.Context, channelService *ChannelService, billingService *BillingService,
+	accountID, groupID int64, upstreamModel string, tokens UsageTokens, requestCount int,
+	totalCost float64, serviceTier string, pricingAt time.Time, policy AccountStatsPricingPolicy,
 	reasoningEfforts ...string,
 ) *float64 {
 	reasoningEffort := ""
@@ -64,7 +81,7 @@ func resolveAccountStatsCost(
 
 	// 优先级 3：模型定价文件（LiteLLM）默认价格
 	if billingService != nil {
-		return tryModelFilePricing(billingService, upstreamModel, tokens, serviceTier, pricingAt, reasoningEffort)
+		return tryModelFilePricingWithPolicy(billingService, upstreamModel, tokens, serviceTier, pricingAt, policy, reasoningEffort)
 	}
 
 	return nil
@@ -75,19 +92,28 @@ func resolveAccountStatsCost(
 // 每加一个定价特性都要手工镜像一次。解析器不配置渠道或分组，保持优先级 3 的
 // 语义：只取模型定价文件，不引入自定义售价。
 func tryModelFilePricing(billingService *BillingService, model string, tokens UsageTokens, serviceTier string, pricingAt time.Time, reasoningEfforts ...string) *float64 {
+	return tryModelFilePricingWithPolicy(billingService, model, tokens, serviceTier, pricingAt, AccountStatsPricingPolicy{}, reasoningEfforts...)
+}
+
+func tryModelFilePricingWithPolicy(billingService *BillingService, model string, tokens UsageTokens, serviceTier string, pricingAt time.Time, policy AccountStatsPricingPolicy, reasoningEfforts ...string) *float64 {
 	reasoningEffort := ""
 	if len(reasoningEfforts) > 0 {
 		reasoningEffort = reasoningEfforts[0]
 	}
 	breakdown, err := billingService.CalculateCostUnified(CostInput{
-		Ctx:             context.Background(),
-		Model:           model,
-		Tokens:          tokens,
-		RateMultiplier:  1,
-		ServiceTier:     normalizeBillingServiceTier(serviceTier),
-		ReasoningEffort: reasoningEffort,
-		PricingAt:       pricingAt,
-		Resolver:        NewModelPricingResolver(nil, billingService),
+		Ctx:                       context.Background(),
+		Model:                     model,
+		Tokens:                    tokens,
+		RateMultiplier:            1,
+		ServiceTier:               normalizeBillingServiceTier(serviceTier),
+		ReasoningEffort:           reasoningEffort,
+		PricingAt:                 pricingAt,
+		Resolver:                  NewModelPricingResolver(nil, billingService),
+		LongContextBillingEnabled: policy.LongContextBillingEnabled,
+		// There is no group pricing at this priority. An explicit account gate
+		// controls only its model-card ladder, never custom account rules.
+		DisableModelLongContextPricing: policy.DisableModelLongContextPricing ||
+			(policy.LongContextBillingEnabled != nil && !*policy.LongContextBillingEnabled),
 	})
 	if err != nil || breakdown == nil || breakdown.TotalCost <= 0 {
 		return nil
@@ -263,7 +289,12 @@ func applyAccountStatsCost(
 	tokens UsageTokens,
 	totalCost float64,
 	pricingAt time.Time,
+	policies ...AccountStatsPricingPolicy,
 ) {
+	policy := AccountStatsPricingPolicy{}
+	if len(policies) > 0 {
+		policy = policies[0]
+	}
 	model := upstreamModel
 	if model == "" {
 		model = requestedModel
@@ -280,7 +311,7 @@ func applyAccountStatsCost(
 	if usageLog != nil && usageLog.ReasoningEffort != nil {
 		reasoningEffort = *usageLog.ReasoningEffort
 	}
-	usageLog.AccountStatsCost = resolveAccountStatsCost(
-		ctx, cs, bs, accountID, groupID, model, tokens, requestCount, totalCost, serviceTier, pricingAt, reasoningEffort,
+	usageLog.AccountStatsCost = resolveAccountStatsCostWithPolicy(
+		ctx, cs, bs, accountID, groupID, model, tokens, requestCount, totalCost, serviceTier, pricingAt, policy, reasoningEffort,
 	)
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/migrations"
+	"github.com/lib/pq"
 )
 
 // schemaMigrationsTableDDL 定义迁移记录表的 DDL。
@@ -67,6 +68,14 @@ const usageLogsGroupRollupCoveringIndexRepairMigration = "237_repair_usage_logs_
 const usageLogsGroupRollupCoveringIndex = "idx_usage_logs_rollup_created_group_cost"
 const usageLogsUpstreamRequestIDIndexMigration = "233_add_usage_log_upstream_request_id_index_notx.sql"
 const usageLogsUpstreamRequestIDIndex = "idx_usage_logs_upstream_request_id"
+const requestIDSearchIndexesMigration = "264_add_request_id_search_indexes_notx.sql"
+
+var requestIDSearchIndexes = [...]struct{ name, table, column string }{
+	{"idx_usage_logs_request_id_trgm", "usage_logs", "request_id"},
+	{"idx_usage_logs_upstream_request_id_trgm", "usage_logs", "upstream_request_id"},
+	{"idx_ops_error_logs_request_id_trgm", "ops_error_logs", "request_id"},
+	{"idx_ops_error_logs_client_request_id_trgm", "ops_error_logs", "client_request_id"},
+}
 
 type migrationChecksumCompatibilityRule struct {
 	fileChecksum       string
@@ -385,9 +394,87 @@ func prepareNonTransactionalMigration(ctx context.Context, db migrationConnectio
 		return dropInvalidIndexIfPresent(ctx, db, usageLogsGroupRollupCoveringIndex)
 	case usageLogsUpstreamRequestIDIndexMigration:
 		return dropInvalidIndexIfPresent(ctx, db, usageLogsUpstreamRequestIDIndex)
+	case requestIDSearchIndexesMigration:
+		// Recheck even if the extension migration was applied in an earlier run:
+		// it may since have been removed or hidden by a changed search_path.
+		// Fail before dropping/rebuilding anything; never silently skip indexes.
+		if err := requireRequestIDSearchTrigram(ctx, db); err != nil {
+			return err
+		}
+		for _, index := range requestIDSearchIndexes {
+			if err := dropInvalidRequestIDSearchIndex(ctx, db, index.table, index.name, index.column); err != nil {
+				return err
+			}
+		}
+		return nil
 	default:
 		return nil
 	}
+}
+
+// Resolve through the same search_path as the migration's unqualified table.
+// An index belongs to its table's schema, not necessarily public. Reject a
+// colliding relation for another target rather than silently accepting
+// CREATE INDEX IF NOT EXISTS's notice and recording an unusable migration.
+func dropInvalidRequestIDSearchIndex(ctx context.Context, db migrationConnection, table, name, column string) error {
+	var schema string
+	var exists, valid, target, definition bool
+	err := db.QueryRowContext(ctx, `SELECT ns.nspname, idx.oid IS NOT NULL,
+ COALESCE(i.indisvalid AND i.indisready, false), COALESCE(i.indrelid = tbl.oid, false),
+ COALESCE(am.amname = 'gin' AND i.indnkeyatts = 1 AND i.indnatts = 1
+   AND i.indexprs IS NULL AND i.indpred IS NULL
+   AND i.indkey[0] = att.attnum AND i.indclass[0] = opc.oid
+   AND i.indcollation[0] = att.attcollation, false)
+ FROM pg_catalog.pg_class tbl
+ JOIN pg_catalog.pg_namespace ns ON ns.oid = tbl.relnamespace
+ LEFT JOIN pg_catalog.pg_class idx ON idx.relnamespace = ns.oid AND idx.relname = $1
+ LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = idx.oid
+ LEFT JOIN pg_catalog.pg_am am ON am.oid = idx.relam
+ LEFT JOIN pg_catalog.pg_attribute att ON att.attrelid = tbl.oid AND att.attname = $3 AND NOT att.attisdropped
+ LEFT JOIN pg_catalog.pg_extension ext ON ext.extname = 'pg_trgm'
+ LEFT JOIN pg_catalog.pg_opclass opc ON opc.opcnamespace = ext.extnamespace AND opc.opcname = 'gin_trgm_ops' AND opc.opcmethod = am.oid
+ WHERE tbl.oid = pg_catalog.to_regclass($2)`, name, table, column).Scan(&schema, &exists, &valid, &target, &definition)
+	if err != nil {
+		return fmt.Errorf("resolve request-ID search index %s for %s: %w", name, table, err)
+	}
+	if !exists {
+		return nil
+	}
+	if !target {
+		return fmt.Errorf("request-ID search index %s.%s conflicts with a different relation", schema, name)
+	}
+	if !definition {
+		return fmt.Errorf("request-ID search index %s.%s has an incompatible definition; expected a full single-column GIN gin_trgm_ops index on %s.%s", schema, name, table, column)
+	}
+	if valid {
+		return nil
+	}
+	qualified := pq.QuoteIdentifier(schema) + "." + pq.QuoteIdentifier(name)
+	if _, err := db.ExecContext(ctx, "DROP INDEX CONCURRENTLY IF EXISTS "+qualified); err != nil {
+		return fmt.Errorf("drop invalid request-ID search index %s: %w", qualified, err)
+	}
+	return nil
+}
+
+func requireRequestIDSearchTrigram(ctx context.Context, db migrationConnection) error {
+	var ready bool
+	err := db.QueryRowContext(ctx, `SELECT EXISTS (
+ SELECT 1
+ FROM pg_catalog.pg_extension e
+ JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace
+ JOIN pg_catalog.pg_opclass o ON o.opcnamespace = n.oid AND o.opcname = 'gin_trgm_ops'
+ JOIN pg_catalog.pg_am a ON a.oid = o.opcmethod AND a.amname = 'gin'
+ WHERE e.extname = 'pg_trgm'
+   AND pg_catalog.pg_opclass_is_visible(o.oid)
+   AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+)`).Scan(&ready)
+	if err != nil {
+		return fmt.Errorf("check request-ID search pg_trgm prerequisite: %w", err)
+	}
+	if !ready {
+		return errors.New("request-ID search requires pg_trgm with accessible, visible gin_trgm_ops; ask the DBA to install the extension, grant schema USAGE and check search_path before retrying")
+	}
+	return nil
 }
 
 func preparePaymentOrdersOutTradeNoUniqueMigration(ctx context.Context, db migrationConnection) error {

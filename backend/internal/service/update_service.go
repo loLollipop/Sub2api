@@ -28,12 +28,12 @@ var (
 	ErrRollbackVersionNotAllowed = infraerrors.BadRequest("ROLLBACK_VERSION_NOT_ALLOWED", "version is not in the allowed rollback list")
 	ErrUpdateOrchestratorMissing = infraerrors.InternalServer("UPDATE_ORCHESTRATOR_MISSING", "update orchestrator is not configured")
 	ErrUpdateDisabled            = infraerrors.BadRequest("UPDATE_DISABLED", "online update is disabled on this deployment; use the release rollout process")
-	ErrUpstreamReviewRequired    = infraerrors.Conflict("UPSTREAM_REVIEW_REQUIRED", "upstream update requires review and synchronization to the personal repository before deployment")
+	// Preserve the existing reason code while explaining the project release guard.
+	ErrUpstreamReviewRequired = infraerrors.Conflict("UPSTREAM_REVIEW_REQUIRED", "online self-replacement is disabled; deploy this project's release through the release rollout process")
 )
 
 const (
 	updateCacheTTL      = 1200 // 20 minutes
-	upstreamMonitorRepo = "kiss-kedaya/sub2api"
 	personalReleaseRepo = "loLollipop/Sub2api"
 
 	// Security: allowed download domains for updates
@@ -70,11 +70,15 @@ type GitHubReleaseClient interface {
 
 // UpdateService handles software updates
 type UpdateService struct {
-	cache          UpdateCache
-	githubClient   GitHubReleaseClient
-	currentVersion string
-	buildType      string // "source" for manual builds, "release" for CI builds
-	updateRuntime  updateRuntimeConfig
+	cache           UpdateCache
+	githubClient    GitHubReleaseClient
+	currentVersion  string
+	buildType       string // "source" for manual builds, "release" for CI builds
+	updateRuntime   updateRuntimeConfig
+	checkMode       string
+	modeWarning     string
+	upstreamSources []updateSourceBaseline
+	checkTimeout    time.Duration
 }
 
 // updateRuntimeConfig controls how an update is applied. The default binary
@@ -90,26 +94,35 @@ type updateRuntimeConfig struct {
 
 // NewUpdateService creates a new UpdateService
 func NewUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, version, buildType string) *UpdateService {
+	mode, warning := loadUpdateCheckMode()
 	return &UpdateService{
-		cache:          cache,
-		githubClient:   githubClient,
-		currentVersion: version,
-		buildType:      buildType,
-		updateRuntime:  loadUpdateRuntimeConfig(),
+		cache:           cache,
+		githubClient:    githubClient,
+		currentVersion:  version,
+		buildType:       buildType,
+		updateRuntime:   loadUpdateRuntimeConfig(),
+		checkMode:       mode,
+		modeWarning:     warning,
+		upstreamSources: defaultUpdateSourceBaselines(),
+		checkTimeout:    20 * time.Second,
 	}
 }
 
 // UpdateInfo contains update information
 type UpdateInfo struct {
-	CurrentVersion string       `json:"current_version"`
-	LatestVersion  string       `json:"latest_version"`
-	HasUpdate      bool         `json:"has_update"`
-	ReviewRequired bool         `json:"review_required"`
-	ReleaseInfo    *ReleaseInfo `json:"release_info,omitempty"`
-	Cached         bool         `json:"cached"`
-	Warning        string       `json:"warning,omitempty"`
-	BuildType      string       `json:"build_type"` // "source" or "release"
-	UpdateStrategy string       `json:"update_strategy"`
+	releaseCheckedAt  int64
+	CurrentVersion    string               `json:"current_version"`
+	LatestVersion     string               `json:"latest_version"`
+	HasUpdate         bool                 `json:"has_update"`
+	ReviewRequired    bool                 `json:"review_required"`
+	ReleaseInfo       *ReleaseInfo         `json:"release_info,omitempty"`
+	Cached            bool                 `json:"cached"`
+	Warning           string               `json:"warning,omitempty"`
+	BuildType         string               `json:"build_type"` // "source" or "release"
+	UpdateStrategy    string               `json:"update_strategy"`
+	CheckMode         string               `json:"check_mode"`
+	ReleaseRepository string               `json:"release_repository"`
+	UpstreamUpdates   []UpstreamUpdateInfo `json:"upstream_updates,omitempty"`
 }
 
 // ReleaseInfo contains GitHub release details
@@ -179,31 +192,51 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 		}
 	}
 
-	// Fetch from GitHub
-	info, err := s.fetchLatestRelease(ctx)
-	if err != nil {
-		// Return cached on error
-		if cached, cacheErr := s.getFromCache(ctx); cacheErr == nil && cached != nil {
-			cached.Warning = "Using cached data: " + err.Error()
-			return cached, nil
-		}
-		return &UpdateInfo{
-			CurrentVersion: s.currentVersion,
-			LatestVersion:  s.currentVersion,
-			HasUpdate:      false,
-			Warning:        err.Error(),
-			BuildType:      s.buildType,
-			UpdateStrategy: s.updateRuntime.strategy,
-		}, nil
+	// Release and branch failures are independent: every enabled source is checked.
+	var sourceResults <-chan []UpstreamUpdateInfo
+	checkTimeout := s.checkTimeout
+	if checkTimeout <= 0 {
+		checkTimeout = 20 * time.Second
 	}
+	remoteCtx, cancel := context.WithTimeout(ctx, checkTimeout)
+	defer cancel()
+	if s.checkMode == updateCheckUpstream {
+		// Keep all three checks within the frontend request timeout. A slow
+		// feed must not prevent other feeds from being checked or displayed.
+		results := make(chan []UpstreamUpdateInfo, 1)
+		go func() { results <- s.checkUpstreamSources(remoteCtx) }()
+		sourceResults = results
+	}
+	info, err := s.fetchLatestRelease(remoteCtx)
+	if err != nil {
+		if cached, cacheErr := s.getFromCache(ctx); cacheErr == nil && cached != nil {
+			info = cached
+			info.Warning = joinUpdateWarnings(info.Warning, "Using cached release data: "+err.Error())
+		} else {
+			info = &UpdateInfo{
+				CurrentVersion: s.currentVersion,
+				LatestVersion:  s.currentVersion,
+				Warning:        err.Error(),
+				BuildType:      s.buildType,
+				UpdateStrategy: s.updateRuntime.strategy,
+			}
+		}
+	}
+	info.CheckMode = s.checkMode
+	info.ReleaseRepository = personalReleaseRepo
+	info.Warning = joinUpdateWarnings(info.Warning, s.modeWarning)
+	if sourceResults != nil {
+		info.UpstreamUpdates = <-sourceResults
+	}
+	info.ReviewRequired = hasUpstreamUpdate(info.UpstreamUpdates)
 
 	// Cache result
 	s.saveToCache(ctx, info)
 	return info, nil
 }
 
-// PerformUpdate intentionally refuses to install releases found by the
-// upstream monitor. They must be reviewed and republished personally first.
+// PerformUpdate retains the deployment's existing no-self-replacement guard.
+// Source monitoring never authorizes downloading or installing upstream assets.
 func (s *UpdateService) PerformUpdate(ctx context.Context) error {
 	if s.updateRuntime.strategy == updateStrategyDisabled {
 		return ErrUpdateDisabled
@@ -218,9 +251,8 @@ func (s *UpdateService) PerformUpdate(ctx context.Context) error {
 		return ErrNoUpdateAvailable
 	}
 
-	// CheckUpdate monitors the upstream project only. Upstream artifacts must
-	// first be reviewed and synchronized into the personal release repository;
-	// they are never eligible for direct installation by this service.
+	// Apply releases through the established release rollout process. Checking
+	// this project's releases does not remove the existing deployment guard.
 	return ErrUpstreamReviewRequired
 }
 
@@ -546,9 +578,12 @@ func (s *UpdateService) fetchRollbackCandidates(ctx context.Context) ([]*GitHubR
 }
 
 func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, error) {
-	release, err := s.githubClient.FetchLatestRelease(ctx, upstreamMonitorRepo)
+	release, err := s.githubClient.FetchLatestRelease(ctx, personalReleaseRepo)
 	if err != nil {
 		return nil, err
+	}
+	if release == nil || release.Draft || release.Prerelease || strings.TrimSpace(release.TagName) == "" {
+		return nil, fmt.Errorf("no official release returned for %s", personalReleaseRepo)
 	}
 
 	latestVersion := strings.TrimPrefix(release.TagName, "v")
@@ -562,12 +597,12 @@ func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, er
 		}
 	}
 
-	hasUpdate := compareVersions(s.currentVersion, latestVersion) < 0
+	hasUpdate := comparePersonalReleaseVersions(s.currentVersion, latestVersion) < 0
 	return &UpdateInfo{
-		CurrentVersion: s.currentVersion,
-		LatestVersion:  latestVersion,
-		HasUpdate:      hasUpdate,
-		ReviewRequired: hasUpdate,
+		releaseCheckedAt: time.Now().Unix(),
+		CurrentVersion:   s.currentVersion,
+		LatestVersion:    latestVersion,
+		HasUpdate:        hasUpdate,
 		ReleaseInfo: &ReleaseInfo{
 			Name:        release.Name,
 			Body:        release.Body,
@@ -743,45 +778,68 @@ func (s *UpdateService) extractBinary(archivePath, destPath string) error {
 }
 
 func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
+	if s.cache == nil {
+		return nil, fmt.Errorf("update cache unavailable")
+	}
 	data, err := s.cache.GetUpdateInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var cached struct {
-		Latest      string       `json:"latest"`
-		ReleaseInfo *ReleaseInfo `json:"release_info"`
-		Timestamp   int64        `json:"timestamp"`
-	}
+	var cached updateCachePayload
 	if err := json.Unmarshal([]byte(data), &cached); err != nil {
 		return nil, err
 	}
 
-	if time.Now().Unix()-cached.Timestamp > updateCacheTTL {
+	if cached.Identity != s.updateCacheIdentity() {
+		return nil, fmt.Errorf("update cache source mismatch")
+	}
+	if cached.Timestamp > time.Now().Unix() || time.Now().Unix()-cached.Timestamp > updateCacheTTL {
 		return nil, fmt.Errorf("cache expired")
+	}
+	if err := s.validateCachedUpstream(cached.UpstreamUpdates); err != nil {
+		return nil, err
+	}
+	if cached.Latest == "" {
+		return nil, fmt.Errorf("cached release version missing")
+	}
+	if cached.ReleaseInfo == nil {
+		cached.Latest = s.currentVersion
+	} else if cached.ReleaseTimestamp <= 0 || cached.ReleaseTimestamp > time.Now().Unix() {
+		return nil, fmt.Errorf("cached release check time invalid")
+	} else if time.Now().Unix()-cached.ReleaseTimestamp > updateCacheTTL {
+		cached.Warning = joinUpdateWarnings(cached.Warning, "Release data is older than 20 minutes; current release status is unknown")
 	}
 
 	return &UpdateInfo{
-		CurrentVersion: s.currentVersion,
-		LatestVersion:  cached.Latest,
-		HasUpdate:      compareVersions(s.currentVersion, cached.Latest) < 0,
-		ReviewRequired: compareVersions(s.currentVersion, cached.Latest) < 0,
-		ReleaseInfo:    cached.ReleaseInfo,
-		Cached:         true,
-		BuildType:      s.buildType,
-		UpdateStrategy: s.updateRuntime.strategy,
+		releaseCheckedAt:  cached.ReleaseTimestamp,
+		CurrentVersion:    s.currentVersion,
+		LatestVersion:     cached.Latest,
+		HasUpdate:         cached.ReleaseInfo != nil && comparePersonalReleaseVersions(s.currentVersion, cached.Latest) < 0,
+		ReviewRequired:    hasUpstreamUpdate(cached.UpstreamUpdates),
+		ReleaseInfo:       cached.ReleaseInfo,
+		Cached:            true,
+		BuildType:         s.buildType,
+		UpdateStrategy:    s.updateRuntime.strategy,
+		CheckMode:         s.checkMode,
+		ReleaseRepository: personalReleaseRepo,
+		Warning:           joinUpdateWarnings(cached.Warning, s.modeWarning),
+		UpstreamUpdates:   cached.UpstreamUpdates,
 	}, nil
 }
 
 func (s *UpdateService) saveToCache(ctx context.Context, info *UpdateInfo) {
-	cacheData := struct {
-		Latest      string       `json:"latest"`
-		ReleaseInfo *ReleaseInfo `json:"release_info"`
-		Timestamp   int64        `json:"timestamp"`
-	}{
-		Latest:      info.LatestVersion,
-		ReleaseInfo: info.ReleaseInfo,
-		Timestamp:   time.Now().Unix(),
+	if s.cache == nil {
+		return
+	}
+	cacheData := updateCachePayload{
+		Identity:         s.updateCacheIdentity(),
+		Latest:           info.LatestVersion,
+		ReleaseInfo:      info.ReleaseInfo,
+		Timestamp:        time.Now().Unix(),
+		ReleaseTimestamp: info.releaseCheckedAt,
+		Warning:          info.Warning,
+		UpstreamUpdates:  info.UpstreamUpdates,
 	}
 
 	data, _ := json.Marshal(cacheData)
@@ -805,8 +863,7 @@ func compareVersions(current, latest string) int {
 }
 
 // comparePersonalReleaseVersions orders production releases in the personal
-// repository. Unlike the upstream monitor comparison, it treats personal.N as
-// an increasing revision of the same upstream base version.
+// repository, including increasing personal.N revisions of the same base.
 func comparePersonalReleaseVersions(left, right string) int {
 	if baseComparison := compareVersions(left, right); baseComparison != 0 {
 		return baseComparison

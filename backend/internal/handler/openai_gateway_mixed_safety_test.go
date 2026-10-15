@@ -29,6 +29,9 @@ func (u *mixedHandlerUpstream) Do(req *http.Request, _ string, _ int64, _ int) (
 	if group, ok := req.Context().Value(ctxkey.Group).(*service.Group); ok {
 		u.groupID = group.ID
 	}
+	if strings.HasSuffix(req.URL.Path, "/messages") {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"id":"msg_mixed","type":"message","role":"assistant","model":"gpt-5.1","content":[{"type":"text","text":"hello"}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":2}}`))}, nil
+	}
 	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"id":"cc_mixed","model":"gpt-5.1","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`))}, nil
 }
 

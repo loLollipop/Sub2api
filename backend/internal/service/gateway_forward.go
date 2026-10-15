@@ -105,6 +105,21 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 	}()
 	beginUpstreamResponseModelObservation(c)
+	// Validate the selected upstream model, before passthrough or OAuth edits.
+	if account != nil && account.Platform == PlatformAnthropic {
+		validationModel := parsed.Model
+		if account.IsBedrock() {
+			if resolved, ok := ResolveBedrockModelID(account, validationModel); ok {
+				validationModel = resolved
+			}
+		} else if account.Type == AccountTypeAPIKey || account.Type == AccountTypeServiceAccount {
+			validationModel = account.GetMappedModel(validationModel)
+		}
+		if validationErr := validateSelectedAnthropicMessagesRequest(c, parsed.Body.Bytes(), validationModel); validationErr != nil {
+			writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", validationErr.Error())
+			return nil, validationErr
+		}
+	}
 
 	// Web Search 模拟：纯 web_search 请求时，直接调用搜索 API 构造响应
 	if account != nil && s.shouldEmulateWebSearch(ctx, account, parsed.GroupID, parsed.Body.Bytes()) {
@@ -703,7 +718,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				logger.LegacyPrintf("service.gateway", "[Forward] Upstream error (retry exhausted, failover): Account=%d(%s) Status=%d RequestID=%s Body=%s",
 					account.ID, account.Name, resp.StatusCode, resp.Header.Get("x-request-id"), truncateString(string(respBody), 1000))
 
-				s.handleRetryExhaustedSideEffects(ctx, resp, account)
+				s.handleRetryExhaustedSideEffects(ctx, resp, account, reqModel)
 				appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 					ProxyID:            opsUpstreamProxyID(account),
 					ProxyName:          opsUpstreamProxyName(account),
@@ -727,7 +742,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 					RetryableOnSameAccount: PoolModeSameAccountRetry(account, resp.StatusCode, resp.Header, respBody),
 				}
 			}
-			return s.handleRetryExhaustedError(ctx, resp, c, account)
+			return s.handleRetryExhaustedError(ctx, resp, c, account, reqModel)
 		}
 
 		if s.shouldFailoverUpstreamResponse(resp.StatusCode, resp.Header, respBody) {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useAppStore } from '@/stores/app'
+import { useAppStore, VERSION_CACHE_TTL_MS } from '@/stores/app'
+import { checkUpdates, type VersionInfo } from '@/api/admin/system'
 import { getPublicSettings } from '@/api/auth'
 import type { PublicSettings } from '@/types'
 
@@ -79,6 +80,7 @@ describe('useAppStore', () => {
     vi.useFakeTimers()
     localStorage.clear()
     vi.mocked(getPublicSettings).mockReset()
+    vi.mocked(checkUpdates).mockReset()
     // 清除 window.__APP_CONFIG__
     delete (window as any).__APP_CONFIG__
   })
@@ -89,6 +91,80 @@ describe('useAppStore', () => {
   })
 
   // --- Toast 消息管理 ---
+
+  describe('版本更新缓存', () => {
+    const info: VersionInfo = {
+      current_version: '2.1.16', latest_version: '2.1.16', has_update: false,
+      cached: false, build_type: 'release', update_strategy: 'disabled',
+      check_mode: 'upstream', release_repository: 'loLollipop/Sub2api',
+      review_required: true, warning: 'release API warning',
+      release_info: { name: '2.1.16', body: '', published_at: '', html_url: 'https://github.com/loLollipop/Sub2api/releases/tag/v2.1.16' },
+      upstream_updates: [{
+        repository: 'kiss-kedaya/sub2api', branch: 'main', baseline_commit: 'a'.repeat(40),
+        latest_commit: 'b'.repeat(40), has_update: true, compare_url: 'https://github.com/kiss-kedaya/sub2api/compare/a...b',
+      }, {
+        repository: 'Wei-Shaw/sub2api', branch: 'main', baseline_commit: 'c'.repeat(40),
+        latest_commit: '', has_update: false, compare_url: '', warning: 'source unavailable',
+      }],
+    }
+
+    it('缓存完整源状态、审查标志、告警，任一更新点亮入口', async () => {
+      vi.mocked(checkUpdates).mockResolvedValue(info)
+      const store = useAppStore()
+      await store.fetchVersion()
+      expect(store.hasUpdate).toBe(false)
+      expect(store.hasAnyUpdate).toBe(true)
+      expect(store.upstreamUpdates).toEqual(info.upstream_updates)
+      await expect(store.fetchVersion()).resolves.toEqual({ ...info, cached: true })
+      expect(checkUpdates).toHaveBeenCalledTimes(1)
+      store.clearVersionCache()
+      expect(store.upstreamUpdates).toEqual([])
+      expect(store.hasAnyUpdate).toBe(false)
+      expect(store.versionWarning).toBe('')
+    })
+
+    it('缓存有界，过期后重新检查', async () => {
+      vi.mocked(checkUpdates).mockResolvedValue(info)
+      const store = useAppStore()
+      await store.fetchVersion()
+      vi.advanceTimersByTime(VERSION_CACHE_TTL_MS - 1)
+      await store.fetchVersion()
+      expect(checkUpdates).toHaveBeenCalledTimes(1)
+      vi.advanceTimersByTime(1)
+      await store.fetchVersion()
+      expect(checkUpdates).toHaveBeenCalledTimes(2)
+    })
+
+    it('并发刷新共享请求，保留旧更新提示和失败告警', async () => {
+      vi.mocked(checkUpdates).mockResolvedValueOnce(info)
+      const store = useAppStore()
+      await store.fetchVersion()
+      const deferred = createDeferred<VersionInfo>()
+      vi.mocked(checkUpdates).mockReturnValueOnce(deferred.promise)
+      const first = store.fetchVersion(true)
+      const second = store.fetchVersion(false)
+      await Promise.resolve()
+      expect(checkUpdates).toHaveBeenCalledTimes(2)
+      deferred.reject(new Error('network unavailable'))
+      await expect(Promise.all([first, second])).resolves.toEqual([null, null])
+      expect(store.hasAnyUpdate).toBe(true)
+      expect(store.versionWarning).toBe('network unavailable')
+      expect(store.versionLoading).toBe(false)
+      expect((await store.fetchVersion())?.warning).toBe('network unavailable')
+    })
+
+    it('首次检查失败保持未知，下一次成功清除失败告警', async () => {
+      vi.mocked(checkUpdates).mockRejectedValueOnce(new Error('offline'))
+      const store = useAppStore()
+      await expect(store.fetchVersion()).resolves.toBeNull()
+      expect(store.versionLoaded).toBe(false)
+      expect(store.versionWarning).toBe('offline')
+      vi.mocked(checkUpdates).mockResolvedValueOnce({ ...info, warning: undefined })
+      await store.fetchVersion()
+      expect(store.versionWarning).toBe('')
+      expect(store.versionLoaded).toBe(true)
+    })
+  })
 
   describe('Toast 消息管理', () => {
     it('showSuccess 创建 success 类型 toast', () => {

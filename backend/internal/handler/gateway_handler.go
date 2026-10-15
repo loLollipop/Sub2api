@@ -192,6 +192,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 	body = parsedReq.Body.Bytes()
+	service.CaptureMessagesValidationFacts(c, body)
 	reqModel := parsedReq.Model
 	reqStream := parsedReq.Stream
 	if service.IsChatUnsupportedMediaModel(reqModel) {
@@ -200,6 +201,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 	bindRequestedReasoningEffort(c, body, reqModel)
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
+		return
+	}
 	if policyBody, changed, err := applyAnthropicReasoningEffortPolicyForRequest(c, apiKey, body); err != nil {
 		respondOpenAIReasoningEffortPolicyError(c, err, h.errorResponse)
 		return
@@ -1312,6 +1316,10 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	}
 
 	// Fallback to default models
+	if responsePlatform == service.PlatformTypeSafe {
+		writeModelsList(c, responsePlatform, []string{"jev-latest"})
+		return
+	}
 	if responsePlatform == service.PlatformOpenAI {
 		writeModelsListResponse(c, openai.DefaultModels)
 		return
@@ -1357,6 +1365,9 @@ func (h *GatewayHandler) groupForModelsList(ctx context.Context, apiKey *service
 }
 
 func (h *GatewayHandler) availableModelsForAPIKey(ctx context.Context, apiKey *service.APIKey, forcedPlatform string) []string {
+	if apiKey != nil {
+		ctx = service.ContextWithModelScope(ctx, apiKey.ModelScope)
+	}
 	groupIDs := apiKeyModelsListGroupIDs(apiKey)
 	if len(groupIDs) == 0 {
 		models := h.modelsForGroupID(ctx, nil, nil, forcedPlatform, false)
@@ -1376,7 +1387,11 @@ func (h *GatewayHandler) availableModelsForAPIKey(ctx context.Context, apiKey *s
 				groupModels = defaultModelIDsForPlatform(group.Platform)
 			}
 			if h.gatewayService != nil {
-				groupModels = h.gatewayService.FilterModelsForKeyScope(ctx, &gid, apiKey.ModelScope, groupModels)
+				var endpoint []string
+				if group != nil && group.Platform == service.PlatformComposite {
+					endpoint = []string{""}
+				}
+				groupModels = h.gatewayService.FilterModelsForKeyScope(ctx, &gid, apiKey.ModelScope, groupModels, endpoint...)
 			} else {
 				groupModels = service.FilterModelScope(apiKey.ModelScope, groupModels)
 			}
@@ -1393,11 +1408,13 @@ func (h *GatewayHandler) modelsForGroupID(ctx context.Context, groupID *int64, g
 	}
 
 	var models []string
-	if strings.TrimSpace(forcedPlatform) == "" || platform == service.PlatformComposite {
+	if platform == service.PlatformComposite {
+		models = h.compositeAvailableModels(ctx, groupID, true, "")
+	} else if strings.TrimSpace(forcedPlatform) == "" {
 		// List by the accounts actually in the group, not the group label.
 		// A Gemini-labeled group with OpenAI-type accounts must still expose
 		// those accounts' mapped models (e.g. gemini-3.8-flash).
-		models = h.compositeAvailableModels(ctx, groupID, platform == service.PlatformComposite)
+		models = h.compositeAvailableModels(ctx, groupID, false)
 	} else if h != nil && h.gatewayService != nil {
 		models = h.gatewayService.GetAvailableModels(ctx, groupID, platform)
 	}
@@ -1445,9 +1462,13 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 	if value, exists := middleware2.GetForcePlatformFromContext(c); exists {
 		forcedPlatform = strings.TrimSpace(value)
 	}
-	modelIDs := h.codexModelIDsForGroup(c.Request.Context(), apiKey.Group, forcedPlatform)
+	modelIDs := h.codexModelIDsForGroup(service.ContextWithModelScope(c.Request.Context(), apiKey.ModelScope), apiKey.Group, forcedPlatform)
 	modelIDs = service.FilterCodexModelIDsForGroup(modelIDs, apiKey.Group)
-	modelIDs = h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, modelIDs)
+	var routeEndpoint []string
+	if apiKey.Group.Platform == service.PlatformComposite && (forcedPlatform == "" || forcedPlatform == service.PlatformComposite) {
+		routeEndpoint = []string{service.CompositeRouteEndpointResponses}
+	}
+	modelIDs = h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), &apiKey.Group.ID, apiKey.ModelScope, modelIDs, routeEndpoint...)
 	body, err := h.gatewayService.BuildCodexModelsManifestForGroup(
 		c.Request.Context(),
 		apiKey.Group,
@@ -1484,7 +1505,7 @@ func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *servi
 		platform = group.Platform
 	}
 	if platform == service.PlatformComposite {
-		availableModels := h.compositeAvailableModels(ctx, groupID, true)
+		availableModels := h.compositeAvailableModels(ctx, groupID, true, service.CompositeRouteEndpointResponses)
 		fallbackModels := defaultCodexModelIDsForPlatform(service.PlatformComposite)
 		if group.ModelAllowlistEnabled() {
 			source := availableModels
@@ -1510,7 +1531,7 @@ func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *servi
 	return fallbackModels
 }
 
-func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *int64, injectUnmappedDefaults bool) []string {
+func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *int64, injectUnmappedDefaults bool, routeEndpoint ...string) []string {
 	if h == nil || h.gatewayService == nil {
 		return nil
 	}
@@ -1520,9 +1541,9 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 	for _, platform := range service.GroupCatalogPlatforms() {
 		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
 		if len(platformModels) == 0 && injectUnmappedDefaults {
-			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
-			// default 分支是 Claude 列表），composite 下只暴露账号映射键。
-			if _, ok := schedulablePlatforms[platform]; ok && !service.IsCNProvider(platform) {
+			// Multi-protocol providers have per-account catalogs, not Claude
+			// fallback models. Listing defaults must not invent callable models.
+			if _, ok := schedulablePlatforms[platform]; ok && !service.IsMultiProtocolAPIKeyProvider(platform) {
 				platformModels = defaultModelIDsForPlatform(platform)
 			}
 		}
@@ -1536,6 +1557,13 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 			}
 			seen[model] = struct{}{}
 			models = append(models, model)
+		}
+	}
+	// Only callers listing a Composite group opt into route-only aliases.
+	// A failed route lookup does not erase the existing account catalog.
+	if len(routeEndpoint) > 0 {
+		if aliases, err := h.gatewayService.GetCompositeRouteModels(ctx, groupID, routeEndpoint[0]); err == nil {
+			models = mergeModelIDs(models, aliases)
 		}
 	}
 	return models
@@ -1680,6 +1708,8 @@ func defaultCodexModelIDsForPlatform(platform string) []string {
 
 func defaultModelIDsForPlatform(platform string) []string {
 	switch platform {
+	case service.PlatformTypeSafe:
+		return []string{"jev-latest"}
 	case service.PlatformOpenAI:
 		return openai.DefaultModelIDs()
 	case service.PlatformGemini:
@@ -1703,6 +1733,9 @@ func defaultModelIDsForPlatform(platform string) []string {
 		ids := make([]string, 0)
 		seen := make(map[string]struct{})
 		for _, concretePlatform := range service.GroupCatalogPlatforms() {
+			if concretePlatform == service.PlatformTypeSafe {
+				continue
+			}
 			for _, id := range defaultModelIDsForPlatform(concretePlatform) {
 				if _, ok := seen[id]; ok {
 					continue
@@ -2178,18 +2211,37 @@ func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *se
 
 	// 使用默认的错误映射
 	status, errType, errMsg := wrapUpstreamClientError(statusCode, responseBody)
+	status, errType, errMsg = exhaustedFailoverResponse(status, errType, errMsg)
 	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
 }
 
 // handleFailoverExhaustedSimple 简化版本，用于没有响应体的情况
 func (h *GatewayHandler) handleFailoverExhaustedSimple(c *gin.Context, statusCode int, streamStarted bool) {
 	status, errType, errMsg := wrapUpstreamClientError(statusCode, nil)
+	status, errType, errMsg = exhaustedFailoverResponse(status, errType, errMsg)
 	service.SetOpsUpstreamError(c, statusCode, errMsg, "")
 	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
 }
 
 func wrapUpstreamClientError(statusCode int, body []byte) (int, string, string) {
 	status, errType, _, message := service.WrapUpstreamErrorForClient(statusCode, body)
+	return status, errType, message
+}
+
+// Normalize only the default terminal response, after explicit passthrough
+// rules and request-specific client errors have had a chance to respond.
+func exhaustedFailoverResponse(status int, errType, message string) (int, string, string) {
+	switch {
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		if strings.TrimSpace(message) == "" || strings.EqualFold(message, "Forbidden") {
+			message = "Upstream request failed"
+		}
+		return http.StatusBadGateway, "upstream_error", message
+	case status == http.StatusServiceUnavailable:
+		return status, errType, message
+	case status == 0 || status >= http.StatusInternalServerError:
+		return 529, "overloaded_error", "Upstream service temporarily unavailable"
+	}
 	return status, errType, message
 }
 
@@ -2252,6 +2304,9 @@ func (h *GatewayHandler) ensureForwardErrorResponse(c *gin.Context, streamStarte
 		return false
 	}
 	if service.IsResponseCommitted(c) {
+		return false
+	}
+	if failoverClientGone(c) {
 		return false
 	}
 	if c.Writer.Written() {
@@ -2408,6 +2463,9 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	// count_tokens 走 messages 严格校验时，复用已解析请求，避免二次反序列化。
 	SetClaudeCodeClientContext(c, body, parsedReq)
 	ensureCompositeTargetPlatform(c, apiKey, parsedReq.Model)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
+		return
+	}
 	reqLog = reqLog.With(zap.String("model", parsedReq.Model), zap.Bool("stream", parsedReq.Stream))
 	// 在请求上下文中记录 thinking 状态，供 Antigravity 最终模型 key 推导/模型维度限流使用
 	c.Request = c.Request.WithContext(service.WithThinkingEnabled(c.Request.Context(), parsedReq.ThinkingEnabled, h.metadataBridgeEnabled()))

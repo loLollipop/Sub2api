@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
 )
@@ -261,6 +262,9 @@ func (r *opsRepository) ListErrorLogs(ctx context.Context, filter *service.OpsEr
 	}
 	if filter == nil {
 		filter = &service.OpsErrorLogFilter{}
+	}
+	if err := usagestats.ValidateRequestIDSearch(filter.RequestID, filter.StartTime, filter.EndTime); err != nil {
+		return nil, err
 	}
 
 	page := filter.Page
@@ -1070,20 +1074,7 @@ func buildOpsErrorLogsWhere(filter *service.OpsErrorLogFilter) (string, []any) {
 		args = append(args, pq.Array(known))
 		clauses = append(clauses, "NOT (COALESCE(e.upstream_status_code, e.status_code, 0) = ANY($"+itoa(len(args))+"))")
 	}
-	// Complete correlation identities; use the existing column indexes and
-	// accept the billing namespace without enabling unindexed fragment scans.
-	if rid := strings.TrimSpace(filter.RequestID); rid != "" {
-		bare := rid
-		for _, prefix := range []string{"client:", "local:"} {
-			if strings.HasPrefix(rid, prefix) {
-				bare = strings.TrimPrefix(rid, prefix)
-				break
-			}
-		}
-		n := len(args) + 1
-		args = append(args, rid, bare)
-		clauses = append(clauses, fmt.Sprintf("(e.request_id IN ($%d, $%d) OR e.client_request_id IN ($%d, $%d))", n, n+1, n, n+1))
-	}
+	clauses, args = appendRequestIDSearchCondition(clauses, args, filter.RequestID, "e.request_id", "e.client_request_id")
 	if crid := strings.TrimSpace(filter.ClientRequestID); crid != "" {
 		args = append(args, crid)
 		clauses = append(clauses, "COALESCE(e.client_request_id,'') = $"+itoa(len(args)))

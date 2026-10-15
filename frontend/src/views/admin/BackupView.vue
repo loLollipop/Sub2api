@@ -401,7 +401,7 @@
 
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api'
 import { useAppStore } from '@/stores'
@@ -483,9 +483,10 @@ const downloadParts = ref<BackupDownloadPart[]>([])
 const downloadPartsModalOpen = ref(false)
 
 // Polling
-const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const restoringPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const pollingTimer = shallowRef<ReturnType<typeof setInterval> | null>(null)
+const restoringPollingTimer = shallowRef<ReturnType<typeof setInterval> | null>(null)
 const MAX_POLL_COUNT = 900
+let disposed = false
 
 function updateRecordInList(updated: BackupRecord) {
   const idx = backups.value.findIndex(r => r.id === updated.id)
@@ -495,9 +496,11 @@ function updateRecordInList(updated: BackupRecord) {
 }
 
 function startPolling(backupId: string) {
+  if (disposed) return
   stopPolling()
   let count = 0
-  pollingTimer.value = setInterval(async () => {
+  const timer = setInterval(async () => {
+    if (disposed || pollingTimer.value !== timer) return
     if (count++ >= MAX_POLL_COUNT) {
       stopPolling()
       creatingBackup.value = false
@@ -506,6 +509,7 @@ function startPolling(backupId: string) {
     }
     try {
       const record = await adminAPI.backup.getBackup(backupId)
+      if (disposed || pollingTimer.value !== timer) return
       updateRecordInList(record)
       if (record.status === 'completed' || record.status === 'failed') {
         stopPolling()
@@ -521,6 +525,7 @@ function startPolling(backupId: string) {
       // 轮询失败时不中断
     }
   }, 2000)
+  pollingTimer.value = timer
 }
 
 function stopPolling() {
@@ -531,9 +536,11 @@ function stopPolling() {
 }
 
 function startRestorePolling(backupId: string) {
+  if (disposed) return
   stopRestorePolling()
   let count = 0
-  restoringPollingTimer.value = setInterval(async () => {
+  const timer = setInterval(async () => {
+    if (disposed || restoringPollingTimer.value !== timer) return
     if (count++ >= MAX_POLL_COUNT) {
       stopRestorePolling()
       restoringId.value = ''
@@ -542,6 +549,7 @@ function startRestorePolling(backupId: string) {
     }
     try {
       const record = await adminAPI.backup.getBackup(backupId)
+      if (disposed || restoringPollingTimer.value !== timer) return
       updateRecordInList(record)
       if (record.restore_status === 'completed' || record.restore_status === 'failed') {
         stopRestorePolling()
@@ -557,6 +565,7 @@ function startRestorePolling(backupId: string) {
       // 轮询失败时不中断
     }
   }, 2000)
+  restoringPollingTimer.value = timer
 }
 
 function stopRestorePolling() {
@@ -573,6 +582,7 @@ function handleVisibilityChange() {
   } else {
     // 标签页恢复时刷新列表，检查是否仍有活跃操作
     loadBackups().then(() => {
+      if (disposed) return
       const running = backups.value.find(r => r.status === 'running')
       if (running) {
         creatingBackup.value = true
@@ -725,14 +735,17 @@ async function saveSchedule() {
 }
 
 async function loadBackups() {
+  if (disposed) return
   loadingBackups.value = true
   try {
     const result = await adminAPI.backup.listBackups()
+    if (disposed) return
     backups.value = result.items || []
   } catch (error) {
+    if (disposed) return
     appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
   } finally {
-    loadingBackups.value = false
+    if (!disposed) loadingBackups.value = false
   }
 }
 
@@ -853,6 +866,7 @@ function formatDate(value?: string): string {
 onMounted(async () => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
   await Promise.all([loadS3Config(), loadImageStorageConfig(), loadSchedule(), loadBackups()])
+  if (disposed) return
 
   // 如果有正在 running 的备份，恢复轮询
   const runningBackup = backups.value.find(r => r.status === 'running')
@@ -868,6 +882,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
   stopPolling()
   stopRestorePolling()
   document.removeEventListener('visibilitychange', handleVisibilityChange)

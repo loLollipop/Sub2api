@@ -103,6 +103,8 @@ type BillingCache interface {
 
 // ModelPricing 模型价格配置（per-token价格，与LiteLLM格式一致）
 type ModelPricing struct {
+	// Metadata for input-only quotes; an explicit zero price is not absent.
+	InputPriceAbsent bool `json:"-"`
 	// UltrafastMultiplier is model-owned and independent of operator Fast pricing.
 	UltrafastMultiplier                float64
 	InputPricePerToken                 float64            // 每token输入价格 (USD)
@@ -437,6 +439,19 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown:     true,
 	}
 
+	// Claude Haiku 5.5: the full request costs 5x when the prompt exceeds 100k.
+	s.fallbackPrices["claude-haiku-5-5"] = &ModelPricing{
+		InputPricePerToken:          0.1e-6,
+		OutputPricePerToken:         0.5e-6,
+		CacheCreationPricePerToken:  0.125e-6,
+		CacheReadPricePerToken:      0.01e-6,
+		CacheCreation5mPrice:        0.125e-6,
+		CacheCreation1hPrice:        0.2e-6,
+		SupportsCacheBreakdown:      true,
+		LongContextInputThreshold:   100000,
+		LongContextInputMultiplier:  5,
+		LongContextOutputMultiplier: 5,
+	}
 	// Claude Fable 5.x uses the same input/output and cache-write prices, while
 	// Fable 5.1 reduces cache reads from $1 to $0.25 per MTok.
 	s.fallbackPrices["claude-fable-5"] = &ModelPricing{
@@ -467,14 +482,15 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown:     false,
 	}
 
-	// Gemini 3.6 Flash (Google AI pricing: $1.50 input / $7.50 output /
-	// $0.15 cached input per MTok). Antigravity's -high/-low/-medium/-tiered
-	// aliases are matched below so unavailable remote pricing never records
-	// token-bearing requests at $0.
+	// Gemini 3.6 Flash (Google AI pricing: $0.75 input / $3.75 output /
+	// $0.075 cached input per MTok, promotional through 2026-12-31; official
+	// rates double to $1.50/$7.50/$0.15 from 2027-01-01). Antigravity's
+	// -high/-low/-medium/-tiered aliases are matched below so unavailable
+	// remote pricing never records token-bearing requests at $0.
 	s.fallbackPrices["gemini-3.6-flash"] = &ModelPricing{
-		InputPricePerToken:     1.5e-6,
-		OutputPricePerToken:    7.5e-6,
-		CacheReadPricePerToken: 0.15e-6,
+		InputPricePerToken:     0.75e-6,
+		OutputPricePerToken:    3.75e-6,
+		CacheReadPricePerToken: 0.075e-6,
 		SupportsCacheBreakdown: false,
 	}
 
@@ -499,6 +515,27 @@ func (s *BillingService) initFallbackPricing() {
 		InputPricePerToken:     0.75e-6,
 		OutputPricePerToken:    3.75e-6,
 		CacheReadPricePerToken: 0.075e-6,
+		SupportsCacheBreakdown: false,
+	}
+
+	// Gemini 4 Argon (Google AI pricing: $2 input / $10 output / $0.10 cached
+	// input per MTok, promotional through 2026-11-30; official rates double to
+	// $4/$20/$0.20 from 2026-12-01). One rate covers every prompt length.
+	// Antigravity's -high/-low/-medium aliases are matched below so unavailable
+	// remote pricing never records token-bearing requests at $0.
+	s.fallbackPrices["gemini-4-argon"] = &ModelPricing{
+		InputPricePerToken:     2e-6,
+		OutputPricePerToken:    10e-6,
+		CacheReadPricePerToken: 0.1e-6,
+		SupportsCacheBreakdown: false,
+	}
+
+	// Gemini 4 Argon Cyber Permissive (Vertex AI pricing: $4 input / $20 output /
+	// $0.20 cached input per MTok). The Gemini 4 Argon promotion does not apply.
+	s.fallbackPrices["gemini-4-argon-cyber-permissive"] = &ModelPricing{
+		InputPricePerToken:     4e-6,
+		OutputPricePerToken:    20e-6,
+		CacheReadPricePerToken: 0.2e-6,
 		SupportsCacheBreakdown: false,
 	}
 
@@ -972,7 +1009,13 @@ func (s *BillingService) initFallbackPricing() {
 
 // getFallbackPricing 根据模型系列获取回退价格
 func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
-	modelLower := strings.ToLower(model)
+	if model == "jev-latest" {
+		return &ModelPricing{InputPricePerToken: 0.042 / 1_000_000, OutputPricePerToken: 0}
+	}
+	if strings.HasPrefix(strings.ToLower(model), "jev") {
+		return nil
+	}
+	modelLower := normalizeAntigravityClaudeTierAlias(strings.ToLower(model))
 
 	// 按模型系列匹配
 	if isClaudeFable51Model(modelLower) {
@@ -1016,6 +1059,9 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 		return s.fallbackPrices["claude-3-5-sonnet"]
 	}
 	if strings.Contains(modelLower, "haiku") {
+		if claude.IsHaiku55(modelLower) {
+			return s.fallbackPrices["claude-haiku-5-5"]
+		}
 		if strings.Contains(modelLower, "3-5") || strings.Contains(modelLower, "3.5") {
 			return s.fallbackPrices["claude-3-5-haiku"]
 		}
@@ -1036,6 +1082,13 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	}
 	if strings.Contains(modelLower, "gemini-3.8-flash") || strings.Contains(modelLower, "gemini-3-8-flash") {
 		return s.fallbackPrices["gemini-3.8-flash"]
+	}
+	// Cyber 变体不享受 Gemini 4 Argon 的优惠价，必须先于 "gemini-4-argon" 判。
+	if strings.Contains(modelLower, "gemini-4-argon-cyber") {
+		return s.fallbackPrices["gemini-4-argon-cyber-permissive"]
+	}
+	if strings.Contains(modelLower, "gemini-4-argon") {
+		return s.fallbackPrices["gemini-4-argon"]
 	}
 
 	// DeepSeek 系列：官方模型 V4 Pro/Flash（含 vision-exp）按各自价卡；
@@ -1314,6 +1367,7 @@ func (s *BillingService) GetModelPricing(model string) (*ModelPricing, error) {
 			price1h := litellmPricing.CacheCreationInputTokenCostAbove1hr
 			enableBreakdown := price1h > 0 && price1h > price5m
 			return s.applyModelSpecificPricingPolicy(model, &ModelPricing{
+				InputPriceAbsent:                   litellmPricing.InputPriceAbsent,
 				InputPricePerToken:                 litellmPricing.InputCostPerToken,
 				InputPricePerTokenPriority:         litellmPricing.InputCostPerTokenPriority,
 				OutputPricePerToken:                litellmPricing.OutputCostPerToken,
@@ -1395,6 +1449,7 @@ func applyChannelTokenPriceOverrides(pricing *ModelPricing, channelPricing *Chan
 		return
 	}
 	if channelPricing.InputPrice != nil {
+		pricing.InputPriceAbsent = false
 		priority := channelTierOverridePrice(pricing.InputPricePerToken, pricing.InputPricePerTokenPriority, *channelPricing.InputPrice)
 		pricing.InputPricePerToken = *channelPricing.InputPrice
 		pricing.InputPricePerTokenPriority = priority
@@ -1446,12 +1501,23 @@ type CostInput struct {
 	Resolver                  *ModelPricingResolver // 定价解析器
 	Resolved                  *ResolvedPricing      // 可选：预解析的定价结果（避免重复 Resolve 调用）
 	LongContextBillingEnabled *bool
+	// DisableModelLongContextPricing exempts the model-card surcharge, not explicit admin intervals.
+	DisableModelLongContextPricing bool
 }
 
 // CalculateCostUnified 统一计费入口，支持三种计费模式。
 // 使用 ModelPricingResolver 解析定价，然后根据 BillingMode 分发计算。
 func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, error) {
 	if input.Resolver == nil {
+		if !input.PricingAt.IsZero() {
+			// Reuse catalog policy calculation for frozen-time requests without
+			// enabling group/channel resolution or changing the legacy no-time
+			// fallback's breakdown shape and long-context default.
+			input.Resolver = NewModelPricingResolver(nil, s)
+			resolved := input.Resolver.Resolve(input.Ctx, PricingInput{Model: input.Model})
+			resolved.longContextPricingEnabled = input.LongContextBillingEnabled == nil || *input.LongContextBillingEnabled
+			return s.calculateTokenCost(resolved, input)
+		}
 		// 无 Resolver，回退到旧路径
 		applyLongContextBilling := true
 		if input.LongContextBillingEnabled != nil {
@@ -1463,7 +1529,7 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 			input.RateMultiplier,
 			input.ServiceTier,
 			nil,
-			applyLongContextBilling,
+			applyLongContextBilling && !input.DisableModelLongContextPricing,
 		)
 		if err == nil {
 			applyCostBreakdownMultiplier(breakdown, reasoningEffortBillingMultiplier(input.ReasoningEffort, nil))
@@ -1548,7 +1614,7 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 	}
 
 	// 官方长上下文阶梯仅在无区间定价时应用（区间定价已包含上下文分层）。
-	applyLongCtx := len(resolved.Intervals) == 0 && contextTierPricingEnabled
+	applyLongCtx := len(resolved.Intervals) == 0 && contextTierPricingEnabled && !input.DisableModelLongContextPricing
 
 	breakdown := s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongCtx)
 	applyCostBreakdownMultiplier(breakdown, resolvedChannelTimeMultiplier(resolved, input.PricingAt))
@@ -1824,6 +1890,7 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 	// 对默认价卡另行叠加（分组/渠道自定义定价不叠加）。
 	if forceDeepSeekRates && isDeepSeekModel(model) {
 		cloned := *pricing
+		cloned.InputPriceAbsent = false // The native policy supplies a verified input rate.
 		if strings.Contains(strings.ToLower(strings.TrimSpace(model)), "deepseek-v4-pro") {
 			cloned.InputPricePerToken = deepseekProOffPeakInputPrice
 			cloned.OutputPricePerToken = deepseekProOffPeakOutputPrice

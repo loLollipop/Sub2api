@@ -30,7 +30,7 @@ func TestMixedScopedKeyAllIngressForwarding(t *testing.T) {
 					account.Credentials["model_mapping"] = map[string]any{model: target}
 					before, err := json.Marshal(account)
 					require.NoError(t, err)
-					upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, strings.ReplaceAll(mixedChatToolJSON, "actual", target), false)}
+					upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(protocol, APIProtocolChatCompletions, mixedHTTPResponse(200, strings.ReplaceAll(mixedChatToolJSON, "actual", target), false))}
 					svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: withModelScopeUpstream(upstream)}
 					body := bytes.ReplaceAll(mixedClientBody(protocol, false), []byte(`"alias"`), []byte(`"`+model+`"`))
 					c, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -51,7 +51,7 @@ func TestMixedScopedKeyAllIngressForwarding(t *testing.T) {
 						require.Empty(t, upstream.requests, "no cross-scope network or protocol retry")
 					} else {
 						require.NoError(t, err)
-						require.Len(t, upstream.requests, 1)
+						require.Len(t, upstream.requests, mixedExpectedAttempts(protocol, APIProtocolChatCompletions))
 						require.Equal(t, target, result.UpstreamModel)
 						require.Equal(t, 9, result.Usage.InputTokens)
 						require.Equal(t, 4, result.Usage.OutputTokens)

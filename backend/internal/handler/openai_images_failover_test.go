@@ -196,8 +196,8 @@ func TestOpenAIGatewayHandlerImages_ServerErrorFailsOverAndReturnsClearErrorWhen
 	require.NotContains(t, loggedFields, "prompt")
 
 	require.Equal(t, []int64{1, 2}, upstream.calls())
-	require.Equal(t, http.StatusBadGateway, rec.Code)
-	require.Equal(t, "upstream_error", gjson.GetBytes(rec.Body.Bytes(), "error.type").String())
+	require.Equal(t, 529, rec.Code)
+	require.Equal(t, "overloaded_error", gjson.GetBytes(rec.Body.Bytes(), "error.type").String())
 	require.Equal(t, "Upstream service temporarily unavailable", gjson.GetBytes(rec.Body.Bytes(), "error.message").String())
 
 	rawEvents, ok := c.Get(service.OpsUpstreamErrorsKey)
@@ -239,5 +239,5 @@ func TestOpenAIImagesSmartRouteDisabledPrimary(t *testing.T) {
 	h.Images(c)
 	require.NotEqual(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	require.Equal(t, []int64{1}, upstream.calls(), "request must reach enabled candidate: %s", rec.Body.String())
-	require.Equal(t, http.StatusBadGateway, rec.Code, rec.Body.String())
+	require.Equal(t, 529, rec.Code, rec.Body.String())
 }

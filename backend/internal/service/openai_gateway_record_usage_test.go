@@ -126,6 +126,25 @@ func TestRecordCyberPolicyUsageLog_NonStreamZeroTokensZeroCost(t *testing.T) {
 	require.Equal(t, RequestTypeCyberBlocked, usageRepo.lastLog.RequestType)
 }
 
+func TestRecordCyberPolicyUsageLogRetainsFrozenPricingAt(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
+	at := time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC)
+	svc.RecordCyberPolicyUsageLog(context.Background(), CyberPolicyUsageInput{
+		APIKey: &APIKey{ID: 2, User: &User{ID: 1}}, Account: &Account{ID: 3},
+		RequestID: "cyber-frozen-pricing", Model: "deepseek-v4-pro", InputTokens: 1000, PricingAt: at,
+	})
+	require.NotNil(t, usageRepo.lastLog)
+	cost, err := svc.calculateOpenAIRecordUsageTokenCost(context.Background(), &APIKey{}, "deepseek-v4-pro", 1.1,
+		at, UsageTokens{InputTokens: 1000}, "", "", nil, false)
+	require.NoError(t, err)
+	require.InDelta(t, cost.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
+	other, err := svc.calculateOpenAIRecordUsageTokenCost(context.Background(), &APIKey{}, "deepseek-v4-pro", 1.1,
+		at.Add(3*time.Hour), UsageTokens{InputTokens: 1000}, "", "", nil, false)
+	require.NoError(t, err)
+	require.InDelta(t, 2*other.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
+}
+
 func TestRecordCyberPolicyUsageLog_SkipsWhenIncomplete(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{}
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)

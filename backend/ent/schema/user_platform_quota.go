@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -38,15 +39,10 @@ func (UserPlatformQuota) Fields() []ent.Field {
 			MaxLen(32).
 			NotEmpty().
 			Validate(func(s string) error {
-				// 注意：平台列表的单一权威源为 service.AllowedQuotaPlatforms；
-				// 此处为 ent 构建期约束，需与 service.AllowedQuotaPlatforms 保持同步。
-				switch s {
-				case "anthropic", "openai", "gemini", "antigravity", "grok",
-					"kimi", "zhipu", "deepseek", "minimax", "mixed":
-					return nil
-				default:
+				if !domain.IsConcretePlatform(s) {
 					return fmt.Errorf("platform %q is not allowed", s)
 				}
+				return nil
 			}),
 
 		// 日 / 周 / 月 USD 上限：

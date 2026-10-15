@@ -150,6 +150,14 @@ var (
 		CacheReadInputTokenCost: 0.2e-6,
 		LiteLLMProvider:         "anthropic", Mode: "chat", SupportsPromptCaching: true,
 	}
+	claudeHaiku55FallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken: 1e-7, OutputCostPerToken: 5e-7,
+		CacheCreationInputTokenCost: 1.25e-7, CacheCreationInputTokenCostAbove1hr: 2e-7,
+		CacheReadInputTokenCost:        1e-8,
+		LongContextInputTokenThreshold: 100000,
+		LongContextInputCostMultiplier: 5, LongContextOutputCostMultiplier: 5,
+		LiteLLMProvider: "anthropic", Mode: "chat", SupportsPromptCaching: true,
+	}
 	openAIGPT56SolFallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken:                   5e-06,
 		InputCostPerTokenPriority:           1e-05,
@@ -236,10 +244,16 @@ type LiteLLMModelPricing struct {
 	OutputCostPerImageToken             float64 `json:"output_cost_per_image_token"` // 图片输出 token 价格
 	InputCostPerImageToken              float64 `json:"input_cost_per_image_token"`  // 图片输入 token 价格（如 gpt-image-2 图片编辑）
 
-	// TokenPricingAbsent 表示源数据中 input/output token 价格均缺失（仅有图片价）。
-	// 此类条目只可用于图片计费，token 计费必须回退到 fallback 或 fail-closed，
+	// Nil means absent; an explicit zero makes storage free without enabling token pricing.
+	CacheStorageCostPerTokenPerHour *float64 `json:"cache_storage_cost_per_token_per_hour,omitempty"`
+
+	// TokenPricingAbsent 表示源数据中 input/output token 价格均缺失（例如仅有图片价或缓存存储价）。
+	// 此类条目不可用于 token 计费，必须回退到 fallback 或 fail-closed，
 	// 否则 token 流量会被按 $0 计费。零值（false）表示条目具备 token 价格。
 	TokenPricingAbsent bool `json:"-"`
+	// InputPriceAbsent distinguishes a missing input rate from an explicit free
+	// rate for input-only quotations. Ordinary token-price eligibility is unchanged.
+	InputPriceAbsent bool `json:"-"`
 }
 
 // PricingRemoteClient 远程价格数据获取接口
@@ -259,6 +273,7 @@ type LiteLLMRawEntry struct {
 	CacheCreationInputTokenCostAbove1hr *float64 `json:"cache_creation_input_token_cost_above_1hr"`
 	CacheReadInputTokenCost             *float64 `json:"cache_read_input_token_cost"`
 	CacheReadInputTokenCostPriority     *float64 `json:"cache_read_input_token_cost_priority"`
+	CacheStorageCostPerTokenPerHour     *float64 `json:"cache_storage_cost_per_token_per_hour"`
 	LongContextInputTokenThreshold      *int     `json:"long_context_input_token_threshold"`
 	LongContextInputCostMultiplier      *float64 `json:"long_context_input_cost_multiplier"`
 	LongContextOutputCostMultiplier     *float64 `json:"long_context_output_cost_multiplier"`
@@ -660,6 +675,9 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 	if err := json.Unmarshal(body, &rawData); err != nil {
 		return nil, fmt.Errorf("parse raw JSON: %w", err)
 	}
+	if err := s.validateCacheStoragePricingSources(); err != nil {
+		return nil, err
+	}
 	rawData = s.applyPricingOverrides(rawData)
 
 	result := make(map[string]*LiteLLMModelPricing)
@@ -671,25 +689,36 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		if modelName == "sample_spec" {
 			continue
 		}
+		// Validate storage separately before the ordinary invalid-entry skip: dropping
+		// an invalid explicit rate could otherwise silently replace it with a builtin.
+		storagePrice, err := parseCacheStoragePricingField(rawEntry)
+		if err != nil {
+			return nil, fmt.Errorf("cache storage pricing for %s: %w", modelName, err)
+		}
 
 		// 尝试解析每个条目
 		var entry LiteLLMRawEntry
 		if err := json.Unmarshal(rawEntry, &entry); err != nil {
+			if storagePrice != nil {
+				return nil, fmt.Errorf("cache storage pricing entry for %s: %w", modelName, err)
+			}
 			skipped++
 			continue
 		}
 
 		// 只保留有有效价格的条目
-		if entry.InputCostPerToken == nil && entry.OutputCostPerToken == nil && entry.OutputCostPerImage == nil && entry.OutputCostPerImageToken == nil && entry.InputCostPerImageToken == nil {
+		if entry.InputCostPerToken == nil && entry.OutputCostPerToken == nil && entry.OutputCostPerImage == nil && entry.OutputCostPerImageToken == nil && entry.InputCostPerImageToken == nil && storagePrice == nil {
 			continue
 		}
 
 		pricing := &LiteLLMModelPricing{
-			LiteLLMProvider:       entry.LiteLLMProvider,
-			Mode:                  entry.Mode,
-			SupportsPromptCaching: entry.SupportsPromptCaching,
-			SupportsServiceTier:   entry.SupportsServiceTier,
-			TokenPricingAbsent:    entry.InputCostPerToken == nil && entry.OutputCostPerToken == nil,
+			LiteLLMProvider:                 entry.LiteLLMProvider,
+			Mode:                            entry.Mode,
+			SupportsPromptCaching:           entry.SupportsPromptCaching,
+			SupportsServiceTier:             entry.SupportsServiceTier,
+			TokenPricingAbsent:              entry.InputCostPerToken == nil && entry.OutputCostPerToken == nil,
+			InputPriceAbsent:                entry.InputCostPerToken == nil,
+			CacheStorageCostPerTokenPerHour: storagePrice,
 		}
 
 		if entry.InputCostPerToken != nil {
@@ -973,7 +1002,7 @@ func mergePricingOverrideEntry(base, patch json.RawMessage) (json.RawMessage, bo
 	merged := make(map[string]any, len(patchFields))
 	if len(base) > 0 {
 		// base 非对象时忽略，仅以 patch 为准。
-		if err := json.Unmarshal(base, &merged); err != nil {
+		if err := json.Unmarshal(base, &merged); err != nil || merged == nil {
 			merged = make(map[string]any, len(patchFields))
 		}
 	}
@@ -1088,7 +1117,7 @@ func (s *PricingService) mergeFallbackPricingData(data map[string]*LiteLLMModelP
 	if s == nil || s.cfg == nil || strings.TrimSpace(s.cfg.Pricing.FallbackFile) == "" {
 		return data
 	}
-	fallbackBody, err := os.ReadFile(s.cfg.Pricing.FallbackFile)
+	fallbackBody, err := os.ReadFile(strings.TrimSpace(s.cfg.Pricing.FallbackFile))
 	if err != nil {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Fallback merge skipped: %v", err)
 		return data
@@ -1142,7 +1171,7 @@ func warnDroppedLongContextLadders(old, next map[string]*LiteLLMModelPricing) {
 
 // useFallbackPricing 使用回退价格文件
 func (s *PricingService) useFallbackPricing() error {
-	fallbackFile := s.cfg.Pricing.FallbackFile
+	fallbackFile := strings.TrimSpace(s.cfg.Pricing.FallbackFile)
 
 	if _, err := os.Stat(fallbackFile); os.IsNotExist(err) {
 		return fmt.Errorf("fallback file not found: %s", fallbackFile)
@@ -1310,10 +1339,10 @@ func (s *PricingService) buildModelLookupCandidates(modelLower string) []string 
 	normalized := normalizeModelNameForPricing(modelLower)
 
 	// A tier-specific entry should take precedence when the pricing catalog gains
-	// one later. Antigravity's Gemini Flash thinking tiers share the base rate,
+	// one later. Antigravity's Gemini thinking tiers share the base rate,
 	// so the normalized base remains the fallback after the exact aliases.
 	candidates := rawCandidates
-	if normalizeGeminiThinkingTierAlias(lastSegment(modelLower)) != lastSegment(modelLower) {
+	if isAntigravityThinkingTierAlias(lastSegment(modelLower)) {
 		candidates = append(candidates, normalized)
 	} else {
 		// Prefer canonical model names for all other aliases (including models/xxx).
@@ -1369,15 +1398,37 @@ func normalizeModelNameForPricing(model string) string {
 		}
 		return canonical
 	}
-	return normalizeGeminiThinkingTierAlias(model)
+	return normalizeAntigravityClaudeTierAlias(normalizeGeminiThinkingTierAlias(model))
 }
 
-// normalizeGeminiThinkingTierAlias maps Antigravity's Gemini Flash
-// thinking-tier model IDs to the public base model. The tier controls reasoning
-// behavior, not the published token rate, so this keeps -high/-low/-medium and
-// -tiered requests on the corresponding base model's price card.
+// normalizeAntigravityClaudeTierAlias maps Antigravity's Claude 5.5 thinking-tier
+// model IDs (claude-opus-5-5-high, claude-sonnet-5-5-low, ...) to the public base
+// model. Like the Gemini tiers, the suffix selects reasoning depth rather than a
+// separate token rate; without this the IDs fall into substring family matching
+// and are billed as claude-opus-5 / claude-sonnet-4-5.
+func normalizeAntigravityClaudeTierAlias(model string) string {
+	for _, baseModel := range []string{"claude-opus-5-5", "claude-sonnet-5-5"} {
+		for _, tier := range []string{"-high", "-low", "-medium"} {
+			if model == baseModel+tier {
+				return baseModel
+			}
+		}
+	}
+	return model
+}
+
+// isAntigravityThinkingTierAlias reports whether model is an Antigravity
+// Gemini or Claude thinking-tier alias of a priced base model.
+func isAntigravityThinkingTierAlias(model string) bool {
+	return normalizeGeminiThinkingTierAlias(model) != model || normalizeAntigravityClaudeTierAlias(model) != model
+}
+
+// normalizeGeminiThinkingTierAlias maps Antigravity's Gemini thinking-tier
+// model IDs to the public base model. The tier controls reasoning behavior, not
+// the published token rate, so this keeps -high/-low/-medium and -tiered
+// requests on the corresponding base model's price card.
 func normalizeGeminiThinkingTierAlias(model string) string {
-	for _, baseModel := range []string{"gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"} {
+	for _, baseModel := range []string{"gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-4-argon"} {
 		for _, tier := range []string{"-high", "-low", "-medium", "-tiered"} {
 			if model == baseModel+tier {
 				return baseModel
@@ -1415,6 +1466,7 @@ func (s *PricingService) extractBaseName(model string) string {
 
 // matchByModelFamily 基于模型系列匹配
 func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
+	model = normalizeAntigravityClaudeTierAlias(model)
 	// modelFamily 定义一个模型系列的匹配和定价查找规则。
 	type modelFamily struct {
 		name    string   // 系列名称
@@ -1432,6 +1484,12 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 	// 系列会被 "4-5" 捕获，按 claude-sonnet-4-5（$3/$15）计费——50% 超收。
 	if claude.IsSonnet55(model) {
 		return claudeSonnet55FallbackPricing
+	}
+	if claude.IsHaiku55(model) {
+		if pricing, ok := s.pricingData["claude-haiku-5-5"]; ok {
+			return pricing
+		}
+		return claudeHaiku55FallbackPricing
 	}
 
 	// 按特异性降序排列：高版本号在前，避免 "claude-opus-4"（opus-4 系列）

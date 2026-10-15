@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
@@ -215,6 +216,38 @@ func TestCalculateTokenCostForRequest_NoResolverFallsBackToCatalog(t *testing.T)
 	want, err := bs.CalculateCost("gpt-5.4", tokens, 1)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
+}
+
+func TestCalculateTokenCostForRequest_NoResolverPreservesTierAndPricingAt(t *testing.T) {
+	bs := NewBillingService(&config.Config{}, nil)
+	tokens := UsageTokens{InputTokens: 1000, OutputTokens: 10}
+	priority, err := bs.CalculateTokenCostForRequest(TokenCostRequest{Model: "gpt-5.4", Tokens: tokens, RateMultiplier: 1, ServiceTier: "priority"})
+	require.NoError(t, err)
+	want, err := bs.CalculateCostWithServiceTier("gpt-5.4", tokens, 1, "priority")
+	require.NoError(t, err)
+	require.Equal(t, want, priority)
+
+	// A request admitted on Monday at peak prices must retain that instant even
+	// when it is settled outside the peak window.
+	peak := time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC)
+	offPeak := peak.Add(3 * time.Hour)
+	calc := func(at time.Time) *CostBreakdown {
+		got, err := bs.CalculateTokenCostForRequest(TokenCostRequest{Model: "deepseek-v4-pro", Tokens: tokens, RateMultiplier: 1, PricingAt: at})
+		require.NoError(t, err)
+		return got
+	}
+	require.InDelta(t, calc(offPeak).ActualCost*2, calc(peak).ActualCost, 1e-12)
+
+	// Capturing a request timestamp must not change the catalog's legacy
+	// long-context default when no account or group policy was provided.
+	long := TokenCostRequest{Model: "gpt-5.4", Tokens: UsageTokens{InputTokens: 300000}, RateMultiplier: 1}
+	withoutTime, err := bs.CalculateTokenCostForRequest(long)
+	require.NoError(t, err)
+	long.PricingAt = peak
+	withTime, err := bs.CalculateTokenCostForRequest(long)
+	require.NoError(t, err)
+	require.InDelta(t, withoutTime.ActualCost, withTime.ActualCost, 1e-12)
+	require.Equal(t, withoutTime.LongContextBillingApplied, withTime.LongContextBillingApplied)
 }
 
 func TestCalculateTokenCostForRequest_ChannelOverridesFable51MaxEffortMultiplier(t *testing.T) {

@@ -66,6 +66,8 @@ type AnthropicContentBlock struct {
 	// Signature carries provider encrypted reasoning (e.g. xAI encrypted_content)
 	// so multi-turn Claude clients can round-trip it back on subsequent turns.
 	Signature string `json:"signature,omitempty"`
+	// Opaque provider data for redacted_thinking history.
+	Data string `json:"data,omitempty"`
 
 	// type=image
 	Source *AnthropicImageSource `json:"source,omitempty"`
@@ -1042,6 +1044,9 @@ func (d ChatDelta) reasoningText() *string {
 // Shared constants
 // ---------------------------------------------------------------------------
 
-// minMaxOutputTokens is the floor for max_output_tokens in a Responses request.
-// Very small values may cause upstream API errors, so we enforce a minimum.
-const minMaxOutputTokens = 128
+// DefaultMinMaxOutputTokens is the default floor for max_output_tokens in a
+// Responses request. Very small values may cause upstream API errors, so we
+// enforce a minimum.
+const DefaultMinMaxOutputTokens = 128
+
+const minMaxOutputTokens = DefaultMinMaxOutputTokens

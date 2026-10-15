@@ -10,7 +10,7 @@ import { adminAPI } from '@/api'
 import { opsAPI, type OpsDashboardOverview, type OpsMetricThresholds, type OpsRealtimeTrafficSummary } from '@/api/admin/ops'
 import type { OpsRequestDetailsPreset } from './OpsRequestDetailsModal.vue'
 import { useAdminSettingsStore } from '@/stores'
-import { formatNumber } from '@/utils/format'
+import { formatDateTimeLocalInput, formatNumber } from '@/utils/format'
 import { formatMemorySizeMB } from '../utils/opsFormatters'
 
 type RealtimeWindow = '1min' | '5min' | '30min' | '1h'
@@ -178,8 +178,8 @@ function handleTimeRangeChange(val: string | number | boolean | null) {
     // 初始化为最近1小时
     const now = new Date()
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
-    customStartTimeInput.value = oneHourAgo.toISOString().slice(0, 16)
-    customEndTimeInput.value = now.toISOString().slice(0, 16)
+    customStartTimeInput.value = formatDateTimeLocalInput(oneHourAgo.getTime() / 1000)
+    customEndTimeInput.value = formatDateTimeLocalInput(now.getTime() / 1000)
     showCustomTimeRangeDialog.value = true
   } else {
     emit('update:timeRange', newValue)
@@ -1395,6 +1395,21 @@ function handleToolbarRefresh() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div v-if="overview" class="rounded-2xl bg-gray-50 px-4 py-3 dark:bg-dark-900" data-testid="output-tps-card">
+      <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div class="flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400">
+          {{ t('admin.ops.outputTps') }}
+          <HelpTooltip v-if="!props.fullscreen" :content="t('admin.ops.tooltips.outputTps')" />
+        </div>
+        <div v-for="metric in ['p5', 'p10', 'p50', 'avg'] as const" :key="metric" class="flex items-baseline gap-1 whitespace-nowrap text-xs">
+          <span class="text-gray-500">{{ metric === 'avg' ? 'Avg' : metric.toUpperCase() }}:</span>
+          <span class="font-bold text-gray-900 dark:text-white" :data-testid="`output-tps-${metric}`">{{ overview.output_tps?.[metric]?.toFixed(1) ?? '—' }}</span>
+          <span class="text-gray-400">tok/s</span>
+        </div>
+        <span class="text-xs text-gray-500" data-testid="output-tps-samples">{{ t('admin.ops.outputTpsSamples', { count: overview.output_tps == null ? '—' : formatNumber(overview.output_tps.sample_count) }) }}</span>
       </div>
     </div>
 

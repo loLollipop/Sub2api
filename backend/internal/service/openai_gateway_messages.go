@@ -54,16 +54,9 @@ func (s *OpenAIGatewayService) forwardOpenAIAnthropic(ctx context.Context, c *gi
 		return nil, err
 	}
 
-	// 原生优先：显式 anthropic 或实际配置了原生端点的 adaptive 账号，
-	// 入站 /v1/messages 直通，保留
-	// thinking / tool_use / cache 语义——不论分组是否开了跨协议转换，都先走这条。
-	// 跨协议转换只在账号确实没有原生 Anthropic 端点时才作为兜底（见下方开关）。
-	//
-	// 2026-09-26（424684b6e）曾把 adaptive 改走 Responses/Chat 转换以换取上游缓存
-	// 命中（部分国产中转的 /v1/messages 不返回 prompt 缓存）。2026-10-03 按运营要求
-	// 改回原生优先：转换链反复丢参数的代价高于缓存命中率。
-	if shouldForwardMessagesViaNativeAnthropic(account) {
-		// 同协议族（messages 入站 -> Anthropic 原生上游），不涉及跨协议转换。
+	routingModel := upstreamRoutingModel(account, body, defaultMappedModel)
+	upstreamProtocol := s.resolveUpstreamProtocolFor(ctx, account, APIProtocolAnthropic, routingModel)
+	if upstreamProtocol == APIProtocolAnthropic {
 		SetActualOpenAIUpstreamEndpoint(c, "/v1/messages")
 		return s.forwardAnthropicViaNativeAnthropicEndpoint(ctx, c, account, body, defaultMappedModel)
 	}
@@ -78,7 +71,7 @@ func (s *OpenAIGatewayService) forwardOpenAIAnthropic(ctx context.Context, c *gi
 
 	// 固定 chat_completions 的 CN 账号，以及不支持 Responses 的其他 APIKey
 	// 账号，均将 Messages 转为 CC；固定 responses 的 CN 账号不受探针旧值覆盖。
-	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) && !forcedOpenAIResponsesProtocol(ctx) {
+	if upstreamProtocol == APIProtocolChatCompletions && !forcedOpenAIResponsesProtocol(ctx) {
 		SetActualOpenAIUpstreamEndpoint(c, "/v1/chat/completions")
 		return s.forwardAnthropicViaRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}
@@ -156,7 +149,7 @@ func (s *OpenAIGatewayService) forwardOpenAIAnthropic(ctx context.Context, c *gi
 	}
 
 	// 3. Convert Anthropic → Responses after compatibility-only replay guard.
-	responsesReq, err := apicompat.AnthropicToResponses(&anthropicReq)
+	responsesReq, err := anthropicToResponses(s.cfg, &anthropicReq)
 	if err != nil {
 		return nil, fmt.Errorf("convert anthropic to responses: %w", err)
 	}
@@ -430,6 +423,9 @@ func (s *OpenAIGatewayService) forwardOpenAIAnthropic(ctx context.Context, c *gi
 				return nil, fmt.Errorf("build grok retry request: %w", err)
 			}
 		}
+		if err := s.repriceOpenAIFinalHTTPRequest(ctx, account, upstreamReq, billingModel, upstreamModel); err != nil {
+			return nil, err
+		}
 		resp, err = s.doOpenAITextUpstream(ctx, c, upstreamReq, proxyURL, account)
 		if err != nil {
 			return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
@@ -558,10 +554,7 @@ func (s *OpenAIGatewayService) forwardOpenAIAnthropic(ctx context.Context, c *gi
 		if tier := resolvedOpenAIUpstreamServiceTier(c, extractOpenAIServiceTierFromBody(responsesBody)); tier != nil {
 			result.ServiceTier = tier
 		}
-		if responsesReq.Reasoning != nil && responsesReq.Reasoning.Effort != "" {
-			re := responsesReq.Reasoning.Effort
-			result.ReasoningEffort = &re
-		}
+		result.ReasoningEffort = finalOpenAIAttemptReasoningEffort(responsesBody, upstreamModel, billingModel, originalModel)
 	}
 
 	// Extract and save Codex usage snapshot from response headers (for OAuth accounts).

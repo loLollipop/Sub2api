@@ -34,10 +34,7 @@ func TestMixedAllUpstreamStreamFailures(t *testing.T) {
 						sse := stream || upstreamProtocol == APIProtocolResponses || upstreamProtocol == APIProtocolAnthropic && ingress != APIProtocolAnthropic
 						payload, input, output := mixedFailurePayload(upstreamProtocol, sse, failure)
 						responses := []*http.Response{}
-						order := []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic}
-						if ingress == APIProtocolAnthropic {
-							order[1], order[2] = order[2], order[1]
-						}
+						order := mixedExpectedProtocolOrder(ingress)
 						for _, protocol := range order {
 							if protocol == upstreamProtocol {
 								break
@@ -149,10 +146,7 @@ func TestMixedHTTPFailuresStillAllowAccountFailover(t *testing.T) {
 		for _, target := range []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic} {
 			for _, status := range []int{http.StatusUnauthorized, http.StatusTooManyRequests} {
 				t.Run(fmt.Sprintf("%s/to=%s/status=%d", ingress, target, status), func(t *testing.T) {
-					order := []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic}
-					if ingress == APIProtocolAnthropic {
-						order[1], order[2] = order[2], order[1]
-					}
+					order := mixedExpectedProtocolOrder(ingress)
 					responses := []*http.Response{}
 					for _, protocol := range order {
 						if protocol == target {
@@ -179,12 +173,8 @@ func TestMixedResponsesDoneWithoutTerminalNeverSucceeds(t *testing.T) {
 	for _, ingress := range []string{APIProtocolResponses, APIProtocolChatCompletions, APIProtocolAnthropic} {
 		for _, stream := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/stream=%t", ingress, stream), func(t *testing.T) {
-				responses := []*http.Response{mixedRefusal(APIProtocolChatCompletions)}
-				if ingress == APIProtocolAnthropic {
-					responses = append(responses, mixedRefusal(APIProtocolAnthropic))
-				}
 				payload, _, _ := mixedFailurePayload(APIProtocolResponses, true, "truncated")
-				responses = append(responses, mixedHTTPResponse(200, payload+"data: [DONE]\n\n", true))
+				responses := mixedResponsesForTarget(ingress, APIProtocolResponses, mixedHTTPResponse(200, payload+"data: [DONE]\n\n", true))
 				attempts := len(responses)
 				upstream := &httpUpstreamRecorder{responses: responses}
 				svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
@@ -224,10 +214,10 @@ func TestMixedPartialStreamNeverFinalizesAndCompleteWithoutDoneWorks(t *testing.
 					// Usage alone is not completion evidence for Mixed.
 					payload += "data: " + `{"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":4}}` + "\n\n"
 				}
-				upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, payload, true)}
+				upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(protocol, APIProtocolChatCompletions, mixedHTTPResponse(200, payload, true))}
 				svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 				result, rec, _, err := mixedForward(t, svc, mixedTestAccount(), protocol, mixedClientBody(protocol, true))
-				require.Len(t, upstream.requests, 1)
+				require.Len(t, upstream.requests, mixedExpectedAttempts(protocol, APIProtocolChatCompletions))
 				if complete {
 					require.NoError(t, err)
 					require.NotNil(t, result)
@@ -340,7 +330,7 @@ func (*mixedFailedReadBody) Close() error { return nil }
 func TestMixedIncompleteRefusalNeverReplays(t *testing.T) {
 	for _, protocol := range []string{APIProtocolResponses, APIProtocolAnthropic, APIProtocolChatCompletions} {
 		t.Run(protocol, func(t *testing.T) {
-			resp := mixedRefusal(APIProtocolChatCompletions)
+			resp := mixedRefusal(protocol)
 			data, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			resp.Body = &mixedFailedReadBody{body: strings.NewReader(string(data))}
@@ -397,10 +387,8 @@ func TestMixedUnsupportedRequestsReturnClientError(t *testing.T) {
 
 func TestMixedForwardDisablesRedirectsAllProtocols(t *testing.T) {
 	for _, protocol := range []string{APIProtocolResponses, APIProtocolAnthropic, APIProtocolChatCompletions} {
-		upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(APIProtocolChatCompletions), mixedRefusal(APIProtocolResponses), mixedRefusal(APIProtocolAnthropic)}}
-		if protocol == APIProtocolAnthropic {
-			upstream.responses[1], upstream.responses[2] = upstream.responses[2], upstream.responses[1]
-		}
+		order := mixedExpectedProtocolOrder(protocol)
+		upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(order[0]), mixedRefusal(order[1]), mixedRefusal(order[2])}}
 		svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 		_, _, _, _ = mixedForward(t, svc, mixedTestAccount(), protocol, mixedClientBody(protocol, false))
 		require.Len(t, upstream.requests, 3)

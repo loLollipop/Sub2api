@@ -453,6 +453,8 @@ const SparkleIcon = {
 const clientTabs = computed((): TabConfig[] => {
   if (!props.platform) return []
   switch (props.platform) {
+    case 'typesafe':
+      return []
     case 'openai': {
       const tabs: TabConfig[] = [
         { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
@@ -530,6 +532,7 @@ const currentTabs = computed(() => {
 })
 
 const platformDescription = computed(() => {
+  if (props.platform === 'typesafe') return t('admin.accounts.typesafeHint')
   if (activeClientTab.value === 'codex' &&
     props.platform !== 'openai' &&
     props.platform !== 'grok' &&
@@ -574,6 +577,7 @@ const platformDescription = computed(() => {
 })
 
 const platformNote = computed(() => {
+  if (props.platform === 'typesafe') return t('admin.accounts.typesafeHint')
   if (activeClientTab.value === 'codex' &&
     props.platform !== 'openai' &&
     props.platform !== 'grok' &&
@@ -722,6 +726,13 @@ const currentFiles = computed((): FileConfig[] => {
     return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
   }
   const apiBase = ensureV1(baseRoot)
+  if (props.platform === 'typesafe') {
+    return [{
+      path: 'systemone.sh',
+      content: `curl '${apiBase}/systemone' -H 'Authorization: Bearer ${apiKey}' -H 'Content-Type: application/json' --data '{"model":"jev-latest","state":"Connection test","questions":{"check":{"type":"noul","instructions":"Is this a connection test?"}}}'`,
+      hint: t('admin.accounts.typesafeHint')
+    }]
+  }
   const antigravityBase = ensureV1(`${baseRoot}/antigravity`)
   const antigravityGeminiBase = (() => {
     const trimmed = `${baseRoot}/antigravity`.replace(/\/+$/, '')
@@ -1258,6 +1269,7 @@ function generateRoutedCodexFiles(
   const preferredModel = preferredModels[platform] || ''
   const model = selectCodexCatalogModel(preferredModel)
   const labels: Record<GroupPlatform, string> = {
+    typesafe: 'TypeSafe',
     anthropic: 'Anthropic',
     openai: 'OpenAI',
     gemini: 'Gemini',
@@ -1267,6 +1279,8 @@ function generateRoutedCodexFiles(
     zhipu: 'Zhipu',
     deepseek: 'DeepSeek',
     minimax: 'MiniMax',
+    command_code: 'Command Code',
+    cline: 'Cline',
     mixed: t('admin.accounts.platforms.mixed'),
     composite: 'Composite'
   }

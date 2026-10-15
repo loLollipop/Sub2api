@@ -8,10 +8,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Version the key when the monitored release repository changes. Otherwise a
-// response cached from the old feed can hide a newly available upstream build
-// until its TTL expires after deployment.
-const updateCacheKey = "update:latest:kiss-kedaya-sub2api:v1"
+// Payload identity also validates check mode, source repositories and checkpoints.
+const updateCacheKey = "update:latest:lolollipop-sub2api:source-tracking:v2"
 
 type updateCache struct {
 	rdb *redis.Client

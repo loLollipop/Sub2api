@@ -7,6 +7,14 @@ vi.mock('@/api/admin/accounts', () => ({
 import { buildModelMappingObject, getModelsByPlatform, getPresetMappingsByPlatform, mergeUpstreamIdentityMappings, splitModelMappingObject } from '../useModelWhitelist'
 
 describe('useModelWhitelist', () => {
+	 it('Claude 5.5 models are available without changing Mixed model discovery', () => {
+	   expect(getModelsByPlatform('claude')).toEqual(expect.arrayContaining([
+	     'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'
+	   ]))
+	   expect(getPresetMappingsByPlatform('claude')).toEqual(expect.arrayContaining([
+	     expect.objectContaining({ from: 'claude-haiku-5-5', to: 'claude-haiku-5-5' })
+	   ]))
+	 })
   it('openai 模型列表包含 GPT-5.4 官方快照', () => {
     const models = getModelsByPlatform('openai')
 
@@ -117,6 +125,21 @@ describe('useModelWhitelist', () => {
     const models = getModelsByPlatform('antigravity')
 
     expect(models).toContain('gemini-3.1-pro')
+  })
+
+  it('Gemini 4 Argon 在 gemini 与 antigravity 平台使用对应真实模型 ID 与预设映射', () => {
+    expect(getModelsByPlatform('gemini')).toContain('gemini-4-argon')
+    const agModels = getModelsByPlatform('antigravity')
+    expect(agModels).not.toContain('gemini-4-argon')
+    expect(agModels).toContain('gemini-4-argon-high')
+    expect(agModels).toContain('gemini-4-argon-medium')
+    expect(agModels).toContain('gemini-4-argon-low')
+    expect(getPresetMappingsByPlatform('antigravity')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from: 'gemini-4-argon', to: 'gemini-4-argon-high' }),
+      expect.objectContaining({ from: 'gemini-4-argon-high', to: 'gemini-4-argon-high' }),
+      expect.objectContaining({ from: 'gemini-4-argon-medium', to: 'gemini-4-argon-medium' }),
+      expect.objectContaining({ from: 'gemini-4-argon-low', to: 'gemini-4-argon-low' })
+    ]))
   })
 
   it('whitelist 模式会忽略通配符条目', () => {

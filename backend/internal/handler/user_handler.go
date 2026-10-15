@@ -128,6 +128,7 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
+	profileResp.User.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 
@@ -192,6 +193,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	profileResp.User.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 
@@ -311,6 +313,7 @@ func (h *UserHandler) BindEmailIdentity(c *gin.Context) {
 		return
 	}
 
+	profileResp.User.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 
@@ -345,6 +348,7 @@ func (h *UserHandler) UnbindIdentity(c *gin.Context) {
 		return
 	}
 
+	profileResp.User.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 
@@ -444,6 +448,7 @@ func (h *UserHandler) VerifyNotifyEmail(c *gin.Context) {
 		return
 	}
 
+	profileResp.User.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 
@@ -486,6 +491,7 @@ func (h *UserHandler) RemoveNotifyEmail(c *gin.Context) {
 		return
 	}
 
+	profileResp.User.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 
@@ -528,6 +534,7 @@ func (h *UserHandler) ToggleNotifyEmail(c *gin.Context) {
 		return
 	}
 
+	profileResp.User.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 

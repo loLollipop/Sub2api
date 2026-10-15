@@ -20,6 +20,7 @@ const (
 	CompositeRouteEndpointEmbeddings      = "embeddings"
 	CompositeRouteEndpointImages          = "images"
 	CompositeRouteEndpointGemini          = "gemini"
+	CompositeRouteEndpointSystemOne       = "systemone"
 
 	CompositeRouteSourceExplicit = "route"
 	CompositeRouteSourceDetector = "detector"
@@ -32,6 +33,11 @@ type CompositeModelOwnership struct {
 	TargetPlatform string
 	Matched        bool
 	Ambiguous      bool
+	// OpenAIGatewayOAuthClaimed 表示声明方中含 OpenAI 网关族平台的 OAuth /
+	// setup-token 凭据。歧义请求无法解析平台，会落到默认的 Anthropic 网关
+	// handler：Anthropic / Gemini / Antigravity 的 OAuth 在那里有原生或兼容
+	// 转发，API Key 上游可能兼容多种格式，唯独这类凭据只能走 OpenAI 网关。
+	OpenAIGatewayOAuthClaimed bool
 }
 
 type CompositeModelOwnershipResolver func(context.Context, int64, string) (CompositeModelOwnership, error)
@@ -106,7 +112,7 @@ func normalizeCompositeRouteEndpoint(endpoint string) string {
 		CompositeRouteEndpointChatCompletions,
 		CompositeRouteEndpointEmbeddings,
 		CompositeRouteEndpointImages,
-		CompositeRouteEndpointGemini:
+		CompositeRouteEndpointGemini, CompositeRouteEndpointSystemOne:
 		return endpoint
 	default:
 		return CompositeRouteEndpointAny

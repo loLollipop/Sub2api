@@ -127,12 +127,23 @@ func (s *RateLimitService) cnBalanceCooldownDuration() time.Duration {
 // 周期额度探测刷新快照后阈值评估会再次停调到正确的时间点。
 // 无快照或均已过期返回 nil。
 func cnProviderQuotaSnapshotReset(account *Account, now time.Time) *time.Time {
-	if account == nil || !account.IsCNProvider() || !account.IsCodingPlan() || len(account.Extra) == 0 {
+	if account == nil || len(account.Extra) == 0 {
+		return nil
+	}
+	if account.IsCommandCode() {
+		if !commandCodeWindowsBinding(account.Extra) {
+			return nil
+		}
+	} else if !account.IsCNProvider() || !account.IsCodingPlan() {
 		return nil
 	}
 	provider := account.Platform
+	suffixes := []string{cnExtraSuffix5hReset, cnExtraSuffixWeeklyReset}
+	if cnQuotaHasMonthlyWindow(provider) {
+		suffixes = append(suffixes, cnExtraSuffixMonthlyReset)
+	}
 	var earliest *time.Time
-	for _, suffix := range []string{cnExtraSuffix5hReset, cnExtraSuffixWeeklyReset} {
+	for _, suffix := range suffixes {
 		t := parseSchedulingResetAt(account.Extra[cnExtraKey(provider, suffix)])
 		if t == nil || !t.After(now) {
 			continue

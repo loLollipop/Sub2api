@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,9 @@ func mixedBillingInput(result *OpenAIForwardResult, account *Account) *OpenAIRec
 	}
 	return &OpenAIRecordUsageInput{
 		Result: result, Account: account, User: &User{ID: 20},
+		// Fixture expectations below use official off-peak cards. Production
+		// requests freeze their own PricingAt; tests must not depend on wall time.
+		PricingAt:          time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC),
 		APIKey:             &APIKey{ID: 10, GroupID: &groupID, Group: &Group{ID: groupID, Platform: PlatformMixed, RateMultiplier: 0.1, MixedProviderRateMultipliers: rates}},
 		ChannelUsageFields: ChannelUsageFields{OriginalModel: result.Model},
 	}
@@ -55,7 +59,7 @@ func TestMixedDomesticAliasForwardsAndBillsUnchangedUpstreamTarget(t *testing.T)
 	for _, upstreamModel := range []string{"deepseek-v4-flash", "unpriced-domestic-model"} {
 		account := mixedTestAccount()
 		account.Credentials["model_mapping"] = map[string]any{"deepseek-ai/deepseek-client-alias": upstreamModel}
-		upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, mixedChatToolJSON, false)}
+		upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(APIProtocolResponses, APIProtocolChatCompletions, mixedHTTPResponse(200, mixedChatToolJSON, false))}
 		forwarder := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 		body := []byte(strings.ReplaceAll(string(mixedClientBody(APIProtocolResponses, false)), `"alias"`, `"deepseek-client-alias"`))
 		result, _, _, err := mixedForward(t, forwarder, account, APIProtocolResponses, body)
@@ -168,7 +172,7 @@ func TestMixedBillingDeepSeekStandardAndVendorUsageAcrossIngress(t *testing.T) {
 					logs := &openAIRecordUsageLogRepoStub{inserted: true}
 					users := &openAIRecordUsageUserRepoStub{}
 					svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil, rawChatCompletionsTestConfig())
-					upstream := &httpUpstreamRecorder{resp: mixedBillingChatResponse("deepseek-v4-flash", usage, stream)}
+					upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(protocol, APIProtocolChatCompletions, mixedBillingChatResponse("deepseek-v4-flash", usage, stream))}
 					svc.httpUpstream = upstream
 					account := mixedTestAccount()
 					account.Credentials["model_mapping"] = map[string]any{"gpt-5.1": "deepseek-v4-flash"}
@@ -217,10 +221,6 @@ func TestMixedBillingAnthropicCacheBreakdownAcrossIngressAndRefusal(t *testing.T
 				logs := &openAIRecordUsageLogRepoStub{inserted: true}
 				users := &openAIRecordUsageUserRepoStub{}
 				svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil, rawChatCompletionsTestConfig())
-				responses := []*http.Response{mixedRefusal(APIProtocolChatCompletions)}
-				if protocol != APIProtocolAnthropic {
-					responses = append(responses, mixedRefusal(APIProtocolResponses))
-				}
 				payload := `{"id":"msg_cost","type":"message","role":"assistant","model":"claude-sonnet-5-5","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":` + usageJSON + `}`
 				if protocol != APIProtocolAnthropic || stream {
 					payload = "event: message_start\ndata: " + `{"type":"message_start","message":{"id":"msg_cost","type":"message","role":"assistant","model":"claude-sonnet-5-5","content":[],"usage":` + usageJSON + "}}\n\n" +
@@ -229,7 +229,7 @@ func TestMixedBillingAnthropicCacheBreakdownAcrossIngressAndRefusal(t *testing.T
 						"event: content_block_stop\ndata: " + `{"type":"content_block_stop","index":0}` + "\n\n" +
 						"event: message_delta\ndata: " + `{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}` + "\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
 				}
-				responses = append(responses, mixedHTTPResponse(200, payload, protocol != APIProtocolAnthropic || stream))
+				responses := mixedResponsesForTarget(protocol, APIProtocolAnthropic, mixedHTTPResponse(200, payload, protocol != APIProtocolAnthropic || stream))
 				upstream := &httpUpstreamRecorder{responses: responses}
 				svc.httpUpstream = upstream
 				account := mixedTestAccount()

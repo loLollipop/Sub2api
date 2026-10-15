@@ -240,6 +240,11 @@ func (h *UsageHandler) List(c *gin.Context) {
 		return
 	}
 
+	if err := usagestats.ValidateRequestIDSearch(parsed.Filters.RequestID, parsed.Filters.StartTime, parsed.Filters.EndTime); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
 	params := pagination.PaginationParams{
 		Page:      page,
 		PageSize:  pageSize,
@@ -260,7 +265,7 @@ func (h *UsageHandler) List(c *gin.Context) {
 
 	out := make([]dto.UsageLog, 0, len(records))
 	for i := range records {
-		out = append(out, *dto.UsageLogFromService(&records[i]))
+		out = append(out, *dto.UsageLogFromService(&records[i]).Localized(c.GetHeader("Accept-Language")))
 	}
 	if page == 1 && service.QueryIncludesUsageInflight(c.Query("include_inflight")) {
 		finished := make(map[string]struct{}, len(out))
@@ -326,6 +331,11 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 		}
 		t = t.AddDate(0, 0, 1)
 		filter.EndTime = &t
+	}
+
+	if err := usagestats.ValidateRequestIDSearch(filter.RequestID, filter.StartTime, filter.EndTime); err != nil {
+		response.BadRequest(c, err.Error())
+		return
 	}
 
 	filter.Model = strings.TrimSpace(c.Query("model"))
@@ -423,7 +433,7 @@ func (h *UsageHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.UsageLogFromService(record))
+	response.Success(c, dto.UsageLogFromService(record).Localized(c.GetHeader("Accept-Language")))
 }
 
 // Stats handles getting usage statistics

@@ -24,7 +24,7 @@ vi.mock('vue-i18n', async () => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => (key === 'common.copy' ? '复制' : key)
+      t: (key: string, params?: Record<string, string>) => key === 'common.copy' ? '复制' : key === 'admin.accounts.syncUpstreamModelsError' ? `${key}: ${params?.message}` : key
     })
   }
 })
@@ -81,6 +81,14 @@ function findModelRow(wrapper: ReturnType<typeof mountSelector>, modelId: string
 }
 
 describe('ModelWhitelistSelector', () => {
+  it('shows a structured backend error when upstream model sync fails', async () => {
+    syncUpstreamModels.mockRejectedValueOnce({ status: 400, message: 'Vertex keys cannot list models' })
+    const wrapper = mountSelector({ platform: 'gemini', accountId: 174 })
+    await wrapper.findAll('button').find(button => button.text() === 'admin.accounts.syncUpstreamModels')!.trigger('click')
+    await flushPromises()
+    expect(showError).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsError: Vertex keys cannot list models')
+    wrapper.unmount()
+  })
   it.each([true, false])('syncs domestic models using saved account=%s without rewriting upstream IDs', async (saved) => {
     const models = ['deepseek-ai/deepseek-v4-flash', 'xiaomi/mimo-v2', 'Agents-A1']
     syncUpstreamModels.mockResolvedValue({ models })

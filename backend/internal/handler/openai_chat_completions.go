@@ -83,6 +83,9 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 	reqModel := modelResult.String()
 	body = rewriteInboundDeepSeekCallIDs(apiKey, reqModel, body)
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
+		return
+	}
 	if !openAICompatibleTextTargetAllowed(c, apiKey, reqModel) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
 		return
@@ -305,6 +308,10 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
+		attemptCtx := service.ContextWithOpenAIAccountPreauthorization(c.Request.Context(), service.OpenAIAccountPreauthorizationInput{
+			APIKey: apiKey, Subscription: subscription,
+			RequestedModel: reqModel, ChannelMapping: channelMapping, PricingAt: pricingAt,
+		})
 		// Keep transport-only SSE comments out of the semantic-output
 		// failover decision.  The pre-header manager may have committed one
 		// or more comments while account selection/slot acquisition waited.
@@ -315,8 +322,12 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
-			return h.gatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, promptCacheKey, "")
+			return h.gatewayService.ForwardAsChatCompletions(attemptCtx, c, account, forwardBody, promptCacheKey, "")
 		}()
+		if service.IsOpenAIAccountPreauthorizationError(err) {
+			h.handlePreauthorizationError(c, err, streamStarted)
+			return
+		}
 		var cyberBlockBodyChat []byte
 		if service.GetOpsCyberPolicy(c) != nil {
 			cyberBlockBodyChat = body

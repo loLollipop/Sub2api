@@ -103,7 +103,8 @@ WITH combined AS (
     ul.api_key_id AS api_key_id,
     ul.account_id AS account_id,
     ul.group_id AS group_id,
-    ul.stream AS stream
+    ul.stream AS stream,
+    a.name AS account_name
   FROM usage_logs ul
   LEFT JOIN groups g ON g.id = ul.group_id
   LEFT JOIN accounts a ON a.id = ul.account_id
@@ -128,7 +129,8 @@ WITH combined AS (
     o.api_key_id AS api_key_id,
     o.account_id AS account_id,
     o.group_id AS group_id,
-    o.stream AS stream
+    o.stream AS stream,
+    a.name AS account_name
   FROM ops_error_logs o
   LEFT JOIN groups g ON g.id = o.group_id
   LEFT JOIN accounts a ON a.id = o.account_id
@@ -180,7 +182,8 @@ SELECT
   api_key_id,
   account_id,
   group_id,
-  stream
+  stream,
+  account_name
 FROM combined
 %s
 %s
@@ -232,7 +235,8 @@ LIMIT $%d OFFSET $%d
 			accountID sql.NullInt64
 			groupID   sql.NullInt64
 
-			stream bool
+			stream      bool
+			accountName sql.NullString
 		)
 
 		if err := rows.Scan(
@@ -253,6 +257,7 @@ LIMIT $%d OFFSET $%d
 			&accountID,
 			&groupID,
 			&stream,
+			&accountName,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -277,7 +282,8 @@ LIMIT $%d OFFSET $%d
 			AccountID: toInt64Ptr(accountID),
 			GroupID:   toInt64Ptr(groupID),
 
-			Stream: stream,
+			Stream:      stream,
+			AccountName: strings.TrimSpace(accountName.String),
 		}
 
 		if item.Platform == "" {

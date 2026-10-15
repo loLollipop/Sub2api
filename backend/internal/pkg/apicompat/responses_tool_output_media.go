@@ -167,14 +167,15 @@ func isResponsesToolOutputItem(item map[string]any) bool {
 }
 
 // DedupeResponsesCallIDs drops a repeated call_id. The first tool call and
-// its first output stay. Later copies are the same call, not a second one.
+// its first output stay, but an empty argument shell may take real arguments
+// from a later copy of the same function call. Item IDs and order never change.
 func DedupeResponsesCallIDs(input any) (any, bool) {
 	items, ok := input.([]any)
 	if !ok || len(items) < 2 {
 		return input, false
 	}
-	seenCall := make(map[string]struct{}, len(items))
-	seenOut := make(map[string]struct{}, len(items))
+	seenCall := make(map[string]map[string]any, len(items))
+	seenOut := make(map[string]map[string]any, len(items))
 	out := make([]any, 0, len(items))
 	changed := false
 	for _, raw := range items {
@@ -192,11 +193,14 @@ func DedupeResponsesCallIDs(input any) (any, bool) {
 		if slot == "output" {
 			seen = seenOut
 		}
-		if _, dup := seen[callID]; dup {
+		if first, dup := seen[callID]; dup {
+			if slot == "call" && first["type"] == "function_call" && item["type"] == "function_call" {
+				retainDuplicateFunctionCallArguments(first, item)
+			}
 			changed = true
 			continue
 		}
-		seen[callID] = struct{}{}
+		seen[callID] = item
 		out = append(out, raw)
 	}
 	if !changed {
@@ -205,14 +209,14 @@ func DedupeResponsesCallIDs(input any) (any, bool) {
 	return out, true
 }
 
-// DedupeChatToolCallIDs drops a repeated chat tool id. The first assistant
-// tool_calls entry and the first tool message keep it.
+// DedupeChatToolCallIDs keeps the first call/output per ID, filling an empty
+// function argument shell from a later same-ID call without moving the turn.
 func DedupeChatToolCallIDs(messages any) (any, bool) {
 	items, ok := messages.([]any)
 	if !ok || len(items) == 0 {
 		return messages, false
 	}
-	seenCall := make(map[string]struct{}, len(items))
+	seenCall := make(map[string]map[string]any, len(items))
 	seenOut := make(map[string]struct{}, len(items))
 	out := make([]any, 0, len(items))
 	changed := false
@@ -235,16 +239,22 @@ func DedupeChatToolCallIDs(messages any) (any, bool) {
 					kept = append(kept, rawCall)
 					continue
 				}
-				if _, dup := seenCall[callID]; dup {
+				if first, dup := seenCall[callID]; dup {
+					retainDuplicateChatFunctionArguments(first, call)
 					changed = true
 					continue
 				}
-				seenCall[callID] = struct{}{}
+				seenCall[callID] = call
 				kept = append(kept, rawCall)
 			}
 			if len(kept) != len(calls) {
 				if len(kept) == 0 {
 					delete(msg, "tool_calls")
+					// A duplicate call-only assistant turn has no remaining
+					// content after its call/output pair is removed.
+					if !chatMessageHasVisibleContent(msg) {
+						continue
+					}
 				} else {
 					msg["tool_calls"] = kept
 				}
@@ -264,6 +274,78 @@ func DedupeChatToolCallIDs(messages any) (any, bool) {
 		return messages, false
 	}
 	return out, true
+}
+
+func retainDuplicateChatFunctionArguments(first, next map[string]any) {
+	for _, call := range []map[string]any{first, next} {
+		if callType := strings.TrimSpace(stringValue(call["type"])); callType != "" && callType != "function" {
+			return
+		}
+	}
+	nextFunction, ok := next["function"].(map[string]any)
+	if !ok {
+		return
+	}
+	firstFunction, ok := first["function"].(map[string]any)
+	if !ok && first["function"] != nil {
+		return
+	}
+	if firstFunction == nil {
+		firstFunction = make(map[string]any)
+	}
+	if retainDuplicateFunctionCallArguments(firstFunction, nextFunction) {
+		first["function"] = firstFunction
+	}
+}
+
+// Only same-ID function calls reach this helper. Never combine conflicting
+// names, replace real arguments, transplant partial JSON, or graft tool output.
+func retainDuplicateFunctionCallArguments(first, next map[string]any) bool {
+	firstName := strings.TrimSpace(stringValue(first["name"]))
+	nextName := strings.TrimSpace(stringValue(next["name"]))
+	if firstName != "" && nextName != "" && firstName != nextName {
+		return false
+	}
+	changed := false
+	if arguments, ok := next["arguments"].(string); ok && emptyFunctionCallArguments(first["arguments"]) &&
+		!emptyFunctionCallArguments(arguments) && json.Valid([]byte(arguments)) {
+		first["arguments"] = arguments
+		changed = true
+	}
+	if firstName == "" && nextName != "" {
+		first["name"] = next["name"]
+		changed = true
+	}
+	return changed
+}
+
+func emptyFunctionCallArguments(value any) bool {
+	if value == nil {
+		return true
+	}
+	text, ok := value.(string)
+	if !ok {
+		return false
+	}
+	text = strings.TrimSpace(text)
+	if text == "" || text == "null" {
+		return true
+	}
+	// Recognize only an empty JSON object, without decoding potentially large
+	// real arguments again for every duplicate in a long conversation.
+	return len(text) >= 2 && text[0] == '{' && text[len(text)-1] == '}' &&
+		strings.Trim(text[1:len(text)-1], " \t\r\n") == ""
+}
+
+func chatMessageHasVisibleContent(msg map[string]any) bool {
+	for _, key := range []string{"content", "text"} {
+		if value, ok := msg[key]; ok && value != nil {
+			if text, ok := value.(string); !ok || strings.TrimSpace(text) != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func responsesCallIDSlot(item map[string]any) (callID, slot string, ok bool) {

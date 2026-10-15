@@ -91,108 +91,211 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
-	// 检查平台：优先使用强制平台（/antigravity 路由），否则要求 gemini 分组
-	forcePlatform, hasForcePlatform := middleware.GetForcePlatformFromContext(c)
-	if !hasForcePlatform && !geminiNativePlatformAllowed(c, apiKey) {
+	forcePlatform, forced := middleware.GetForcePlatformFromContext(c)
+	if !forced && !geminiNativePlatformAllowed(c, apiKey) {
 		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
-
-	// 分组级模型白名单启用时过滤 models[].name（含前缀 models/xxx）。
-	filterGeminiModels := func(models []gemini.Model) []gemini.Model {
-		if (apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled()) && service.NormalizeModelScope(apiKey.ModelScope) == service.ModelScopeAll {
-			return models
+	ctx := service.ContextWithModelScope(c.Request.Context(), apiKey.ModelScope)
+	localModels := make([]gemini.Model, 0)
+	var response, failure *service.UpstreamHTTPResult
+	for _, groupID := range geminiStudioGroupIDs(apiKey) {
+		if h.geminiCompatService == nil {
+			continue
 		}
-		filtered := make([]gemini.Model, 0, len(models))
-		ids := make([]string, 0, len(models))
-		for _, model := range models {
-			ids = append(ids, model.Name)
+		group := h.groupForModelsList(ctx, apiKey, groupID)
+		requireMixed := forcePlatform != service.PlatformAntigravity && (group == nil || group.Platform != service.PlatformComposite)
+		ids, err := h.geminiCompatService.AntigravityGeminiModelIDs(ctx, &groupID, requireMixed)
+		if err != nil {
+			requestLogger(c, "handler.gemini_v1beta.models").Warn("unable to list Antigravity mappings", zap.Int64("group_id", groupID), zap.Error(err))
 		}
-		allowed := h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, ids)
-		allow := make(map[string]bool, len(allowed))
-		for _, id := range allowed {
-			allow[id] = true
-		}
-		for _, model := range models {
-			if allow[model.Name] && (apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled() || apiKey.Group.ModelAllowlist.Allows(model.Name)) {
-				filtered = append(filtered, model)
+		localByPlatform := map[string][]string{service.PlatformAntigravity: ids}
+		if forcePlatform != service.PlatformAntigravity {
+			compatible, compatErr := h.geminiCompatService.GeminiOpenAIModelIDs(ctx, &groupID)
+			if compatErr == nil {
+				localByPlatform[service.PlatformGemini] = compatible
 			}
 		}
-		return filtered
-	}
-
-	agModels := make([]gemini.Model, 0)
-	seenAGModels := make(map[string]bool)
-	if h.geminiCompatService != nil {
-		for _, groupID := range geminiStudioGroupIDs(apiKey) {
-			ids, err := h.geminiCompatService.AntigravityGeminiModelIDs(c.Request.Context(), &groupID, forcePlatform != service.PlatformAntigravity)
-			if err != nil {
-				requestLogger(c, "handler.gemini_v1beta.models").Warn("unable to list Antigravity mappings", zap.Int64("group_id", groupID), zap.Error(err))
-				continue
+		for _, platform := range []string{service.PlatformAntigravity, service.PlatformGemini} {
+			local := make([]gemini.Model, 0, len(localByPlatform[platform]))
+			for _, id := range localByPlatform[platform] {
+				local = append(local, gemini.FallbackModel(id))
 			}
-			for _, id := range ids {
-				if !seenAGModels[id] {
-					agModels = append(agModels, gemini.FallbackModel(id))
-					seenAGModels[id] = true
+			localBody, _ := json.Marshal(gemini.ModelsListResponse{Models: local})
+			if projected, projectErr := h.filterGeminiCatalogForGroup(ctx, apiKey, groupID, localBody, platform); projectErr == nil {
+				var catalog gemini.ModelsListResponse
+				if json.Unmarshal(projected, &catalog) == nil {
+					localModels = append(localModels, catalog.Models...)
 				}
 			}
 		}
-	}
-	// 本地目录只来自账号的真实映射（agModels）。禁止再用 gemini.DefaultModels()
-	// 之类的内置全量目录合成 200：分组里混着 OpenAI 兼容账号或 Antigravity 账号时，
-	// 内置目录会列出这个分组根本跑不了的模型，客户端拿到的列表和实际能力对不上。
-	writeLocalCatalog := func() {
-		c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: filterGeminiModels(agModels)})
-	}
-	if forcePlatform == service.PlatformAntigravity {
-		writeLocalCatalog()
-		return
-	}
-
-	account, err := h.selectGeminiStudioAccount(c.Request.Context(), apiKey)
-	if err != nil || account == nil || account.IsGeminiOpenAIProtocol() {
-		// 没有可选的 Gemini 原生账号，或账号走 OpenAI 兼容上游：两种情况都拿不到
-		// Google 格式目录，也没有上游响应可透传，只能回本地真实映射（空就是空）。
-		// 这里仍然返回 200 空目录而不是 503：Gemini SDK 在 generateContent 前会先
-		// sync GET /v1beta/models，503 会让客户端直接报 "sync failed"。
-		writeLocalCatalog()
-		return
-	}
-
-	res, err := h.geminiCompatService.ForwardAIStudioGET(c.Request.Context(), account, "/v1beta/models")
-	if err != nil || res == nil {
-		// 上游没返回任何响应体，没有东西可透传，同样只回本地真实映射。
-		writeLocalCatalog()
-		return
-	}
-	if shouldFallbackGeminiModels(res) || res.StatusCode >= 400 {
-		// 上游目录不可用（含 401/403 scope 不足）：透传上游自己的状态码和错误体，
-		// 让客户端看到真实失败原因，而不是一份 200 的假目录。
-		writeUpstreamResponse(c, res)
-		return
-	}
-	if res.StatusCode == http.StatusOK && len(agModels) > 0 {
-		if merged, ok := appendUpstreamGeminiModels(res.Body, agModels); ok {
-			res.Body = merged
+		if forcePlatform == service.PlatformAntigravity {
+			continue
 		}
-	}
-
-	if apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
-		if filtered, dropped, ok := filterUpstreamGeminiModelsBody(res.Body, apiKey.Group.ModelAllowlist); ok && dropped {
-			res.Body = filtered
+		account, err := h.geminiCompatService.SelectAccountForModelsEndpoints(ctx, &groupID)
+		if err != nil || account == nil {
+			continue
 		}
-	}
-	if service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll {
-		filtered, err := filterModelCatalogueForScope(res.Body, apiKey.ModelScope, func(models []string) []string {
-			return h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, models)
-		})
+		res, err := h.geminiCompatService.ForwardListModels(ctx, account)
+		if err != nil || res == nil {
+			continue
+		}
+		if res.StatusCode != http.StatusOK {
+			if failure == nil {
+				failure = res
+			}
+			continue
+		}
+		body, err := h.filterGeminiCatalogForGroup(ctx, apiKey, groupID, res.Body, account.Platform)
 		if err != nil {
 			googleError(c, http.StatusBadGateway, "Invalid model catalogue")
 			return
 		}
-		res.Body = filtered
+		res.Body = body
+		if response == nil {
+			response = res
+		} else if merged, ok := mergeUpstreamGeminiCatalogs(response.Body, res.Body); ok {
+			response.Body = merged
+		} else {
+			googleError(c, http.StatusBadGateway, "Invalid model catalogue")
+			return
+		}
 	}
-	writeUpstreamResponse(c, res)
+	if response == nil && failure != nil {
+		writeUpstreamResponse(c, failure)
+		return
+	}
+	if response == nil {
+		// Only explicitly supported local mappings, never the builtin full list.
+		body, _ := json.Marshal(gemini.ModelsListResponse{Models: []gemini.Model{}})
+		response = &service.UpstreamHTTPResult{StatusCode: http.StatusOK, Headers: http.Header{"Content-Type": {"application/json"}}, Body: body}
+	}
+	if merged, ok := appendUpstreamGeminiModels(response.Body, localModels); ok {
+		response.Body = merged
+	}
+	writeUpstreamResponse(c, response)
+}
+
+func (h *GatewayHandler) filterGeminiIDsForGroup(ctx context.Context, apiKey *service.APIKey, groupID int64, ids []string) []string {
+	group := h.groupForModelsList(ctx, apiKey, groupID)
+	if group == nil {
+		return nil // A cold group-policy projection cannot establish its allowlist.
+	}
+	allowed := service.FilterModelScope(apiKey.ModelScope, ids)
+	if h.gatewayService != nil {
+		allowed = h.gatewayService.FilterModelsForKeyScope(ctx, &groupID, apiKey.ModelScope, allowed, service.CompositeRouteEndpointGemini)
+	}
+	filtered := make([]string, 0, len(allowed))
+	for _, id := range allowed {
+		if !group.ModelAllowlistEnabled() || group.ModelAllowlist.Allows(id) {
+			filtered = append(filtered, id)
+		}
+	}
+	return filtered
+}
+
+func (h *GatewayHandler) filterGeminiCatalogForGroup(ctx context.Context, apiKey *service.APIKey, groupID int64, body []byte, catalogPlatform string) ([]byte, error) {
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(body, &envelope) != nil || envelope == nil {
+		return nil, errors.New("invalid model catalog")
+	}
+	var models []json.RawMessage
+	if json.Unmarshal(envelope["models"], &models) != nil {
+		return nil, errors.New("invalid model catalog")
+	}
+	ids := make([]string, len(models))
+	metadata := make(map[string]json.RawMessage, len(models))
+	for i, raw := range models {
+		var model struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(raw, &model) != nil || model.Name == "" {
+			return nil, errors.New("invalid model metadata")
+		}
+		ids[i] = strings.TrimPrefix(model.Name, "models/")
+		metadata[ids[i]] = raw
+	}
+	group := h.groupForModelsList(ctx, apiKey, groupID)
+	if h.gatewayService != nil {
+		ids = append(ids, h.gatewayService.GeminiCatalogAliases(ctx, group)...)
+	}
+	allowed := make(map[string]bool)
+	for _, id := range h.filterGeminiIDsForGroup(ctx, apiKey, groupID, ids) {
+		allowed[id] = true
+	}
+	kept := make([]json.RawMessage, 0, len(models))
+	seen := make(map[string]bool)
+	changed := false
+	for _, public := range ids {
+		if !allowed[public] || seen[public] {
+			continue
+		}
+		routeCtx, target, ok := h.gatewayService.GeminiCatalogRoute(ctx, group, public)
+		if !ok || len(service.FilterModelScope(apiKey.ModelScope, []string{target})) == 0 {
+			continue
+		}
+		if platform, resolved := service.ResolvedTargetPlatformFromContext(routeCtx); resolved && platform != catalogPlatform {
+			continue
+		}
+		raw, exists := metadata[target]
+		if !exists {
+			continue
+		}
+		if public != target {
+			var projected map[string]json.RawMessage
+			if json.Unmarshal(raw, &projected) != nil || projected == nil {
+				return nil, errors.New("invalid model metadata")
+			}
+			projected["name"], _ = json.Marshal("models/" + public)
+			raw, _ = json.Marshal(projected)
+			changed = true
+		}
+		kept = append(kept, raw)
+		seen[public] = true
+	}
+	if !changed && len(kept) == len(models) {
+		return body, nil
+	}
+	envelope["models"], _ = json.Marshal(kept)
+	return json.Marshal(envelope)
+}
+
+// Merge only already-authorized entries; retain unknown metadata and the first
+// native response envelope (including its pagination token).
+func mergeUpstreamGeminiCatalogs(body, extra []byte) ([]byte, bool) {
+	var envelope, more map[string]json.RawMessage
+	if json.Unmarshal(body, &envelope) != nil || envelope == nil || json.Unmarshal(extra, &more) != nil {
+		return nil, false
+	}
+	var models, additions []json.RawMessage
+	if json.Unmarshal(envelope["models"], &models) != nil || json.Unmarshal(more["models"], &additions) != nil {
+		return nil, false
+	}
+	seen := make(map[string]bool)
+	for _, raw := range models {
+		var model struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(raw, &model) != nil {
+			return nil, false
+		}
+		seen[model.Name] = true
+	}
+	for _, raw := range additions {
+		var model struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(raw, &model) != nil {
+			return nil, false
+		}
+		if !seen[model.Name] {
+			models = append(models, raw)
+			seen[model.Name] = true
+		}
+	}
+	envelope["models"], _ = json.Marshal(models)
+	merged, err := json.Marshal(envelope)
+	return merged, err == nil
 }
 
 // appendUpstreamGeminiModels preserves unknown model metadata and envelope fields.
@@ -292,62 +395,91 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
-	// 检查平台：优先使用强制平台（/antigravity 路由），否则要求 gemini 分组
-	forcePlatform, hasForcePlatform := middleware.GetForcePlatformFromContext(c)
-	if !hasForcePlatform && !geminiNativePlatformAllowed(c, apiKey) {
+	forcePlatform, forced := middleware.GetForcePlatformFromContext(c)
+	if !forced && !geminiNativePlatformAllowed(c, apiKey) {
 		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
-
-	modelName := strings.TrimSpace(c.Param("model"))
-	if modelName == "" {
-		googleError(c, http.StatusBadRequest, "Missing model in URL")
+	publicModel := strings.TrimSpace(c.Param("model"))
+	model := publicModel
+	if resolved, ok := service.ResolvedUpstreamModelFromContext(c.Request.Context()); ok && strings.TrimSpace(resolved) != "" {
+		model = strings.TrimSpace(resolved)
+	}
+	if !forced && servesCompositeAntigravityGemini(apiKey, effectiveAPIKeyPlatform(c, apiKey)) && !isAntigravityGeminiModel(model) {
+		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
-	// 模型名会被拼进上游 URL 的 path，先在入口校验片段合规性，
-	// 见 service/upstream_path_guard.go。
-	if !service.IsSafeGeminiModelPathSegment(modelName) {
+	// Validate both the public and the mapped segment before constructing a URL.
+	if !service.IsSafeGeminiModelPathSegment(publicModel) || !service.IsSafeGeminiModelPathSegment(model) {
 		googleError(c, http.StatusBadRequest, "Invalid model in URL")
 		return
 	}
-	if apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() && !apiKey.Group.ModelAllowlist.Allows(modelName) {
-		googleError(c, http.StatusNotFound, "Model is not available for this group")
-		return
+	ctx := service.ContextWithModelScope(c.Request.Context(), apiKey.ModelScope)
+	var failure *service.UpstreamHTTPResult
+	sawTransportError := false
+	for _, groupID := range geminiStudioGroupIDs(apiKey) {
+		if len(h.filterGeminiIDsForGroup(ctx, apiKey, groupID, []string{publicModel})) == 0 || h.geminiCompatService == nil {
+			continue
+		}
+		routeCtx, target, targetOK := h.gatewayService.GeminiCatalogRoute(ctx, h.groupForModelsList(ctx, apiKey, groupID), publicModel)
+		model = target
+		if !targetOK || len(service.FilterModelScope(apiKey.ModelScope, []string{model})) == 0 {
+			continue
+		}
+		platform, resolved := service.ResolvedTargetPlatformFromContext(routeCtx)
+		var ids []string
+		if !resolved || platform == service.PlatformAntigravity {
+			requireMixed := forcePlatform != service.PlatformAntigravity && !resolved
+			ids, _ = h.geminiCompatService.AntigravityGeminiModelIDs(routeCtx, &groupID, requireMixed)
+		}
+		if forcePlatform != service.PlatformAntigravity && (!resolved || platform == service.PlatformGemini) {
+			compatible, err := h.geminiCompatService.GeminiOpenAIModelIDs(routeCtx, &groupID)
+			if err == nil {
+				ids = append(ids, compatible...)
+			}
+		}
+		for _, id := range ids {
+			if id == model {
+				c.JSON(http.StatusOK, gemini.FallbackModel(publicModel))
+				return
+			}
+		}
+		if forcePlatform == service.PlatformAntigravity {
+			continue
+		}
+		account, err := h.geminiCompatService.SelectAccountForModelsEndpoints(routeCtx, &groupID, model)
+		if err != nil || account == nil {
+			continue
+		}
+		res, err := h.geminiCompatService.ForwardGetModel(routeCtx, account, model)
+		if err != nil || res == nil {
+			sawTransportError = true
+			continue
+		}
+		if res.StatusCode == http.StatusOK {
+			if model != publicModel {
+				var metadata map[string]json.RawMessage
+				if json.Unmarshal(res.Body, &metadata) != nil || metadata == nil {
+					googleError(c, http.StatusBadGateway, "Invalid model metadata")
+					return
+				}
+				metadata["name"], _ = json.Marshal("models/" + publicModel)
+				res.Body, _ = json.Marshal(metadata)
+			}
+			writeUpstreamResponse(c, res)
+			return
+		}
+		if failure == nil || (failure.StatusCode == http.StatusNotFound && res.StatusCode != http.StatusNotFound) {
+			failure = res
+		}
 	}
-	if resolvedModel, ok := service.ResolvedUpstreamModelFromContext(c.Request.Context()); ok && strings.TrimSpace(resolvedModel) != "" {
-		modelName = strings.TrimSpace(resolvedModel)
-	}
-	if !apiKey.AllowsModelScope(modelName) {
+	if failure != nil {
+		writeUpstreamResponse(c, failure)
+	} else if sawTransportError {
+		googleError(c, http.StatusBadGateway, "Unable to fetch upstream model")
+	} else {
 		googleError(c, http.StatusNotFound, "Model is not available for this API key")
-		return
 	}
-	if service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll && len(h.gatewayService.FilterModelsForKeyScope(c.Request.Context(), apiKey.GroupID, apiKey.ModelScope, []string{modelName})) == 0 {
-		googleError(c, http.StatusNotFound, "Model is not available for this API key")
-		return
-	}
-
-	// 强制 antigravity 模式：返回 antigravity 模型信息
-	if forcePlatform == service.PlatformAntigravity {
-		c.JSON(http.StatusOK, antigravity.FallbackGeminiModel(modelName))
-		return
-	}
-
-	account, err := h.selectGeminiStudioAccount(c.Request.Context(), apiKey)
-	if err != nil {
-		c.JSON(http.StatusOK, gemini.FallbackModel(modelName))
-		return
-	}
-	if account != nil && account.IsGeminiOpenAIProtocol() {
-		c.JSON(http.StatusOK, gemini.FallbackModel(modelName))
-		return
-	}
-
-	res, err := h.geminiCompatService.ForwardAIStudioGET(c.Request.Context(), account, "/v1beta/models/"+modelName)
-	if err != nil || shouldFallbackGeminiModel(modelName, res) || (res != nil && res.StatusCode >= 400) {
-		c.JSON(http.StatusOK, gemini.FallbackModel(modelName))
-		return
-	}
-	writeUpstreamResponse(c, res)
 }
 
 // GeminiV1BetaModels proxies Gemini native REST endpoints like:
@@ -398,6 +530,10 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	}
 	if resolvedModel, ok := service.ResolvedUpstreamModelFromContext(c.Request.Context()); ok && strings.TrimSpace(resolvedModel) != "" {
 		modelName = strings.TrimSpace(resolvedModel)
+	}
+	if !middleware.HasForcePlatform(c) && servesCompositeAntigravityGemini(apiKey, effectiveAPIKeyPlatform(c, apiKey)) && !isAntigravityGeminiModel(modelName) {
+		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
+		return
 	}
 
 	stream := action == "streamGenerateContent"
@@ -640,7 +776,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				return
 			}
 			if len(fs.FailedAccountIDs) == 0 {
-				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, modelName, modelName, service.PlatformGemini)
+				diagPlatform := service.PlatformGemini
+				if p := effectiveAPIKeyPlatform(c, apiKey); p == service.PlatformAntigravity {
+					diagPlatform = service.PlatformAntigravity
+				}
+				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, modelName, modelName, diagPlatform)
 				cls = classifySelectionFailureErrorFromGin(c, err, cls)
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -934,6 +1074,7 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 
 	// 使用默认的错误映射
 	status, _, message := wrapUpstreamClientError(statusCode, responseBody)
+	status, _, message = exhaustedFailoverResponse(status, "", message)
 	googleError(c, status, message)
 }
 
@@ -1059,4 +1200,17 @@ func derefGroupID(groupID *int64) int64 {
 		return 0
 	}
 	return *groupID
+}
+
+func servesCompositeAntigravityGemini(apiKey *service.APIKey, effectivePlatform string) bool {
+	return apiKey.Group != nil && apiKey.Group.Platform == service.PlatformComposite && effectivePlatform == service.PlatformAntigravity
+}
+
+func isAntigravityGeminiModel(model string) bool {
+	trimmed := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(model, "models/")))
+	if trimmed == "" || strings.HasPrefix(trimmed, "claude-") {
+		return false
+	}
+	detected, ok := service.DetectModelPlatform(trimmed)
+	return ok && detected == service.PlatformGemini
 }

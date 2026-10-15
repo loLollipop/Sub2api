@@ -16,6 +16,7 @@ import (
 
 const (
 	EndpointMessages             = "/v1/messages"
+	EndpointSystemOne            = "/v1/systemone"
 	EndpointChatCompletions      = "/v1/chat/completions"
 	EndpointEmbeddings           = "/v1/embeddings"
 	EndpointAlphaSearch          = "/v1/alpha/search"
@@ -196,6 +197,8 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 	inbound = strings.TrimSpace(inbound)
 
 	switch platform {
+	case service.PlatformTypeSafe:
+		return EndpointSystemOne
 	case service.PlatformOpenAI, service.PlatformGrok:
 		if inbound == EndpointEmbeddings || inbound == EndpointAlphaSearch || inbound == EndpointResponsesInputTokens || inbound == EndpointImagesGenerations || inbound == EndpointImagesEdits || inbound == EndpointVideosGenerations || inbound == EndpointVideosEdits || inbound == EndpointVideosExtensions || inbound == EndpointVideos {
 			return inbound

@@ -639,7 +639,7 @@ const applyFilters = () => {
   }
 }
 const handleRequestIdClick = (requestID: string) => {
-  filters.value.request_id = requestID
+  filters.value.request_id = '=' + requestID
   pagination.page = 1
   loadLogs()
 }

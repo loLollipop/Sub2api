@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
@@ -122,6 +123,8 @@ func DetectModelPlatform(model string) (string, bool) {
 	}
 
 	switch {
+	case normalized == "jev-latest":
+		return PlatformTypeSafe, true
 	case strings.HasPrefix(normalized, "anthropic.claude-"),
 		strings.HasPrefix(normalized, "claude-"):
 		return PlatformAnthropic, true
@@ -201,11 +204,5 @@ func (s *GatewayService) resolveCompositeRouteDecision(ctx context.Context, grou
 }
 
 func isConcreteRequestPlatform(platform string) bool {
-	switch platform {
-	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
-		PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed:
-		return true
-	default:
-		return false
-	}
+	return domain.IsConcretePlatform(platform)
 }

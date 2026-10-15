@@ -5,7 +5,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 
@@ -21,10 +20,10 @@ func TestMixedResponsesJSONCompletionIndependentOfUsage(t *testing.T) {
 					body += `,"usage":{"input_tokens":9,"output_tokens":4}`
 				}
 				body += "}"
-				upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(APIProtocolChatCompletions), mixedHTTPResponse(200, body, false)}}
+				upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, body, false)}
 				svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 				result, rec, _, err := mixedForward(t, svc, mixedTestAccount(), APIProtocolResponses, mixedClientBody(APIProtocolResponses, false))
-				require.Len(t, upstream.requests, 2)
+				require.Len(t, upstream.requests, 1)
 				require.NotNil(t, result)
 				if usage {
 					require.Equal(t, 9, result.Usage.InputTokens)
@@ -49,12 +48,12 @@ func TestMixedMalformedResponsesTerminalNeverSucceeds(t *testing.T) {
 		t.Run(fmt.Sprint(stream), func(t *testing.T) {
 			prefix, _, _ := mixedFailurePayload(APIProtocolResponses, true, "truncated")
 			body := prefix + "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":\n\n"
-			upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(APIProtocolChatCompletions), mixedHTTPResponse(200, body, true)}}
+			upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, body, true)}
 			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 			result, rec, _, err := mixedForward(t, svc, mixedTestAccount(), APIProtocolResponses, mixedClientBody(APIProtocolResponses, stream))
 			require.Error(t, err)
 			require.NotNil(t, result)
-			require.Len(t, upstream.requests, 2)
+			require.Len(t, upstream.requests, 1)
 			require.Equal(t, 9, result.Usage.InputTokens)
 			require.Equal(t, 4, result.Usage.OutputTokens)
 			require.Contains(t, rec.Body.String(), `"error"`)
@@ -74,12 +73,12 @@ func TestMixedNamedChatErrorNeverFinalizes(t *testing.T) {
 					body = "data: " + `{"type":"error","message":"overloaded","usage":{"prompt_tokens":9,"completion_tokens":4}}` + "\n\n"
 				}
 				body += "data: [DONE]\n\n"
-				upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, body, true)}
+				upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(ingress, APIProtocolChatCompletions, mixedHTTPResponse(200, body, true))}
 				svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 				result, rec, _, err := mixedForward(t, svc, mixedTestAccount(), ingress, mixedClientBody(ingress, true))
 				require.Error(t, err)
 				require.NotNil(t, result)
-				require.Len(t, upstream.requests, 1)
+				require.Len(t, upstream.requests, mixedExpectedAttempts(ingress, APIProtocolChatCompletions))
 				require.Equal(t, 9, result.Usage.InputTokens)
 				require.Equal(t, 4, result.Usage.OutputTokens)
 				require.Contains(t, rec.Body.String(), `"error"`)
@@ -104,14 +103,14 @@ func TestMixedReversedNamedChatErrorNeverFinalizes(t *testing.T) {
 					if finalBlank {
 						body += "\ndata: [DONE]\n\n"
 					}
-					upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, body, true)}
+					upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(ingress, APIProtocolChatCompletions, mixedHTTPResponse(200, body, true))}
 					svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 					result, rec, _, err := mixedForward(t, svc, mixedTestAccount(), ingress, mixedClientBody(ingress, true))
 					require.Error(t, err)
 					var replay *UpstreamFailoverError
 					require.False(t, errors.As(err, &replay))
 					require.NotNil(t, result)
-					require.Len(t, upstream.requests, 1)
+					require.Len(t, upstream.requests, mixedExpectedAttempts(ingress, APIProtocolChatCompletions))
 					require.Equal(t, 9, result.Usage.InputTokens)
 					require.Equal(t, 4, result.Usage.OutputTokens)
 					require.Contains(t, rec.Body.String(), `"error"`)
@@ -137,10 +136,10 @@ func TestMixedBufferedResponsesUsesValidatedTerminal(t *testing.T) {
 				body += fmt.Sprintf(`{"type":"response.completed","response":{"id":"resp_first","status":%q,"output":[{"type":"message","content":[{"type":"output_text","text":"FIRST"}]}],"usage":{"input_tokens":9,"output_tokens":4}}}`, first)
 			}
 			body += "\n\nevent: response.completed\ndata: " + `{"type":"response.completed","response":{"id":"resp_last","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"LAST"}]}],"usage":{"input_tokens":12,"output_tokens":6}}}` + "\n\n"
-			upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(APIProtocolChatCompletions), mixedHTTPResponse(200, body, true)}}
+			upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, body, true)}
 			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 			result, rec, _, err := mixedForward(t, svc, mixedTestAccount(), APIProtocolResponses, mixedClientBody(APIProtocolResponses, false))
-			require.Len(t, upstream.requests, 2)
+			require.Len(t, upstream.requests, 1)
 			require.NotNil(t, result)
 			if first == "completed" {
 				require.NoError(t, err)
@@ -168,13 +167,13 @@ func TestMixedPendingChatUsageSurvivesReadFailure(t *testing.T) {
 			body := "data: " + `{"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":4}}` + "\n"
 			response := mixedHTTPResponse(200, body, true)
 			response.Body = &mixedFailedReadBody{body: strings.NewReader(body)}
-			upstream := &httpUpstreamRecorder{resp: response}
+			upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(ingress, APIProtocolChatCompletions, response)}
 			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 			result, rec, _, err := mixedForward(t, svc, mixedTestAccount(), ingress, mixedClientBody(ingress, true))
 			require.Error(t, err)
 			var replay *UpstreamFailoverError
 			require.False(t, errors.As(err, &replay))
-			require.Len(t, upstream.requests, 1)
+			require.Len(t, upstream.requests, mixedExpectedAttempts(ingress, APIProtocolChatCompletions))
 			require.NotNil(t, result)
 			require.Equal(t, 9, result.Usage.InputTokens)
 			require.Equal(t, 4, result.Usage.OutputTokens)
@@ -196,13 +195,13 @@ func TestMixedBufferedResponsesNamedErrorCannotBeMasked(t *testing.T) {
 				body = data + event
 			}
 			body += "\nevent: response.completed\ndata: " + `{"type":"response.completed","response":{"id":"resp_last","status":"completed","output":[],"usage":{"input_tokens":9,"output_tokens":4}}}` + "\n\n"
-			upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(APIProtocolChatCompletions), mixedHTTPResponse(200, body, true)}}
+			upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, body, true)}
 			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 			result, rec, _, err := mixedForward(t, svc, mixedTestAccount(), APIProtocolResponses, mixedClientBody(APIProtocolResponses, false))
 			require.Error(t, err)
 			var replay *UpstreamFailoverError
 			require.False(t, errors.As(err, &replay))
-			require.Len(t, upstream.requests, 2)
+			require.Len(t, upstream.requests, 1)
 			require.NotNil(t, result)
 			require.Equal(t, 9, result.Usage.InputTokens)
 			require.Equal(t, 4, result.Usage.OutputTokens)

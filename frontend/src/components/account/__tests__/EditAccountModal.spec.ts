@@ -56,6 +56,96 @@ vi.mock('vue-i18n', async () => {
 
 import EditAccountModal from '../EditAccountModal.vue'
 
+describe('EditAccountModal catalog providers', () => {
+  it('keeps TypeSafe on its native default endpoint when edited', async () => {
+    const account = buildAccount()
+    account.platform = 'typesafe'
+    account.credentials = { api_key: 'ts-existing-key' }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await flushPromises()
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    const credentials = updateAccountMock.mock.calls[0]?.[1]?.credentials
+    expect(credentials.base_url).toBe('https://api.typesafe.ai')
+    expect(credentials.api_protocol).toBeUndefined()
+    expect(credentials.protocol_rules).toBeUndefined()
+    wrapper.unmount()
+  })
+  it.each(['command_code', 'cline'])('preserves %s endpoint overrides and does not assign CN-only options', async platform => {
+    const account = buildAccount()
+    account.platform = platform
+    account.credentials = {
+      api_key: 'provider-key',
+      base_url: 'https://relay.example/v1',
+      account_mode: 'payg',
+      api_protocol: platform === 'cline' ? 'chat_completions' : 'adaptive',
+      api_base_urls: { chat_completions: 'https://relay.example/v1', anthropic: 'https://relay.example/anthropic' },
+      protocol_rules: [{ pattern: 'custom-*', protocol: 'anthropic', protocols: ['anthropic', 'chat_completions'] }]
+    }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await flushPromises()
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    const credentials = updateAccountMock.mock.calls[0]?.[1]?.credentials
+    expect(credentials.base_url).toBe('https://relay.example/v1')
+    expect(credentials.api_protocol).toBe(platform === 'cline' ? 'chat_completions' : 'adaptive')
+    if (platform === 'command_code') {
+      expect(credentials.protocol_rules).toEqual(account.credentials.protocol_rules)
+      expect(credentials.api_base_urls.anthropic).toBe('https://relay.example/anthropic')
+    }
+    wrapper.unmount()
+  })
+})
+
+describe('EditAccountModal cooling scopes', () => {
+  const checkedScopes = (wrapper: ReturnType<typeof mountModal>) => wrapper
+    .findAll('[data-testid^="temp-unsched-scope-"][aria-checked="true"]')
+    .map((radio) => radio.attributes('data-testid'))
+
+  beforeEach(() => {
+    authIsSimpleMode.value = true
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+  })
+
+  it('preserves legacy defaults and explicit normalized scopes on save', async () => {
+    const account = buildAccount()
+    account.credentials.temp_unschedulable_enabled = true
+    account.credentials.temp_unschedulable_rules = [
+      { error_code: 401, keywords: ['unauthorized'], duration_minutes: 10 },
+      { error_code: 503, keywords: ['unavailable'], duration_minutes: 30 },
+      { error_code: 401, keywords: ['model'], duration_minutes: 10, scope: 'model' },
+      { error_code: 503, keywords: ['all'], duration_minutes: 30, scope: ' Account ' }
+    ]
+    updateAccountMock.mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    expect(checkedScopes(wrapper)).toEqual([
+      'temp-unsched-scope-account', 'temp-unsched-scope-model',
+      'temp-unsched-scope-model', 'temp-unsched-scope-account'
+    ])
+    await wrapper.findAll('[data-testid="temp-unsched-scope-model"]')[3].trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const rules = updateAccountMock.mock.calls[0]?.[1]?.credentials?.temp_unschedulable_rules as Array<{ scope: string }>
+    expect(rules.map((rule) => rule.scope)).toEqual(['account', 'model', 'model', 'model'])
+    wrapper.unmount()
+  })
+
+  it('defaults new rules to model scope', async () => {
+    const account = buildAccount()
+    account.credentials.temp_unschedulable_enabled = true
+    account.credentials.temp_unschedulable_rules = []
+    const wrapper = mountModal(account)
+    const addRule = wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.tempUnschedulable.addRule'))
+    expect(addRule).toBeTruthy()
+    await addRule!.trigger('click')
+    expect(checkedScopes(wrapper)).toEqual(['temp-unsched-scope-model'])
+    wrapper.unmount()
+  })
+})
+
 const BaseDialogStub = defineComponent({
   name: 'BaseDialog',
   props: {
@@ -324,6 +414,37 @@ function mountModal(account = buildAccount(), renderGroupSelector = false) {
 }
 
 describe('EditAccountModal', () => {
+  it.each(['', 'rotated-key'])('preserves or rotates a redacted Vertex API key (%s) without requiring SA JSON', async newKey => {
+    const account = buildVertexAccount()
+    account.credentials = { auth_mode: 'apikey', project_id: 'demo-project', location: 'us-central1', tier_id: 'vertex' }
+    account.credentials_status = { has_api_key: true }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await wrapper.get('[data-testid="edit-vertex-api-key-input"]').setValue(newKey)
+    await wrapper.get('[data-testid="edit-vertex-api-key-project-id-input"]').setValue('')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const credentials = updateAccountMock.mock.calls[0]?.[1]?.credentials
+    expect(credentials.auth_mode).toBe('apikey')
+    expect(credentials.api_key).toBe(newKey || undefined)
+    expect(credentials.project_id).toBeUndefined()
+    expect(credentials.service_account_json).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('requires a replacement Vertex key if the backend reports no stored key', async () => {
+    const account = buildVertexAccount()
+    account.credentials = { auth_mode: 'apikey', location: 'global', tier_id: 'vertex' }
+    account.credentials_status = { has_api_key: false }
+    updateAccountMock.mockReset()
+    const wrapper = mountModal(account)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
   beforeEach(() => {
     authIsSimpleMode.value = true
   })

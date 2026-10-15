@@ -7,29 +7,9 @@ version: 1
 # 否则会给人「我们在跟踪」的假象。
 exceptions:
   # ---------------------------------------------------------------- 仍然需要
-  # 2026-09-30 复核：本项目对 xlsx 是**纯写**用法（只调 aoa_to_sheet /
-  # sheet_add_aoa / book_new / book_append_sheet / write），一个解析 API 都没有，
-  # 而这两条 advisory 都在解析路径上，因此不可达。
-  #
-  # 关键改进：这个「不可达」原先只是注释里的一句话，是个会悄悄失效的前提——
-  # 只要以后有人写一句 XLSX.read(用户上传的文件)，豁免立刻从合理变成错误，
-  # 而清单不会知道。现在由测试强制：Makefile 的 FRONTEND_CRITICAL_VITEST 里
-  # 列了 src/__tests__/xlsxWriteOnly.spec.ts，引入解析 API 或同步 import 就会
-  # 让 CI 失败。
-  - package: xlsx
-    advisory: "GHSA-4r6h-8v6p-xvw6"
-    severity: high
-    reason: "Prototype pollution lives in the PARSE path (XLSX.read on an untrusted workbook). This repo never parses xlsx — the only call sites are utils.aoa_to_sheet / sheet_add_aoa / book_new / book_append_sheet / write in the admin UsageView export."
-    mitigation: "Write-only usage, lazily imported; CI test src/__tests__/xlsxWriteOnly.spec.ts fails if any parsing API or eager import appears"
-    expires_on: "2027-04-06"
-    owner: "security@your-domain"
-  - package: xlsx
-    advisory: "GHSA-5pgg-2g8v-p4x9"
-    severity: high
-    reason: "ReDoS is in the PARSE path for malicious workbooks. Same write-only justification as GHSA-4r6h-8v6p-xvw6."
-    mitigation: "Write-only usage, lazily imported; CI test src/__tests__/xlsxWriteOnly.spec.ts fails if any parsing API or eager import appears"
-    expires_on: "2027-04-06"
-    owner: "security@your-domain"
+  # xlsx 的两条解析漏洞豁免已于 2026-10-15 移除：依赖升级并精确锁定到
+  # SHA512 校验的 0.20.3，生产 audit 已无 xlsx advisory。继续由
+  # src/__tests__/xlsxWriteOnly.spec.ts 保护纯写、懒加载的应用边界。
   - package: nanoid
     advisory: "GHSA-2v37-7h3g-55p8"
     severity: high

@@ -169,6 +169,10 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 	// 设置支持的模型系列（始终设置，空数组表示不限制）
 	builder = builder.SetSupportedModelScopes(groupIn.SupportedModelScopes)
 
+	if groupIn.I18n != nil {
+		builder = builder.SetI18n(groupIn.I18n)
+	}
+
 	created, err := builder.Save(ctx)
 	if err != nil {
 		return translatePersistenceError(err, nil, service.ErrGroupExists)
@@ -435,6 +439,12 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 
 	// 处理 SupportedModelScopes（始终设置，空数组表示不限制）
 	builder = builder.SetSupportedModelScopes(groupIn.SupportedModelScopes)
+
+	i18n := groupIn.I18n
+	if i18n == nil {
+		i18n = service.GroupI18n{}
+	}
+	builder = builder.SetI18n(i18n)
 
 	updated, err := builder.Save(ctx)
 	if err != nil {
@@ -865,20 +875,15 @@ func (r *groupRepository) DeleteCascadeIfEmpty(ctx context.Context, id int64) ([
 }
 
 func (r *groupRepository) deleteCascade(ctx context.Context, id int64, requireEmpty bool) ([]int64, error) {
-	// 使用 ent 事务统一包裹：避免手工基于 *sql.Tx 构造 ent client 带来的驱动断言问题，
-	// 同时保证级联删除的原子性。
-	tx, err := r.client.Tx(ctx)
-	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+	tx, owned, err := moderationTransaction(ctx, r.client, r.sql)
+	if err != nil {
 		return nil, err
 	}
-	exec := r.client
-	txClient := r.client
-	if err == nil {
+	if owned {
 		defer func() { _ = tx.Rollback() }()
-		exec = tx.Client()
-		txClient = exec
 	}
-	// err 为 dbent.ErrTxStarted 时，复用当前 client 参与同一事务。
+	exec := tx.Client()
+	txClient := exec
 
 	// Lock the group row to avoid concurrent writes while we cascade.
 	// 这里使用 exec.QueryContext 手动扫描，确保同一事务内加锁并能区分"未找到"与其他错误。
@@ -969,14 +974,27 @@ func (r *groupRepository) deleteCascade(ctx context.Context, id int64, requireEm
 	if _, err := txClient.Group.Delete().Where(group.IDEQ(id)).Exec(ctx); err != nil {
 		return nil, err
 	}
+	moderationChanged, err := pruneContentModerationGroup(ctx, exec, id)
+	if err != nil {
+		return nil, err
+	}
+	afterModerationCommit(tx, func() {
+		invalidateModelAvailabilityCaches()
+		if moderationChanged {
+			contentModerationConfigGeneration.Add(1)
+		}
+	})
 
-	if tx != nil {
+	if owned {
 		if err := tx.Commit(); err != nil {
 			return nil, err
 		}
 	}
-	invalidateModelAvailabilityCachesAfterCommit(ctx)
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &id, nil); err != nil {
+	outboxExec := r.sql
+	if !owned {
+		outboxExec = exec
+	}
+	if err := enqueueSchedulerOutbox(ctx, outboxExec, service.SchedulerOutboxEventGroupChanged, nil, &id, nil); err != nil {
 		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group cascade delete failed: group=%d err=%v", id, err)
 	}
 

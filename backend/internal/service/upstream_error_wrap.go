@@ -61,6 +61,11 @@ func WrapUpstreamErrorForClient(statusCode int, body []byte) (status int, errTyp
 			errType = "api_error"
 		}
 	}
+	// Explicit 503 still means unavailable; other 5xx overloaded envelopes use
+	// Anthropic's 529 status without changing the financial-error mask above.
+	if errType == "overloaded_error" && status >= 500 && status != http.StatusServiceUnavailable {
+		status = 529
+	}
 	errCode = extractUpstreamErrorCode(body)
 	return
 }

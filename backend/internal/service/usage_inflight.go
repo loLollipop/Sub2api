@@ -224,7 +224,13 @@ func filterUsageInflight(rows []UsageInflightSnapshot, filters usagestats.UsageL
 	}
 	out := make([]UsageInflightSnapshot, 0, len(rows))
 	model := strings.TrimSpace(filters.Model)
-	requestID := strings.TrimSpace(filters.RequestID)
+	if err := usagestats.ValidateRequestIDSearch(filters.RequestID, filters.StartTime, filters.EndTime); err != nil {
+		return nil
+	}
+	requestID, err := usagestats.ParseRequestIDSearch(filters.RequestID)
+	if err != nil {
+		return nil
+	}
 	for _, row := range rows {
 		if row.RequestID == "" {
 			continue
@@ -232,7 +238,7 @@ func filterUsageInflight(rows []UsageInflightSnapshot, filters usagestats.UsageL
 		if _, done := finished[row.RequestID]; done {
 			continue
 		}
-		if requestID != "" && row.RequestID != requestID && row.RequestID != "client:"+requestID && row.RequestID != "local:"+requestID {
+		if !requestID.Matches(row.RequestID) {
 			continue
 		}
 		if filters.APIKeyID != 0 && row.APIKeyID != filters.APIKeyID {

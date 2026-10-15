@@ -216,20 +216,35 @@ func (s *OpenAIGatewayService) forwardWithProtocolFallback(ctx context.Context, 
 	if !openAIProtocolFallbackEligible(c, account, body) {
 		return nil, writeMixedLocalRequestError(c, clientProtocol)
 	}
-	// All Mixed models start with Chat, independent of legacy account-wide
-	// Responses probes. Re-entering an attempt never starts a fresh budget.
+	// Official API imports reuse the original provider dispatcher, including
+	// native paths and its explicit protocol settings, not relay trial order.
+	if mixedOfficialProviderView(account) != nil {
+		return initial(ctx)
+	}
+	// Reuse the client's native protocol before converting after an explicit
+	// refusal. Re-entering an attempt never starts a fresh budget.
 	if openAIProtocolFallbackFromContext(ctx) != nil {
 		return initial(ctx)
 	}
 	order := []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic}
-	if clientProtocol == APIProtocolAnthropic {
-		order = []string{APIProtocolChatCompletions, APIProtocolAnthropic, APIProtocolResponses}
+	// Cursor may post a Responses body to the Chat URL. Preserve the existing
+	// native dispatcher's shape detection before selecting an upstream protocol.
+	responsesShapedChat := clientProtocol == APIProtocolChatCompletions &&
+		!gjson.GetBytes(body, "messages").Exists() && gjson.GetBytes(body, "input").Exists()
+	switch clientProtocol {
+	case APIProtocolResponses:
+		order = []string{APIProtocolResponses, APIProtocolChatCompletions, APIProtocolAnthropic}
+	case APIProtocolAnthropic:
+		order = []string{APIProtocolAnthropic, APIProtocolChatCompletions, APIProtocolResponses}
+	}
+	if responsesShapedChat {
+		order = []string{APIProtocolResponses, APIProtocolChatCompletions, APIProtocolAnthropic}
 	}
 	state := &openAIProtocolFallbackState{clientCtx: ctx, visited: make(map[string]bool, 3), order: order}
 	ctx = context.WithValue(ctx, openAIProtocolFallbackKey{}, state)
 	beginUpstreamResponseModelObservation(c)
 	setCodexToolNameReverse(c, nil)
-	protocol := APIProtocolChatCompletions
+	protocol := order[0]
 	for attempts := 0; attempts < len(order); attempts++ {
 		if err := state.clientCtx.Err(); err != nil {
 			return nil, err
@@ -257,12 +272,26 @@ func (s *OpenAIGatewayService) forwardWithProtocolFallback(ctx context.Context, 
 			case APIProtocolResponses:
 				result, err = s.forwardOpenAIChatCompletions(ctx, c, account, body, promptCacheKey, defaultMappedModel)
 			case APIProtocolChatCompletions:
-				result, err = s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
+				chatBody := body
+				if responsesShapedChat {
+					chatBody, err = s.convertResponsesShapedChatBody(body)
+					if err != nil {
+						return nil, err
+					}
+				}
+				result, err = s.forwardAsRawChatCompletions(ctx, c, account, chatBody, defaultMappedModel)
 			case APIProtocolAnthropic:
-				result, err = s.forwardChatCompletionsViaNativeAnthropic(ctx, c, account, body, defaultMappedModel)
+				chatBody := body
+				if responsesShapedChat {
+					chatBody, err = s.convertResponsesShapedChatBody(body)
+					if err != nil {
+						return nil, err
+					}
+				}
+				result, err = s.forwardChatCompletionsViaNativeAnthropic(ctx, c, account, chatBody, defaultMappedModel)
 			}
 		case APIProtocolAnthropic:
-			if !crossProtocolConversionAllowedFromContext(c) {
+			if protocol != APIProtocolAnthropic && !crossProtocolConversionAllowedFromContext(c) {
 				return nil, CrossProtocolConversionError{}
 			}
 			switch protocol {

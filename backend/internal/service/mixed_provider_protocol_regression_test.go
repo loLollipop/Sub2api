@@ -98,7 +98,7 @@ func TestMixedGLMParameterAdaptationAcrossIngress(t *testing.T) {
 					}
 					encoded, err := json.Marshal(body)
 					require.NoError(t, err)
-					upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, strings.ReplaceAll(mixedChatToolJSON, `"actual"`, `"`+upstreamModel+`"`), false)}
+					upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(protocol, APIProtocolChatCompletions, mixedHTTPResponse(200, strings.ReplaceAll(mixedChatToolJSON, `"actual"`, `"`+upstreamModel+`"`), false))}
 					svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 					result, _, _, err := mixedForward(t, svc, account, protocol, encoded)
 					require.NoError(t, err)
@@ -128,10 +128,7 @@ func TestMixedDispatcherFallbackAfterHeartbeat(t *testing.T) {
 	for _, ingress := range []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic} {
 		for _, outcome := range []string{APIProtocolResponses, APIProtocolAnthropic, "refused"} {
 			t.Run(ingress+"/"+outcome, func(t *testing.T) {
-				order := []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic}
-				if ingress == APIProtocolAnthropic {
-					order = []string{APIProtocolChatCompletions, APIProtocolAnthropic, APIProtocolResponses}
-				}
+				order := mixedExpectedProtocolOrder(ingress)
 				responses := []*http.Response{}
 				for _, protocol := range order {
 					if protocol != outcome {
@@ -211,54 +208,56 @@ func TestMixedOneRelayAccountSupportsModelSpecificProtocols(t *testing.T) {
 	} {
 		for _, ingress := range []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic} {
 			for _, stream := range []bool{false, true} {
-				t.Run(fmt.Sprintf("%s/%s/stream=%t", model.public, ingress, stream), func(t *testing.T) {
-					responses := []*http.Response{}
-					if model.protocol != APIProtocolChatCompletions {
-						responses = append(responses, mixedRefusal(APIProtocolChatCompletions))
-					}
-					if model.protocol == APIProtocolResponses && ingress == APIProtocolAnthropic {
-						responses = append(responses, mixedRefusal(APIProtocolAnthropic))
-					}
-					if model.protocol == APIProtocolAnthropic && ingress != APIProtocolAnthropic {
-						responses = append(responses, mixedRefusal(APIProtocolResponses))
-					}
-					wire := mixedChatToolJSON
-					upstreamStream := stream
-					if stream {
-						wire = mixedChatToolSSE()
-					}
-					if model.protocol == APIProtocolResponses {
-						wire = mixedResponsesToolSSE()
-						upstreamStream = true
-						if ingress == APIProtocolResponses && !stream {
-							wire = `{"id":"resp_1","object":"response","model":"actual","status":"completed","output":[{"type":"function_call","id":"fc_1","call_id":"call_1","name":"lookup","arguments":"{}"}],"usage":{"input_tokens":9,"output_tokens":4}}`
-							upstreamStream = false
+				for _, history := range []bool{false, true} {
+					t.Run(fmt.Sprintf("%s/%s/stream=%t/history=%t", model.public, ingress, stream, history), func(t *testing.T) {
+						wire := mixedChatToolJSON
+						upstreamStream := stream
+						if stream {
+							wire = mixedChatToolSSE()
 						}
-					}
-					if model.protocol == APIProtocolAnthropic {
-						wire = toolAnthropicSSEStream()
-						upstreamStream = true
-						if ingress == APIProtocolAnthropic && !stream {
-							wire = `{"id":"msg_1","type":"message","role":"assistant","model":"actual","content":[{"type":"tool_use","id":"toolu_1","name":"lookup","input":{}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}}`
-							upstreamStream = false
+						if model.protocol == APIProtocolResponses {
+							wire = mixedResponsesToolSSE()
+							upstreamStream = true
+							if ingress == APIProtocolResponses && !stream {
+								wire = `{"id":"resp_1","object":"response","model":"actual","status":"completed","output":[{"type":"function_call","id":"fc_1","call_id":"call_1","name":"lookup","arguments":"{}"}],"usage":{"input_tokens":9,"output_tokens":4}}`
+								upstreamStream = false
+							}
 						}
-					}
-					wire = strings.ReplaceAll(wire, `"actual"`, `"`+model.target+`"`)
-					responses = append(responses, mixedHTTPResponse(200, wire, upstreamStream))
-					upstream := &httpUpstreamRecorder{responses: responses}
-					svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
-					body := []byte(strings.ReplaceAll(string(mixedClientBody(ingress, stream)), `"alias"`, `"`+model.public+`"`))
-					result, rec, _, err := mixedForward(t, svc, account, ingress, body)
-					require.NoError(t, err)
-					require.Equal(t, model.target, result.UpstreamModel)
-					require.Equal(t, protocolUpstreamEndpoint(model.protocol), upstream.lastReq.URL.Path)
-					require.Contains(t, rec.Body.String(), "lookup")
-					for i, req := range upstream.requests {
-						require.Equal(t, "upstream.example", req.URL.Host)
-						require.Equal(t, model.target, gjson.GetBytes(upstream.bodies[i], "model").String())
-						require.Contains(t, string(upstream.bodies[i]), "prior")
-					}
-				})
+						if model.protocol == APIProtocolAnthropic {
+							wire = toolAnthropicSSEStream()
+							upstreamStream = true
+							if ingress == APIProtocolAnthropic && !stream {
+								wire = `{"id":"msg_1","type":"message","role":"assistant","model":"actual","content":[{"type":"tool_use","id":"toolu_1","name":"lookup","input":{}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}}`
+								upstreamStream = false
+							}
+						}
+						wire = strings.ReplaceAll(wire, `"actual"`, `"`+model.target+`"`)
+						responses := mixedResponsesForTarget(ingress, model.protocol, mixedHTTPResponse(200, wire, upstreamStream))
+						upstream := &httpUpstreamRecorder{responses: responses}
+						svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+						clientBody := mixedPlainClientBody(ingress, stream)
+						if history {
+							clientBody = mixedClientBody(ingress, stream)
+						}
+						body := []byte(strings.ReplaceAll(string(clientBody), `"alias"`, `"`+model.public+`"`))
+						result, rec, _, err := mixedForward(t, svc, account, ingress, body)
+						require.NoError(t, err)
+						require.Equal(t, model.target, result.UpstreamModel)
+						require.Len(t, upstream.requests, mixedExpectedAttempts(ingress, model.protocol))
+						require.Equal(t, protocolUpstreamEndpoint(model.protocol), upstream.lastReq.URL.Path)
+						require.Contains(t, rec.Body.String(), "lookup")
+						for i, req := range upstream.requests {
+							require.Equal(t, protocolUpstreamEndpoint(mixedExpectedProtocolOrder(ingress)[i]), req.URL.Path)
+							require.Equal(t, "upstream.example", req.URL.Host)
+							require.Equal(t, model.target, gjson.GetBytes(upstream.bodies[i], "model").String())
+							if history {
+								require.Contains(t, string(upstream.bodies[i]), "prior")
+							} else {
+								require.Contains(t, string(upstream.bodies[i]), "hello")
+							}
+						}
+					})
+				}
 			}
 		}
 	}

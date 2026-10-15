@@ -24,6 +24,7 @@ type Group struct {
 	ID                           int64
 	Name                         string
 	Description                  string
+	I18n                         GroupI18n
 	Platform                     string
 	RateMultiplier               float64
 	// 高峰时段倍率：peak_rate_enabled 为 true 且当前时刻处于 [PeakStart, PeakEnd) 时，

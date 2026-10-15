@@ -1,6 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { enableAutoUnmount, mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { BUILTIN_PLATFORM_CATALOG, listPlatformIds, resetPlatformCatalog, setPlatformCatalog } from '@/constants/platformCatalog'
+
+enableAutoUnmount(afterEach)
+afterEach(resetPlatformCatalog)
 
 const apiMocks = vi.hoisted(() => ({
   showError: vi.fn(),
@@ -101,15 +105,9 @@ describe('UserPlatformQuotaModal', () => {
     expect(apiMocks.getPlatformQuotas).toHaveBeenCalledWith(99)
   })
 
-  it('空数据渲染 6 个 platform 行', async () => {
+  it('空数据渲染清单中的全部平台行', async () => {
     const w = await mountAndOpen()
-    const html = w.html()
-    expect(html).toContain('anthropic')
-    expect(html).toContain('openai')
-    expect(html).toContain('gemini')
-    expect(html).toContain('antigravity')
-    expect(html).toContain('grok')
-    expect(html).toContain('mixed')
+    expect(w.findAll('tbody tr').map(row => row.get('td').text())).toEqual(listPlatformIds())
   })
 
   it('已有数据正确填充 limit input', async () => {
@@ -121,13 +119,12 @@ describe('UserPlatformQuotaModal', () => {
     })
     const w = await mountAndOpen()
     const inputs = w.findAll('input[type=number]')
-    // 6 platforms × 3 windows = 18 inputs
-    expect(inputs.length).toBe(18)
+    expect(inputs).toHaveLength(listPlatformIds().length * 3)
     // 第一个 input 是 anthropic.daily = 10
     expect((inputs[0].element as HTMLInputElement).value).toBe('10')
   })
 
-  it('保存提交完整 6 platform payload', async () => {
+  it('保存提交清单中的完整平台 payload', async () => {
     apiMocks.getPlatformQuotas.mockResolvedValueOnce({
       platform_quotas: [
         { platform: 'openai', daily_limit_usd: null, weekly_limit_usd: 20, monthly_limit_usd: null,
@@ -144,10 +141,46 @@ describe('UserPlatformQuotaModal', () => {
     expect(apiMocks.updatePlatformQuotas).toHaveBeenCalledTimes(1)
     const [uid, payload] = apiMocks.updatePlatformQuotas.mock.calls[0]
     expect(uid).toBe(99)
-    expect(payload).toHaveLength(6) // 6 platforms always submitted
+    expect(payload.map((item: { platform: string }) => item.platform)).toEqual(listPlatformIds())
     expect(payload).toContainEqual({ platform: 'mixed', daily_limit_usd: null, weekly_limit_usd: null, monthly_limit_usd: null })
     const openai = payload.find((p: any) => p.platform === 'openai')
     expect(openai.weekly_limit_usd).toBe(20)
+  })
+
+  it('保留 Mixed 和原生供应商平台的限额并保存', async () => {
+    const platforms = ['mixed', 'kimi', 'zhipu', 'deepseek', 'minimax', 'command_code', 'cline']
+    const limits = platforms.map((platform, index) => ({
+      platform, daily_limit_usd: 0, weekly_limit_usd: index + 1, monthly_limit_usd: 50,
+    }))
+    apiMocks.getPlatformQuotas.mockResolvedValueOnce({ platform_quotas: limits })
+    const w = await mountAndOpen()
+    for (const limit of limits) {
+      const row = w.findAll('tbody tr').find(candidate => candidate.get('td').text() === limit.platform)!
+      expect(row.findAll('input').map(input => (input.element as HTMLInputElement).value))
+        .toEqual(['0', String(limit.weekly_limit_usd), '50'])
+    }
+    await w.findAll('button').find(button => button.text() === 'admin.users.platformQuota.save')!.trigger('click')
+    await flushPromises()
+    expect(apiMocks.updatePlatformQuotas.mock.calls[0][1]).toEqual(expect.arrayContaining(limits))
+  })
+
+  it('新登记的平台出现在表格和保存 payload 中', async () => {
+    setPlatformCatalog({
+      ...BUILTIN_PLATFORM_CATALOG,
+      platforms: [...BUILTIN_PLATFORM_CATALOG.platforms, {
+        id: 'new_provider', display_name: 'New Provider', gateway: 'openai', cn_provider: false,
+      }],
+    })
+    const w = await mountAndOpen()
+    expect(w.findAll('tbody tr').map(row => row.get('td').text())).toEqual(listPlatformIds())
+    const inputs = w.get('tbody tr:last-child').findAll('input')
+    await inputs[0].setValue('0')
+    await inputs[1].setValue('25')
+    await w.findAll('button').find(button => button.text() === 'admin.users.platformQuota.save')!.trigger('click')
+    await flushPromises()
+    expect(apiMocks.updatePlatformQuotas.mock.calls[0][1]).toContainEqual({
+      platform: 'new_provider', daily_limit_usd: 0, weekly_limit_usd: 25, monthly_limit_usd: null,
+    })
   })
 
   it('全部清空把所有 limit 置 null（确认通过）', async () => {

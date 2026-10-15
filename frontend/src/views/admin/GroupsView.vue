@@ -511,26 +511,26 @@
         class="space-y-5"
       >
         <div>
-          <label class="input-label">{{ t("admin.groups.form.name") }}</label>
-          <input
+          <GroupI18nField
             v-model="createForm.name"
-            type="text"
+            v-model:i18n="createForm.i18n"
+            :label="t('admin.groups.form.name')"
+            field="name"
             required
-            class="input"
             :placeholder="t('admin.groups.enterGroupName')"
             data-tour="group-form-name"
           />
         </div>
         <div>
-          <label class="input-label">{{
-            t("admin.groups.form.description")
-          }}</label>
-          <textarea
+          <GroupI18nField
             v-model="createForm.description"
+            v-model:i18n="createForm.i18n"
+            :label="t('admin.groups.form.description')"
+            field="description"
+            multiline
             rows="3"
-            class="input"
             :placeholder="t('admin.groups.optionalDescription')"
-          ></textarea>
+          />
         </div>
         <div>
           <label class="input-label">{{
@@ -2165,24 +2165,24 @@
         class="space-y-5"
       >
         <div>
-          <label class="input-label">{{ t("admin.groups.form.name") }}</label>
-          <input
+          <GroupI18nField
             v-model="editForm.name"
-            type="text"
+            v-model:i18n="editForm.i18n"
+            :label="t('admin.groups.form.name')"
+            field="name"
             required
-            class="input"
             data-tour="edit-group-form-name"
           />
         </div>
         <div>
-          <label class="input-label">{{
-            t("admin.groups.form.description")
-          }}</label>
-          <textarea
+          <GroupI18nField
             v-model="editForm.description"
+            v-model:i18n="editForm.i18n"
+            :label="t('admin.groups.form.description')"
+            field="description"
+            multiline
             rows="3"
-            class="input"
-          ></textarea>
+          />
         </div>
         <div>
           <label class="input-label">{{
@@ -4333,6 +4333,7 @@ import type {
   CompositeRouteDecision,
   CompositeRouteEndpoint,
   CompositeRouteMatchType,
+  GroupI18n,
   GroupPlatform,
   SubscriptionType,
 } from "@/types";
@@ -4353,6 +4354,7 @@ import EmptyState from "@/components/common/EmptyState.vue";
 import Select from "@/components/common/Select.vue";
 import PlatformIcon from "@/components/common/PlatformIcon.vue";
 import Icon from "@/components/icons/Icon.vue";
+import GroupI18nField from "@/components/admin/group/GroupI18nField.vue";
 import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
@@ -4892,6 +4894,7 @@ const showSortModal = ref(false);
 const submitting = ref(false);
 const sortSubmitting = ref(false);
 const editingGroup = ref<AdminGroup | null>(null);
+let editRequestID = 0;
 const deletingGroup = ref<AdminGroup | null>(null);
 const duplicatingGroupIds = reactive(new Set<number>());
 const showRateMultipliersModal = ref(false);
@@ -4996,6 +4999,7 @@ const submitEditAllowlistCustomEntry = () => {
 const createForm = reactive({
   name: "",
   description: "",
+  i18n: {} as GroupI18n,
   platform: "anthropic" as GroupPlatform,
   rate_multiplier: 1.0,
   mixed_provider_rate_multipliers: initializeMixedProviderRates() as MixedProviderRateMap,
@@ -5285,22 +5289,29 @@ const loadModelAllowlistCandidates = async (
   if (authStore.isSimpleMode) return;
   const request = { mode, groupID, platform };
   const requestID = modelAllowlistCandidatesTracker.next(request);
+  const editOwner = editRequestID;
+  const isCurrentRequest = () =>
+    modelAllowlistCandidatesTracker.isCurrent(requestID, request) &&
+    (mode === "create" ||
+      (editOwner === editRequestID &&
+        editingGroup.value?.id === groupID &&
+        editForm.platform === platform));
   const state = mode === "create" ? createModelAllowlistState : editModelAllowlistState;
   const loadingRef = mode === "create" ? createModelAllowlistLoading : editModelAllowlistLoading;
   loadingRef.value = true;
   try {
     const models = await adminAPI.groups.getModelAllowlistCandidates(groupID, platform);
-    if (!modelAllowlistCandidatesTracker.isCurrent(requestID, request)) {
+    if (!isCurrentRequest()) {
       return;
     }
     setModelAllowlistCandidates(state, models);
   } catch (error) {
-    if (!modelAllowlistCandidatesTracker.isCurrent(requestID, request)) {
+    if (!isCurrentRequest()) {
       return;
     }
     console.error("Error loading group models list candidates:", error);
   } finally {
-    if (modelAllowlistCandidatesTracker.isCurrent(requestID, request)) {
+    if (isCurrentRequest()) {
       loadingRef.value = false;
     }
   }
@@ -5363,6 +5374,7 @@ const convertApiFormatToRoutingRules = async (
 const editForm = reactive({
   name: "",
   description: "",
+  i18n: {} as GroupI18n,
   platform: "anthropic" as GroupPlatform,
   rate_multiplier: 1.0,
   mixed_provider_rate_multipliers: initializeMixedProviderRates() as MixedProviderRateMap,
@@ -5829,6 +5841,7 @@ const closeCreateModal = () => {
   clearAllAccountSearchState();
   createForm.name = "";
   createForm.description = "";
+  createForm.i18n = {};
   createForm.platform = "anthropic";
   createForm.rate_multiplier = 1.0;
   createForm.mixed_provider_rate_multipliers = initializeMixedProviderRates();
@@ -6080,6 +6093,7 @@ const handleCreateGroup = async () => {
       ? {
           name: createForm.name,
           description: createForm.description,
+          i18n: createForm.i18n,
           platform: createForm.platform,
         }
       : requestData;
@@ -6103,9 +6117,19 @@ const handleCreateGroup = async () => {
 };
 
 const handleEdit = async (group: AdminGroup) => {
+  closeEditModal();
+  const requestID = editRequestID;
+  const isCurrentEdit = () =>
+    requestID === editRequestID && editingGroup.value?.id === group.id;
   editingGroup.value = group;
   editForm.name = group.name;
   editForm.description = group.description || "";
+  editForm.i18n = Object.fromEntries(
+    Object.entries(group.i18n ?? {}).map(([locale, text]) => [
+      locale,
+      { ...text },
+    ]),
+  );
   editForm.platform = group.platform;
   editForm.rate_multiplier = group.rate_multiplier;
   editForm.mixed_provider_rate_multipliers = initializeMixedProviderRates(group.mixed_provider_rate_multipliers);
@@ -6210,6 +6234,7 @@ const handleEdit = async (group: AdminGroup) => {
     adminAPI.accounts
       .getById(id)
       .then((account) => {
+        if (!isCurrentEdit()) return;
         editCodexManifestAccountNames.value = {
           ...editCodexManifestAccountNames.value,
           [id]: account.name,
@@ -6220,14 +6245,18 @@ const handleEdit = async (group: AdminGroup) => {
       });
   }
   // 加载模型路由规则（异步加载账号名称）
-  editModelRoutingRules.value = await convertApiFormatToRoutingRules(
+  const routingRules = await convertApiFormatToRoutingRules(
     group.model_routing,
   );
+  if (!isCurrentEdit()) return;
+  editModelRoutingRules.value = routingRules;
   loadModelAllowlistCandidates("edit", group.id, group.platform);
   showEditModal.value = true;
 };
 
 const closeEditModal = () => {
+  editRequestID++;
+  editModelAllowlistLoading.value = false;
   editModelRoutingRules.value.forEach((rule) => {
     accountSearchRunner.clearKey(getEditRuleSearchKey(rule));
   });
@@ -6276,7 +6305,7 @@ const handleUpdateGroup = async () => {
     appStore.showError(t('common.mixedRatesInvalid'));
     return;
   }
-  if (!editingGroup.value) return;
+  if (!editingGroup.value || !showEditModal.value) return;
   if (!editForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
     return;
@@ -6442,6 +6471,7 @@ const handleUpdateGroup = async () => {
       ? {
           name: editForm.name,
           description: editForm.description,
+          i18n: editForm.i18n,
         }
       : payload;
     await adminAPI.groups.update(editingGroup.value.id, requestData);
@@ -6944,6 +6974,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  editRequestID++;
   document.removeEventListener("click", handleClickOutside);
   accountSearchRunner.clearAll();
   clearAllAccountSearchState();

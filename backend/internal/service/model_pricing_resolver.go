@@ -237,7 +237,7 @@ func (r *ModelPricingResolver) applyChannelOverrides(ctx context.Context, groupI
 // applyTokenOverrides 应用 token 模式的渠道覆盖
 func (r *ModelPricingResolver) applyTokenOverrides(chPricing *ChannelModelPricing, resolved *ResolvedPricing) {
 	if resolved.BasePricing == nil {
-		resolved.BasePricing = &ModelPricing{}
+		resolved.BasePricing = &ModelPricing{InputPriceAbsent: true}
 	} else {
 		// 防止修改 fallbackPrices 中的共享指针
 		cloned := *resolved.BasePricing
@@ -332,7 +332,7 @@ func (r *ModelPricingResolver) GetIntervalPricing(resolved *ResolvedPricing, tot
 
 // intervalToModelPricing 将区间定价转换为 ModelPricing
 func intervalToModelPricing(iv *PricingInterval, base *ModelPricing, chPricing *ChannelModelPricing) *ModelPricing {
-	pricing := &ModelPricing{}
+	pricing := &ModelPricing{InputPriceAbsent: true}
 	if base != nil {
 		*pricing = *base
 	}
@@ -343,6 +343,7 @@ func intervalToModelPricing(iv *PricingInterval, base *ModelPricing, chPricing *
 		return value * *multiplier
 	}
 	if iv.InputPrice != nil {
+		pricing.InputPriceAbsent = false
 		pricing.InputPricePerTokenPriority = channelTierOverridePrice(pricing.InputPricePerToken, pricing.InputPricePerTokenPriority, *iv.InputPrice)
 		pricing.InputPricePerToken = *iv.InputPrice
 	} else if iv.InputMultiplier != nil {

@@ -183,6 +183,10 @@ func (h *UsageHandler) List(c *gin.Context) {
 		response.BadRequest(c, "start_date must not be after end_date")
 		return
 	}
+	if err := usagestats.ValidateRequestIDSearch(requestID, startTime, endTime); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
 	params := pagination.PaginationParams{
 		Page:      page,

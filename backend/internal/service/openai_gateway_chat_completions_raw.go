@@ -61,7 +61,19 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	body []byte,
 	defaultMappedModel string,
 ) (*OpenAIForwardResult, error) {
-	startTime := time.Now()
+	return s.forwardAsRawChatCompletionsWithStartTime(ctx, c, account, body, defaultMappedModel, time.Now())
+}
+
+// Keep the original request clock when a rejected Responses attempt falls back
+// to raw Chat, including its duration and first-token measurements.
+func (s *OpenAIGatewayService) forwardAsRawChatCompletionsWithStartTime(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	body []byte,
+	defaultMappedModel string,
+	startTime time.Time,
+) (*OpenAIForwardResult, error) {
 
 	// 1. Parse minimal fields needed for routing/billing
 	originalModel := gjson.GetBytes(body, "model").String()
@@ -179,6 +191,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	}
 	upstreamBody = applyOllamaCloudRawChatCompletionsRequest(account, upstreamBody)
 	upstreamBody = clampOllamaCloudUpstreamMaxTokens(account, upstreamBody)
+	reasoningEffort = finalOpenAIAttemptReasoningEffort(upstreamBody, upstreamModel, billingModel, originalModel)
 
 	logger.L().Debug("openai chat_completions raw: forwarding without protocol conversion",
 		zap.Int64("account_id", account.ID),
@@ -199,6 +212,9 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		return nil, err
 	}
 	SetActualOpenAIUpstreamEndpoint(c, grokChatRawEndpoint)
+	if err := s.repriceOpenAIFinalAttempt(ctx, account, upstreamBody, billingModel, upstreamModel); err != nil {
+		return nil, err
+	}
 	customUA := account.GetOpenAIUserAgent()
 	if customUA == "" && account.IsGrokOAuth() {
 		customUA = defaultGrokUpstreamUserAgent()
@@ -321,6 +337,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 	var terminal openAIRawStreamTerminalState
 	var mixedStreamErr error
+	mixedSawOutput, mixedSawPolicy := false, false
 
 	writeLine := func(line string) {
 		if clientDisconnected {
@@ -365,7 +382,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 				if u := extractCCStreamUsage(payload); u != nil {
 					usage = *u
 				}
-				if firstTokenMs == nil && !usageOnlyChunk {
+				if firstTokenMs == nil && !usageOnlyChunk && (!account.IsMixed() || mixedCCPayloadHasOutput([]byte(payload))) {
 					elapsed := int(time.Since(startTime).Milliseconds())
 					firstTokenMs = &elapsed
 				}
@@ -387,11 +404,22 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	}
 	processMixedFrame := func(frame openAICompatSSEFrame) bool {
 		payload := strings.TrimSpace(frame.Data)
-		if u := extractCCStreamUsage(payload); u != nil {
-			usage = *u
+		observeMixedCCPayload(c, []byte(payload), frame.EventType)
+		if parsed, ok := extractOpenAIUsageFromJSONBytes([]byte(payload)); ok {
+			usage = parsed
 		}
-		if mixedPayloadIsError([]byte(payload), frame.EventType) || payload != "[DONE]" && !gjson.Valid(payload) {
-			mixedStreamErr = errors.New("upstream Chat Completions SSE error")
+		if mixedCCPayloadIsError([]byte(payload), frame.EventType) || payload != "[DONE]" && !gjson.Valid(payload) {
+			kind := "upstream_error"
+			if !gjson.Valid(payload) && payload != "" {
+				kind = "invalid_json"
+			}
+			mixedStreamErr = newMixedCCFailure(c, []byte(payload), frame.EventType, kind, mixedSawOutput || mixedSawPolicy || mixedCCPayloadHasOutput([]byte(payload)), nil)
+			return false
+		}
+		mixedSawOutput = mixedSawOutput || mixedCCPayloadHasOutput([]byte(payload))
+		mixedSawPolicy = mixedSawPolicy || mixedCCPayloadHasPolicy([]byte(payload))
+		if payload == "[DONE]" && !mixedSawOutput {
+			mixedStreamErr = newMixedCCFailure(c, nil, "", "empty_completion", mixedSawPolicy, nil)
 			return false
 		}
 		if frame.EventType != "" {
@@ -421,8 +449,8 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		if frame, ok := mixedParser.Finish(); ok {
 			if scanner.Err() == nil {
 				processMixedFrame(frame)
-			} else if u := extractCCStreamUsage(frame.Data); u != nil {
-				usage = *u
+			} else if parsed, ok := extractOpenAIUsageFromJSONBytes([]byte(frame.Data)); ok {
+				usage = parsed
 			}
 		}
 	}
@@ -443,6 +471,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 			Stream:                        true,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  firstTokenMs,
+			NonBillableUpstreamError:      mixedCCErrorNonBillable(mixedStreamErr),
 		}
 	}
 
@@ -454,7 +483,11 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		if mixedStreamErr == nil && !terminal.sawDone && !terminal.sawFinishReason {
 			mixedStreamErr = ErrOpenAIUpstreamStreamTruncated
 		}
+		if mixedStreamErr == nil && !mixedSawOutput {
+			mixedStreamErr = newMixedCCFailure(c, nil, "", "empty_completion", mixedSawPolicy, nil)
+		}
 		if mixedStreamErr != nil {
+			mixedStreamErr = s.recordMixedCCFailure(c, resp, mixedStreamErr)
 			writeMixedStreamFailure(c, APIProtocolChatCompletions, mixedStreamErr)
 			return resultWithUsage(), newOpenAIUpstreamStreamReadError(mixedStreamErr)
 		}
@@ -579,17 +612,13 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 	var respBody []byte
 	var err error
 	if account.IsMixed() {
-		respBody, err = s.readMixedUpstreamBody(resp)
-		usage := OpenAIUsage{}
-		if parsed, ok := extractOpenAIUsageFromJSONBytes(respBody); ok {
-			usage = parsed
-		}
-		if err == nil && mixedCCBufferedIncomplete(respBody) {
-			err = fmt.Errorf("upstream Chat Completions response failed or incomplete")
-		}
+		var usage OpenAIUsage
+		respBody, usage, err = s.readMixedCCResponse(c, resp)
 		if err != nil {
 			writeMixedStreamFailure(c, APIProtocolChatCompletions, err)
-			return mixedPartialForwardResult(c, resp, usage, originalModel, billingModel, upstreamModel, false, startTime), err
+			result := mixedPartialForwardResult(c, resp, usage, originalModel, billingModel, upstreamModel, false, startTime)
+			result.NonBillableUpstreamError = mixedCCErrorNonBillable(err)
+			return result, err
 		}
 	} else {
 		respBody, err = ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)

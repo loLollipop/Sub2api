@@ -217,7 +217,11 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	}
 	if account != nil && account.IsOpenAI() {
 		responsesLite := isOpenAIResponsesLiteHeader(c.GetHeader(responsesLiteHeader)) || isOpenAIResponsesLiteWebSocketPayload(body)
-		normalizedBody, normalized, normalizeErr := normalizeOpenAIResponsesCompatibilityBody(body, account, responsesLite, isOpenAIResponsesCompactPath(c))
+		normalizedBody, normalized, normalizeErr := normalizeOpenAIResponsesCompatibilityBodyWithOptions(body, account, openAIResponsesCompatibilityOptions{
+			Config:        s.cfg,
+			ResponsesLite: responsesLite,
+			Compact:       isOpenAIResponsesCompactPath(c),
+		})
 		if normalizeErr != nil {
 			return nil, fmt.Errorf("normalize passthrough Responses compatibility: %w", normalizeErr)
 		}
@@ -414,11 +418,15 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		// canonical model scope.
 		upstreamPassthroughModel = actualModel
 		SetOpsUpstreamModel(c, actualModel)
+		reasoningEffort = finalOpenAIAttemptReasoningEffort(body, actualModel, reqModel)
 		upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 		upstreamReq, buildErr := s.buildUpstreamRequestOpenAIPassthrough(upstreamCtx, c, account, body, token)
 		releaseUpstreamCtx()
 		if buildErr != nil {
 			return nil, buildErr
+		}
+		if err := s.repriceOpenAIFinalHTTPRequest(ctx, account, upstreamReq, reqModel, actualModel); err != nil {
+			return nil, err
 		}
 
 		upstreamStart := time.Now()
@@ -669,7 +677,9 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL)
+			targetURL = buildOpenAIResponsesURLForPlatform(account.openAIWirePlatform(), validatedURL)
+		} else if account.IsMixed() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
+			return nil, fmt.Errorf("account requires an explicit Responses endpoint")
 		}
 	}
 	targetURL = appendOpenAIResponsesRequestPathSuffix(targetURL, openAIResponsesRequestPathSuffix(c))

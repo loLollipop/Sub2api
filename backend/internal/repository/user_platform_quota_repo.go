@@ -9,6 +9,7 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/lib/pq"
 )
@@ -93,6 +94,9 @@ func (r *userPlatformQuotaRepository) BulkInsertInitial(ctx context.Context, rec
 		return nil
 	}
 
+	if err := validateQuotaPlatforms(records); err != nil {
+		return err
+	}
 	client := clientFromContext(ctx, r.client)
 
 	var sb strings.Builder
@@ -337,6 +341,9 @@ func monthlyMaybeReset(prevUsage float64, prevStart *time.Time, cost float64, no
 //
 // 仅改 *_limit_usd + deleted_at + updated_at，保留 *_usage_usd / *_window_start。
 func (r *userPlatformQuotaRepository) UpsertForUser(ctx context.Context, userID int64, records []UserPlatformQuotaRecord) error {
+	if err := validateQuotaPlatforms(records); err != nil {
+		return err
+	}
 	return r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
 		platforms := make([]string, 0, len(records))
 		for _, rec := range records {
@@ -502,6 +509,15 @@ func (r *userPlatformQuotaRepository) BatchSnapshotUsage(ctx context.Context, sn
 				return ErrUserPlatformQuotaFKViolation
 			}
 			return err
+		}
+	}
+	return nil
+}
+
+func validateQuotaPlatforms(records []UserPlatformQuotaRecord) error {
+	for _, rec := range records {
+		if !domain.IsConcretePlatform(rec.Platform) {
+			return fmt.Errorf("user_platform_quotas: platform %q is not allowed", rec.Platform)
 		}
 	}
 	return nil

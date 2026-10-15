@@ -54,7 +54,7 @@
       <!-- Remove button (always visible, stop propagation) -->
       <button
         type="button"
-        @click.stop="emit('remove')"
+        @click.stop="removeEntry"
         class="flex-shrink-0 rounded p-1 text-gray-400 hover:text-red-500"
       >
         <Icon name="trash" size="sm" />
@@ -267,7 +267,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -300,6 +300,20 @@ const emit = defineEmits<{
 
 // Collapse state: entries with existing models default to collapsed
 const collapsed = ref(props.entry.models.length > 0)
+let defaultPriceRequestId = 0
+let pendingDefaultSnapshot: string | null = null
+watch(() => props.entry, (entry) => {
+  if (pendingDefaultSnapshot !== null && JSON.stringify(entry) !== pendingDefaultSnapshot) {
+    defaultPriceRequestId++
+    pendingDefaultSnapshot = null
+  }
+}, { deep: true, flush: 'sync' })
+onBeforeUnmount(() => { defaultPriceRequestId++ })
+
+function removeEntry() {
+  defaultPriceRequestId++
+  emit('remove')
+}
 
 const billingModeOptions = computed(() => [
   { value: 'token', label: t('admin.channels.billingMode.token') },
@@ -320,6 +334,7 @@ const maxReasoningEffortMultiplierPlaceholder = computed(() =>
 )
 
 function emitField(field: keyof PricingFormEntry, value: string) {
+  defaultPriceRequestId++
   emit('update', { ...props.entry, [field]: value === '' ? null : value })
 }
 
@@ -367,22 +382,31 @@ function removeInterval(idx: number) {
 }
 
 async function onModelsUpdate(newModels: string[]) {
+  const requestId = ++defaultPriceRequestId
   const oldModels = props.entry.models
+  const initialSnapshot = JSON.stringify(props.entry)
+  const expectedSnapshot = JSON.stringify({ ...props.entry, models: newModels })
+  pendingDefaultSnapshot = expectedSnapshot
   emit('update', { ...props.entry, models: newModels })
 
-  // 只在新增模型且当前无价格时自动填充
+  // Only the first single-model selection can initialize an empty entry.
   const addedModels = newModels.filter(m => !oldModels.includes(m))
-  if (addedModels.length === 0) return
+  if (oldModels.length !== 0 || newModels.length !== 1 || addedModels.length !== 1) return
 
   // 检查是否所有价格字段都为空
   const e = props.entry
   const hasPrice = e.input_price != null || e.output_price != null ||
-                   e.cache_write_price != null || e.cache_write_1h_price != null || e.cache_read_price != null
+                   e.cache_write_price != null || e.cache_write_1h_price != null || e.cache_read_price != null ||
+                   e.image_input_price != null || e.image_output_price != null || e.per_request_price != null ||
+                   e.max_reasoning_effort_multiplier != null
   if (hasPrice) return
 
   // 查询第一个新增模型的默认价格
   try {
     const result = await channelsAPI.getModelDefaultPricing(addedModels[0])
+    if (requestId !== defaultPriceRequestId) return
+    const currentSnapshot = JSON.stringify(props.entry)
+    if (currentSnapshot !== initialSnapshot && currentSnapshot !== expectedSnapshot) return
     if (result.found) {
       emit('update', {
         ...props.entry,
@@ -399,6 +423,8 @@ async function onModelsUpdate(newModels: string[]) {
     }
   } catch {
     // 查询失败不影响用户操作
+  } finally {
+    if (requestId === defaultPriceRequestId) pendingDefaultSnapshot = null
   }
 }
 </script>

@@ -18,7 +18,7 @@ func WithOpenAIMessagesKeyRoute(ctx context.Context) context.Context {
 	return context.WithValue(ctx, openAIMessagesKeyRouteContextKey{}, true)
 }
 
-func openAIMessagesKeyRouteGroupAllowed(ctx context.Context, group *Group) bool {
+func openAIMessagesKeyRouteGroupAllowed(ctx context.Context, group *Group, singleCandidate bool) bool {
 	if ctx == nil {
 		return true
 	}
@@ -31,7 +31,7 @@ func openAIMessagesKeyRouteGroupAllowed(ctx context.Context, group *Group) bool 
 	if group.Platform == PlatformGrok || IsMultiProtocolAPIKeyProvider(group.Platform) {
 		return true
 	}
-	if group.Platform == PlatformComposite {
+	if group.Platform == PlatformComposite || singleCandidate {
 		if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok && (platform == PlatformGrok || IsMultiProtocolAPIKeyProvider(platform)) {
 			return true
 		}
@@ -69,7 +69,7 @@ func (s *OpenAIGatewayService) hydrateAPIKeyGroup(ctx context.Context, apiKey *A
 	if err != nil {
 		return nil, err
 	}
-	if !openAIMessagesKeyRouteGroupAllowed(ctx, routed.Group) {
+	if !openAIMessagesKeyRouteGroupAllowed(ctx, routed.Group, len(apiKey.CandidateGroupIDs()) <= 1) {
 		return nil, ErrNoAvailableAccounts
 	}
 	return routed, nil

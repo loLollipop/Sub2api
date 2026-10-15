@@ -45,7 +45,7 @@ func TestNativeProviderMessagesKeyRoutesPreserveModel(t *testing.T) {
 			group := &Group{ID: 1, Platform: platform, Status: StatusActive, Hydrated: true}
 			sanitizeGroupMessagesDispatchFields(group)
 			require.False(t, group.AllowMessagesDispatch)
-			require.True(t, openAIMessagesKeyRouteGroupAllowed(ctx, group))
+			require.True(t, openAIMessagesKeyRouteGroupAllowed(ctx, group, false))
 			require.Empty(t, group.ResolveMessagesDispatchModel(model))
 			require.Equal(t, model, openAIMessagesKeyRouteModel(ctx, group, model))
 			for _, ids := range [][]int64{{1}, {1, 2}} {
@@ -58,12 +58,12 @@ func TestNativeProviderMessagesKeyRoutesPreserveModel(t *testing.T) {
 			}
 			composite := &Group{Platform: PlatformComposite}
 			resolved := WithResolvedTargetPlatform(ctx, platform)
-			require.True(t, openAIMessagesKeyRouteGroupAllowed(resolved, composite))
+			require.True(t, openAIMessagesKeyRouteGroupAllowed(resolved, composite, false))
 			require.Equal(t, model, openAIMessagesKeyRouteModel(resolved, composite, model))
 		})
 	}
 	ctx := WithOpenAIMessagesKeyRoute(context.Background())
-	require.False(t, openAIMessagesKeyRouteGroupAllowed(ctx, &Group{Platform: PlatformOpenAI}))
+	require.False(t, openAIMessagesKeyRouteGroupAllowed(ctx, &Group{Platform: PlatformOpenAI}, true))
 }
 
 func TestNativeProviderMessagesRoutesEnforceCandidatePermission(t *testing.T) {
@@ -80,7 +80,7 @@ func TestNativeProviderMessagesRoutesEnforceCandidatePermission(t *testing.T) {
 			svc := &OpenAIGatewayService{schedulerSnapshot: snapshot}
 			key := &APIKey{User: &User{}, GroupID: &primary.ID, Group: primary, RouteGroupIDs: []int64{1, 2}}
 			ctx := WithResolvedTargetPlatform(WithOpenAIMessagesKeyRoute(context.Background()), platform)
-			require.False(t, openAIMessagesKeyRouteGroupAllowed(ctx, primary))
+			require.False(t, openAIMessagesKeyRouteGroupAllowed(ctx, primary, false))
 			var tried []int64
 			_, _, routed, err := svc.selectAlongKeyRoutes(ctx, key, []string{platform}, model,
 				func(_ context.Context, groupID *int64, _ []string, requestedModel string) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
@@ -93,6 +93,27 @@ func TestNativeProviderMessagesRoutesEnforceCandidatePermission(t *testing.T) {
 			require.Equal(t, int64(2), *routed.GroupID)
 		})
 	}
+}
+
+func TestNativeProviderMessagesSingleCandidateRetainsTargetPermission(t *testing.T) {
+	const model = "grok-4.6"
+	group := &Group{ID: 1, Platform: PlatformAnthropic, Status: StatusActive, Hydrated: true, CrossProtocolConversionEnabled: true}
+	account := &Account{ID: 11, Platform: PlatformGrok, GroupIDs: []int64{1}, Credentials: map[string]any{"model_mapping": map[string]any{model: model}}}
+	snapshot, _ := newSmartRouteCoreSnapshot([]*Group{group}, account)
+	svc := &OpenAIGatewayService{schedulerSnapshot: snapshot}
+	key := &APIKey{User: &User{}, GroupID: &group.ID, Group: group}
+	ctx := WithResolvedTargetPlatform(WithOpenAIMessagesKeyRoute(context.Background()), PlatformGrok)
+	var tried []int64
+	_, _, routed, err := svc.selectAlongKeyRoutes(ctx, key, []string{PlatformGrok}, model,
+		func(_ context.Context, groupID *int64, platforms []string, requestedModel string) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+			tried = append(tried, *groupID)
+			require.Equal(t, model, requestedModel)
+			require.Equal(t, []string{PlatformGrok}, platforms)
+			return &AccountSelectionResult{Account: account}, OpenAIAccountScheduleDecision{}, nil
+		})
+	require.NoError(t, err)
+	require.Equal(t, []int64{1}, tried)
+	require.Equal(t, group.ID, *routed.GroupID)
 }
 
 func nativeProviderResponsesToolSSE() string {

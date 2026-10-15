@@ -574,6 +574,7 @@ export default {
         emailPlaceholder: '请输入邮箱',
         usernameLabel: '用户名',
         usernamePlaceholder: '请输入用户名（选填）',
+        usernameInvalid: '用户名最多 50 个字符，仅支持字母、数字、空格、下划线、短横线和句点。',
         notesLabel: '备注',
         notesPlaceholder: '请输入备注（仅管理员可见）',
         notesHint: '此备注仅对管理员可见',
@@ -943,6 +944,12 @@ export default {
         privacySetOnly: '仅允许隐私保护已设置的账号',
         privacySetOnlyEnabled: '已启用 — Privacy 未设置的账号将被排除',
         disabled: '未启用'
+      },
+      i18nField: {
+        default: '默认',
+        add: '新增 {language} 版',
+        edit: '编辑 {language} 版',
+        placeholder: '{language} 版，留空则显示默认内容'
       },
       enterGroupName: '请输入分组名称',
       optionalDescription: '可选描述',

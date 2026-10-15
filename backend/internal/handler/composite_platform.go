@@ -10,7 +10,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func ensureCompositeTargetPlatform(c *gin.Context, apiKey *service.APIKey, model string) {
+func ensureCompositeTargetPlatform(c *gin.Context, apiKey *service.APIKey, model string, resolvers ...service.UpstreamPlatformResolver) {
 	if c == nil || c.Request == nil || apiKey == nil || !apiKey.UsesRequestTargetPlatform() {
 		return
 	}
@@ -21,6 +21,13 @@ func ensureCompositeTargetPlatform(c *gin.Context, apiKey *service.APIKey, model
 	// route matched. Smart-routing keys must not: guessing from "gemini-*" /
 	// "grok-*" overrides the account catalog (0.1.262).
 	if apiKey.Group == nil || apiKey.Group.Platform != service.PlatformComposite {
+		// GET upgrades have no model for middleware to resolve. Once the WS
+		// first frame is readable, use its real account catalog instead.
+		if len(resolvers) > 0 && resolvers[0] != nil {
+			if platform, ok := resolvers[0].UpstreamPlatformForModel(c.Request.Context(), apiKey, model); ok {
+				c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), platform))
+			}
+		}
 		return
 	}
 	if platform, ok := service.DetectModelPlatform(model); ok {

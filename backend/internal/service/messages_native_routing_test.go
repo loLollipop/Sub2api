@@ -14,6 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Match cc-switch's protocol selection: native endpoints win over conversion,
+// but managed Codex OAuth credentials must keep their Responses wire protocol.
+// Adaptive is not proof that a native Messages endpoint exists (e.g. Gemini).
+func shouldForwardMessagesViaNativeAnthropic(account *Account) bool {
+	if account == nil || account.UsesOpenAICodexProtocol() {
+		return false
+	}
+	return account.IsAnthropicProtocol() ||
+		(account.IsAdaptiveAPIProtocol() && strings.TrimSpace(account.GetAnthropicProtocolBaseURL()) != "")
+}
+
 func TestMessagesNativeProtocolSelection(t *testing.T) {
 	for _, tc := range []struct {
 		name, platform, protocol, accountType, nativeBase string

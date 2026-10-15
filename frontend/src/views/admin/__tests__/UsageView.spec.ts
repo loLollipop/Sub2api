@@ -288,10 +288,10 @@ describe('admin UsageView route filters', () => {
     ;(wrapper.vm as any).pagination.page = 4
     wrapper.findAllComponents({ name: 'UsageTable' }).at(-1)!.vm.$emit('requestIdClick', 'up%_stream')
     await flushPromises()
-    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, request_id: 'up%_stream' }), expect.anything())
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, request_id: '=up%_stream' }), expect.anything())
     ;(wrapper.vm as any).handlePageChange(2)
     await flushPromises()
-    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, request_id: 'up%_stream' }), expect.anything())
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, request_id: '=up%_stream' }), expect.anything())
     wrapper.unmount()
   })
 
@@ -299,6 +299,8 @@ describe('admin UsageView route filters', () => {
     ['  550e8400-e29b-41d4-a716-446655440000  ', '550e8400-e29b-41d4-a716-446655440000'],
     ['  client:abc  ', 'client:abc'],
     ['  fragment%_  ', 'fragment%_'],
+    ['  =client:abc%_  ', '=client:abc%_'],
+    ['  ^local:abc%_  ', '^local:abc%_'],
     ['   ', undefined],
   ])('trims ID search %s without changing the raw ID', async (input, expected) => {
     const wrapper = mountRouteFilteredUsageView()

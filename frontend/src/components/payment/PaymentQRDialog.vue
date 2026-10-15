@@ -234,12 +234,13 @@ async function tryRecoverPendingOrder(order: PaymentOrder): Promise<PaymentOrder
 
 function startCountdown(seconds: number) {
   remainingSeconds.value = Math.max(0, seconds)
+  const deadline = Date.now() + remainingSeconds.value * 1000
   if (remainingSeconds.value <= 0) {
     expired.value = true
     return
   }
   countdownTimer = setInterval(() => {
-    remainingSeconds.value--
+    remainingSeconds.value = Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
     if (remainingSeconds.value <= 0) {
       expired.value = true
       cleanup()
@@ -289,7 +290,7 @@ function init() {
   let seconds = 30 * 60
   if (props.expiresAt) {
     const expiresAt = new Date(props.expiresAt)
-    seconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
+    seconds = Math.ceil((expiresAt.getTime() - Date.now()) / 1000)
   }
   startCountdown(seconds)
   pollTimer = setInterval(pollStatus, 3000)

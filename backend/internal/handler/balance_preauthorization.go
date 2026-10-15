@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -49,6 +50,7 @@ func preauthorizeTextGatewayRequest(
 	}
 	payloadHash := service.HashUsageRequestPayload(body)
 	tokenEstimate := service.EstimateBalancePreauthorizationTokens(body)
+	serviceTier = initialTextPreauthorizationTier(apiKey, serviceTier)
 	return preauthorizer.Preauthorize(ctx, service.BalancePreauthorizationRequest{
 		RequestID:                 service.ResolveBalancePreauthorizationRequestID(ctx),
 		APIKeyID:                  apiKey.ID,
@@ -60,6 +62,18 @@ func preauthorizeTextGatewayRequest(
 		InitialOutputWindowTokens: tokenEstimate.OutputTokens,
 		CostInput:                 pricing.BalancePreauthorizationCostInput(ctx, apiKey, billingModel, pricingAt, serviceTier),
 	})
+}
+
+// Before account selection Free Fast uses its Standard lower bound. Final
+// wire/account repricing must fund any non-OpenAI tier before network I/O.
+func initialTextPreauthorizationTier(apiKey *service.APIKey, tier string) string {
+	tier = strings.ToLower(strings.TrimSpace(tier))
+	if apiKey != nil && apiKey.Group != nil && apiKey.Group.FreeOpenAIFast &&
+		(apiKey.Group.Platform == service.PlatformOpenAI || apiKey.Group.Platform == service.PlatformComposite) &&
+		(tier == "priority" || tier == "fast") {
+		return ""
+	}
+	return tier
 }
 
 // preauthorizePerRequestGatewayRequest reserves balance for count/size/duration

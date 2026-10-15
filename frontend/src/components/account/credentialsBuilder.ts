@@ -1,4 +1,8 @@
 import { openAIPlanTypeKey, openAIPlanTypeLabel, openAIPlanTypes } from '@/utils/planType'
+import {
+  getProviderMode,
+  getProviderProfile
+} from '@/constants/platformCatalog'
 
 export function applyInterceptWarmup(
   credentials: Record<string, unknown>,
@@ -39,15 +43,7 @@ export interface HeaderOverrideRow {
 
 /** 请求头覆写资格（与后端 IsHeaderOverrideEligible 保持一致） */
 export function isHeaderOverrideCapable(platform: string, type: string): boolean {
-  if (
-    platform === 'anthropic' ||
-    platform === 'openai' ||
-    platform === 'kimi' ||
-    platform === 'zhipu' ||
-    platform === 'deepseek' ||
-    platform === 'minimax' ||
-    platform === 'mixed'
-  ) {
+  if (platform === 'anthropic' || platform === 'openai' || platform === 'mixed' || isMultiProtocolApiKeyPlatform(platform)) {
     return type === 'apikey' || (platform === 'openai' && type === 'cloudflare')
   }
   if (platform === 'grok') {
@@ -265,10 +261,10 @@ export type CnProviderPlatform = 'kimi' | 'zhipu' | 'deepseek' | 'minimax'
 export type CnApiProtocol = 'adaptive' | 'chat_completions' | 'anthropic' | 'responses'
 
 export type CnNativeApiProtocol = Exclude<CnApiProtocol, 'adaptive'>
-export type AdaptiveProtocolPlatform = 'kimi' | 'zhipu' | 'deepseek' | 'gemini' | 'minimax'
+export type AdaptiveProtocolPlatform = 'kimi' | 'zhipu' | 'deepseek' | 'gemini' | 'minimax' | 'command_code' | 'cline'
 
 export function isAdaptiveProtocolPlatform(platform: string): platform is AdaptiveProtocolPlatform {
-  return platform === 'kimi' || platform === 'zhipu' || platform === 'deepseek' || platform === 'gemini' || platform === 'minimax'
+  return isMultiProtocolApiKeyPlatform(platform) || platform === 'gemini'
 }
 
 export function isGeminiOpenAIProtocolAccount(account: {
@@ -292,10 +288,95 @@ export function isCNProviderPlatform(platform: string): platform is CnProviderPl
   return platform === 'kimi' || platform === 'zhipu' || platform === 'deepseek' || platform === 'minimax'
 }
 
-/** DeepSeek、Kimi 与 MiniMax 提供原生 Responses 端点。 */
-export function cnSupportsNativeResponses(platform: string): boolean {
-  return platform === 'deepseek' || platform === 'kimi' || platform === 'minimax' || platform === 'gemini'
+const NATIVE_API_PROTOCOLS: CnNativeApiProtocol[] = ['chat_completions', 'anthropic', 'responses']
+
+/** 平台是否为多协议 API Key 供应商（平台清单中带 profile）。 */
+export function isMultiProtocolApiKeyPlatform(platform: string): boolean {
+  return !!getProviderProfile(platform)
 }
+
+/** 供应商在该接入模式下是否提供某协议的原生端点（未知模式按默认模式）。 */
+export function providerSupportsProtocol(platform: string, mode: string | undefined, protocol: CnNativeApiProtocol): boolean {
+  return !!getProviderMode(platform, mode)?.base_urls[protocol]
+}
+
+/** 供应商是否提供原生 Responses 端点。 */
+export function cnSupportsNativeResponses(platform: string, mode?: string): boolean {
+  return platform === 'gemini' || providerSupportsProtocol(platform, mode, 'responses')
+}
+
+/** 该接入模式下可直连的原生协议（按 chat_completions、anthropic、responses 顺序）。 */
+export function providerNativeProtocols(platform: string, mode?: string): CnNativeApiProtocol[] {
+  return (platform === 'gemini' ? NATIVE_API_PROTOCOLS : NATIVE_API_PROTOCOLS.filter(protocol => providerSupportsProtocol(platform, mode, protocol)))
+}
+
+/** 供应商按模型名选择上游协议（多模型聚合平台），此时 adaptive 账号携带分流规则。 */
+export function providerRoutesByModel(platform: string): boolean {
+  return getProviderProfile(platform)?.routing === 'by_model'
+}
+
+export interface ProviderProtocolRuleRow {
+  pattern: string
+  protocol: CnNativeApiProtocol
+  protocols?: CnNativeApiProtocol[]
+}
+
+export function providerProtocolRules(platform: string, raw?: unknown, mode?: string): ProviderProtocolRuleRow[] {
+  const rules = Array.isArray(raw) ? raw : getProviderMode(platform, mode)?.protocol_rules ?? []
+  return rules.flatMap((rule) => {
+    if (!rule || typeof rule !== 'object') return []
+    const entry = rule as Record<string, unknown>
+    const protocols = Array.isArray(entry.protocols)
+      ? entry.protocols.filter((protocol): protocol is CnNativeApiProtocol => NATIVE_API_PROTOCOLS.includes(protocol as CnNativeApiProtocol))
+      : []
+    const protocol = (entry.protocol || protocols[0]) as CnNativeApiProtocol
+    if (typeof entry.pattern !== 'string' || !NATIVE_API_PROTOCOLS.includes(protocol)) return []
+    return [{
+      pattern: entry.pattern,
+      protocol,
+      ...(protocols.length > 1 ? { protocols: [...new Set([protocol, ...protocols])] } : {})
+    }]
+  })
+}
+
+export function serializeProviderProtocolRules(rules: ProviderProtocolRuleRow[]): ProviderProtocolRuleRow[] {
+  return rules.filter(rule => rule.pattern.trim()).map(rule => ({
+    pattern: rule.pattern.trim().toLowerCase(),
+    protocol: rule.protocol,
+    ...(rule.protocols && rule.protocols.length > 1 ? { protocols: [...new Set([rule.protocol, ...rule.protocols])] } : {})
+  }))
+}
+
+/** 上游模型目录给出每个模型支持的协议；未命中分流规则的模型据此选协议。 */
+export function providerHasModelCatalog(platform: string): boolean {
+  return getProviderProfile(platform)?.model_catalog === true
+}
+
+/** 接入模式的展示名；未知模式原样显示。 */
+export function providerModeLabel(mode: string, t: (key: string) => string): string {
+  switch (mode) {
+    case 'payg':
+      return t('admin.accounts.cnProviders.accountMode.payg')
+    case 'coding':
+      return t('admin.accounts.cnProviders.accountMode.coding')
+    default:
+      return mode
+  }
+}
+
+/** 供应商的接入模式，默认模式在前。 */
+export function providerAccountModes(platform: string): string[] {
+  return getProviderProfile(platform)?.modes.map(item => item.mode) ?? []
+}
+
+/** 规范化接入模式：不在该供应商模式列表中的值回落默认模式。 */
+export function resolveProviderAccountMode(platform: string, value: unknown): string {
+  const profile = getProviderProfile(platform)
+  if (!profile) return typeof value === 'string' ? value : ''
+  if (typeof value === 'string' && profile.modes.some(item => item.mode === value)) return value
+  return profile.default_mode
+}
+
 
 export interface CnBaseUrlPreset {
   mode: CnAccountMode
@@ -345,53 +426,32 @@ export const CN_BASE_URL_PRESETS: Record<CnProviderPlatform, CnBaseUrlPreset[]> 
 /** 返回指定供应商 + 账号类型 + API 协议的默认 base url。 */
 export function defaultCNBaseUrl(
   platform: string,
-  mode: CnAccountMode,
+  mode: string,
   protocol: CnApiProtocol = 'chat_completions'
 ): string {
-  if (protocol === 'anthropic') {
-    switch (platform) {
-      case 'kimi':
-        return mode === 'coding' ? 'https://api.kimi.com/coding' : 'https://api.moonshot.cn/anthropic'
-      case 'zhipu':
-        return 'https://open.bigmodel.cn/api/anthropic'
-      case 'deepseek':
-        return 'https://api.deepseek.com/anthropic'
-      case 'gemini':
-        return ''
-      case 'minimax':
-        return 'https://api.minimaxi.com/anthropic'
-      default:
-        return ''
-    }
-  }
-  // responses: Kimi / DeepSeek / MiniMax / Gemini custom upstream share chat_completions base.
-  switch (platform) {
-    case 'kimi':
-      return mode === 'coding' ? 'https://api.kimi.com/coding/v1' : 'https://api.moonshot.cn/v1'
-    case 'zhipu':
-      return mode === 'coding'
-        ? 'https://open.bigmodel.cn/api/coding/paas/v4'
-        : 'https://open.bigmodel.cn/api/paas/v4'
-    case 'deepseek':
-      return 'https://api.deepseek.com'
-    case 'gemini':
-      return ''
-    case 'minimax':
-      return 'https://api.minimaxi.com/v1'
+  const baseUrls = getProviderMode(platform, mode)?.base_urls
+  if (!baseUrls) return ''
+  const chatBaseUrl = baseUrls.chat_completions ?? ''
+  switch (protocol) {
+    case 'anthropic':
+      return baseUrls.anthropic ?? ''
+    case 'responses':
+      return baseUrls.responses || chatBaseUrl
     default:
-      return ''
+      return chatBaseUrl
   }
 }
 
 /** 返回自适应模式下需要配置的原生协议及其默认端点。 */
 export function defaultCNAdaptiveBaseUrls(
-  platform: AdaptiveProtocolPlatform,
-  mode: CnAccountMode
+  platform: string,
+  mode: string
 ): Record<CnNativeApiProtocol, string> {
+  const baseUrls = getProviderMode(platform, mode)?.base_urls ?? {}
   return {
-    chat_completions: defaultCNBaseUrl(platform, mode, 'chat_completions'),
-    anthropic: defaultCNBaseUrl(platform, mode, 'anthropic'),
-    responses: cnSupportsNativeResponses(platform) ? defaultCNBaseUrl(platform, mode, 'responses') : ''
+    chat_completions: baseUrls.chat_completions ?? '',
+    anthropic: baseUrls.anthropic ?? '',
+    responses: baseUrls.responses ?? ''
   }
 }
 
@@ -399,12 +459,86 @@ export function defaultCNAdaptiveBaseUrls(
 // CNProviderQuotaCell / CNProviderBalanceCell 与 AccountUsageCell 的占位符判定
 // 共用，避免多处复制条件后一处改另一处漏改。
 
-export function cnQuotaCellVisible(platform: string, accountMode: string): boolean {
-  return (platform === 'kimi' || platform === 'zhipu' || platform === 'minimax') && accountMode === 'coding'
+/** 用量单元格可见性判定所需的账号字段。 */
+export interface CNUsageCellAccount {
+  platform: string
+  type: string
+  credentials?: Record<string, unknown>
 }
 
-export function cnBalanceCellVisible(platform: string, accountMode: string): boolean {
-  return (platform === 'kimi' || platform === 'deepseek') && accountMode !== 'coding'
+// Command Code、Cline 的积分与用量接口只查官方主机上的 API Key 账号（与后端
+// commandCodeUsageSupported / clineAccountAPISupported 一致）：自定义中转的 Key 不发往
+// 官方接口，后端直接拒绝探测，单元格只会显示一行报错。
+const OFFICIAL_ACCOUNT_API_PLATFORMS = ['command_code', 'cline']
+
+function cnUsageCellAccountMode(account: CNUsageCellAccount): string {
+  const mode = account.credentials?.account_mode
+  return typeof mode === 'string' ? mode : ''
+}
+
+/** 与后端 Account.GetAPIProtocol 一致：按模型分流的供应商未指定原生协议时为 adaptive。 */
+function accountUsesAdaptiveProtocol(platform: string, mode: string, protocol: unknown): boolean {
+  if (protocol === 'adaptive') return true
+  if (protocol === 'chat_completions' || protocol === 'anthropic') return false
+  if (protocol === 'responses' && cnSupportsNativeResponses(platform, mode)) return false
+  return providerRoutesByModel(platform)
+}
+
+/**
+ * 账号实际使用的 Chat Completions 端点（与后端 Account.GetOpenAIBaseURL 一致）：adaptive
+ * 账号优先分协议端点，其次 base_url，都没填时为平台清单的默认端点。
+ */
+function accountChatBaseUrl(account: CNUsageCellAccount, mode: string): string {
+  const credentials = account.credentials
+  const baseUrls = credentials?.api_base_urls
+  if (baseUrls && typeof baseUrls === 'object' && accountUsesAdaptiveProtocol(account.platform, mode, credentials?.api_protocol)) {
+    const chat = (baseUrls as Record<string, unknown>).chat_completions
+    if (typeof chat === 'string' && chat.trim()) return chat.trim()
+  }
+  const baseUrl = credentials?.base_url
+  if (typeof baseUrl === 'string' && baseUrl.trim()) return baseUrl.trim()
+  return defaultCNBaseUrl(account.platform, mode)
+}
+
+/** 官方主机即平台清单默认端点的主机，且必须是 https。 */
+function officialAccountAPISupported(account: CNUsageCellAccount, mode: string): boolean {
+  if (account.type !== 'apikey') return false
+  try {
+    const official = new URL(defaultCNBaseUrl(account.platform, mode))
+    const endpoints = [accountChatBaseUrl(account, mode)]
+    const storedBase = account.credentials?.base_url
+    if (typeof storedBase === 'string' && storedBase.trim()) endpoints.push(storedBase.trim())
+    const protocolBases = account.credentials?.api_base_urls
+    if (protocolBases && typeof protocolBases === 'object') {
+      for (const value of Object.values(protocolBases)) {
+        if (typeof value === 'string' && value.trim()) endpoints.push(value.trim())
+      }
+    }
+    return endpoints.every(endpoint => {
+      const target = new URL(endpoint)
+      return target.protocol === 'https:' && target.hostname === official.hostname &&
+        !target.username && !target.password && (!target.port || target.port === '443') &&
+        !endpoint.includes('?') && !endpoint.includes('#') && !target.pathname.includes('%') &&
+        !target.search && !target.hash
+    })
+  } catch {
+    return false
+  }
+}
+
+export function cnQuotaCellVisible(account: CNUsageCellAccount): boolean {
+  const { platform } = account
+  const mode = cnUsageCellAccountMode(account)
+  // Command Code、Cline：订阅窗口与积分由一次探测同时刷新。
+  if (OFFICIAL_ACCOUNT_API_PLATFORMS.includes(platform)) return officialAccountAPISupported(account, mode)
+  return (platform === 'kimi' || platform === 'zhipu' || platform === 'minimax') && mode === 'coding'
+}
+
+export function cnBalanceCellVisible(account: CNUsageCellAccount): boolean {
+  const { platform } = account
+  const mode = cnUsageCellAccountMode(account)
+  if (OFFICIAL_ACCOUNT_API_PLATFORMS.includes(platform)) return officialAccountAPISupported(account, mode)
+  return (platform === 'kimi' || platform === 'deepseek') && mode !== 'coding'
 }
 
 /**

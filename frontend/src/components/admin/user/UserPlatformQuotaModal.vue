@@ -116,6 +116,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
+import { listPlatformIds } from '@/constants/platformCatalog'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -128,7 +129,7 @@ const emit = defineEmits(['close', 'success'])
 const { t } = useI18n()
 const appStore = useAppStore()
 
-const PLATFORMS: PlatformQuotaPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'mixed']
+const PLATFORMS = listPlatformIds() as PlatformQuotaPlatform[]
 
 interface QuotaRow {
   platform: PlatformQuotaPlatform

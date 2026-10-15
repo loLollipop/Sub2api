@@ -39,6 +39,40 @@ func mixedRefusal(protocol string) *http.Response {
 	return mixedHTTPResponse(404, string(b), false)
 }
 
+// These expectations are deliberately independent of the production dispatcher.
+func mixedExpectedProtocolOrder(ingress string) []string {
+	switch ingress {
+	case APIProtocolResponses:
+		return []string{APIProtocolResponses, APIProtocolChatCompletions, APIProtocolAnthropic}
+	case APIProtocolAnthropic:
+		return []string{APIProtocolAnthropic, APIProtocolChatCompletions, APIProtocolResponses}
+	default:
+		return []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic}
+	}
+}
+
+// Supply real HTTP refusals for every preceding protocol. mixedForward always
+// enters the production dispatcher, including tests targeting a converted path.
+func mixedResponsesForTarget(ingress, target string, response *http.Response) []*http.Response {
+	responses := []*http.Response{}
+	for _, protocol := range mixedExpectedProtocolOrder(ingress) {
+		if protocol == target {
+			return append(responses, response)
+		}
+		responses = append(responses, mixedRefusal(protocol))
+	}
+	panic("unknown Mixed test target")
+}
+
+func mixedExpectedAttempts(ingress, target string) int {
+	for i, protocol := range mixedExpectedProtocolOrder(ingress) {
+		if protocol == target {
+			return i + 1
+		}
+	}
+	panic("unknown Mixed test target")
+}
+
 const mixedChatToolJSON = `{"id":"cc_1","object":"chat.completion","model":"actual","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\"id\":1}"}}]},"finish_reason":"stop"}],"usage":{"prompt_tokens":9,"completion_tokens":4,"total_tokens":13,"prompt_tokens_details":{"cached_tokens":3}}}`
 
 func mixedChatToolSSE() string {
@@ -78,7 +112,7 @@ func mixedForward(t *testing.T, svc *OpenAIGatewayService, account *Account, pro
 	return result, recorder, c, err
 }
 
-func TestMixedChatFirstAllIngressToolsAndUsage(t *testing.T) {
+func TestMixedChatFallbackAllIngressToolsAndUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, protocol := range []string{APIProtocolResponses, APIProtocolChatCompletions, APIProtocolAnthropic} {
 		for _, stream := range []bool{false, true} {
@@ -89,11 +123,11 @@ func TestMixedChatFirstAllIngressToolsAndUsage(t *testing.T) {
 				if stream {
 					upstreamBody = mixedChatToolSSE()
 				}
-				upstream := &httpUpstreamRecorder{resp: mixedHTTPResponse(200, upstreamBody, stream)}
+				upstream := &httpUpstreamRecorder{responses: mixedResponsesForTarget(protocol, APIProtocolChatCompletions, mixedHTTPResponse(200, upstreamBody, stream))}
 				svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 				result, recorder, c, err := mixedForward(t, svc, account, protocol, mixedClientBody(protocol, stream))
 				require.NoError(t, err)
-				require.Len(t, upstream.requests, 1)
+				require.Len(t, upstream.requests, mixedExpectedAttempts(protocol, APIProtocolChatCompletions))
 				require.Equal(t, "/v1/chat/completions", upstream.lastReq.URL.Path)
 				require.Equal(t, "/v1/chat/completions", GetActualOpenAIUpstreamEndpoint(c))
 				require.Equal(t, "Bearer test-secret", upstream.lastReq.Header.Get("Authorization"))
@@ -123,10 +157,7 @@ func TestMixedFallbackOrderBoundedAndMapsOriginalOnce(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, protocol := range []string{APIProtocolResponses, APIProtocolChatCompletions, APIProtocolAnthropic} {
 		t.Run(protocol, func(t *testing.T) {
-			order := []string{APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic}
-			if protocol == APIProtocolAnthropic {
-				order = []string{APIProtocolChatCompletions, APIProtocolAnthropic, APIProtocolResponses}
-			}
+			order := mixedExpectedProtocolOrder(protocol)
 			upstream := &httpUpstreamRecorder{responses: []*http.Response{mixedRefusal(order[0]), mixedRefusal(order[1]), mixedRefusal(order[2])}}
 			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 			account := mixedTestAccount()
@@ -293,13 +324,6 @@ func TestMixedFallbackSuccessPreservesClientFormatsAndTools(t *testing.T) {
 		for _, target := range []string{APIProtocolResponses, APIProtocolAnthropic} {
 			for _, stream := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/to=%s/stream=%t", protocol, target, stream), func(t *testing.T) {
-					responses := []*http.Response{mixedRefusal(APIProtocolChatCompletions)}
-					if protocol == APIProtocolAnthropic && target == APIProtocolResponses {
-						responses = append(responses, mixedRefusal(APIProtocolAnthropic))
-					}
-					if protocol != APIProtocolAnthropic && target == APIProtocolAnthropic {
-						responses = append(responses, mixedRefusal(APIProtocolResponses))
-					}
 					var upstreamResponse *http.Response
 					if target == APIProtocolResponses {
 						if protocol == APIProtocolResponses && !stream {
@@ -315,7 +339,7 @@ func TestMixedFallbackSuccessPreservesClientFormatsAndTools(t *testing.T) {
 							upstreamResponse = mixedHTTPResponse(200, strings.ReplaceAll(toolAnthropicSSEStream(), `"stop_reason":"tool_use"`, `"stop_reason":"end_turn"`), true)
 						}
 					}
-					responses = append(responses, upstreamResponse)
+					responses := mixedResponsesForTarget(protocol, target, upstreamResponse)
 					attempts := len(responses)
 					upstream := &httpUpstreamRecorder{responses: responses}
 					svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}

@@ -592,6 +592,13 @@ const loadingResults = ref(false)
 const plans = ref<ScheduledTestPlan[]>([])
 const results = ref<ScheduledTestResult[]>([])
 const expandedPlanId = ref<number | null>(null)
+let resultsRequestId = 0
+watch([expandedPlanId, () => props.show, () => props.accountId], () => {
+  resultsRequestId++
+  results.value = []
+  loadingResults.value = false
+}, { flush: 'sync' })
+onUnmounted(() => { resultsRequestId++ })
 const selectedResultId = ref<number | null>(null)
 const previewMode = ref<'preview' | 'source'>('preview')
 // Cache parsed evidence by immutable result object, not repeatedly in render/filter.
@@ -675,8 +682,9 @@ const refreshOpenPanel = async () => {
       const windowRevision = resultWindowRevision(plan)
       const windowChanged = windowRevision !== resultsWindowRevision
       const afterId = windowChanged ? undefined : results.value.reduce((id, result) => Math.max(id, result.id), 0)
+      const requestId = resultsRequestId
       const latestResults = await adminAPI.scheduledTests.listResults(planId, limit, afterId)
-      if (props.show && expandedPlanId.value === planId && props.accountId === accountId) {
+      if (requestId === resultsRequestId && props.show && expandedPlanId.value === planId && props.accountId === accountId) {
         if (windowChanged) {
           results.value = latestResults.slice(0, limit)
         } else {
@@ -851,20 +859,22 @@ const toggleExpand = async (planId: number) => {
   selectedResultId.value = null
   previewMode.value = 'preview'
   loadingResults.value = true
+  const requestId = ++resultsRequestId
   try {
     const plan = plans.value.find(plan => plan.id === planId)
     const revision = planRevision(plan)
     const loaded = await adminAPI.scheduledTests.listResults(planId, resultLimit(plan))
-    if (!props.show || expandedPlanId.value !== planId) return
+    if (requestId !== resultsRequestId || !props.show || expandedPlanId.value !== planId) return
     results.value = loaded
     resultsRevision = revision
     resultsWindowRevision = resultWindowRevision(plan)
     selectedResultId.value = results.value[0]?.id ?? null
   } catch (error: any) {
+    if (requestId !== resultsRequestId) return
     appStore.showError(error?.message || 'Failed to load results')
     results.value = []
   } finally {
-    loadingResults.value = false
+    if (requestId === resultsRequestId) loadingResults.value = false
   }
 }
 

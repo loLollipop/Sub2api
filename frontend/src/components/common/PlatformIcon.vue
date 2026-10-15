@@ -63,7 +63,19 @@
     <path d="M21 19.5V5.4c0-1.55-1.92-2.27-2.94-1.11L8.6 15.1l2.32 2.65L17.5 10.2v9.3H21Z" />
     <path d="m10.15 14.38 2.32-2.64 2.93 3.36-2.32 2.65-2.93-3.37Z" />
   </svg>
+  <svg v-else-if="platform === 'typesafe'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+    <path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6L12 2Z" />
+    <path d="m7 12 3 3 7-7" />
+  </svg>
   <!-- Composite group icon -->
+  <svg v-else-if="platform === 'command_code'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="2" y="4" width="20" height="16" rx="3" />
+    <path d="m6 9 3 3-3 3m6 0h6" />
+  </svg>
+  <svg v-else-if="platform === 'cline'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="4" y="7" width="16" height="14" rx="4" />
+    <path d="M12 3v4M2 12v5m20-5v5M8 12v3m8-3v3m-7 3h6" />
+  </svg>
   <svg v-else-if="platform === 'composite'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <circle cx="6" cy="12" r="3" />
     <circle cx="18" cy="6" r="3" />

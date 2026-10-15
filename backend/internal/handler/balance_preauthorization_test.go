@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,12 +39,35 @@ func (s *preauthorizerStub) RequiresPreauthorization(int8) bool {
 type pricingProviderStub struct {
 	lastModel     string
 	lastPricingAt time.Time
+	lastTier      string
 }
 
-func (s *pricingProviderStub) BalancePreauthorizationCostInput(_ context.Context, _ *service.APIKey, model string, pricingAt time.Time, _ string) service.CostInput {
+func (s *pricingProviderStub) BalancePreauthorizationCostInput(_ context.Context, _ *service.APIKey, model string, pricingAt time.Time, tier string) service.CostInput {
 	s.lastModel = model
 	s.lastPricingAt = pricingAt
+	s.lastTier = tier
 	return service.CostInput{Model: model, RateMultiplier: 1, PricingAt: pricingAt}
+}
+
+func TestPreauthorizeTextFreeFastInitialTier(t *testing.T) {
+	for _, platform := range []string{service.PlatformOpenAI, service.PlatformComposite, service.PlatformMixed} {
+		for _, tier := range []string{"priority", " FAST ", "ultrafast", "flex"} {
+			t.Run(platform+"/"+tier, func(t *testing.T) {
+				preauthorizer := &preauthorizerStub{requires: true}
+				pricing := &pricingProviderStub{}
+				key := perRequestTestAPIKey()
+				key.Group = &service.Group{ID: *key.GroupID, Platform: platform, FreeOpenAIFast: true}
+				_, err := preauthorizeTextGatewayRequest(context.Background(), preauthorizer, pricing, key, nil,
+					[]byte(`{"model":"gpt-6.1-sol"}`), "gpt-6.1-sol", time.Unix(123, 0), tier)
+				require.NoError(t, err)
+				want := strings.ToLower(strings.TrimSpace(tier))
+				if platform != service.PlatformMixed && (want == "priority" || want == "fast") {
+					want = ""
+				}
+				require.Equal(t, want, pricing.lastTier)
+			})
+		}
+	}
 }
 
 func perRequestTestAPIKey() *service.APIKey {

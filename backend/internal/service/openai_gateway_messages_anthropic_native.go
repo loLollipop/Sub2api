@@ -31,17 +31,6 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// Match cc-switch's protocol selection: native endpoints win over conversion,
-// but managed Codex OAuth credentials must keep their Responses wire protocol.
-// Adaptive is not proof that a native Messages endpoint exists (e.g. Gemini).
-func shouldForwardMessagesViaNativeAnthropic(account *Account) bool {
-	if account == nil || account.UsesOpenAICodexProtocol() {
-		return false
-	}
-	return account.IsAnthropicProtocol() ||
-		(account.IsAdaptiveAPIProtocol() && strings.TrimSpace(account.GetAnthropicProtocolBaseURL()) != "")
-}
-
 // forwardAnthropicViaNativeAnthropicEndpoint 将 Anthropic Messages 请求零转换
 // 直通到国产供应商的原生 Anthropic 端点。仅做模型名映射与少量 body 清洗
 // （空文本块 / web-search 历史块），协议本身不转换。
@@ -63,6 +52,11 @@ func (s *OpenAIGatewayService) forwardAnthropicViaNativeAnthropicEndpoint(
 
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if err := validateSelectedAnthropicMessagesRequest(c, body, upstreamModel); err != nil {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
+	body = sanitizeAnthropicThinkingForModel(body, upstreamModel)
 	if upstreamModel != originalModel {
 		rewritten, err := sjson.SetBytes(body, "model", upstreamModel)
 		if err != nil {
@@ -73,16 +67,6 @@ func (s *OpenAIGatewayService) forwardAnthropicViaNativeAnthropicEndpoint(
 	if normalized, changed := NormalizeGLM53AnthropicThinking(body, upstreamModel); changed {
 		body = normalized
 	}
-
-	// 记录客户端请求的推理强度：优先 Claude 协议的 output_config.effort；
-	// 缺失且 thinking 已启用时，按国产 passback-required 模型兜底为 high
-	// （对齐 Anthropic 网关 gateway_handler 的记录语义，避免该路径长期落 NULL）。
-	requestedReasoningEffort := NormalizeClaudeOutputEffort(gjson.GetBytes(body, "output_config.effort").String())
-	reasoningEffort := ApplyThinkingEnabledFallback(
-		requestedReasoningEffort,
-		body,
-		billingModel,
-	)
 
 	// 与 Anthropic 平台 passthrough 相同的 pre-filter：剥离空文本块与上游
 	// 无法接受的 web-search 历史块（GLM/Kimi/DeepSeek 对 server_tool_use 400）。
@@ -107,12 +91,17 @@ func (s *OpenAIGatewayService) forwardAnthropicViaNativeAnthropicEndpoint(
 	}
 
 	upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, clientStream)
-	upstreamReq, _, err := s.buildNativeAnthropicUpstreamRequest(upstreamCtx, c, account, body, apiKey, targetURL)
+	upstreamReq, forwardedBody, err := s.buildNativeAnthropicUpstreamRequest(upstreamCtx, c, account, body, apiKey, targetURL)
 	releaseUpstreamCtx()
 	if err != nil {
 		return nil, err
 	}
 
+	reasoningEffort := NormalizeClaudeOutputEffort(gjson.GetBytes(forwardedBody, "output_config.effort").String())
+	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, forwardedBody, upstreamModel)
+	if err := s.repriceOpenAIFinalAttempt(ctx, account, forwardedBody, billingModel, upstreamModel); err != nil {
+		return nil, err
+	}
 	resp, err := s.doOpenAITextUpstream(ctx, c, upstreamReq, proxyURL, account)
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, true)
@@ -249,6 +238,7 @@ func (s *OpenAIGatewayService) buildNativeAnthropicUpstreamRequest(
 
 	// 账号级请求头覆写（最终生效，覆盖上面所有来源的同名头）
 	account.ApplyHeaderOverrides(req.Header)
+	filterSonnet55ToolsetBetaHeader(req.Header, body, gjson.GetBytes(body, "model").String())
 
 	return req, body, nil
 }

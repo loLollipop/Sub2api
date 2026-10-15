@@ -9,8 +9,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"golang.org/x/sync/singleflight"
 )
+
+const (
+	CompositeRouteReasonAmbiguous      = "model is exposed by multiple provider platforms"
+	CompositeRouteReasonOAuthAmbiguous = "model is exposed by multiple provider platforms including OAuth accounts"
+)
+
+func (d CompositeRouteDecision) OAuthAmbiguous() bool {
+	return !d.Matched && d.Reason == CompositeRouteReasonOAuthAmbiguous
+}
+
+func (d CompositeRouteDecision) AmbiguousMessage() string {
+	return fmt.Sprintf("Model %q is mapped on multiple provider platforms in this group; configure an explicit composite route", d.PublicModel)
+}
 
 // ErrCompositeRouteCacheNotReady indicates that the immutable route projection
 // has not been published yet.  Callers should return a retryable readiness
@@ -69,6 +83,73 @@ func (r *CompositeRouteResolver) SetModelOwnershipResolver(resolver CompositeMod
 	}
 }
 
+// ListExactPublicModels returns concrete public IDs, not prefix patterns. It
+// uses the same invalidatable route projection as forwarding and never mutates
+// that projection while preparing a caller's catalog.
+func (r *CompositeRouteResolver) ListExactPublicModels(ctx context.Context, groupID int64, endpoint string) ([]string, error) {
+	targets, err := r.exactPublicModelTargets(ctx, groupID, endpoint)
+	if err != nil {
+		return nil, err
+	}
+	models := make([]string, 0, len(targets))
+	for model, candidates := range targets {
+		for _, target := range candidates {
+			if CheckModelScope(ctx, model, target.model) == nil {
+				models = append(models, model)
+				break
+			}
+		}
+	}
+	sort.Strings(models)
+	return models, nil
+}
+
+type compositeCatalogTarget struct {
+	model    string
+	platform string
+}
+
+func (r *CompositeRouteResolver) exactPublicModelTargets(ctx context.Context, groupID int64, endpoint string) (map[string][]compositeCatalogTarget, error) {
+	if r == nil || r.repo == nil || groupID <= 0 {
+		return nil, nil
+	}
+	routes, err := r.routesForGroup(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if endpoint != "" {
+		endpoint = normalizeCompositeRouteEndpoint(endpoint)
+	}
+	targets := make(map[string][]compositeCatalogTarget, len(routes))
+	for _, route := range routes {
+		if !route.Enabled || strings.TrimSpace(route.MatchType) != CompositeRouteMatchExact {
+			continue
+		}
+		routeEndpoint := normalizeCompositeRouteEndpoint(route.Endpoint)
+		if endpoint != "" && routeEndpoint != CompositeRouteEndpointAny && routeEndpoint != endpoint {
+			continue
+		}
+		model := strings.TrimSpace(route.PublicModel)
+		if model == "" || strings.ContainsAny(model, "*?") {
+			continue
+		}
+		effectiveEndpoint := endpoint
+		if effectiveEndpoint == "" {
+			effectiveEndpoint = routeEndpoint
+		}
+		selected, matched := matchCompositeRoute(routes, model, effectiveEndpoint)
+		if !matched {
+			continue
+		}
+		target := strings.TrimSpace(selected.UpstreamModel)
+		if target == "" {
+			target = model
+		}
+		targets[model] = append(targets[model], compositeCatalogTarget{model: target, platform: selected.TargetPlatform})
+	}
+	return targets, nil
+}
+
 func (r *CompositeRouteResolver) Resolve(ctx context.Context, groupID int64, model, endpoint string) (CompositeRouteDecision, error) {
 	model = strings.TrimSpace(model)
 	endpoint = normalizeCompositeRouteEndpoint(endpoint)
@@ -114,7 +195,12 @@ func (r *CompositeRouteResolver) Resolve(ctx context.Context, groupID int64, mod
 				return decision, fmt.Errorf("resolve account model ownership: %w", err)
 			}
 		} else if ownership.Ambiguous {
-			decision.Reason = "model is exposed by multiple provider platforms"
+			decision.Reason = CompositeRouteReasonAmbiguous
+			// 未解析的请求由下游 handler 按模型名前缀兜底选平台；只有兜底落在
+			// OpenAI 网关族时，OpenAI 网关 OAuth 声明方才会被误送进 Anthropic 管线。
+			if guessed, ok := DetectModelPlatform(model); ok && ownership.OpenAIGatewayOAuthClaimed && domain.UsesOpenAIGateway(guessed) {
+				decision.Reason = CompositeRouteReasonOAuthAmbiguous
+			}
 			return decision, nil
 		} else if ownership.Matched {
 			platform := strings.TrimSpace(ownership.TargetPlatform)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -116,6 +117,10 @@ func (h *OpsHandler) GetErrorLogs(c *gin.Context) {
 	filter.Owner = strings.TrimSpace(c.Query("error_owner"))
 	filter.Source = strings.TrimSpace(c.Query("error_source"))
 	filter.RequestID = strings.TrimSpace(c.Query("request_id"))
+	if err := usagestats.ValidateRequestIDSearch(filter.RequestID, filter.StartTime, filter.EndTime); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	filter.Query = strings.TrimSpace(c.Query("q"))
 	filter.UserQuery = strings.TrimSpace(c.Query("user_query"))
 	// Model 过滤：admin 走精确匹配（ModelFuzzy 默认 false，保持管理端语义）。
@@ -246,6 +251,10 @@ func (h *OpsHandler) ListRequestErrors(c *gin.Context) {
 	filter.Owner = strings.TrimSpace(c.Query("error_owner"))
 	filter.Source = strings.TrimSpace(c.Query("error_source"))
 	filter.RequestID = strings.TrimSpace(c.Query("request_id"))
+	if err := usagestats.ValidateRequestIDSearch(filter.RequestID, filter.StartTime, filter.EndTime); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	filter.Query = strings.TrimSpace(c.Query("q"))
 	filter.UserQuery = strings.TrimSpace(c.Query("user_query"))
 	// Model 过滤：admin 走精确匹配（ModelFuzzy 默认 false，保持管理端语义）。
@@ -401,7 +410,7 @@ func (h *OpsHandler) ListRequestErrorUpstreamErrors(c *gin.Context) {
 
 	// Prefer exact match on request_id; if missing, fall back to client_request_id.
 	if requestID != "" {
-		filter.RequestID = requestID
+		filter.RequestID = "=" + requestID
 	} else {
 		filter.ClientRequestID = clientRequestID
 	}
@@ -478,6 +487,10 @@ func (h *OpsHandler) ListUpstreamErrors(c *gin.Context) {
 	filter.Owner = "provider"
 	filter.Source = strings.TrimSpace(c.Query("error_source"))
 	filter.RequestID = strings.TrimSpace(c.Query("request_id"))
+	if err := usagestats.ValidateRequestIDSearch(filter.RequestID, filter.StartTime, filter.EndTime); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	filter.Query = strings.TrimSpace(c.Query("q"))
 
 	if platform := strings.TrimSpace(c.Query("platform")); platform != "" {

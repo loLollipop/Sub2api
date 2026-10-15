@@ -121,6 +121,10 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	if err := validateUserSchedulingLimits(&input.Concurrency, &input.RPMLimit); err != nil {
 		return nil, err
 	}
+	email := strings.TrimSpace(input.Email)
+	if err := ValidateRegistrationEmailFormat(email); err != nil {
+		return nil, err
+	}
 	balance := 0.0
 	if input.Balance != nil {
 		balance = *input.Balance
@@ -134,9 +138,16 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 		return nil, err
 	}
 
+	username := strings.TrimSpace(input.Username)
+	if username != "" {
+		if err := ValidateUsername(username); err != nil {
+			return nil, err
+		}
+	}
+
 	user := &User{
-		Email:         input.Email,
-		Username:      input.Username,
+		Email:         email,
+		Username:      username,
 		Notes:         input.Notes,
 		Role:          role,
 		Balance:       balance,
@@ -242,8 +253,15 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	var fields UserUpdateFields
 
 	if input.Email != "" {
-		user.Email = input.Email
-		fields.Email = true
+		email := strings.TrimSpace(input.Email)
+		// Existing legacy values may be resubmitted when editing unrelated fields.
+		if email != strings.TrimSpace(user.Email) {
+			if err := ValidateRegistrationEmailFormat(email); err != nil {
+				return nil, err
+			}
+			user.Email = email
+			fields.Email = true
+		}
 	}
 	if input.Password != "" {
 		if err := user.SetPassword(input.Password); err != nil {
@@ -253,8 +271,17 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	}
 
 	if input.Username != nil {
-		user.Username = *input.Username
-		fields.Username = true
+		// 与用户侧同口径：管理员也不能写入标记字符或超长用户名。
+		username := strings.TrimSpace(*input.Username)
+		if username != strings.TrimSpace(user.Username) {
+			if username != "" {
+				if err := ValidateUsername(username); err != nil {
+					return nil, err
+				}
+			}
+			user.Username = username
+			fields.Username = true
+		}
 	}
 	if input.Notes != nil {
 		user.Notes = *input.Notes

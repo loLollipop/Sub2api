@@ -3,11 +3,10 @@ import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * xlsx 的豁免不能只是一句注释。
+ * xlsx 只用于懒加载导出，不引入不可信工作簿解析。
  *
- * `.github/audit-exceptions.yml` 为 xlsx 的两条 high 漏洞（GHSA-4r6h-8v6p-xvw6
- * 原型污染、GHSA-5pgg-2g8v-p4x9 ReDoS）做了豁免，理由是「仅管理端导出、已改为
- * 动态导入」。**这两条漏洞都在解析路径上**——原型污染出自 `XLSX.read`
+ * 旧版两条 high 漏洞（GHSA-4r6h-8v6p-xvw6 原型污染、GHSA-5pgg-2g8v-p4x9
+ * ReDoS）在升级到精确锁定的 0.20.3 后不再需要豁免。它们都在解析路径上：原型污染出自 `XLSX.read`
  * 对不可信工作簿的处理，ReDoS 出自解析恶意文件。
  *
  * 本项目对 xlsx 的用法是**纯写**：aoa_to_sheet / sheet_add_aoa / book_new /
@@ -51,7 +50,7 @@ function collectSourceFiles(dir: string, out: string[] = []): string[] {
   return out
 }
 
-describe('xlsx is write-only (the premise behind its audit exception)', () => {
+describe('xlsx remains a lazy write-only export dependency', () => {
   const files = collectSourceFiles(SRC_DIR)
 
   it('never calls an xlsx parsing API anywhere in src', () => {
@@ -65,7 +64,7 @@ describe('xlsx is write-only (the premise behind its audit exception)', () => {
         }
       }
     }
-    expect(offenders, 'xlsx parsing is reachable — the audit exception is no longer valid').toEqual([])
+    expect(offenders, 'xlsx parsing is reachable — review the export-only boundary').toEqual([])
   })
 
   it('only uses the allowed write-path API surface', () => {
@@ -81,7 +80,7 @@ describe('xlsx is write-only (the premise behind its audit exception)', () => {
         }
       }
     }
-    expect(offenders, 'unexpected xlsx API — review whether the audit exception still holds').toEqual([])
+    expect(offenders, 'unexpected xlsx API — review the export-only boundary').toEqual([])
   })
 
   it('loads xlsx lazily so it never enters the initial bundle', () => {

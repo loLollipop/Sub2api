@@ -373,7 +373,7 @@ func geminiQuotaTierKeyForAccount(account *Account) string {
 	if account == nil || account.Platform != PlatformGemini {
 		return ""
 	}
-	if account.IsGeminiOpenAIProtocol() {
+	if account.usesGeminiProviderQuota() {
 		return ""
 	}
 

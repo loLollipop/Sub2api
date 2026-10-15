@@ -35,6 +35,19 @@ function readBlobAsText(blob: Blob): Promise<string> {
 }
 
 describe('UseKeyModal', () => {
+  it('shows only the native System One request for TypeSafe', () => {
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, apiKey: 'ts-local-test', baseUrl: 'https://example.com/v1', platform: 'typesafe' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
+    })
+    const code = wrapper.findAll('pre code').map((block) => block.text()).join('\n')
+    expect(code).toContain('https://example.com/v1/systemone')
+    expect(code).toContain('"model":"jev-latest"')
+    expect(code).not.toContain('ANTHROPIC')
+    expect(code).not.toContain('model_provider')
+    expect(code).not.toContain('chat/completions')
+    expect(wrapper.text()).not.toContain('keys.useKeyModal.cliTabs.codexCli')
+  })
   afterEach(() => {
     vi.unstubAllGlobals()
     saveAsMock.mockClear()

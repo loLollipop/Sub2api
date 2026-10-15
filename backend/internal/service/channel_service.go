@@ -91,6 +91,10 @@ type wildcardMappingEntry struct {
 
 // channelCache 渠道缓存快照（扁平化哈希结构，热路径 O(1) 查找）
 type channelCache struct {
+	// policyLoaded distinguishes a successfully loaded empty policy from a
+	// neutral cold/error snapshot. Resource authorization must fail closed on
+	// the latter, while legacy scheduler reads retain their existing behavior.
+	policyLoaded bool
 	// 热路径查找
 	pricingByGroupModel     map[channelModelKey]*ChannelModelPricing            // (groupID, platform, model) → 定价
 	wildcardByGroupPlatform map[channelGroupPlatformKey][]*wildcardPricingEntry // (groupID, platform) → 通配符定价（按配置顺序，先匹配先使用）
@@ -423,6 +427,7 @@ func (s *ChannelService) fetchChannelData(ctx context.Context) ([]Channel, map[i
 // 避免"每个出口各自记得 normalize"反模式。
 func populateChannelCache(channels []Channel, groupPlatforms map[int64]string) *channelCache {
 	cache := newEmptyChannelCache()
+	cache.policyLoaded = true
 	cache.groupPlatform = groupPlatforms
 	cache.byID = make(map[int64]*Channel, len(channels))
 	cache.loadedAt = time.Now()

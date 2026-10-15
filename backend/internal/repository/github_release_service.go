@@ -108,6 +108,38 @@ func (c *githubReleaseClientError) FetchLatestRelease(ctx context.Context, repo 
 	return nil, c.err
 }
 
+func (c *githubReleaseClientError) FetchBranchHead(ctx context.Context, repo, branch string) (string, error) {
+	return "", c.err
+}
+
+// FetchBranchHead is intentionally restricted to the two reviewed source feeds.
+func (c *githubReleaseClient) FetchBranchHead(ctx context.Context, repo, branch string) (string, error) {
+	if branch != "main" || (repo != "kiss-kedaya/sub2api" && repo != "Wei-Shaw/sub2api") {
+		return "", fmt.Errorf("unsupported upstream source")
+	}
+	req, err := c.newAPIRequest(ctx, fmt.Sprintf("https://api.github.com/repos/%s/branches/%s", repo, branch))
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub API returned %d", resp.StatusCode)
+	}
+	var result struct {
+		Commit struct {
+			SHA string `json:"sha"`
+		} `json:"commit"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1024*1024)).Decode(&result); err != nil {
+		return "", err
+	}
+	return result.Commit.SHA, nil
+}
+
 func (c *githubReleaseClientError) FetchRecentReleases(ctx context.Context, repo string, perPage int) ([]*service.GitHubRelease, error) {
 	return nil, c.err
 }

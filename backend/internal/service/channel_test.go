@@ -193,9 +193,11 @@ func TestChannelClone_Nil(t *testing.T) {
 
 func TestChannelModelPricingClone(t *testing.T) {
 	original := ChannelModelPricing{
-		Models: []string{"a", "b"},
+		CacheWrite1hPrice:            testPtrFloat64(2),
+		MaxReasoningEffortMultiplier: testPtrFloat64(3),
+		Models:                       []string{"a", "b"},
 		Intervals: []PricingInterval{
-			{MinTokens: 0, TierLabel: "tier1"},
+			{MinTokens: 0, TierLabel: "tier1", CacheWrite1hPrice: testPtrFloat64(4)},
 		},
 		TimePricing: &ChannelTimePricing{
 			Timezone:     "Asia/Shanghai",
@@ -209,6 +211,12 @@ func TestChannelModelPricingClone(t *testing.T) {
 	}
 
 	cloned := original.Clone()
+	*cloned.CacheWrite1hPrice = 20
+	*cloned.MaxReasoningEffortMultiplier = 30
+	*cloned.Intervals[0].CacheWrite1hPrice = 40
+	require.Equal(t, 2.0, *original.CacheWrite1hPrice)
+	require.Equal(t, 3.0, *original.MaxReasoningEffortMultiplier)
+	require.Equal(t, 4.0, *original.Intervals[0].CacheWrite1hPrice)
 
 	// Modify clone slices — original unchanged
 	cloned.Models[0] = "hacked"

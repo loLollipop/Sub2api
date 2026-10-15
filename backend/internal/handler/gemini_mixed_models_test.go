@@ -100,6 +100,15 @@ type geminiMixedModelsUpstream struct {
 	body   string
 }
 
+type geminiCatalogGroupRepo struct {
+	service.GroupRepository
+	groups map[int64]*service.Group
+}
+
+func (r geminiCatalogGroupRepo) GetByIDLite(_ context.Context, id int64) (*service.Group, error) {
+	return r.groups[id], nil
+}
+
 func (u *geminiMixedModelsUpstream) Do(_ *http.Request, _ string, _ int64, _ int) (*http.Response, error) {
 	return &http.Response{StatusCode: u.status, Header: http.Header{"Content-Type": {"application/json"}, "X-Request-Id": {"native-id"}}, Body: io.NopCloser(strings.NewReader(u.body))}, nil
 }
@@ -186,7 +195,16 @@ func TestGeminiNativeModelsIncludesSmartRoutingMappings(t *testing.T) {
 		if openAIProtocol {
 			repo.byGroup[45] = append(repo.byGroup[45], service.Account{ID: 4, Platform: service.PlatformGemini, Type: service.AccountTypeAPIKey, Credentials: map[string]any{"api_protocol": service.APIProtocolResponses}})
 		}
-		h := &GatewayHandler{geminiCompatService: service.NewGeminiMessagesCompatService(repo, nil, nil, nil, nil, nil, nil, nil, nil)}
+		groups := geminiCatalogGroupRepo{groups: map[int64]*service.Group{
+			45: {ID: 45, Platform: service.PlatformGemini},
+			46: {ID: 46, Platform: service.PlatformGemini},
+		}}
+		h := &GatewayHandler{
+			geminiCompatService: service.NewGeminiMessagesCompatService(repo, nil, nil, nil, nil, nil, nil, nil, nil),
+			gatewayService: service.NewGatewayService(repo, groups,
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil),
+		}
 		rec := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(rec)
 		c.Request = httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)

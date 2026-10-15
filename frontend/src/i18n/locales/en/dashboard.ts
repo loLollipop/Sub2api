@@ -409,7 +409,7 @@ export default {
     inflightRunning: 'In progress',
     inflightFold: 'In-flight requests',
     inflightMore: 'Show more',
-    requestIdPlaceholder: 'Enter the complete request ID',
+    requestIdPlaceholder: 'Request / upstream ID: fragment, =exact, ^prefix; short fragments need a range within 24h',
     inflightRunningHint: 'Still running. Duration and cost update when you refresh.',
     inflightElapsed: 'Elapsed',
     firstToken: 'First Token',

@@ -6,11 +6,11 @@
         @click="toggleDropdown"
         class="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
         :class="[
-          hasUpdate
+          hasUpdate || hasWarning
             ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-800 dark:text-dark-400 dark:hover:bg-dark-700'
         ]"
-        :title="hasUpdate ? t('version.updateAvailable') : t('version.upToDate')"
+        :title="hasUpdate ? t('version.updateAvailable') : checkComplete ? t('version.upToDate') : t('version.checkUnknown')"
       >
         <span v-if="currentVersion" class="font-medium">{{ displayCurrentVersion }}</span>
         <span
@@ -89,20 +89,26 @@
                   <span v-else class="text-2xl font-bold text-gray-400 dark:text-dark-500">--</span>
                   <!-- Show check mark when up to date -->
                   <span
-                    v-if="!hasUpdate"
+                    v-if="checkComplete && !hasUpdate"
                     class="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
                   >
                     <Icon name="checkSolid" size="none" class="h-3 w-3 text-green-600 dark:text-green-400" :stroke-width="1" />
                   </span>
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+                  {{ t('version.projectRelease') }}:
                   {{
-                    hasUpdate
+                    hasReleaseUpdate
                       ? t('version.latestVersion') + ': ' + displayLatestVersion
-                      : t('version.upToDate')
+                      : releaseCheckComplete ? t('version.upToDate') : t('version.checkUnknown')
                   }}
                 </p>
               </div>
+
+              <p v-if="versionWarning" data-testid="version-warning" class="mb-3 break-words rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                {{ t('version.checkFailed') }}: {{ versionWarning }}
+              </p>
+              <p class="mb-2 text-xs font-medium text-gray-600 dark:text-dark-300">{{ t('version.projectRelease') }}</p>
 
               <!-- Priority 1: Rollback success - need restart -->
               <div v-if="updateSuccess && needRestart" class="space-y-2">
@@ -187,8 +193,8 @@
                 </div>
               </div>
 
-              <!-- Priority 3: Upstream update available - review only, never install directly -->
-              <div v-else-if="hasUpdate" class="space-y-2">
+              <!-- Project releases continue to use the established rollout process. -->
+              <div v-else-if="hasReleaseUpdate" class="space-y-2">
                 <div
                   class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-900/20"
                 >
@@ -204,7 +210,7 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-amber-700 dark:text-amber-300">
-                      {{ t('version.upstreamUpdateAvailable') }}
+                      {{ t('version.updateAvailable') }}
                     </p>
                     <p class="text-xs text-amber-600/70 dark:text-amber-400/70">
                       {{ displayLatestVersion }}
@@ -217,7 +223,7 @@
                 >
                   <Icon name="infoCircleSimple" size="none" class="h-3.5 w-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" :stroke-width="2" />
                   <p class="text-xs text-blue-600 dark:text-blue-400">
-                    {{ t('version.upstreamReviewHint') }}
+                    {{ updateDisabled ? t('version.updateDisabledHint') : t('version.releaseRolloutHint') }}
                   </p>
                 </div>
 
@@ -228,7 +234,7 @@
                   rel="noopener noreferrer"
                   class="flex items-center justify-center gap-1 text-xs text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-dark-200"
                 >
-                  {{ t('version.reviewUpstreamRelease') }}
+                  {{ t('version.viewRelease') }}
                   <Icon name="externalLink" size="xs" :stroke-width="2" />
                 </a>
               </div>
@@ -253,7 +259,22 @@
                 </a>
               </div>
 
-              <!-- Personal release rollback remains available when upstream has an update. -->
+              <div v-if="upstreamUpdates.length" class="mt-3 space-y-2 border-t border-gray-100 pt-3 dark:border-dark-700" data-testid="upstream-updates">
+                <p class="text-xs font-medium text-gray-600 dark:text-dark-300">{{ t('version.upstreamSources') }}</p>
+                <div v-for="source in upstreamUpdates" :key="source.repository" class="rounded-lg border border-gray-200 p-2 text-xs dark:border-dark-700">
+                  <a :href="upstreamSourceURL(source)" target="_blank" rel="noopener noreferrer" class="break-words font-medium text-primary-600 dark:text-primary-400">{{ source.repository }} / {{ source.branch }}</a>
+                  <p class="mt-1" :class="source.has_update || source.warning ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-dark-400'">
+                    {{ source.warning || versionWarning ? t('version.checkUnknown') : source.has_update ? t('version.upstreamUpdateAvailable') : t('version.checkpointMatched') }}
+                  </p>
+                  <p v-if="source.baseline_commit" class="mt-1 text-gray-500 dark:text-dark-400">{{ t('version.reviewedCheckpoint') }}: {{ source.baseline_commit.slice(0, 12) }}</p>
+                  <p v-if="source.latest_commit" class="text-gray-500 dark:text-dark-400">{{ t('version.branchHead') }}: {{ source.latest_commit.slice(0, 12) }}</p>
+                  <p v-if="source.warning" class="mt-1 break-words text-amber-600 dark:text-amber-400">{{ source.warning }}</p>
+                  <a v-if="source.compare_url" :href="source.compare_url" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block text-primary-600 dark:text-primary-400">{{ t('version.reviewChanges') }}</a>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('version.upstreamReviewHint') }}</p>
+              </div>
+
+              <!-- Rollback always uses this project's releases. -->
               <div v-if="!updateSuccess" class="border-t border-gray-100 pt-2 dark:border-dark-700">
                   <button
                     @click="toggleRollbackPanel"
@@ -514,14 +535,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import {
   restartService,
   getRollbackVersions,
   rollback as rollbackAPI,
-  type RollbackVersionInfo
+  type RollbackVersionInfo,
+  type UpstreamUpdateInfo
 } from '@/api/admin/system'
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
@@ -560,7 +582,17 @@ function formatVersion(version?: string): string {
 
 const displayCurrentVersion = computed(() => formatVersion(currentVersion.value))
 const displayLatestVersion = computed(() => formatVersion(latestVersion.value))
-const hasUpdate = computed(() => appStore.hasUpdate)
+const hasReleaseUpdate = computed(() => appStore.hasUpdate)
+const upstreamUpdates = computed(() => appStore.upstreamUpdates)
+const hasUpdate = computed(() => appStore.hasAnyUpdate)
+const versionWarning = computed(() => appStore.versionWarning)
+const hasWarning = computed(() => !!versionWarning.value || upstreamUpdates.value.some((source) => !!source.warning))
+const checkComplete = computed(() => appStore.versionLoaded && !hasWarning.value)
+const releaseCheckComplete = computed(() => appStore.versionLoaded && !versionWarning.value)
+
+function upstreamSourceURL(source: UpstreamUpdateInfo): string {
+  return `https://github.com/${source.repository}/tree/${source.branch}`
+}
 // 生产多实例部署（UPDATE_STRATEGY=disabled）禁止在线更新/回退：原地换二进制与
 // 按版本命名的 systemd 单元不匹配，会把当前版本跑死。
 const updateDisabled = computed(() => appStore.updateStrategy === 'disabled')
@@ -775,14 +807,24 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 onMounted(() => {
-  if (isAdmin.value) {
-    // Use cached version if available, otherwise fetch
-    appStore.fetchVersion(false)
-  }
   document.addEventListener('click', handleClickOutside)
 })
 
+// The store expires version data after 20 minutes and shares active requests.
+// Poll only for administrators; revoke the timer on logout and unmount.
+let versionPoll: ReturnType<typeof setInterval> | undefined
+watch(isAdmin, (admin) => {
+  if (versionPoll) clearInterval(versionPoll)
+  versionPoll = undefined
+  if (!admin) return
+  void appStore.fetchVersion(false)
+  versionPoll = setInterval(() => {
+    if (!document.hidden) void appStore.fetchVersion(false)
+  }, 60 * 1000)
+}, { immediate: true })
+
 onBeforeUnmount(() => {
+  if (versionPoll) clearInterval(versionPoll)
   document.removeEventListener('click', handleClickOutside)
 })
 </script>

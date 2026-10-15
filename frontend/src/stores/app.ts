@@ -10,9 +10,12 @@ import { i18n } from '@/i18n'
 import {
   checkUpdates as checkUpdatesAPI,
   type VersionInfo,
-  type ReleaseInfo
+  type ReleaseInfo,
+  type UpstreamUpdateInfo
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
+
+export const VERSION_CACHE_TTL_MS = 20 * 60 * 1000
 
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
@@ -44,6 +47,13 @@ export const useAppStore = defineStore('app', () => {
   const buildType = ref<string>('source')
   const updateStrategy = ref<string>('')
   const releaseInfo = ref<ReleaseInfo | null>(null)
+  const upstreamUpdates = ref<UpstreamUpdateInfo[]>([])
+  const versionWarning = ref('')
+  const reviewRequired = ref(false)
+  const checkMode = ref<VersionInfo['check_mode']>('release')
+  const releaseRepository = ref('loLollipop/Sub2api')
+  let versionFetchedAt = 0
+  let versionRequest: Promise<VersionInfo | null> | null = null
 
   // Auto-incrementing ID for toasts
   let toastIdCounter = 0
@@ -52,6 +62,7 @@ export const useAppStore = defineStore('app', () => {
 
   const hasActiveToasts = computed(() => toasts.value.length > 0)
   const backendModeEnabled = computed(() => cachedPublicSettings.value?.backend_mode_enabled ?? false)
+  const hasAnyUpdate = computed(() => hasUpdate.value || upstreamUpdates.value.some((source) => source.has_update))
 
   const loadingCount = ref<number>(0)
 
@@ -242,8 +253,9 @@ export const useAppStore = defineStore('app', () => {
    * @param force - Force refresh from API
    */
   async function fetchVersion(force = false): Promise<VersionInfo | null> {
+    if (versionRequest) return versionRequest
     // Return cached data if available and not forcing refresh
-    if (versionLoaded.value && !force) {
+    if (versionLoaded.value && !force && Date.now() - versionFetchedAt < VERSION_CACHE_TTL_MS) {
       return {
         current_version: currentVersion.value,
         latest_version: latestVersion.value,
@@ -251,32 +263,45 @@ export const useAppStore = defineStore('app', () => {
         build_type: buildType.value,
         update_strategy: updateStrategy.value,
         release_info: releaseInfo.value || undefined,
+        review_required: reviewRequired.value,
+        check_mode: checkMode.value,
+        release_repository: releaseRepository.value,
+        upstream_updates: upstreamUpdates.value,
+        warning: versionWarning.value || undefined,
         cached: true
       }
     }
 
-    // Prevent duplicate requests
-    if (versionLoading.value) {
-      return null
-    }
-
     versionLoading.value = true
-    try {
-      const data = await checkUpdatesAPI(force)
-      currentVersion.value = data.current_version
-      latestVersion.value = data.latest_version
-      hasUpdate.value = data.has_update
-      buildType.value = data.build_type || 'source'
-      updateStrategy.value = data.update_strategy || ''
-      releaseInfo.value = data.release_info || null
-      versionLoaded.value = true
-      return data
-    } catch (error) {
-      console.error('Failed to fetch version:', error)
-      return null
-    } finally {
-      versionLoading.value = false
-    }
+    const request = Promise.resolve()
+      .then(() => checkUpdatesAPI(force))
+      .then((data) => {
+        currentVersion.value = data.current_version
+        latestVersion.value = data.latest_version
+        hasUpdate.value = data.has_update
+        buildType.value = data.build_type || 'source'
+        updateStrategy.value = data.update_strategy || ''
+        releaseInfo.value = data.release_info || null
+        upstreamUpdates.value = data.upstream_updates || []
+        versionWarning.value = data.warning || ''
+        reviewRequired.value = data.review_required || false
+        checkMode.value = data.check_mode || 'release'
+        releaseRepository.value = data.release_repository || 'loLollipop/Sub2api'
+        versionLoaded.value = true
+        versionFetchedAt = Date.now()
+        return data
+      })
+      .catch((error: unknown) => {
+        const err = error as { response?: { data?: { message?: string } }; message?: string }
+        versionWarning.value = err.response?.data?.message || err.message || i18n.global.t('version.checkFailed')
+        return null
+      })
+      .finally(() => {
+        versionRequest = null
+        versionLoading.value = false
+      })
+    versionRequest = request
+    return request
   }
 
   /**
@@ -285,6 +310,10 @@ export const useAppStore = defineStore('app', () => {
   function clearVersionCache(): void {
     versionLoaded.value = false
     hasUpdate.value = false
+    upstreamUpdates.value = []
+    versionWarning.value = ''
+    reviewRequired.value = false
+    versionFetchedAt = 0
   }
 
   // ==================== Public Settings Management ====================
@@ -473,10 +502,16 @@ export const useAppStore = defineStore('app', () => {
     buildType,
     updateStrategy,
     releaseInfo,
+    upstreamUpdates,
+    versionWarning,
+    reviewRequired,
+    checkMode,
+    releaseRepository,
 
     // Computed
     hasActiveToasts,
     backendModeEnabled,
+    hasAnyUpdate,
 
     // Actions
     toggleSidebar,

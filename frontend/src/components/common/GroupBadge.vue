@@ -9,7 +9,7 @@
     <!-- Platform logo -->
     <PlatformIcon v-if="platform" :platform="platform" size="sm" />
     <!-- Group name -->
-    <span class="truncate">{{ name }}</span>
+    <span :class="truncate ? 'truncate' : 'min-w-0 whitespace-normal [overflow-wrap:anywhere]'">{{ name }}</span>
     <!-- Right side label -->
     <MixedProviderRates v-if="showRate && vendorRates !== undefined" :rates="vendorRates" :user-override="userRateMultiplier != null" />
     <span v-else-if="showLabel" :class="labelClass">
@@ -50,6 +50,8 @@ interface Props {
   peakEnd?: string
   peakRateMultiplier?: number
   showRate?: boolean
+  /** Allow complete group names to wrap in multi-line account layouts. */
+  truncate?: boolean
   daysRemaining?: number | null // 剩余天数（订阅类型时使用）
   /**
    * 订阅分组默认在右侧 label 展示"订阅"或剩余天数；
@@ -62,6 +64,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   subscriptionType: 'standard',
   showRate: true,
+  truncate: true,
   daysRemaining: null,
   userRateMultiplier: null,
   peakRateEnabled: false,

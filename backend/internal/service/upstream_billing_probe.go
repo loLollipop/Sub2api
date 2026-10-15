@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"io"
 	"log/slog"
 	"math"
@@ -630,7 +631,7 @@ func (s *UpstreamBillingProbeService) probeLoadedAccount(ctx context.Context, ac
 		// Match Mixed forwarding: strip a full wire endpoint while preserving
 		// the configured origin and any vendor/version prefix.
 		baseURL = normalizeMixedBaseURL(baseURL)
-	} else if account.IsCNProvider() && account.IsAdaptiveAPIProtocol() {
+	} else if account.RoutesProtocolByInbound() && account.IsAdaptiveAPIProtocol() {
 		baseURL = account.GetCNProtocolBaseURL(APIProtocolChatCompletions)
 	}
 	if account.Platform == PlatformOpenAI {
@@ -1012,16 +1013,7 @@ func decodeUpstreamBillingProbeSnapshot(extra map[string]any) *UpstreamBillingPr
 // type=apikey by the admin form, so only pre-existing type=upstream rows
 // cannot turn the probe on.
 func IsUpstreamBillingProbeIdentity(platform, accountType string) bool {
-	if accountType != AccountTypeAPIKey {
-		return false
-	}
-	switch platform {
-	case PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformAntigravity, PlatformGrok,
-		PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed:
-		return true
-	default:
-		return false
-	}
+	return accountType == AccountTypeAPIKey && domain.IsConcretePlatform(platform)
 }
 
 func isUpstreamBillingProbeAccount(account *Account) bool {
@@ -1055,6 +1047,8 @@ var upstreamBillingProbeOfficialAPIDomains = []string{
 	"kimi.com",
 	"bigmodel.cn",
 	"deepseek.com",
+	"commandcode.ai",
+	"cline.bot",
 }
 
 func upstreamBillingProbeTargetIsOfficialAPI(baseURL string) bool {

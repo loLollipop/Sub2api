@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { BUILTIN_PLATFORM_CATALOG, listPlatformIds, resetPlatformCatalog, setPlatformCatalog } from "@/constants/platformCatalog";
 
 import {
   appendAuthSourceDefaultsToUpdateRequest,
@@ -9,14 +10,12 @@ import {
   type DefaultPlatformQuotasMap,
 } from "@/api/admin/settings";
 
-/** 全 null 的 5 平台 map，用于断言归一化默认值 */
-const allNullQuotas: DefaultPlatformQuotasMap = {
-  anthropic: { daily: null, weekly: null, monthly: null },
-  openai:    { daily: null, weekly: null, monthly: null },
-  gemini:    { daily: null, weekly: null, monthly: null },
-  antigravity: { daily: null, weekly: null, monthly: null },
-  grok: { daily: null, weekly: null, monthly: null },
-}
+/** 清单中全部平台的全 null map，用于断言归一化默认值 */
+const allNullQuotas: DefaultPlatformQuotasMap = Object.fromEntries(
+  BUILTIN_PLATFORM_CATALOG.platforms.map(({ id }) => [id, { daily: null, weekly: null, monthly: null }]),
+);
+
+afterEach(resetPlatformCatalog);
 
 describe("admin settings auth source defaults helpers", () => {
   it("builds auth source defaults state from flat settings fields", () => {
@@ -240,9 +239,9 @@ describe("normalizePlatformQuotasMap", () => {
     expect(result.grok).toEqual({ daily: null, weekly: null, monthly: null });
   });
 
-  it("无参数时返回全 5 平台全 null", () => {
+  it("无参数时返回清单中全部平台的全 null 限额", () => {
     const result = normalizePlatformQuotasMap();
-    expect(Object.keys(result)).toHaveLength(5);
+    expect(Object.keys(result)).toEqual(listPlatformIds());
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }
@@ -290,9 +289,35 @@ describe("sanitizePlatformQuotasMap", () => {
 
   it("缺失平台填充为全 null", () => {
     const result = sanitizePlatformQuotasMap({});
-    expect(Object.keys(result)).toHaveLength(5);
+    expect(Object.keys(result)).toEqual(listPlatformIds());
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
+    }
+  });
+});
+
+describe("platform quota catalog coverage", () => {
+  it.each(['mixed', 'kimi', 'zhipu', 'deepseek', 'minimax', 'command_code', 'cline'])(
+    "保留 %s 平台的显式零值和限额",
+    (platform) => {
+      const limits = { daily: 0, weekly: 10, monthly: 50 };
+      for (const transform of [normalizePlatformQuotasMap, sanitizePlatformQuotasMap]) {
+        expect(transform({ [platform]: limits })).toMatchObject({ [platform]: limits });
+      }
+    },
+  );
+
+  it("登记新平台后归一化和提交清洗均包含其默认限额", () => {
+    setPlatformCatalog({
+      ...BUILTIN_PLATFORM_CATALOG,
+      platforms: [...BUILTIN_PLATFORM_CATALOG.platforms, {
+        id: 'new_provider', display_name: 'New Provider', gateway: 'openai', cn_provider: false,
+      }],
+    });
+    for (const transform of [normalizePlatformQuotasMap, sanitizePlatformQuotasMap]) {
+      const result = transform();
+      expect(Object.keys(result)).toEqual([...Object.keys(allNullQuotas), 'new_provider']);
+      expect(result).toMatchObject({ new_provider: { daily: null, weekly: null, monthly: null } });
     }
   });
 });

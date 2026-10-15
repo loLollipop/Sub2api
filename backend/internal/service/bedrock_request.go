@@ -127,7 +127,15 @@ func normalizeBedrockModelID(modelID string) (normalized string, shouldAdjustReg
 		return "", false, false
 	}
 	if mapped, exists := domain.DefaultBedrockModelMapping[modelID]; exists {
+		// Sonnet 5.5 currently has only a global inference profile. The
+		// endpoint region must not rewrite it to a nonexistent regional ID.
+		if mapped == "global.anthropic.claude-sonnet-5-5" {
+			return mapped, false, true
+		}
 		return mapped, true, true
+	}
+	if modelID == "global.anthropic.claude-sonnet-5-5" {
+		return modelID, false, true
 	}
 	if isRegionalBedrockModelID(modelID) {
 		return modelID, true, true
@@ -240,10 +248,16 @@ func PrepareBedrockRequestBodyWithTokens(body []byte, modelID string, betaTokens
 	// 参考 litellm: _convert_output_format_to_inline_schema()
 	body = convertOutputFormatToInlineSchema(body)
 
-	// 移除 output_config 字段（Bedrock Invoke 不支持）
-	body, err = sjson.DeleteBytes(body, "output_config")
+	// Sonnet 5.5 InvokeModel accepts effort, but not other output_config
+	// members. Structured output has already been inlined above.
+	if claude.IsSonnet55(modelID) && gjson.GetBytes(body, "output_config.effort").Exists() {
+		effort := gjson.GetBytes(body, "output_config.effort")
+		body, err = sjson.SetRawBytes(body, "output_config", []byte(`{"effort":`+effort.Raw+`}`))
+	} else {
+		body, err = sjson.DeleteBytes(body, "output_config")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("remove output_config field: %w", err)
+		return nil, fmt.Errorf("normalize output_config field: %w", err)
 	}
 
 	// 移除工具定义中的 custom 字段
@@ -274,13 +288,17 @@ func ResolveBedrockBetaTokens(betaHeader string, body []byte, modelID string) []
 // Bedrock Invoke 不支持 output_format 参数，litellm 的做法是将 schema 追加到用户消息中
 // 参考: litellm AmazonAnthropicClaudeMessagesConfig._convert_output_format_to_inline_schema()
 func convertOutputFormatToInlineSchema(body []byte) []byte {
-	outputFormat := gjson.GetBytes(body, "output_format")
+	outputFormat := gjson.GetBytes(body, "output_config.format")
+	if !outputFormat.Exists() {
+		outputFormat = gjson.GetBytes(body, "output_format")
+	}
 	if !outputFormat.Exists() || !outputFormat.IsObject() {
 		return body
 	}
 
 	// 先从请求体中移除 output_format
 	body, _ = sjson.DeleteBytes(body, "output_format")
+	body, _ = sjson.DeleteBytes(body, "output_config.format")
 
 	schema := outputFormat.Get("schema")
 	if !schema.Exists() {
@@ -727,6 +745,17 @@ func sanitizeBedrockThinking(body []byte, modelID string) []byte {
 		}
 		if thinkingType == "enabled" || thinkingType == "adaptive" {
 			body, _ = sjson.DeleteBytes(body, "thinking.budget_tokens")
+		}
+		return body
+	}
+
+	if claude.IsSonnet55(modelID) {
+		switch thinkingType {
+		case "enabled":
+			body, _ = sjson.SetBytes(body, "thinking.type", "adaptive")
+			body, _ = sjson.DeleteBytes(body, "thinking.budget_tokens")
+		case "disabled":
+			body, _ = sjson.SetBytes(body, "thinking.type", "between_tools")
 		}
 		return body
 	}

@@ -63,6 +63,14 @@ export interface OpsDashboardOverview {
     avg: number
   }
 
+  output_tps?: {
+    p5: number | null
+    p10: number | null
+    p50: number | null
+    avg: number | null
+    sample_count: number
+  } | null
+
   duration: OpsPercentiles
   ttft: OpsPercentiles
 }
@@ -128,6 +136,7 @@ export interface OpsRequestDetail {
   user_id?: number | null
   api_key_id?: number | null
   account_id?: number | null
+  account_name?: string
   group_id?: number | null
 
   stream?: boolean

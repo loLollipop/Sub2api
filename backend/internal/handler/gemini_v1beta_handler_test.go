@@ -6,14 +6,47 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/gemini"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+// Legacy fallback predicates are exercised only by compatibility tests; live
+// catalog handlers now resolve group models directly.
+func shouldFallbackGeminiModels(res *service.UpstreamHTTPResult) bool {
+	if res == nil {
+		return true
+	}
+	if res.StatusCode != http.StatusUnauthorized && res.StatusCode != http.StatusForbidden {
+		return false
+	}
+	if strings.Contains(strings.ToLower(res.Headers.Get("Www-Authenticate")), "insufficient_scope") {
+		return true
+	}
+	if strings.Contains(strings.ToLower(string(res.Body)), "insufficient authentication scopes") {
+		return true
+	}
+	if strings.Contains(strings.ToLower(string(res.Body)), "access_token_scope_insufficient") {
+		return true
+	}
+	return false
+}
+
+func shouldFallbackGeminiModel(modelName string, res *service.UpstreamHTTPResult) bool {
+	if shouldFallbackGeminiModels(res) {
+		return true
+	}
+	if res == nil || res.StatusCode != http.StatusNotFound {
+		return false
+	}
+	return gemini.HasFallbackModel(modelName)
+}
 
 func TestGeminiV1BetaListModels_AllowlistFiltersNativeResponse(t *testing.T) {
 	body := []byte(`{"models":[{"name":"models/gemini-2.5-pro"},{"name":"models/gemini-2.5-flash"}],"nextPageToken":"next"}`)
@@ -211,4 +244,89 @@ func TestShouldFallbackGeminiModel_DelegatesScopeFallback(t *testing.T) {
 		Body:       []byte("insufficient authentication scopes"),
 	}
 	require.True(t, shouldFallbackGeminiModel("gemini-future-model", res))
+}
+
+func TestGeminiV1BetaGetModel_CompositeAntigravityRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("composite route to antigravity gemini model succeeds", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		req := httptest.NewRequest(http.MethodGet, "/v1beta/models/gemini-4-argon", nil)
+		req = req.WithContext(service.WithCompositeRouteDecision(req.Context(), service.CompositeRouteDecision{
+			Matched:        true,
+			TargetPlatform: service.PlatformAntigravity,
+			UpstreamModel:  "gemini-4-argon-high",
+		}))
+		c.Request = req
+		c.Params = gin.Params{{Key: "model", Value: "gemini-4-argon"}}
+		groupID := int64(4)
+		c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{
+			ID:      1,
+			GroupID: &groupID,
+			Group:   &service.Group{ID: groupID, Platform: service.PlatformComposite},
+		})
+
+		repo := &geminiAllowlistAccountRepoStub{gatewayModelsAccountRepoStub: gatewayModelsAccountRepoStub{byGroup: map[int64][]service.Account{groupID: {
+			{ID: 1, Platform: service.PlatformAntigravity, Type: service.AccountTypeOAuth, Credentials: map[string]any{"model_mapping": map[string]any{"gemini-4-argon": "gemini-4-argon-high", "gemini-4-argon-high": "gemini-4-argon-high"}}},
+		}}}}
+		h := &GatewayHandler{
+			geminiCompatService: service.NewGeminiMessagesCompatService(repo, nil, nil, nil, nil, nil, nil, nil, nil),
+			gatewayService: service.NewGatewayService(repo, nil,
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+				service.NewCompositeRouteResolver(gatewayCompositeCatalogRepo{routes: []service.CompositeModelRoute{{
+					GroupID: groupID, PublicModel: "gemini-4-argon", UpstreamModel: "gemini-4-argon-high",
+					TargetPlatform: service.PlatformAntigravity, MatchType: service.CompositeRouteMatchExact, Enabled: true,
+				}}}), nil, nil),
+		}
+		h.GeminiV1BetaGetModel(c)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Contains(t, rec.Body.String(), "models/gemini-4-argon")
+	})
+
+	t.Run("composite route to antigravity claude model is rejected on v1beta", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		req := httptest.NewRequest(http.MethodGet, "/v1beta/models/claude-sonnet-5-5-high", nil)
+		req = req.WithContext(service.WithCompositeRouteDecision(req.Context(), service.CompositeRouteDecision{
+			Matched:        true,
+			TargetPlatform: service.PlatformAntigravity,
+			UpstreamModel:  "claude-sonnet-5-5-high",
+		}))
+		c.Request = req
+		c.Params = gin.Params{{Key: "model", Value: "claude-sonnet-5-5-high"}}
+		groupID := int64(4)
+		c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{
+			ID:      1,
+			GroupID: &groupID,
+			Group:   &service.Group{ID: groupID, Platform: service.PlatformComposite},
+		})
+
+		(&GatewayHandler{}).GeminiV1BetaGetModel(c)
+		require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	})
+
+	t.Run("composite route to antigravity claude model is rejected on generateContent", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		req := httptest.NewRequest(http.MethodPost, "/v1beta/models/claude-sonnet-5-5-high:generateContent", nil)
+		req = req.WithContext(service.WithCompositeRouteDecision(req.Context(), service.CompositeRouteDecision{
+			Matched:        true,
+			TargetPlatform: service.PlatformAntigravity,
+			UpstreamModel:  "claude-sonnet-5-5-high",
+		}))
+		c.Request = req
+		c.Params = gin.Params{{Key: "modelAction", Value: "/claude-sonnet-5-5-high:generateContent"}}
+		groupID := int64(4)
+		c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{
+			ID:      1,
+			GroupID: &groupID,
+			Group:   &service.Group{ID: groupID, Platform: service.PlatformComposite},
+		})
+		c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 1, Concurrency: 1})
+
+		(&GatewayHandler{}).GeminiV1BetaModels(c)
+		require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	})
 }

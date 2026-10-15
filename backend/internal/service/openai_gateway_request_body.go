@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
@@ -57,8 +58,8 @@ func buildOpenAIResponsesURL(base string) string {
 // DeepSeek 官方 Responses 端点为 /responses（无 /v1 前缀，适配 Codex）；
 // 其余平台维持 /v1/responses。
 func buildOpenAIResponsesURLForPlatform(platform string, base string) string {
-	if platform == PlatformDeepseek {
-		return buildOpenAIEndpointURL(base, "/responses")
+	if profile := LookupProviderProfile(platform); profile != nil && profile.ResponsesPath != "" {
+		return buildOpenAIEndpointURL(base, profile.ResponsesPath)
 	}
 	return buildOpenAIResponsesURL(base)
 }
@@ -240,7 +241,7 @@ func deepSeekCallIDScope(platform, model string) bool {
 func deepSeekDuplicateCallIDRewrite(account *Account, body []byte) bool {
 	platform := ""
 	if account != nil {
-		platform = account.Platform
+		platform = account.openAIWirePlatform()
 	}
 	return deepSeekCallIDScope(platform, gjson.GetBytes(body, "model").String())
 }
@@ -1336,6 +1337,21 @@ func normalizeOpenAIResponsesWebSocketCompatibilityBody(body []byte, account *Ac
 }
 
 func normalizeOpenAIResponsesCompatibilityBody(body []byte, account *Account, responsesLite bool, compact bool) ([]byte, bool, error) {
+	return normalizeOpenAIResponsesCompatibilityBodyWithOptions(body, account, openAIResponsesCompatibilityOptions{ResponsesLite: responsesLite, Compact: compact})
+}
+
+func normalizeOpenAIResponsesWebSocketCompatibilityBodyWithConfig(cfg *config.Config, body []byte, account *Account, responsesLite bool) ([]byte, bool, error) {
+	return normalizeOpenAIResponsesCompatibilityBodyWithOptions(body, account, openAIResponsesCompatibilityOptions{Config: cfg, ResponsesLite: responsesLite})
+}
+
+type openAIResponsesCompatibilityOptions struct {
+	Config        *config.Config
+	ResponsesLite bool
+	Compact       bool
+}
+
+func normalizeOpenAIResponsesCompatibilityBodyWithOptions(body []byte, account *Account, opts openAIResponsesCompatibilityOptions) ([]byte, bool, error) {
+	responsesLite, compact := opts.ResponsesLite, opts.Compact
 	if account == nil || !account.IsOpenAI() {
 		return body, false, nil
 	}
@@ -1343,7 +1359,7 @@ func normalizeOpenAIResponsesCompatibilityBody(body []byte, account *Account, re
 	changed := false
 	if account.IsOpenAIOAuthLike() {
 		var err error
-		normalized, changed, err = normalizeOpenAIResponsesLegacyIngress(body)
+		normalized, changed, err = normalizeOpenAIResponsesLegacyIngressWithConfig(opts.Config, body)
 		if err != nil {
 			return body, false, err
 		}

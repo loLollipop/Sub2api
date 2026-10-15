@@ -3,11 +3,56 @@
   "source_repository": "Wei-Shaw/sub2api",
   "source_releases": {
     "v0.2.14": "0363b8cdba8cec3e2ba4b2dbd49c4481143fa55d",
-    "v0.2.15": "f2669c8cf62555cd92389b3f55920e9e6e7c6ff2"
+    "v0.2.15": "f2669c8cf62555cd92389b3f55920e9e6e7c6ff2",
+    "v0.2.16": "01842576b3d5c1e2545b5a99ad555d36e28ed306"
   },
+  "latest_reviewed_main_commit": "1b2243a4f50621508e79aef4b498a2937a6238ee",
+  "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
+  "cumulative_sync": {
+    "status": "selective_sync_recorded_with_explicit_deferrals",
+    "source_head": "1b2243a4f50621508e79aef4b498a2937a6238ee",
+    "implemented_with_local_regression": [
+      "Toolchain, cooldown scopes and frontend lifecycle fixes",
+      "Provider registry with Mixed/Cline/Command Code and credential destination protection",
+      "Vertex API-key/service-account endpoint/model handling and authorized Gemini catalog",
+      "Group localization and exact composite aliases",
+      "Haiku 5.5 protocol/context/pricing and GPT-6.1 subscription long-context policy",
+      "Final-wire/account repricing, frozen pricing time and explicit pricing-source corrections",
+      "Guarded structured-input rejection fallback with bounded completeness/cancellation and cumulative timing",
+      "Ops request account-name display and output-TPS UI with selected frontend regression",
+      "SheetJS0.20.3 exact source tarball/integrity, clean frozen installation, export regression and production audit review",
+      "Codex workspace-aware imports, Vertex capacity/token errors and single error-policy evaluation",
+      "Anthropic protocol base URL, Composite OpenAI OAuth ambiguity rejection and configurable minimum output tokens",
+      "Argon and Antigravity catalogs, tool media/native parts, GLM credit windows and source pricing constants"
+    ],
+    "implemented_not_runtime_enabled": [
+      "Gemini cache binding/endpoint identity260-261 and source-compatible quote/protocol helpers; runtime CRUD is not enabled"
+    ],
+    "not_complete": [
+      "Upstream Gemini cache runtime integration remains unfinished; do not replace it with a newly designed financial/recovery subsystem",
+      "Gemini promotion automatic expiry is not implemented upstream; current source constants are imported without a new pricing scheduler"
+    ],
+    "reverted_local_mechanisms_by_user_request": ["Custom Gemini operation journal/migration262 and v2 frozen-price schedule", "Custom System One journal/manual-resolution APIs/recovery worker/migration267 and native-only hold markers", "Experimental durable-image task store and this continuation's Redis CAS/billing-recovery extensions"],
+    "verification_limits": ["Full frontend387 files/3095 tests, typecheck/lint/pinned production build passed", "Mixed actual HTTP/SSE native-dispatch regression1004 tests/subtests passed", "Production-schema-only PostgreSQL16 migration rehearsal applies ten migrations twice; final backend/CI and production rollout gates are recorded separately"],
+    "evidence": ".artifacts/source-sync-resume-20261015/notes.md"
+  },
   "selected_fixes": [
+    { "commit": "f48866958", "scope": "openai-only-codex-image-bridge", "note": "Mixed and other non-OpenAI accounts cannot inject hosted OpenAI image tools." },
+    { "commit": "1c68f9996", "scope": "gemini-auth-key-redaction", "note": "Cover monitoring, plain logs and credentials echoed inside non-sensitive JSON string fields." },
+    { "commit": "ce6242fca", "scope": "international-kimi-coding-quota", "note": "Exact HTTPS host/path recognition and allowlist checks; spoofed URLs cannot receive credentials." },
+    { "commit": "cfbbfd6b3", "scope": "antigravity-image-rate-limit-isolation" },
+    { "commit": "ba2a71733", "scope": "gemini-tool-result-images" },
+    { "commit": "492c63059", "scope": "gemini-tool-result-image-regressions" },
+    { "commit": "071858126", "scope": "gpt61-offline-context-window", "note": "Default missing/null context to 500k; retain explicit upstream context and existing maximum." },
+    { "commit": "3bfd40f5a", "scope": "gemini-request-scoped-cache-not-found", "note": "Existing native request errors do not penalize the account; no explicit cache-management feature added." },
+    { "commit": "d01628975", "scope": "select-ime-composition" },
+    { "commit": "c4224045d", "scope": "payment-real-deadline-countdown" },
+    { "commit": "2bfc49477", "scope": "ops-local-time-range" },
+    { "commit": "5753552b9", "scope": "gemini-oauth-error-message" },
+    { "commit": "66b7ce08e", "scope": "complete-account-group-name", "note": "Retain Mixed vendor price labels and existing layout." },
+    { "commit": "0f189af8d", "scope": "rpm-modal-request-ownership", "note": "Also guard stale save/clear completion, serialize pending writes and block edits before a successful initial load." },
     { "commit": "6e315616e", "scope": "deployment-bootstrap-email", "note": "Remove deployment defaults that bypass the existing backend random email generator; existing users are unchanged." },
     { "commit": "bbba01dae", "scope": "codex-api-key-model-discovery", "note": "Enable remote discovery in generated configurations only; local file mode remains unchanged." },
     { "commit": "b6a157c19", "scope": "ws-passthrough-image-usage", "note": "Carry image input/output counters and hosted-tool fallback into per-turn and aggregate usage." },
@@ -33,8 +78,11 @@
     "Controlled release, migration-validation and disabled self-update deployment policy"
   ],
   "deferred": [
-    "Cline/CommandCode and provider-profile database/platform restructuring",
-    "Composite exact-alias model-catalog expansion",
-    "Additional unrelated frontend lifecycle/auth/dialog changes and built-in checkout lifecycle changes"
+    "Moderation group cleanup (27de27ac6): transactional RawMessage-safe pruning and generation-aware caches are implemented and locally tested; real PostgreSQL concurrent delete/save/rollback validation is still required.",
+    "Gemini explicit cache management: source-compatible binding260-261 and protocol helpers remain without runtime routes. Custom operation journal262 and frozen-price redesign were withdrawn by user request; continue only source-based integration, not a new financial subsystem.",
+    "Gemini 3.6 promotion (4426593e9): source constants imported as published; upstream supplies no automatic expiry. No bespoke frozen-price or scheduler mechanism added.",
+    "Monitoring platform picker/details refresh and compact filters are already present. Ops account-name/output-TPS UI is implemented with selected frontend regressions; final backend validation is tracked separately.",
+    "SheetJS CDN dependency replacement (daa791574) is now pinned0.20.3 with verified SHA512/clean-store frozen installation/export regression; obsolete xlsx audit exemptions removed.",
+    "Final real PostgreSQL schema upgrade/rollback, race/Redis/Docker and cross-batch integration verification remain outstanding; implemented source features are listed in cumulative_sync rather than the historical deferral list."
   ]
 }

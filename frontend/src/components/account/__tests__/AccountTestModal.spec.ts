@@ -125,10 +125,15 @@ function mountModal(account: Record<string, unknown> = {
 }
 
 describe('AccountTestModal', () => {
-  it('renders Chat Completions path status from the canonical test panel SSE', async () => {
+  it.each([
+    ['Hello from model', 'Hello from model'],
+    ['', 'admin.accounts.batchTest.emptyOutput']
+  ])('keeps protocol diagnostics out of the completed reply %j', async (reply, expected) => {
     getAvailableModels.mockResolvedValue([{ id: 'gpt-5.4', display_name: 'GPT-5.4' }])
     global.fetch = vi.fn().mockResolvedValue(createStreamResponse([
       'data: {"type":"status","text":"已通过 /v1/chat/completions 验证"}\n',
+      'data: ' + JSON.stringify({ type: 'content', text: reply }) + '\n',
+      'data: {"type":"status","text":"Upstream: /v1/responses"}\n',
       'data: {"type":"test_complete","success":true}\n'
     ]))
     const wrapper = mountModal({ id: 42, name: 'OpenAI', platform: 'openai', type: 'oauth', status: 'active' })
@@ -136,7 +141,10 @@ describe('AccountTestModal', () => {
     await flushPromises()
     await wrapper.get('[data-test="row-test-gpt-5.4"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('已通过 /v1/chat/completions 验证')
+    expect(wrapper.get('[data-test="test-output-42-gpt-5.4"]').text()).toBe(expected)
+    expect(wrapper.find('.model-test-status.is-success').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('/v1/')
+    expect(wrapper.text()).not.toContain('Upstream:')
   })
 
   it('测试设置默认折叠，展开后保留填写内容', async () => {

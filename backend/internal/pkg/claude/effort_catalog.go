@@ -26,6 +26,7 @@ var effortFamilies = []struct {
 	{family: "claude-opus-4-5", levels: effortLowMediumHigh},
 	{family: "claude-opus-5-5", levels: effortLowMediumHighXHighMax},
 	{family: "claude-opus-5", levels: effortLowMediumHighXHighMax},
+	{family: "claude-haiku-5-5", levels: effortLowMediumHighXHighMax},
 }
 
 // EffortLevelsForModel returns the output_config.effort values accepted by a
@@ -51,6 +52,10 @@ func IsOpus55(model string) bool {
 // into the sonnet-4.5 family ($3/$15) and overcharges by 50%.
 func IsSonnet55(model string) bool {
 	return normalizeEffortModelID(model) == "claude-sonnet-5-5"
+}
+
+func IsHaiku55(model string) bool {
+	return normalizeEffortModelID(model) == "claude-haiku-5-5"
 }
 
 func normalizeEffortModelID(model string) string {

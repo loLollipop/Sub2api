@@ -139,6 +139,50 @@ func (f githubReleaseRoundTripFunc) RoundTrip(req *http.Request) (*http.Response
 	return f(req)
 }
 
+func TestGitHubReleaseClientFetchBranchHeadFixedSources(t *testing.T) {
+	client := newTestGitHubReleaseClient()
+	client.updateGitHubToken = "update-secret"
+	var paths []string
+	client.httpClient.Transport = githubReleaseRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, "api.github.com", req.URL.Host)
+		require.Equal(t, "Bearer update-secret", req.Header.Get("Authorization"))
+		paths = append(paths, req.URL.Path)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}`)), Header: make(http.Header)}, nil
+	})
+	for _, repo := range []string{"kiss-kedaya/sub2api", "Wei-Shaw/sub2api"} {
+		head, err := client.FetchBranchHead(context.Background(), repo, "main")
+		require.NoError(t, err)
+		require.Equal(t, strings.Repeat("a", 40), head)
+	}
+	require.Equal(t, []string{"/repos/kiss-kedaya/sub2api/branches/main", "/repos/Wei-Shaw/sub2api/branches/main"}, paths)
+	for _, source := range [][2]string{{"attacker/repo", "main"}, {"kiss-kedaya/sub2api", "other"}, {"https://example.com", "main"}} {
+		_, err := client.FetchBranchHead(context.Background(), source[0], source[1])
+		require.Error(t, err)
+	}
+	require.Len(t, paths, 2, "invalid source must never make a request")
+}
+
+func TestGitHubReleaseClientBranchHeadErrors(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"rate limited", http.StatusForbidden, `{}`},
+		{"missing branch", http.StatusNotFound, `{}`},
+		{"malformed payload", http.StatusOK, `not json`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newTestGitHubReleaseClient()
+			client.httpClient.Transport = githubReleaseRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: tt.status, Body: io.NopCloser(strings.NewReader(tt.body)), Header: make(http.Header)}, nil
+			})
+			_, err := client.FetchBranchHead(context.Background(), "kiss-kedaya/sub2api", "main")
+			require.Error(t, err)
+		})
+	}
+}
+
 func (s *GitHubReleaseServiceSuite) SetupTest() {
 	s.tempDir = s.T().TempDir()
 }

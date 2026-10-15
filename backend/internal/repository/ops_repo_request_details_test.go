@@ -38,11 +38,11 @@ func TestOpsRepositoryListRequestDetails_LatencySort(t *testing.T) {
 				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(13))
 			rows := sqlmock.NewRows([]string{
 				"kind", "created_at", "request_id", "platform", "model", "duration_ms", "first_token_ms",
-				"status_code", "error_id", "phase", "severity", "message", "user_id", "api_key_id", "account_id", "group_id", "stream",
+				"status_code", "error_id", "phase", "severity", "message", "user_id", "api_key_id", "account_id", "group_id", "stream", "account_name",
 			}).
-				AddRow("success", start, "req-slow", "openai", "gpt-5.5", 12000, 800, nil, nil, nil, nil, nil, 1, 2, 3, 4, true).
-				AddRow("error", start, "req-zero", "openai", "gpt-5.5", 9000, 0, 502, 5, "upstream", "error", "failed", 1, 2, 3, 4, true).
-				AddRow("success", start, "req-missing", "openai", "gpt-5.5", 5000, nil, nil, nil, nil, nil, nil, 1, 2, 3, 4, false)
+				AddRow("success", start, "req-slow", "openai", "gpt-5.5", 12000, 800, nil, nil, nil, nil, nil, 1, 2, 3, 4, true, " 主账号 ").
+				AddRow("error", start, "req-zero", "openai", "gpt-5.5", 9000, 0, 502, 5, "upstream", "error", "failed", 1, 2, 3, 4, true, "备用账号").
+				AddRow("success", start, "req-missing", "openai", "gpt-5.5", 5000, nil, nil, nil, nil, nil, nil, 1, 2, 3, 4, false, nil)
 			mock.ExpectQuery(`(?s)ul\.first_token_ms AS first_token_ms.*o\.time_to_first_token_ms AS first_token_ms.*SELECT.*duration_ms,\s+first_token_ms,.*ORDER BY `+tc.order+`\s+LIMIT \$3 OFFSET \$4`).
 				WithArgs(start, end, 10, 10).
 				WillReturnRows(rows)
@@ -57,6 +57,9 @@ func TestOpsRepositoryListRequestDetails_LatencySort(t *testing.T) {
 			require.NotNil(t, items[1].FirstTokenMs)
 			require.Zero(t, *items[1].FirstTokenMs)
 			require.Nil(t, items[2].FirstTokenMs)
+			require.Equal(t, "主账号", items[0].AccountName)
+			require.Equal(t, "备用账号", items[1].AccountName)
+			require.Empty(t, items[2].AccountName, "deleted/missing accounts keep historical request rows")
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}

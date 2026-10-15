@@ -509,6 +509,7 @@ export default {
         emailPlaceholder: 'Enter email',
         usernameLabel: 'Username',
         usernamePlaceholder: 'Enter username (optional)',
+        usernameInvalid: 'Use up to 50 letters, numbers, spaces, underscores, hyphens or periods.',
         notesLabel: 'Notes',
         notesPlaceholder: 'Enter notes (admin only)',
         notesHint: 'This note is only visible to administrators',
@@ -910,6 +911,12 @@ export default {
       exclusiveObj: {
         yes: 'Yes',
         no: 'No'
+      },
+      i18nField: {
+        default: 'Default',
+        add: 'Add {language} version',
+        edit: 'Edit {language} version',
+        placeholder: '{language} version; leave empty to show the default text'
       },
       enterGroupName: 'Enter group name',
       optionalDescription: 'Optional description',

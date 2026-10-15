@@ -37,11 +37,25 @@ type settingAllCacheEntry struct {
 type settingRepository struct {
 	client *ent.Client
 
-	mu         sync.Mutex
-	keyCache   map[string]settingCacheEntry
-	allCache   *settingAllCacheEntry
-	version    uint64
-	loadSingle singleflight.Group
+	mu                   sync.Mutex
+	keyCache             map[string]settingCacheEntry
+	allCache             *settingAllCacheEntry
+	version              uint64
+	moderationGeneration uint64
+	loadSingle           singleflight.Group
+}
+
+// syncModerationGenerationLocked must run under mu before every cache access or
+// version check, including stores by queries started before a different repo's
+// commit. Advancing version also separates their singleflight keys.
+func (r *settingRepository) syncModerationGenerationLocked() {
+	generation := contentModerationConfigGeneration.Load()
+	if r.moderationGeneration != generation {
+		r.moderationGeneration = generation
+		delete(r.keyCache, service.SettingKeyContentModerationConfig)
+		r.allCache = nil
+		r.version++
+	}
 }
 
 func NewSettingRepository(client *ent.Client) service.SettingRepository {
@@ -54,6 +68,7 @@ func NewSettingRepository(client *ent.Client) service.SettingRepository {
 func (r *settingRepository) peekKeyCache(key string) (settingCacheEntry, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.syncModerationGenerationLocked()
 	entry, ok := r.keyCache[key]
 	if !ok || time.Now().UnixNano() >= entry.expiresAt {
 		return settingCacheEntry{}, false
@@ -66,6 +81,7 @@ func (r *settingRepository) peekKeyCache(key string) (settingCacheEntry, bool) {
 func (r *settingRepository) storeKeyCacheIfVersion(key string, entry settingCacheEntry, version uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.syncModerationGenerationLocked()
 	if r.version != version {
 		return
 	}
@@ -78,6 +94,7 @@ func (r *settingRepository) storeKeyCacheIfVersion(key string, entry settingCach
 func (r *settingRepository) storeAllCacheIfVersion(entry *settingAllCacheEntry, version uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.syncModerationGenerationLocked()
 	if r.version != version {
 		return
 	}
@@ -87,6 +104,7 @@ func (r *settingRepository) storeAllCacheIfVersion(entry *settingAllCacheEntry, 
 func (r *settingRepository) cacheVersion() uint64 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.syncModerationGenerationLocked()
 	return r.version
 }
 
@@ -317,6 +335,7 @@ func (r *settingRepository) SetMultiple(ctx context.Context, settings map[string
 
 func (r *settingRepository) GetAll(ctx context.Context) (map[string]string, error) {
 	r.mu.Lock()
+	r.syncModerationGenerationLocked()
 	if r.allCache != nil && time.Now().UnixNano() < r.allCache.expiresAt {
 		values := cloneSettingValues(r.allCache.values)
 		r.mu.Unlock()
@@ -328,6 +347,7 @@ func (r *settingRepository) GetAll(ctx context.Context) (map[string]string, erro
 	flightKey := "setting-all:" + strconv.FormatUint(flightVersion, 10)
 	resultCh := r.loadSingle.DoChan(flightKey, func() (any, error) {
 		r.mu.Lock()
+		r.syncModerationGenerationLocked()
 		if r.allCache != nil && time.Now().UnixNano() < r.allCache.expiresAt {
 			values := cloneSettingValues(r.allCache.values)
 			r.mu.Unlock()

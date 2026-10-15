@@ -235,6 +235,7 @@ type AdminBoundAuthIdentityChannel struct {
 type CreateGroupInput struct {
 	Name                         string
 	Description                  string
+	I18n                         GroupI18n
 	Platform                     string
 	RateMultiplier               float64
 	MixedProviderRateMultipliers map[string]float64
@@ -317,6 +318,7 @@ type CreateGroupInput struct {
 type UpdateGroupInput struct {
 	Name                         string
 	Description                  *string
+	I18n                         *GroupI18n
 	Platform                     string
 	RateMultiplier               *float64           // 使用指针以支持设置为0
 	MixedProviderRateMultipliers map[string]float64 // nil preserves; {} resets Mixed vendor rates to 1x

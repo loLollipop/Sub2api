@@ -200,7 +200,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				logger.LegacyPrintf("service.gateway", "[Anthropic Passthrough] Upstream error (retry exhausted, failover): Account=%d(%s) Status=%d RequestID=%s Body=%s",
 					account.ID, account.Name, resp.StatusCode, resp.Header.Get("x-request-id"), truncateString(string(respBody), 1000))
 
-				s.handleRetryExhaustedSideEffects(ctx, resp, account)
+				s.handleRetryExhaustedSideEffects(ctx, resp, account, input.RequestModel)
 				appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 					ProxyID:            opsUpstreamProxyID(account),
 					ProxyName:          opsUpstreamProxyName(account),
@@ -225,7 +225,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 					RetryableOnSameAccount: PoolModeSameAccountRetry(account, resp.StatusCode, resp.Header, respBody),
 				}
 			}
-			return s.handleRetryExhaustedError(ctx, resp, c, account)
+			return s.handleRetryExhaustedError(ctx, resp, c, account, input.RequestModel)
 		}
 
 		if s.shouldFailoverUpstreamResponse(resp.StatusCode, resp.Header, respBody) {
@@ -322,7 +322,7 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	body = normalizeCacheControlTTLOrder(body)
 	body = sanitizeAnthropicThinkingForModel(body, gjson.GetBytes(body, "model").String())
 	targetURL := claudeAPIURL
-	baseURL := account.GetBaseURL()
+	baseURL := getAnthropicGatewayBaseURL(account)
 	if baseURL != "" {
 		validatedURL, err := s.validateUpstreamBaseURL(baseURL)
 		if err != nil {
@@ -350,8 +350,8 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	}
 
 	// Ollama Cloud DeepSeek 出站 max_tokens clamp：判定与上方 targetURL 的
-	// base 取值同源（GetBaseURL），详见 helper 注释。
-	body = clampOllamaCloudAnthropicMessagesMaxTokens(account, account.GetBaseURL(), body)
+	// base 取值同源，详见 helper 注释。
+	body = clampOllamaCloudAnthropicMessagesMaxTokens(account, baseURL, body)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(body))
 	if err != nil {
@@ -378,7 +378,7 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	req.Header.Del("cookie")
 	// Ollama Cloud Anthropic 兼容端点按实际 base_url 强制 Bearer（同上方
 	// targetURL 的 base 取值），其余保持 extra/default 行为。
-	setAnthropicAPIKeyAuthHeader(req.Header, account, token, account.GetBaseURL())
+	setAnthropicAPIKeyAuthHeader(req.Header, account, token, baseURL)
 
 	if getHeaderRaw(req.Header, "content-type") == "" {
 		setHeaderRaw(req.Header, "content-type", "application/json")
@@ -397,6 +397,7 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 
 	// 账号级请求头覆写（最终生效，覆盖上面所有来源的同名头）
 	account.ApplyHeaderOverrides(req.Header)
+	filterSonnet55ToolsetBetaHeader(req.Header, body, gjson.GetBytes(body, "model").String())
 
 	return req, body, nil
 }
@@ -594,6 +595,22 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 				}
 			}
 
+			// An in-stream error is the semantic terminal event. Preserve its
+			// frame and usage observation, without appending a synthetic 502.
+			if payload, ok := anthropicStreamErrorPayload(line); ok {
+				if IsUpstreamFinancialError(0, []byte(payload)) {
+					setOpsUpstreamError(c, http.StatusBadGateway, extractUpstreamErrorMessage([]byte(payload)), "")
+					if !clientDisconnected {
+						WriteUpstreamFinancialError(c, 0, []byte(payload))
+					}
+					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
+				}
+				sawTerminalEvent = true
+				errStatus, errType, errMsg := anthropicStreamErrorSemantics(payload)
+				setOpsUpstreamError(c, errStatus, errMsg, "")
+				MarkOpsStreamError(c, errType, errMsg, errStatus)
+			}
+
 			if !clientDisconnected {
 				restored := string(reverseToolNamesIfPresent(c, []byte(line)))
 				if pendingErrorHeader != "" {
@@ -674,6 +691,37 @@ func extractAnthropicSSEDataLine(line string) (string, bool) {
 		start++
 	}
 	return line[start:], true
+}
+
+func anthropicStreamErrorPayload(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if data, ok := extractAnthropicSSEDataLine(trimmed); ok {
+		trimmed = strings.TrimSpace(data)
+	}
+	if !gjson.Valid(trimmed) || !strings.HasPrefix(trimmed, "{") || gjson.Get(trimmed, "type").String() != "error" {
+		return "", false
+	}
+	return trimmed, true
+}
+
+func anthropicStreamErrorSemantics(payload string) (status int, errType, message string) {
+	errType = strings.TrimSpace(gjson.Get(payload, "error.type").String())
+	if errType == "" {
+		errType = "upstream_error"
+	}
+	message = strings.TrimSpace(gjson.Get(payload, "error.message").String())
+	if message == "" {
+		message = strings.TrimSpace(gjson.Get(payload, "message").String())
+	}
+	switch errType {
+	case "overloaded_error":
+		status = 529
+	case "rate_limit_error":
+		status = http.StatusTooManyRequests
+	default:
+		status = http.StatusBadGateway
+	}
+	return status, errType, message
 }
 
 // parseSSEUsagePassthrough 从 Anthropic SSE data 行提取 usage（包级函数：

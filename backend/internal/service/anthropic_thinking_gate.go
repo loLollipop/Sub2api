@@ -41,6 +41,11 @@ func anthropicModelRequiresAdaptiveThinking(modelID string) bool {
 	if strings.Contains(lower, "claude-fable-5") {
 		return true
 	}
+	// Legacy enabled->adaptive compatibility was established only for Opus
+	// and Sonnet. Haiku 5.5 explicitly rejects enabled and must reach validation.
+	if !strings.Contains(lower, "claude-opus-") && !strings.Contains(lower, "claude-sonnet-") {
+		return false
+	}
 	// claudeVersionRe 未锚定，因此 "anthropic/claude-opus-5.5" 这类带厂商前缀的
 	// 别名同样能命中。
 	matches := claudeVersionRe.FindStringSubmatch(lower)

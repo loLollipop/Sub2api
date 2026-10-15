@@ -197,6 +197,89 @@ async function openCodexImportStep(toggleClicks = 0) {
 }
 
 describe('CreateAccountModal OpenAI long-context billing', () => {
+  it('creates TypeSafe with native-only API key defaults', async () => {
+    createAccountMock.mockResolvedValue({ id: 42, platform: 'typesafe', type: 'apikey' })
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-typesafe"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('native account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('ts-local-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload).toMatchObject({ platform: 'typesafe', type: 'apikey', credentials: { base_url: 'https://api.typesafe.ai', api_key: 'ts-local-key' } })
+    expect(payload.credentials.api_protocol).toBeUndefined()
+    expect(payload.credentials.protocol_rules).toBeUndefined()
+    expect(probeUpstreamBillingMock).not.toHaveBeenCalled()
+    expect(syncUpstreamModelsMock).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+  it.each(['', 'demo-project'])('creates a Vertex API key account with optional project %s', async projectId => {
+    createAccountMock.mockReset().mockResolvedValue({ id: 73, platform: 'gemini', type: 'service_account' })
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'Gemini')
+    await selectButtonByText(wrapper, 'admin.accounts.vertexLabel')
+    await wrapper.get('[data-testid="vertex-auth-mode-apikey"]').setValue(true)
+    await flushPromises()
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Vertex key')
+    await wrapper.get('[data-testid="vertex-api-key-input"]').setValue('test-vertex-key')
+    await wrapper.get('[data-testid="vertex-api-key-project-id-input"]').setValue(projectId)
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      platform: 'gemini', type: 'service_account',
+      credentials: { auth_mode: 'apikey', api_key: 'test-vertex-key', tier_id: 'vertex' }
+    })
+    const credentials = createAccountMock.mock.calls[0]?.[0]?.credentials
+    expect(credentials.project_id).toBe(projectId || undefined)
+    expect(credentials.service_account_json).toBeUndefined()
+    expect(credentials.client_email).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('keeps Vertex API key credentials isolated when changing authentication mode or platform', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'Gemini')
+    await selectButtonByText(wrapper, 'admin.accounts.vertexLabel')
+    await wrapper.get('[data-testid="vertex-auth-mode-apikey"]').setValue(true)
+    await flushPromises()
+    await wrapper.get('[data-testid="vertex-api-key-input"]').setValue('must-clear')
+    await wrapper.get('input[type="radio"][value="service_account"]').setValue(true)
+    await flushPromises()
+    await wrapper.get('[data-testid="vertex-auth-mode-apikey"]').setValue(true)
+    await flushPromises()
+    expect((wrapper.get('[data-testid="vertex-api-key-input"]').element as HTMLInputElement).value).toBe('')
+    await selectButtonByText(wrapper, 'Anthropic')
+    await selectButtonByText(wrapper, 'admin.accounts.vertexLabel')
+    expect(wrapper.find('[data-testid="vertex-auth-mode-apikey"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="vertex-api-key-input"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it.each(['command_code', 'cline'])('creates catalog provider %s with its native endpoints and protocol rules', async (platform) => {
+    createAccountMock.mockResolvedValue({ id: 42, platform, type: 'apikey' })
+    const wrapper = mountModal()
+    await wrapper.get(`[data-testid="platform-button-${platform}"]`).trigger('click')
+    await flushPromises()
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('catalog provider')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('provider-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload.platform).toBe(platform)
+    expect(payload.type).toBe('apikey')
+    expect(payload.credentials.account_mode).toBe('payg')
+    if (platform === 'cline') {
+      expect(payload.credentials.api_protocol).toBe('chat_completions')
+      expect(payload.credentials.base_url).toBe('https://api.cline.bot/api/v1')
+      expect(payload.credentials.protocol_rules).toBeUndefined()
+    } else {
+      expect(payload.credentials.api_protocol).toBe('adaptive')
+      expect(payload.credentials.api_base_urls.chat_completions).toBe('https://api.commandcode.ai/provider/v1')
+      expect(payload.credentials.protocol_rules.some((rule: { pattern: string }) => rule.pattern === 'gpt-*')).toBe(true)
+    }
+    wrapper.unmount()
+  })
   beforeEach(() => {
     authIsSimpleMode.value = true
     createAccountMock.mockReset().mockResolvedValue({ id: 42, platform: 'openai', type: 'apikey' })

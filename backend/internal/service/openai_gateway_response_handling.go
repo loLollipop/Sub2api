@@ -621,6 +621,14 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			}
 			if account != nil && account.IsMixed() && mixedPayloadIsError(dataBytes, eventType) {
 				s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
+				// Keep the existing pre-generation request-error billing rule on
+				// this early Mixed exit too. Never make partial/policy output free.
+				outputStarted := responsesSemanticOutputSeen || openAIStreamClientOutputStarted(c, clientOutputStarted) ||
+					len(frame.root.Get("response.output").Array()) > 0
+				if !outputStarted && !mixedCCPayloadHasPolicy(dataBytes) &&
+					isOpenAINonBillableRequestError(extractOpenAISSEErrorMessage(dataBytes), dataBytes) {
+					nonBillableUpstreamError = true
+				}
 				flushPending("Client disconnected during failure flush, returning collected usage")
 				streamEarlyErr = fmt.Errorf("upstream Responses stream failed")
 				writeMixedStreamFailure(c, APIProtocolResponses, streamEarlyErr)
@@ -1360,6 +1368,11 @@ func isResponsesFunctionCallItemType(itemType string) bool {
 }
 
 func dedupeRepeatedJSONArgumentString(arguments string) (string, bool) {
+	// Never rewrite an already complete argument value, even if its bytes
+	// happen to look repeated. Only malformed concatenated values may recover.
+	if json.Valid([]byte(strings.TrimSpace(arguments))) {
+		return "", false
+	}
 	if len(arguments) == 0 || len(arguments)%2 != 0 {
 		return "", false
 	}

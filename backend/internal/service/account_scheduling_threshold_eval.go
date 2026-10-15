@@ -58,7 +58,7 @@ func EvaluateAccountSchedulingThreshold(account *Account, thresholds map[string]
 		winner = pickLatestResetSchedulingCandidate(anthropicThresholdCandidates(account), threshold, now)
 	case PlatformGrok:
 		winner = pickLatestResetSchedulingCandidate(grokThresholdCandidates(account), threshold, now)
-	case PlatformKimi, PlatformZhipu, PlatformMiniMax:
+	case PlatformKimi, PlatformZhipu, PlatformMiniMax, PlatformCommandCode:
 		winner = pickLatestResetSchedulingCandidate(cnProviderThresholdCandidates(account, decision.Platform), threshold, now)
 	default:
 		return decision
@@ -356,11 +356,20 @@ func cnProviderThresholdCandidates(account *Account, provider string) []*account
 	if account == nil || len(account.Extra) == 0 {
 		return nil
 	}
-	return []*accountSchedulingThresholdCandidate{
+	if provider == PlatformCommandCode && !commandCodeWindowsBinding(account.Extra) {
+		return nil
+	}
+	candidates := []*accountSchedulingThresholdCandidate{
 		cnThresholdCandidate(account.Extra, provider, "5h"),
 		cnThresholdCandidate(account.Extra, provider, "weekly"),
 	}
+	if cnQuotaHasMonthlyWindow(provider) {
+		candidates = append(candidates, cnThresholdCandidate(account.Extra, provider, "monthly"))
+	}
+	return candidates
 }
+
+func cnQuotaHasMonthlyWindow(provider string) bool { return provider == PlatformCommandCode }
 
 func cnThresholdCandidate(extra map[string]any, provider, window string) *accountSchedulingThresholdCandidate {
 	var usedKey, resetKey string
@@ -368,6 +377,9 @@ func cnThresholdCandidate(extra map[string]any, provider, window string) *accoun
 	case "5h":
 		usedKey = cnExtraKey(provider, cnExtraSuffix5hUsed)
 		resetKey = cnExtraKey(provider, cnExtraSuffix5hReset)
+	case "monthly":
+		usedKey = cnExtraKey(provider, cnExtraSuffixMonthlyUsed)
+		resetKey = cnExtraKey(provider, cnExtraSuffixMonthlyReset)
 	case "weekly":
 		usedKey = cnExtraKey(provider, cnExtraSuffixWeeklyUsed)
 		resetKey = cnExtraKey(provider, cnExtraSuffixWeeklyReset)

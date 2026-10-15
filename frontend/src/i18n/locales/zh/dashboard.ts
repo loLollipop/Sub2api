@@ -414,7 +414,7 @@ export default {
     inflightRunning: '正在请求',
     inflightFold: '在途请求',
     inflightMore: '查看更多',
-    requestIdPlaceholder: '输入完整请求 ID',
+    requestIdPlaceholder: '请求 / 上游 ID：片段搜索，=精确，^前缀；短片段请限定 24 小时内',
     inflightRunningHint: '请求还没结束。点刷新才会更新时长和费用。',
     inflightElapsed: '已运行',
     firstToken: '首 Token',

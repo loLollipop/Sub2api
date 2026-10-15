@@ -72,14 +72,54 @@ func TestUsageInflightBillingIdentityDeduplicatesCommittedRows(t *testing.T) {
 func TestFilterUsageInflightMatchesCompleteRequestID(t *testing.T) {
 	rows := []UsageInflightSnapshot{{RequestID: "client:fcfb9013-144a-4994-a2e7-f40eb688adc5"}}
 	for _, id := range []string{"fcfb9013-144a-4994-a2e7-f40eb688adc5", rows[0].RequestID} {
-		got := filterUsageInflight(rows, usagestats.UsageLogFilters{RequestID: id}, nil)
+		got := filterUsageInflight(rows, usagestats.UsageLogFilters{RequestID: "=" + id}, nil)
 		if len(got) != 1 {
 			t.Fatalf("complete identity should match, got %+v", got)
 		}
 	}
 	for _, id := range []string{"fcfb9013", "%", "FCFB9013-144a-4994-a2e7-f40eb688adc5"} {
-		if got := filterUsageInflight(rows, usagestats.UsageLogFilters{RequestID: id}, nil); len(got) != 0 {
+		if got := filterUsageInflight(rows, usagestats.UsageLogFilters{RequestID: "=" + id}, nil); len(got) != 0 {
 			t.Fatalf("fragment/wildcard/case change should not match, got %+v", got)
 		}
+	}
+}
+
+func TestFilterUsageInflightRequestIDSearchModes(t *testing.T) {
+	start := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	rows := []UsageInflightSnapshot{
+		{RequestID: "client:abc%_tail", APIKeyID: 7, StartedAt: start},
+		{RequestID: "local:ABC%_tail", APIKeyID: 7, StartedAt: start},
+		{RequestID: "xabc%_tail", APIKeyID: 7, StartedAt: start},
+		{RequestID: "client:abcZZtail", APIKeyID: 7, StartedAt: start},
+		{RequestID: "client:abc%_tail", APIKeyID: 8, StartedAt: start},
+	}
+	for _, tc := range []struct {
+		input string
+		ids   []string
+	}{
+		{"=abc%_tail", []string{"client:abc%_tail"}},
+		{"=local:ABC%_tail", []string{"local:ABC%_tail"}},
+		{"^client:abc%_", []string{"client:abc%_tail", "local:ABC%_tail"}},
+		{"abc%_", []string{"client:abc%_tail", "local:ABC%_tail", "xabc%_tail"}},
+		{"%_", []string{"client:abc%_tail", "local:ABC%_tail", "xabc%_tail"}},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			got := filterUsageInflight(rows, usagestats.UsageLogFilters{APIKeyID: 7, RequestID: tc.input, StartTime: &start, EndTime: &end}, nil)
+			if len(got) != len(tc.ids) {
+				t.Fatalf("got %+v want %q", got, tc.ids)
+			}
+			for i := range got {
+				if got[i].RequestID != tc.ids[i] {
+					t.Errorf("got %q want %q", got[i].RequestID, tc.ids[i])
+				}
+			}
+		})
+	}
+	if got := filterUsageInflight(rows, usagestats.UsageLogFilters{RequestID: "%_"}, nil); len(got) != 0 {
+		t.Fatalf("unbounded short search: %+v", got)
+	}
+	if got := filterUsageInflight(rows, usagestats.UsageLogFilters{RequestID: "="}, nil); len(got) != 0 {
+		t.Fatalf("empty exact search: %+v", got)
 	}
 }

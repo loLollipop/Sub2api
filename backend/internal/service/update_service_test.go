@@ -30,6 +30,7 @@ func (s *updateServiceCacheStub) SetUpdateInfo(_ context.Context, data string, _
 
 type updateServiceGitHubClientStub struct {
 	release        *GitHubRelease
+	latestErr      error
 	recentReleases []*GitHubRelease
 	recentErr      error
 	latestRepos    []string
@@ -39,7 +40,7 @@ type updateServiceGitHubClientStub struct {
 
 func (s *updateServiceGitHubClientStub) FetchLatestRelease(_ context.Context, repo string) (*GitHubRelease, error) {
 	s.latestRepos = append(s.latestRepos, repo)
-	return s.release, nil
+	return s.release, s.latestErr
 }
 
 func (s *updateServiceGitHubClientStub) FetchRecentReleases(_ context.Context, repo string, _ int) ([]*GitHubRelease, error) {
@@ -76,12 +77,13 @@ func TestUpdateServicePerformUpdateNoUpdateReturnsSentinel(t *testing.T) {
 	require.ErrorIs(t, err, ErrNoUpdateAvailable)
 }
 
-func TestUpdateServiceCheckUpdateUsesUpstreamRepository(t *testing.T) {
+func TestUpdateServiceCheckUpdateUsesPersonalReleaseRepository(t *testing.T) {
+	t.Setenv("UPDATE_CHECK_MODE", "")
 	client := &updateServiceGitHubClientStub{
 		release: &GitHubRelease{
 			TagName: "v2.0.49",
 			Name:    "v2.0.49",
-			HTMLURL: "https://github.com/kiss-kedaya/sub2api/releases/tag/v2.0.49",
+			HTMLURL: "https://github.com/loLollipop/Sub2api/releases/tag/v2.0.49",
 		},
 	}
 	svc := NewUpdateService(&updateServiceCacheStub{}, client, "v2.0.48-personal.1", "release")
@@ -89,13 +91,15 @@ func TestUpdateServiceCheckUpdateUsesUpstreamRepository(t *testing.T) {
 	info, err := svc.CheckUpdate(context.Background(), true)
 
 	require.NoError(t, err)
-	require.Equal(t, []string{upstreamMonitorRepo}, client.latestRepos)
+	require.Equal(t, []string{personalReleaseRepo}, client.latestRepos)
 	require.True(t, info.HasUpdate)
-	require.True(t, info.ReviewRequired)
+	require.False(t, info.ReviewRequired)
+	require.Equal(t, "release", info.CheckMode)
+	require.Empty(t, info.UpstreamUpdates)
 	require.Equal(t, client.release.HTMLURL, info.ReleaseInfo.HTMLURL)
 }
 
-func TestUpdateServicePerformUpdateRequiresReviewWithoutDownloadingUpstream(t *testing.T) {
+func TestUpdateServicePerformUpdateKeepsRolloutGuardWithoutDownloading(t *testing.T) {
 	t.Setenv("UPDATE_STRATEGY", "binary")
 	client := &updateServiceGitHubClientStub{
 		release: &GitHubRelease{
@@ -135,7 +139,7 @@ func TestUpdateServiceDisabledStrategyRejectsUpdateAndRollback(t *testing.T) {
 	require.ErrorIs(t, svc.RollbackToVersion(context.Background(), "0.1.131"), ErrUpdateDisabled)
 }
 
-func TestUpdateServiceOrchestratedStrategyStillRequiresUpstreamReview(t *testing.T) {
+func TestUpdateServiceOrchestratedStrategyKeepsRolloutGuard(t *testing.T) {
 	t.Setenv("UPDATE_STRATEGY", "orchestrated")
 	t.Setenv("UPDATE_ORCHESTRATOR", "")
 

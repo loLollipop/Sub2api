@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -81,16 +80,12 @@ func TestMixedBillingResponsesUpstreamUsageAcrossIngress(t *testing.T) {
 					logs := &openAIRecordUsageLogRepoStub{inserted: true}
 					svc := newOpenAIRecordUsageServiceForTest(logs, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil, rawChatCompletionsTestConfig())
 					svc.resolver = NewModelPricingResolver(nil, svc.billingService)
-					responses := []*http.Response{mixedRefusal(APIProtocolChatCompletions)}
-					if protocol == APIProtocolAnthropic {
-						responses = append(responses, mixedRefusal(APIProtocolAnthropic))
-					}
 					payload := strings.ReplaceAll(mixedResponsesToolSSE(), `{"input_tokens":9,"output_tokens":4,"total_tokens":13,"input_tokens_details":{"cached_tokens":3}}`, tc.usage)
 					payload = strings.ReplaceAll(payload, `"model":"actual"`, `"model":"`+tc.model+`"`)
 					if protocol == APIProtocolResponses && !stream {
 						payload = `{"id":"resp_1","object":"response","model":"` + tc.model + `","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],"usage":` + tc.usage + `}`
 					}
-					responses = append(responses, mixedHTTPResponse(200, payload, protocol != APIProtocolResponses || stream))
+					responses := mixedResponsesForTarget(protocol, APIProtocolResponses, mixedHTTPResponse(200, payload, protocol != APIProtocolResponses || stream))
 					upstream := &httpUpstreamRecorder{responses: responses}
 					svc.httpUpstream = upstream
 					account := mixedTestAccount()

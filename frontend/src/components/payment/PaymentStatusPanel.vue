@@ -441,9 +441,10 @@ async function pollStatus() {
 
 function startCountdown(seconds: number) {
   remainingSeconds.value = Math.max(0, seconds)
+  const deadline = Date.now() + remainingSeconds.value * 1000
   if (remainingSeconds.value <= 0) { setOutcome('expired'); return }
   countdownTimer = setInterval(() => {
-    remainingSeconds.value--
+    remainingSeconds.value = Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
     if (remainingSeconds.value <= 0) { setOutcome('expired'); cleanup() }
   }, 1000)
 }
@@ -477,7 +478,7 @@ verifyAttempts = 0
 lastVerifyAt = 0
 let seconds = 30 * 60
 if (props.expiresAt) {
-  seconds = Math.floor((new Date(props.expiresAt).getTime() - Date.now()) / 1000)
+  seconds = Math.ceil((new Date(props.expiresAt).getTime() - Date.now()) / 1000)
 }
 startCountdown(seconds)
 pollTimer = setInterval(pollStatus, 3000)

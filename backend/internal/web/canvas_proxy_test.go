@@ -39,6 +39,43 @@ func TestInfiniteCanvasHandler_ServesLocalIndex(t *testing.T) {
 	require.Equal(t, "ok", other.Body.String())
 }
 
+func TestServeInfiniteCanvasFile_TraversalCannotSelectOutsideFile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	parent := t.TempDir()
+	root := filepath.Join(parent, "canvas")
+	require.NoError(t, os.Mkdir(root, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "index.html"), []byte("canvas index"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(parent, "private.txt"), []byte("outside secret"), 0o644))
+	for _, requestPath := range []string{
+		"/canvas/../private.txt",
+		"/canvas/%2e%2e/private.txt",
+		"/canvas/..%5cprivate.txt",
+	} {
+		t.Run(requestPath, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodGet, requestPath, nil)
+			fileServer := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("traversal selected an existing file outside the static root")
+			})
+			if serveInfiniteCanvasFile(c, root, fileServer) {
+				switch rec.Code {
+				case http.StatusOK:
+					require.Equal(t, "canvas index", rec.Body.String())
+				case http.StatusBadRequest:
+					// net/http may reject a dot-segment URL before serving
+					// the SPA fallback; rejection also preserves confinement.
+					require.NotContains(t, rec.Body.String(), "outside secret")
+				default:
+					t.Fatalf("unexpected traversal response status: %d", rec.Code)
+				}
+			} else {
+				require.Empty(t, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestInfiniteCanvasHandler_ProxiesUpstream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const query = "v=123&tag=one&tag=two&q=hello+world&next=%2Fcanvas%2F&empty="

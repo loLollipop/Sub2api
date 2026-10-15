@@ -39,8 +39,8 @@ describe('Ops request latency details', () => {
     viewport.desktop = true
     listRequestDetails.mockResolvedValue({
       items: [
-        { kind: 'success', created_at: '2026-09-10T00:00:00Z', duration_ms: 12000, first_token_ms: 800 },
-        { kind: 'success', created_at: '2026-09-10T00:00:01Z', duration_ms: 9000, first_token_ms: 0 },
+        { kind: 'success', created_at: '2026-09-10T00:00:00Z', duration_ms: 12000, first_token_ms: 800, account_id: 10, account_name: '主账号 <script>alert(1)</script>' },
+        { kind: 'success', created_at: '2026-09-10T00:00:01Z', duration_ms: 9000, first_token_ms: 0, account_id: 11 },
         { kind: 'success', created_at: '2026-09-10T00:00:02Z', duration_ms: 5000, first_token_ms: null },
       ],
       total: 3,
@@ -74,7 +74,7 @@ describe('Ops request latency details', () => {
     expect(wrapper.text()).not.toContain('12000 ms')
     expect(wrapper.text()).not.toContain('9000 ms')
     expect(wrapper.text()).not.toContain('5000 ms')
-    if (desktop) expect(wrapper.findAll('tbody tr')[2].findAll('td')[4].text()).toBe('-')
+    if (desktop) expect(wrapper.findAll('tbody tr')[2].findAll('td')[5].text()).toBe('-')
     else expect(wrapper.text()).toContain('admin.ops.ttftLabel: -')
     wrapper.unmount()
   })
@@ -85,6 +85,18 @@ describe('Ops request latency details', () => {
     expect(wrapper.text()).toContain('admin.ops.requestDetails.table.duration')
     expect(wrapper.text()).toContain('12000 ms')
     expect(wrapper.text()).not.toContain('800 ms')
+    wrapper.unmount()
+  })
+
+  it.each([true, false])('shows request-owned account names and missing-account fallbacks (desktop: %s)', async (desktop) => {
+    viewport.desktop = desktop
+    const wrapper = await openDetails('duration_desc')
+    const accounts = wrapper.findAll('[data-testid="request-account"]')
+    expect(accounts[0].text()).toContain('主账号 <script>alert(1)</script>')
+    expect(accounts[0].find('script').exists()).toBe(false)
+    expect(accounts[1].text()).toContain('#11')
+    expect(accounts[2].text()).toContain('-')
+    expect(listRequestDetails).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 })

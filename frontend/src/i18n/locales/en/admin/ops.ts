@@ -429,6 +429,7 @@ export default {
           time: 'Time',
           kind: 'Kind',
           platform: 'Platform',
+            account: 'Account',
           model: 'Model',
           duration: 'Duration',
           status: 'Status',
@@ -830,7 +831,10 @@ export default {
         unavailable: 'Unavailable',
         accountError: 'Error'
       },
+      outputTps: 'Per-request generation speed',
+      outputTpsSamples: 'Eligible samples: {count}',
       tooltips: {
+        outputTps: 'Output tokens divided by duration after the first token, not total gateway throughput. Text requests need at least 20 output tokens and a 1-second generation window. P5/P10 show the slow tail; P50 is the median. Missing timings, images, videos and very short requests are excluded.',
         totalRequests: 'Total number of requests (including both successful and failed requests) in the selected time window.',
         throughputTrend: 'Requests/QPS + Tokens/TPS in the selected window.',
         switchRateTrend: 'Trend of account switches / total requests over the last 5 hours (avg switches).',

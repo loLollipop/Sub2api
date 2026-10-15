@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
@@ -77,12 +78,7 @@ func IsOpenAICompatibleUpstreamPlatform(platform string) bool {
 }
 
 func isOpenAICompatibleUpstreamPlatform(platform string) bool {
-	switch strings.TrimSpace(platform) {
-	case PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed:
-		return true
-	default:
-		return false
-	}
+	return domain.UsesOpenAIGateway(strings.TrimSpace(platform))
 }
 
 func groupPlatformFitsRequest(groupPlatform, requestPlatform string) bool {
@@ -106,6 +102,12 @@ func groupUsableForRequest(group *Group, requestPlatform, model string, schedula
 		return true
 	}
 	if !groupAllowsRequestedModel(group, model) {
+		return false
+	}
+	if requestPlatform == PlatformTypeSafe {
+		return model == "jev-latest" && (group.Platform == PlatformTypeSafe || group.Platform == PlatformComposite)
+	}
+	if group.Platform == PlatformTypeSafe {
 		return false
 	}
 	if groupPlatformFitsRequest(group.Platform, requestPlatform) {
@@ -149,10 +151,7 @@ func GroupCatalogPlatforms() []string {
 }
 
 func groupCatalogPlatforms() []string {
-	return []string{
-		PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
-		PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed,
-	}
+	return domain.CompositePrecedencePlatformIDs()
 }
 
 func modelsAdmitRequestedModel(models []string, requestedModel string) bool {
@@ -318,6 +317,12 @@ func (s *GatewayService) UpstreamPlatformForModel(ctx context.Context, apiKey *A
 	if s == nil || apiKey == nil {
 		return "", false
 	}
+	if model == "jev-latest" {
+		return PlatformTypeSafe, true
+	}
+	if apiKey.Group != nil && apiKey.Group.Platform == PlatformTypeSafe && !apiKey.UsesRequestTargetPlatform() {
+		return "", false
+	}
 	if apiKey.Group != nil && apiKey.Group.Platform == PlatformMixed && !apiKey.UsesRequestTargetPlatform() {
 		return PlatformMixed, true
 	}
@@ -325,40 +330,13 @@ func (s *GatewayService) UpstreamPlatformForModel(ctx context.Context, apiKey *A
 	if len(ids) == 0 && apiKey.Group != nil && apiKey.Group.ID > 0 {
 		ids = []int64{apiKey.Group.ID}
 	}
-	detected, detectedOK := DetectModelPlatform(model)
-	prefer := []string{
-		PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed,
-		PlatformAnthropic, PlatformGemini, PlatformAntigravity,
-	}
-	if detectedOK && detected == PlatformGrok {
-		prefer = []string{
-			PlatformGrok, PlatformOpenAI, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed,
-			PlatformAnthropic, PlatformGemini, PlatformAntigravity,
-		}
-	}
-	sawCatalog := false
-	for _, gid := range ids {
-		gid := gid
-		group := s.GroupPolicyForRequest(ctx, gid)
-		if group == nil && apiKey.Group != nil && apiKey.Group.ID == gid {
-			group = apiKey.Group
-		}
-		if !groupAllowsRequestedModel(group, model) {
-			continue
-		}
-		for _, platform := range prefer {
-			models := s.GetAvailableModels(ctx, &gid, platform)
-			if models == nil {
-				continue
-			}
-			sawCatalog = true
-			if modelsAdmitRequestedModel(models, model) {
-				return platform, true
-			}
-		}
+	platform, matched, sawCatalog := upstreamPlatformCatalogMatch(ctx, apiKey, model, ids, s.GroupPolicyForRequest, s.GetAvailableModels, nil)
+	if matched {
+		return platform, true
 	}
 	// Catalog miss is not a closed world. A grok-* (or gpt-*, claude-*) ID that
 	// no mapping lists yet still belongs on a matching-platform candidate group.
+	detected, detectedOK := DetectModelPlatform(model)
 	if detectedOK {
 		for _, gid := range ids {
 			gid := gid
@@ -386,6 +364,100 @@ func (s *GatewayService) UpstreamPlatformForModel(ctx context.Context, apiKey *A
 		}
 	}
 	return "", false
+}
+
+// UpstreamPlatformForModel resolves WS first frames from the same account
+// catalog as HTTP dispatch. It deliberately omits the legacy group-label and
+// model-name fallbacks: an unresolved smart key must not enter a protocol chain.
+func (s *OpenAIGatewayService) UpstreamPlatformForModel(ctx context.Context, apiKey *APIKey, model string) (string, bool) {
+	model = strings.TrimSpace(model)
+	if s == nil || apiKey == nil || model == "" ||
+		(apiKey.Group != nil && apiKey.Group.Platform == PlatformTypeSafe && !apiKey.UsesRequestTargetPlatform()) {
+		return "", false
+	}
+	if model == "jev-latest" {
+		return PlatformTypeSafe, true
+	}
+	ids := apiKey.CandidateGroupIDs()
+	if len(ids) == 0 && apiKey.Group != nil && apiKey.Group.ID > 0 {
+		ids = []int64{apiKey.Group.ID}
+	}
+	// Each group's immutable account projection is read once for this frame.
+	catalogs := make(map[int64]groupModelsCatalog, len(ids))
+	getModels := func(ctx context.Context, groupID *int64, platform string) []string {
+		cat, ok := catalogs[*groupID]
+		if !ok {
+			cat = s.routeModelsCatalog(ctx, groupID)
+			catalogs[*groupID] = cat
+		}
+		return cat.modelsFor(platform)
+	}
+	policy := &GatewayService{schedulerSnapshot: s.schedulerSnapshot}
+	platform, matched, _ := upstreamPlatformCatalogMatch(ctx, apiKey, model, ids, policy.GroupPolicyForRequest, getModels, s.ResolveChannelMappingAndRestrict)
+	return platform, matched
+}
+
+func upstreamPlatformCatalogMatch(ctx context.Context, apiKey *APIKey, model string, ids []int64,
+	getGroup func(context.Context, int64) *Group, getModels groupCatalogModelLookup,
+	resolveMapping func(context.Context, *int64, string) (ChannelMappingResult, bool),
+) (string, bool, bool) {
+	prefer := domain.PlatformIDsWhere(func(spec domain.PlatformSpec) bool {
+		return spec.Gateway == domain.PlatformGatewayOpenAI
+	})
+	if detected, ok := DetectModelPlatform(model); ok && detected == PlatformGrok {
+		for i, platform := range prefer {
+			if platform == PlatformGrok {
+				copy(prefer[1:i+1], prefer[:i])
+				prefer[0] = PlatformGrok
+				break
+			}
+		}
+	}
+	prefer = append(prefer, domain.PlatformIDsWhere(func(spec domain.PlatformSpec) bool {
+		return spec.Gateway != domain.PlatformGatewayOpenAI && spec.Gateway != domain.PlatformGatewaySystemOne
+	})...)
+	sawCatalog := false
+	for _, gid := range ids {
+		group := getGroup(ctx, gid)
+		if group == nil && apiKey.Group != nil && apiKey.Group.ID == gid {
+			group = apiKey.Group
+		}
+		if !groupAllowsRequestedModel(group, model) {
+			continue
+		}
+		routeCtx := ctx
+		catalogModel := model
+		if resolveMapping != nil {
+			if group != nil {
+				routeCtx = ContextWithAPIKeyRoute(ctx, cloneAPIKeyWithGroupID(apiKey, group))
+			}
+			mapping, restricted := resolveMapping(routeCtx, &gid, model)
+			if restricted {
+				continue
+			}
+			if mapping.Mapped {
+				catalogModel = strings.TrimSpace(mapping.MappedModel)
+			}
+			// Match the existing candidate iterator: a channel alias does not
+			// bypass authorization of either the public or mapped model.
+			if catalogModel == "" || !ValidModelScope(apiKey.ModelScope) ||
+				!apiKey.AllowsModelScope(model) || !apiKey.AllowsModelScope(catalogModel) {
+				continue
+			}
+		}
+		for _, platform := range prefer {
+			models := getModels(routeCtx, &gid, platform)
+			if models == nil {
+				continue
+			}
+			sawCatalog = true
+			if modelsAdmitRequestedModel(models, model) ||
+				(catalogModel != model && modelsAdmitRequestedModel(models, catalogModel)) {
+				return platform, true, sawCatalog
+			}
+		}
+	}
+	return "", false, sawCatalog
 }
 
 func shouldContinueAlongKeyRoutes(err error) bool {

@@ -12,6 +12,13 @@ import (
 
 const modelsListCatalogMarker = "*"
 
+func (s *GatewayService) GetCompositeRouteModels(ctx context.Context, groupID *int64, endpoint string) ([]string, error) {
+	if s == nil || s.compositeResolver == nil || groupID == nil {
+		return nil, nil
+	}
+	return s.compositeResolver.ListExactPublicModels(ctx, *groupID, endpoint)
+}
+
 type groupModelsCatalog struct {
 	byPlatform map[string][]string
 	platforms  map[string]struct{}
@@ -195,15 +202,59 @@ func loadGroupModelsCatalogFromStore(ctx context.Context, repo AccountRepository
 // FilterModelsForKeyScope applies the same public and target boundaries as
 // forwarding. Opaque aliases that cannot establish the selected family remain
 // unavailable for scoped keys. Legacy all keys preserve their original list.
-func (s *GatewayService) FilterModelsForKeyScope(ctx context.Context, groupID *int64, scope string, models []string) []string {
+func (s *GatewayService) FilterModelsForKeyScope(ctx context.Context, groupID *int64, scope string, models []string, compositeEndpoint ...string) []string {
 	if NormalizeModelScope(scope) == ModelScopeAll {
 		return cloneStringSlice(models)
 	}
 	cat := s.ensureGroupModelsCatalog(ctx, groupID)
-	return filterModelsForKeyScopeMapped(cat, scope, models, func(model string) string {
+	channelModel := func(model string) string {
 		mapped, _ := s.ResolveChannelMappingAndRestrict(ctx, groupID, model)
 		return mapped.MappedModel
-	})
+	}
+	if len(compositeEndpoint) == 0 || groupID == nil || s.compositeResolver == nil {
+		return filterModelsForKeyScopeMapped(cat, scope, models, channelModel)
+	}
+	targets, err := s.compositeResolver.exactPublicModelTargets(ctx, *groupID, compositeEndpoint[0])
+	if err != nil {
+		// Preserve the account-only catalog when the route store is unavailable.
+		return filterModelsForKeyScopeMapped(cat, scope, models, channelModel)
+	}
+	filtered := make([]string, 0, len(models))
+	for _, model := range models {
+		if !ModelScopeAllows(scope, model) {
+			continue
+		}
+		candidates, routed := targets[model]
+		if !routed {
+			if len(filterModelsForKeyScopeMapped(cat, scope, []string{model}, channelModel)) > 0 {
+				filtered = append(filtered, model)
+			}
+			continue
+		}
+		// A route alias is authorized against its winning target before the
+		// channel/account mapping boundary, just like actual forwarding.
+		for _, target := range candidates {
+			targetCatalog := cat
+			if target.platform != "" {
+				targetCatalog.scopeMappings = nil
+				for _, account := range cat.scopeMappings {
+					if account.platform == target.platform {
+						targetCatalog.scopeMappings = append(targetCatalog.scopeMappings, account)
+					}
+				}
+				// No account of the routed platform cannot establish scope. Do
+				// not borrow another platform's passthrough/mapping capability.
+				if len(targetCatalog.scopeMappings) == 0 {
+					continue
+				}
+			}
+			if len(filterModelsForKeyScopeMapped(targetCatalog, scope, []string{target.model}, channelModel)) > 0 {
+				filtered = append(filtered, model)
+				break
+			}
+		}
+	}
+	return filtered
 }
 
 func (s *OpenAIGatewayService) FilterModelsForKeyScope(ctx context.Context, groupID *int64, scope string, models []string) []string {
@@ -381,6 +432,12 @@ func modelsFromSchedulableAccounts(accounts []Account, platform string) []string
 	for i := range accounts {
 		acc := &accounts[i]
 		if filterPlatform != "" && acc.Platform != filterPlatform {
+			continue
+		}
+		if acc.IsTypeSafe() {
+			if acc.Type == AccountTypeAPIKey && acc.IsModelSupported("jev-latest") && acc.GetMappedModel("jev-latest") == "jev-latest" {
+				modelSet["jev-latest"] = struct{}{}
+			}
 			continue
 		}
 		if platform == PlatformOpenAI && acc.IsOpenAIPassthroughEnabled() {

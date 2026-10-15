@@ -22,7 +22,7 @@
         :loading="loading"
         :auto-refresh="autoRefresh"
         @update:window="handleWindowChange"
-        @refresh="manualReload"
+        @refresh="refresh()"
       />
 
       <MonitorCardGrid
@@ -80,12 +80,15 @@ const showDetail = ref(false)
 const detailTarget = ref<UserMonitorView | null>(null)
 
 let abortController: AbortController | null = null
+let disposed = false
+const detailVersions = new Map<number, number>()
+const pendingDetails = new Set<number>()
 
 const autoRefresh = useAutoRefresh({
   storageKey: 'channel-status-auto-refresh',
   intervals: [30, 60, 120] as const,
   defaultInterval: DEFAULT_INTERVAL_SECONDS,
-  onRefresh: () => reload(true),
+  onRefresh: () => refresh(true),
   shouldPause: () => document.hidden || loading.value,
 })
 const countdown = autoRefresh.countdown
@@ -106,29 +109,33 @@ const detailTitle = computed(() => {
 
 // ── Loaders ──
 async function reload(silent = false) {
+  if (disposed) return false
   if (abortController) abortController.abort()
   const ctrl = new AbortController()
   abortController = ctrl
   if (!silent) loading.value = true
   try {
     const res = await listChannelMonitorViews({ signal: ctrl.signal })
-    if (ctrl.signal.aborted || abortController !== ctrl) return
+    if (disposed || ctrl.signal.aborted || abortController !== ctrl) return false
     items.value = res.items || []
+    return true
   } catch (err: unknown) {
+    if (disposed || ctrl.signal.aborted || abortController !== ctrl) return false
     const e = err as { name?: string; code?: string }
-    if (e?.name === 'AbortError' || e?.code === 'ERR_CANCELED') return
+    if (e?.name === 'AbortError' || e?.code === 'ERR_CANCELED') return false
     appStore.showError(extractApiErrorMessage(err, t('channelStatus.loadError')))
+    return false
   } finally {
-    if (abortController === ctrl) {
-      if (!silent) loading.value = false
+    if (!disposed && abortController === ctrl) {
+      loading.value = false
       countdown.value = DEFAULT_INTERVAL_SECONDS
       abortController = null
     }
   }
 }
 
-async function manualReload() {
-  await reload(false)
+async function refresh(silent = false) {
+  if (!await reload(silent) || disposed) return
   // After base reload, refresh any cached detail records so non-7d availability
   // values stay in sync without forcing the user to switch tabs again.
   if (currentWindow.value !== '7d') {
@@ -137,11 +144,18 @@ async function manualReload() {
 }
 
 async function loadDetail(id: number, force = false) {
-  if (!force && detailCache[id]) return
+  if (disposed || (!force && (detailCache[id] || pendingDetails.has(id)))) return
+  const version = (detailVersions.get(id) ?? 0) + 1
+  detailVersions.set(id, version)
+  pendingDetails.add(id)
   try {
-    detailCache[id] = await fetchChannelMonitorDetail(id)
+    const detail = await fetchChannelMonitorDetail(id)
+    if (!disposed && detailVersions.get(id) === version) detailCache[id] = detail
   } catch (err: unknown) {
+    if (disposed || detailVersions.get(id) !== version) return
     appStore.showError(extractApiErrorMessage(err, t('channelStatus.detailLoadError')))
+  } finally {
+    if (!disposed && detailVersions.get(id) === version) pendingDetails.delete(id)
   }
 }
 
@@ -186,6 +200,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
   if (abortController) abortController.abort()
 })
 </script>

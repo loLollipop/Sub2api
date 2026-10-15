@@ -287,7 +287,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { marked } from 'marked'
@@ -297,6 +297,7 @@ import { useAnnouncementStore } from '@/stores/announcements'
 import { formatRelativeTime, formatRelativeWithDateTime } from '@/utils/format'
 import type { UserAnnouncement } from '@/types'
 import Icon from '@/components/icons/Icon.vue'
+import { createDialogLayer } from './dialogStack'
 import '@/styles/announcement-markdown.css'
 
 const { t } = useI18n()
@@ -348,14 +349,17 @@ function closeDetail() {
 
 async function markAsRead(id: number) {
   try {
-    await announcementStore.markAsRead(id)
+    const marked = await announcementStore.markAsRead(id)
+    if (!marked) appStore.showError(t('common.unknownError'))
+    return marked
   } catch (err: any) {
     appStore.showError(err?.message || t('common.unknownError'))
+    return false
   }
 }
 
 async function markAsReadAndClose(id: number) {
-  await markAsRead(id)
+  if (!await markAsRead(id)) return
   appStore.showSuccess(t('announcements.markedAsRead'))
   closeDetail()
 }
@@ -369,22 +373,18 @@ async function markAllAsRead() {
   }
 }
 
-function handleEscape(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    if (detailModalOpen.value) {
-      closeDetail()
-    } else if (isModalOpen.value) {
-      closeModal()
-    }
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', handleEscape)
-})
+const listLayer = createDialogLayer(closeModal)
+const detailLayer = createDialogLayer(closeDetail)
+// Required announcement popups stay open until explicitly acknowledged.
+const popupLayer = createDialogLayer(() => {})
+watch(isModalOpen, open => listLayer.update(open, 100), { flush: 'sync' })
+watch(detailModalOpen, open => detailLayer.update(open, 110), { flush: 'sync' })
+watch(() => announcementStore.currentPopup, popup => popupLayer.update(!!popup, 120), { immediate: true, flush: 'sync' })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleEscape)
+  listLayer.remove()
+  detailLayer.remove()
+  popupLayer.remove()
   document.body.style.overflow = ''
 })
 

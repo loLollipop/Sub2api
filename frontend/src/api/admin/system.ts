@@ -21,6 +21,19 @@ export interface VersionInfo {
   warning?: string
   build_type: string // "source" for manual builds, "release" for CI builds
   update_strategy?: string // "binary" | "runtime" | "orchestrated" | "disabled"
+  check_mode?: 'release' | 'upstream'
+  release_repository?: string
+  upstream_updates?: UpstreamUpdateInfo[]
+}
+
+export interface UpstreamUpdateInfo {
+  repository: string
+  branch: string
+  baseline_commit: string
+  latest_commit: string
+  has_update: boolean
+  compare_url: string
+  warning?: string
 }
 
 /**

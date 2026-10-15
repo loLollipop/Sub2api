@@ -121,6 +121,7 @@ func bindSelectedKeyRoute(c *gin.Context, gateway keyRouteBillingProvider, billi
 		if selected.Group != nil && selected.Group.ForceOpenAIFast && selected.Group.Platform == service.PlatformOpenAI {
 			tier = "priority"
 		}
+		tier = initialTextPreauthorizationTier(selected, tier)
 		if *binding.Guard == nil {
 			var guard *service.BalancePreauthorizationGuard
 			if binding.PerRequest == nil {

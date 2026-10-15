@@ -72,7 +72,7 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 	if normalized {
 		body = normalizedBody
 	}
-	legacyIngressBody, legacyIngressChanged, legacyIngressErr := normalizeOpenAIResponsesLegacyIngress(body)
+	legacyIngressBody, legacyIngressChanged, legacyIngressErr := normalizeOpenAIResponsesLegacyIngressWithConfig(s.cfg, body)
 	if legacyIngressErr != nil {
 		return nil, legacyIngressErr
 	}
@@ -146,7 +146,7 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 	}
 
 	nativeCNResponses := account.usesNativeResponsesUpstream()
-	nativeDeepSeekResponses := account.Platform == PlatformDeepseek && nativeCNResponses
+	nativeDeepSeekResponses := account.openAIWirePlatform() == PlatformDeepseek && nativeCNResponses
 	if nativeDeepSeekResponses && account.Type == AccountTypeAPIKey && !compactPath &&
 		needsOpenAIResponsesClientToolAdaptation(body) {
 		adaptedBody, mapping, adaptErr := adaptOpenAIResponsesClientTools(body)
@@ -166,19 +166,6 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 		return s.forwardGrokResponses(ctx, c, account, body, originalModel, reqStream, startTime)
 	}
 
-	// CN 供应商 anthropic 协议账号：/v1/responses 入站是交叉协议组合
-	// （Responses 客户端 × Anthropic 上游），转成 Anthropic 请求走原生端点。
-	// 不能落到下面的 raw-CC 分支——其 URL 构造会把 anthropic base 当 CC base 用。
-	//
-	// 这是 OpenAI 协议族跨到 Anthropic 协议族，受分组级跨协议转换开关约束：
-	// 关闭时返回可诊断的 400，不再静默转换。
-	if account.IsAnthropicProtocol() {
-		if !crossProtocolConversionAllowedFromContext(c) {
-			writeResponsesError(c, http.StatusBadRequest, crossProtocolDisabledCode, crossProtocolDisabledMessage)
-			return nil, CrossProtocolConversionError{}
-		}
-		return s.forwardResponsesViaNativeAnthropic(ctx, c, account, body, reqModel)
-	}
 	if account.IsOpenAIApiKey() {
 		if normalized, changed, normalizeErr := normalizeOpenAIParallelToolCallsWithoutTools(body, responsesLite); normalizeErr != nil {
 			return nil, normalizeErr
@@ -197,8 +184,18 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 		originalModel = reqModel
 	}
 
-	if shouldPreemptivelyConvertInboundResponsesToChat(account) && !forcedOpenAIResponsesProtocol(ctx) {
-		return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
+	routingModel := upstreamRoutingModel(account, body, "")
+	switch s.resolveUpstreamProtocolFor(ctx, account, APIProtocolResponses, routingModel) {
+	case APIProtocolAnthropic:
+		if !crossProtocolConversionAllowedFromContext(c) {
+			writeResponsesError(c, http.StatusBadRequest, crossProtocolDisabledCode, crossProtocolDisabledMessage)
+			return nil, CrossProtocolConversionError{}
+		}
+		return s.forwardResponsesViaNativeAnthropic(ctx, c, account, body, reqModel)
+	case APIProtocolChatCompletions:
+		if !forcedOpenAIResponsesProtocol(ctx) {
+			return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
+		}
 	}
 	if account.IsOpenAI() && (account.IsOpenAIApiKey() || account.IsOpenAIOAuthLike()) {
 		normalizedReasoningBody, reasoningChanged, reasoningErr := normalizeOpenAIResponsesReasoningContentReplay(body)
@@ -591,8 +588,8 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 	if !isCodexCLI {
 		maxOutputTokens := requestRoot.Get("max_output_tokens")
 		if maxOutputTokens.Exists() {
-			switch account.Platform {
-			case PlatformOpenAI, PlatformDeepseek:
+			switch account.openAIWirePlatform() {
+			case PlatformOpenAI, PlatformDeepseek, PlatformMixed:
 				// Preserve Responses-native output limits unless the selected upstream
 				// explicitly rejects the field in the bounded HTTP retry loop below.
 			case PlatformAnthropic:
@@ -906,6 +903,9 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 					break
 				}
 			}
+			if err := s.repriceOpenAIFinalAttempt(ctx, account, forwardBody, billingModel, upstreamModel); err != nil {
+				return nil, err
+			}
 			wsResult, wsErr = s.forwardOpenAIWSV2(
 				ctx,
 				c,
@@ -1065,6 +1065,7 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 		if err := clientCtx.Err(); err != nil {
 			return nil, err
 		}
+		reasoningEffort = finalOpenAIAttemptReasoningEffort(body, upstreamModel, billingModel, originalModel)
 		// Build upstream request
 		upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 		var headerGuard *openAIFirstOutputHeaderGuard
@@ -1078,6 +1079,12 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 			releaseUpstreamCtx()
 		}
 		if err != nil {
+			if headerGuard != nil {
+				headerGuard.close()
+			}
+			return nil, err
+		}
+		if err := s.repriceOpenAIFinalHTTPRequest(ctx, account, upstreamReq, billingModel, upstreamModel); err != nil {
 			if headerGuard != nil {
 				headerGuard.close()
 			}
@@ -1465,7 +1472,10 @@ func shouldForwardOpenAIResponsesViaRawChatCompletions(account *Account) bool {
 	if account.Type != AccountTypeAPIKey {
 		return false
 	}
-	if account.IsCNProvider() || account.IsGeminiOpenAIProtocol() {
+	if account.routesByModel() {
+		return false
+	}
+	if account.RoutesProtocolByInbound() || account.IsGeminiOpenAIProtocol() {
 		// 显式协议配置优先于异步探针 Extra；adaptive 仅 DeepSeek / Kimi /
 		// Gemini 自定义上游有原生 Responses，其余回退 Chat Completions。
 		switch account.GetAPIProtocol() {
@@ -1501,7 +1511,10 @@ func shouldPreemptivelyConvertInboundResponsesToChat(account *Account) bool {
 	if account.Type != AccountTypeAPIKey {
 		return false
 	}
-	if account.IsCNProvider() || account.IsGeminiOpenAIProtocol() {
+	if account.routesByModel() {
+		return false
+	}
+	if account.RoutesProtocolByInbound() || account.IsGeminiOpenAIProtocol() {
 		switch account.GetAPIProtocol() {
 		case APIProtocolChatCompletions:
 			return true
@@ -1549,6 +1562,9 @@ func openAIStickyYieldsToNativeResponses(ctx context.Context, account *Account, 
 }
 
 func shouldFallbackOpenAIResponsesToChatOnUnsupportedEndpoint(account *Account, c *gin.Context, status int) bool {
+	if account != nil && account.routesByModel() {
+		return false
+	}
 	if isResponsesEndpointSupportedByStatus(status) {
 		return false
 	}
@@ -1588,8 +1604,8 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 			baseURL = account.GetCNProtocolBaseURL(APIProtocolResponses)
 		}
 		if baseURL == "" {
-			if account.IsMixed() {
-				return nil, fmt.Errorf("mixed requires an explicit base_url")
+			if account.IsMixed() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
+				return nil, fmt.Errorf("account requires an explicit Responses endpoint")
 			}
 			targetURL = openaiPlatformAPIURL
 		} else {
@@ -1597,7 +1613,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL)
+			targetURL = buildOpenAIResponsesURLForPlatform(account.openAIWirePlatform(), validatedURL)
 		}
 	default:
 		targetURL = openaiPlatformAPIURL

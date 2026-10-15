@@ -23,13 +23,14 @@
         <div class="flex items-end gap-2">
           <div class="relative flex-1">
             <input
-              v-model="searchQuery"
+              :value="searchQuery"
+              :disabled="!canEditDraft"
               type="text"
               autocomplete="off"
               class="input w-full"
               :placeholder="t('admin.groups.searchUserPlaceholder')"
               @input="handleSearchUsers"
-              @focus="showDropdown = true"
+              @focus="showDropdown = canEditDraft"
             />
             <div
               v-if="showDropdown && searchResults.length > 0"
@@ -39,6 +40,7 @@
                 v-for="user in searchResults"
                 :key="user.id"
                 type="button"
+                :disabled="!canEditDraft"
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-dark-600"
                 @click="selectUser(user)"
               >
@@ -50,19 +52,21 @@
           </div>
           <div class="w-24">
             <input
-              v-model.number="newRpm"
+              :value="newRpm"
+              :disabled="!canEditDraft"
               type="number"
               step="1"
               min="0"
               autocomplete="off"
               class="hide-spinner input w-full"
               placeholder="100"
+              @input="updateNewRpm(($event.target as HTMLInputElement).value)"
             />
           </div>
           <button
             type="button"
             class="btn btn-primary shrink-0"
-            :disabled="!selectedUser || newRpm == null || newRpm < 0"
+            :disabled="!canEditDraft || !selectedUser || !validRpm(newRpm)"
             @click="handleAddLocal"
           >
             {{ t('common.add') }}
@@ -72,7 +76,7 @@
         <div v-if="localEntries.length > 0" class="mt-3 flex items-center justify-end border-t border-gray-100 pt-3 dark:border-dark-600">
           <button
             type="button"
-            :disabled="clearing"
+            :disabled="!canEditDraft || saving || clearing"
             class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
             @click="clearAllLocal"
           >
@@ -140,6 +144,7 @@
                     <td class="whitespace-nowrap px-3 py-2">
                       <input
                         type="number"
+                        :disabled="!canEditDraft"
                         step="1"
                         min="0"
                         autocomplete="off"
@@ -151,6 +156,7 @@
                     <td class="px-2 py-2">
                       <button
                         type="button"
+                        :disabled="!canEditDraft"
                         class="rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                         @click="removeLocal(entry.user_id)"
                       >
@@ -180,6 +186,7 @@
           <button
             type="button"
             class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+            :disabled="!canEditDraft"
             @click="handleCancel"
           >
             {{ t('admin.groups.revertChanges') }}
@@ -193,7 +200,7 @@
             v-if="isDirty"
             type="button"
             class="btn btn-primary btn-sm px-4 py-1.5"
-            :disabled="saving"
+            :disabled="!canEditDraft || saving || clearing"
             @click="handleSave"
           >
             <Icon v-if="saving" name="refresh" size="sm" class="mr-1 animate-spin" />
@@ -206,7 +213,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -233,7 +240,9 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const loading = ref(false)
+const entriesLoaded = ref(false)
 const saving = ref(false)
+const clearing = ref(false)
 const serverEntries = ref<GroupRPMOverrideEntry[]>([])
 const localEntries = ref<LocalEntry[]>([])
 const searchQuery = ref('')
@@ -243,8 +252,29 @@ const selectedUser = ref<AdminUser | null>(null)
 const newRpm = ref<number | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(10)
+const canEditDraft = computed(() => props.show && !!props.group && entriesLoaded.value && !loading.value && !saving.value && !clearing.value)
+const validRpm = (rpm: number | null): rpm is number =>
+  typeof rpm === 'number' && Number.isInteger(rpm) && rpm >= 0 && rpm <= 2147483647
 
 let searchTimeout: ReturnType<typeof setTimeout>
+let loadVersion = 0
+let searchVersion = 0
+
+const resetDraft = () => {
+  loadVersion++
+  searchVersion++
+  clearTimeout(searchTimeout)
+  entriesLoaded.value = false
+  loading.value = false
+  serverEntries.value = []
+  localEntries.value = []
+  currentPage.value = 1
+  searchQuery.value = ''
+  searchResults.value = []
+  showDropdown.value = false
+  selectedUser.value = null
+  newRpm.value = null
+}
 
 const platformColorClass = computed(() => {
   switch (props.group?.platform) {
@@ -271,17 +301,23 @@ const cloneEntries = (entries: GroupRPMOverrideEntry[]): LocalEntry[] => {
 }
 
 const loadEntries = async () => {
-  if (!props.group) return
+  if (!props.show || !props.group) return
+  const groupId = props.group.id
+  const version = loadVersion
   loading.value = true
   try {
-    serverEntries.value = await adminAPI.groups.getGroupRPMOverrides(props.group.id)
+    const entries = await adminAPI.groups.getGroupRPMOverrides(groupId)
+    if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
+    serverEntries.value = entries
     localEntries.value = cloneEntries(serverEntries.value)
+    entriesLoaded.value = true
     adjustPage()
   } catch (error) {
+    if (version !== loadVersion) return
     appStore.showError(t('admin.groups.failedToLoad'))
     console.error('Error loading RPM overrides:', error)
   } finally {
-    loading.value = false
+    if (version === loadVersion) loading.value = false
   }
 }
 
@@ -290,50 +326,56 @@ const adjustPage = () => {
   if (currentPage.value > totalPages) currentPage.value = totalPages
 }
 
-watch(() => props.show, (val) => {
-  if (val && props.group) {
-    currentPage.value = 1
-    searchQuery.value = ''
-    searchResults.value = []
-    selectedUser.value = null
-    newRpm.value = null
-    loadEntries()
-  }
-})
+watch([() => props.show, () => props.group?.id], ([show]) => {
+  resetDraft()
+  if (show && props.group) loadEntries()
+}, { immediate: true, flush: 'sync' })
 
 const handlePageSizeChange = (newSize: number) => {
   pageSize.value = newSize
   currentPage.value = 1
 }
 
-const handleSearchUsers = () => {
+const handleSearchUsers = (event: Event) => {
+  if (!canEditDraft.value) return
+  searchQuery.value = (event.target as HTMLInputElement).value
   clearTimeout(searchTimeout)
+  const version = ++searchVersion
+  const query = searchQuery.value.trim()
   selectedUser.value = null
-  if (!searchQuery.value.trim()) {
+  if (!query) {
     searchResults.value = []
     showDropdown.value = false
     return
   }
   searchTimeout = setTimeout(async () => {
+    if (version !== searchVersion || !canEditDraft.value) return
     try {
-      const res = await adminAPI.users.list(1, 10, { search: searchQuery.value.trim() })
+      const res = await adminAPI.users.list(1, 10, { search: query })
+      if (version !== searchVersion || !canEditDraft.value) return
       searchResults.value = res.items
       showDropdown.value = true
     } catch {
-      searchResults.value = []
+      if (version === searchVersion && canEditDraft.value) searchResults.value = []
     }
   }, 300)
 }
 
 const selectUser = (user: AdminUser) => {
+  if (!canEditDraft.value) return
   selectedUser.value = user
   searchQuery.value = user.email
   showDropdown.value = false
   searchResults.value = []
 }
 
+const updateNewRpm = (value: string) => {
+  if (!canEditDraft.value) return
+  newRpm.value = value.trim() ? Number(value) : null
+}
+
 const handleAddLocal = () => {
-  if (!selectedUser.value || newRpm.value == null || newRpm.value < 0) return
+  if (!canEditDraft.value || !selectedUser.value || !validRpm(newRpm.value)) return
   const user = selectedUser.value
   const idx = localEntries.value.findIndex(e => e.user_id === user.id)
   const entry: LocalEntry = {
@@ -358,26 +400,30 @@ const handleAddLocal = () => {
 const updateLocalRpm = (userId: number, value: string) => {
   if (!value.trim()) return
   const num = Number(value)
-  if (!Number.isInteger(num) || num < 0) return
+  if (!canEditDraft.value || !validRpm(num)) return
   const entry = localEntries.value.find(e => e.user_id === userId)
   if (entry) entry.rpm_override = num
 }
 
 const removeLocal = (userId: number) => {
+  if (!canEditDraft.value) return
   localEntries.value = localEntries.value.filter(e => e.user_id !== userId)
   adjustPage()
 }
 
-const clearing = ref(false)
 const clearAllLocal = async () => {
-  if (!props.group || clearing.value) return
+  if (!canEditDraft.value || !props.group || clearing.value || saving.value) return
+  const groupId = props.group.id
+  const version = loadVersion
   clearing.value = true
   try {
-    await adminAPI.groups.clearGroupRPMOverrides(props.group.id)
+    await adminAPI.groups.clearGroupRPMOverrides(groupId)
+    if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
     localEntries.value = []
     serverEntries.value = []
     appStore.showSuccess(t('admin.groups.rpmSaved'))
   } catch (error) {
+    if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
     appStore.showError(t('admin.groups.failedToSave'))
     console.error('Error clearing RPM overrides:', error)
   } finally {
@@ -386,23 +432,32 @@ const clearAllLocal = async () => {
 }
 
 const handleCancel = () => {
+  if (!canEditDraft.value) return
   localEntries.value = cloneEntries(serverEntries.value)
   adjustPage()
 }
 
 const handleSave = async () => {
-  if (!props.group) return
+  if (!canEditDraft.value || !props.group || saving.value || clearing.value) return
+  if (localEntries.value.some(entry => !validRpm(entry.rpm_override))) {
+    appStore.showError(t('admin.groups.failedToSave'))
+    return
+  }
+  const groupId = props.group.id
+  const version = loadVersion
   saving.value = true
   try {
     const entries = localEntries.value.map(e => ({
       user_id: e.user_id,
       rpm_override: e.rpm_override
     }))
-    await adminAPI.groups.batchSetGroupRPMOverrides(props.group.id, entries)
+    await adminAPI.groups.batchSetGroupRPMOverrides(groupId, entries)
+    if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
     appStore.showSuccess(t('admin.groups.rpmSaved'))
     emit('success')
     emit('close')
   } catch (error) {
+    if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
     appStore.showError(t('admin.groups.failedToSave'))
     console.error('Error saving RPM overrides:', error)
   } finally {
@@ -411,9 +466,7 @@ const handleSave = async () => {
 }
 
 const handleClose = () => {
-  if (isDirty.value) {
-    localEntries.value = cloneEntries(serverEntries.value)
-  }
+  resetDraft()
   emit('close')
 }
 
@@ -421,6 +474,10 @@ const handleClickOutside = () => { showDropdown.value = false }
 if (typeof document !== 'undefined') {
   document.addEventListener('click', handleClickOutside)
 }
+onUnmounted(() => {
+  resetDraft()
+  if (typeof document !== 'undefined') document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <style scoped>

@@ -66,7 +66,6 @@
           <td class="border-r border-gray-100 py-2.5 pl-5 pr-4 align-middle dark:border-dark-700/60">
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="font-medium text-gray-900 dark:text-white">{{ m.name }}</span>
-              <span v-if="m.billing_model && m.billing_model !== m.name" class="w-full break-all text-xs text-gray-500 dark:text-dark-400">{{ m.billing_model }}</span>
               <!-- 时段徽章紧跟模型名,其余徽章排在后面,空间不足时先换行的是它们 -->
               <span
                 v-if="period"
@@ -292,11 +291,11 @@
               class="font-bold text-gray-700 dark:text-gray-300"
               >{{ requestRate(m) }}x</span
             >
-            <template v-else-if="hasCustomRate(m)">
-              <span class="mr-1 text-gray-400 line-through dark:text-dark-500">{{ baseRate(m) }}x</span>
-              <span class="font-bold text-primary-600 dark:text-primary-400">{{ effectiveRate(m) }}x</span>
+            <template v-else-if="hasCustomRate">
+              <span class="mr-1 text-gray-400 line-through dark:text-dark-500">{{ rateMultiplier }}x</span>
+              <span class="font-bold text-primary-600 dark:text-primary-400">{{ effectiveRate }}x</span>
             </template>
-            <span v-else class="font-bold text-gray-700 dark:text-gray-300">{{ effectiveRate(m) }}x</span>
+            <span v-else class="font-bold text-gray-700 dark:text-gray-300">{{ effectiveRate }}x</span>
           </td>
         </tr>
       </tbody>
@@ -364,17 +363,10 @@ const sortedModels = computed(() => {
   })
 })
 
-function baseRate(m: PlazaModel): number {
-  return m.rate_multiplier ?? (props.platform === 'mixed' ? 1 : props.rateMultiplier)
-}
-
-function effectiveRate(m: PlazaModel): number {
-  return props.userRateMultiplier ?? baseRate(m)
-}
-
-function hasCustomRate(m: PlazaModel): boolean {
-  return props.userRateMultiplier != null && props.userRateMultiplier !== baseRate(m)
-}
+const effectiveRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
+const hasCustomRate = computed(
+  () => props.userRateMultiplier != null && props.userRateMultiplier !== props.rateMultiplier
+)
 
 function billingMode(m: PlazaModel): BillingMode {
   return (m.pricing?.billing_mode || BILLING_MODE_TOKEN) as BillingMode
@@ -398,7 +390,7 @@ interface PlazaRow {
 
 const rows = computed<PlazaRow[]>(() =>
   sortedModels.value.flatMap((m) => {
-    const base: PlazaRow = { model: m, period: null, key: `${m.platform}:${m.name}:${m.billing_model ?? ''}` }
+    const base: PlazaRow = { model: m, period: null, key: `${m.platform}:${m.name}` }
     const periodRows = timePeriods(m).map<PlazaRow>((p, idx) => ({
       model: m,
       period: p,
@@ -416,7 +408,7 @@ function periodRate(m: PlazaModel, period: PlazaTimePricingPeriod): number {
 /** 实付价 = 渠道单价 × 生效倍率(时段行再乘时段倍率),按 $/1M token 展示。 */
 function paidPerMillion(m: PlazaModel, value: number | null | undefined, period: PlazaTimePricingPeriod | null = null): string {
   if (value == null) return '-'
-  const rate = period ? periodRate(m, period) : effectiveRate(m)
+  const rate = period ? periodRate(m, period) : effectiveRate.value
   return formatScaled(value * rate, PER_MILLION, MIN_DECIMALS)
 }
 
@@ -427,7 +419,7 @@ function usesIndependentImageRate(m: PlazaModel): boolean {
 
 /** 按次/按图片行的生效倍率。 */
 function requestRate(m: PlazaModel): number {
-  return usesIndependentImageRate(m) ? (props.imageRateMultiplier ?? 1) : effectiveRate(m)
+  return usesIndependentImageRate(m) ? (props.imageRateMultiplier ?? 1) : effectiveRate.value
 }
 
 /** 按次 / 按图片单价(乘该行生效倍率,不换算 1M)。 */

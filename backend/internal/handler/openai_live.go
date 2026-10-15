@@ -187,8 +187,6 @@ func liveCallIdentity(
 
 func (h *OpenAIGatewayHandler) writeLiveCreateError(c *gin.Context, err error) {
 	switch {
-	case h.handleModelScopeError(c, err, false):
-		return
 	case errors.Is(err, service.ErrLiveBillingNotConfigured):
 		h.writeLiveBillingNotConfigured(c)
 	case errors.Is(err, service.ErrLiveIdentityMismatch):
@@ -246,9 +244,6 @@ func (h *OpenAIGatewayHandler) LiveSideband(c *gin.Context) {
 	c.Request = c.Request.WithContext(service.ContextWithAPIKeyRoute(c.Request.Context(), apiKey))
 	record, err := h.gatewayService.GetLiveCallForIdentity(c.Request.Context(), c.Param("call_id"), identity)
 	if err != nil {
-		if h.handleModelScopeError(c, err, false) {
-			return
-		}
 		if errors.Is(err, service.ErrLiveIdentityMismatch) {
 			h.errorResponse(c, http.StatusForbidden, "permission_error", "Live call belongs to another identity")
 			return

@@ -455,10 +455,16 @@ func validateAPIKeyGroupAllowed(apiKey *service.APIKey) bool {
 }
 
 func validateAPIKeyGroupAvailable(apiKey *service.APIKey) (string, string, bool) {
+	if apiKey != nil && service.NormalizeModelScope(apiKey.ModelScope) != service.ModelScopeAll {
+		return "LEGACY_KEY_SCOPE_UNSUPPORTED", "This API key uses a retired provider scope; migrate it to an explicit native group before use", false
+	}
 	if apiKey == nil || apiKey.GroupID == nil {
 		return "", "", true
 	}
 	group := apiKey.Group
+	if group != nil && group.Platform == "mixed" {
+		return "LEGACY_PLATFORM_UNSUPPORTED", "Mixed has been retired; migrate this group to an explicit native platform before use", false
+	}
 	if group == nil || strings.EqualFold(group.Status, "deleted") {
 		return "GROUP_DELETED", "API Key 所属分组已删除", false
 	}

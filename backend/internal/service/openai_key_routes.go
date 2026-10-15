@@ -28,11 +28,13 @@ func openAIMessagesKeyRouteGroupAllowed(ctx context.Context, group *Group) bool 
 	if group == nil {
 		return false
 	}
-	if group.Platform == PlatformMixed || group.Platform == PlatformGrok || IsCNProvider(group.Platform) {
+	if group.Platform == PlatformGrok || IsMultiProtocolAPIKeyProvider(group.Platform) {
 		return true
 	}
-	if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok && (platform == PlatformGrok || IsCNProvider(platform)) {
-		return true
+	if group.Platform == PlatformComposite {
+		if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok && (platform == PlatformGrok || IsMultiProtocolAPIKeyProvider(platform)) {
+			return true
+		}
 	}
 	// Initial handler dispatch can defer this check to a later smart route.
 	// A concrete candidate must enforce its own switch before catalog or sticky use.
@@ -43,18 +45,12 @@ func openAIMessagesKeyRouteModel(ctx context.Context, group *Group, model string
 	if enabled, _ := ctx.Value(openAIMessagesKeyRouteContextKey{}).(bool); !enabled {
 		return model
 	}
-	if group != nil && group.Platform == PlatformMixed {
-		return model
-	}
 	normalized := NormalizeOpenAICompatRequestedModel(model)
 	if group == nil {
 		return normalized
 	}
 	if group.Platform == PlatformComposite {
-		if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok && platform == PlatformMixed {
-			return model
-		}
-		if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok && (platform == PlatformGrok || IsCNProvider(platform)) {
+		if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok && (platform == PlatformGrok || IsMultiProtocolAPIKeyProvider(platform)) {
 			return normalized
 		}
 	}

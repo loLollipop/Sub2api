@@ -48,6 +48,35 @@ func TestSelectedOpusMessagesOriginalFactsAndMapping(t *testing.T) {
 	require.NoError(t, validateSelectedAnthropicMessagesRequest(nil, []byte(`{}`), "deepseek-v4"))
 }
 
+func TestClaude55BufferedResponsePreservesSignatureAtServiceBoundary(t *testing.T) {
+	const sse = "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"m\",\"model\":\"alias\",\"content\":[],\"usage\":{\"input_tokens\":1}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"signed\"}}\n\n" +
+		"event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\n" +
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+	for _, native := range []bool{false, true} {
+		t.Run(map[bool]string{false: "anthropic", true: "openai-native"}[native], func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			resp := &http.Response{Header: http.Header{}, Body: io.NopCloser(strings.NewReader(sse))}
+			cfg := &config.Config{}
+			if native {
+				svc := &OpenAIGatewayService{cfg: cfg}
+				_, err := svc.handleResponsesBufferedFromNativeAnthropic(resp, c, "alias", "claude-haiku-5-5", "claude-haiku-5-5", nil, time.Now(), apicompat.ResponsesClientToolMapping{})
+				require.NoError(t, err)
+			} else {
+				svc := &GatewayService{cfg: cfg}
+				_, err := svc.handleResponsesBufferedStreamingResponse(resp, c, "alias", "claude-haiku-5-5", nil, time.Now(), apicompat.ResponsesClientToolMapping{})
+				require.NoError(t, err)
+			}
+			require.Contains(t, rec.Body.String(), "anthropic-thinking-v1:")
+			require.Contains(t, rec.Body.String(), `"model":"alias"`)
+		})
+	}
+}
+
 func TestMappedOpusValidationBeforeUpstreamOnBothMessagesPaths(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		for _, pass := range []bool{false, true} {
@@ -69,7 +98,7 @@ func TestMappedOpusValidationBeforeUpstreamOnBothMessagesPaths(t *testing.T) {
 				}, Extra: map[string]any{"anthropic_passthrough": pass}}
 				var err error
 				if native {
-					account.Platform = PlatformMixed
+					account.Platform = PlatformCommandCode
 					_, err = (&OpenAIGatewayService{}).forwardAnthropicViaNativeAnthropicEndpoint(context.Background(), c, account, body, "")
 				} else {
 					_, err = (&GatewayService{}).Forward(context.Background(), c, account, &ParsedRequest{Model: "public-alias", Body: NewRequestBodyRef(body)})
@@ -81,34 +110,5 @@ func TestMappedOpusValidationBeforeUpstreamOnBothMessagesPaths(t *testing.T) {
 				// panic rather than satisfy the validation assertions above.
 			})
 		}
-	}
-}
-
-func TestClaude55BufferedResponsePreservesSignatureAtServiceBoundary(t *testing.T) {
-	const sse = "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"m\",\"model\":\"alias\",\"content\":[],\"usage\":{\"input_tokens\":1}}}\n\n" +
-		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n" +
-		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"signed\"}}\n\n" +
-		"event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
-		"event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\n" +
-		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
-	for _, native := range []bool{false, true} {
-		t.Run(map[bool]string{false: "anthropic", true: "openai-native"}[native], func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(rec)
-			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
-			resp := &http.Response{Header: http.Header{}, Body: io.NopCloser(strings.NewReader(sse))}
-			cfg := &config.Config{}
-			if native {
-				svc := &OpenAIGatewayService{cfg: cfg}
-				_, err := svc.handleResponsesBufferedFromNativeAnthropic(resp, c, "alias", "claude-haiku-5-5", "claude-haiku-5-5", nil, time.Now(), apicompat.ResponsesClientToolMapping{}, true)
-				require.NoError(t, err)
-			} else {
-				svc := &GatewayService{cfg: cfg}
-				_, err := svc.handleResponsesBufferedStreamingResponse(resp, c, "alias", "claude-haiku-5-5", nil, time.Now(), apicompat.ResponsesClientToolMapping{})
-				require.NoError(t, err)
-			}
-			require.Contains(t, rec.Body.String(), "anthropic-thinking-v1:")
-			require.Contains(t, rec.Body.String(), `"model":"alias"`)
-		})
 	}
 }

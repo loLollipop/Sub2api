@@ -1977,9 +1977,6 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatibleReason(ctx con
 	if account == nil {
 		return false, "account_nil"
 	}
-	if !openAIAccountAllowsModelScope(ctx, account, req.RequestedModel, req.RequireCompact) {
-		return false, "model_scope_denied"
-	}
 	if req.RequirePrivacySet && !account.IsPrivacySet() {
 		return false, "privacy_not_set"
 	}
@@ -2805,11 +2802,6 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResult(account *Accoun
 	if account == nil {
 		return false
 	}
-	for _, err := range observedErr {
-		if errors.Is(err, ErrModelScopeDenied) {
-			return false
-		}
-	}
 	accountID := account.ID
 	healthTripped := false
 	if s != nil && s.rateLimitService != nil {
@@ -2842,7 +2834,7 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResult(account *Accoun
 // ObserveOpenAIAccountHealthFailure records failures that cannot reach the
 // scheduler-result path, for example after semantic response bytes were sent.
 func (s *OpenAIGatewayService) ObserveOpenAIAccountHealthFailure(ctx context.Context, account *Account, observedErr error) bool {
-	if s == nil || s.rateLimitService == nil || account == nil || observedErr == nil || errors.Is(observedErr, ErrModelScopeDenied) {
+	if s == nil || s.rateLimitService == nil || account == nil || observedErr == nil {
 		return false
 	}
 	return s.rateLimitService.ObserveOpenAIAPIKeyHealthFailure(ctx, account, observedErr)

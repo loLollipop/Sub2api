@@ -89,7 +89,7 @@ func NewGeminiMessagesCompatService(
 		schedulerSnapshot:         schedulerSnapshot,
 		tokenProvider:             tokenProvider,
 		rateLimitService:          rateLimitService,
-		httpUpstream:              withModelScopeUpstream(httpUpstream),
+		httpUpstream:              httpUpstream,
 		antigravityGatewayService: antigravityGatewayService,
 		cfg:                       cfg,
 		responseHeaderFilter:      compileResponseHeaderFilter(cfg),
@@ -529,7 +529,7 @@ func (s *GeminiMessagesCompatService) AntigravityGeminiModelIDs(ctx context.Cont
 			continue
 		}
 		for model := range account.GetModelMapping() {
-			if isAntigravityGeminiModel(model) && CheckModelScope(ctx, model, account.GetMappedModel(model)) == nil {
+			if isAntigravityGeminiModel(model) {
 				seen[model] = struct{}{}
 			}
 		}
@@ -849,9 +849,6 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 		requestIDHeader = idHeader
 
 		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
-		if errors.Is(err, ErrModelScopeDenied) {
-			return nil, err
-		}
 		if err != nil {
 			safeErr := sanitizeUpstreamErrorMessage(err.Error())
 			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -1427,9 +1424,6 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 		requestIDHeader = idHeader
 
 		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
-		if errors.Is(err, ErrModelScopeDenied) {
-			return nil, err
-		}
 		if err != nil {
 			safeErr := sanitizeUpstreamErrorMessage(err.Error())
 			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{

@@ -1218,7 +1218,7 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildAntigravityAPIKeyModelsRequest(ctx, account)
 	case account.IsGrok():
 		return s.buildGrokUpstreamModelsRequest(ctx, account)
-	case account.IsOpenAI() || account.IsMixed() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol():
+	case account.IsOpenAI() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol():
 		// 国产 OpenAI 兼容供应商和 Gemini 自定义协议账号复用 OpenAI /v1/models 探测。
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():
@@ -1435,9 +1435,6 @@ func (s *AccountTestService) buildOpenAIUpstreamModelsRequest(ctx context.Contex
 // buildOpenAIAPIKeyModelsRequest is shared by admin discovery and public model
 // listing. Codex content negotiation is intentionally absent from this request.
 func buildOpenAIAPIKeyModelsRequest(ctx context.Context, account *Account, validateBaseURL func(string) (string, error)) (*http.Request, error) {
-	if account.IsMixed() {
-		ctx = WithHTTPUpstreamRedirectsDisabled(ctx)
-	}
 	if account.Type != AccountTypeAPIKey {
 		return nil, newUpstreamModelSyncUnsupportedError(
 			fmt.Sprintf("Unsupported OpenAI account type for upstream model sync: %s", account.Type), nil,
@@ -1452,7 +1449,7 @@ func buildOpenAIAPIKeyModelsRequest(ctx context.Context, account *Account, valid
 	// 列表同步需使用 OpenAI 格式 base（供应商 × 模式默认）。
 	baseURL := account.GetOpenAIFormatBaseURL()
 	if strings.TrimSpace(baseURL) == "" {
-		if account.IsMixed() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
+		if account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
 			return nil, newUpstreamModelSyncConfigError("Account requires an explicit OpenAI-compatible model catalog endpoint", nil)
 		}
 		baseURL = "https://api.openai.com"

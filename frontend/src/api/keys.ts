@@ -69,11 +69,9 @@ export async function create(
   rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number },
   groupIds?: number[],
   anthropicCacheTtlMode?: 'inherit' | 'off' | '1h' | '5m',
-  options?: { idempotencyKey?: string },
-  modelScope?: CreateApiKeyRequest['model_scope']
+  options?: { idempotencyKey?: string }
 ): Promise<ApiKey> {
   const payload: CreateApiKeyRequest = { name }
-  if (modelScope !== undefined) payload.model_scope = modelScope
   if (groupId !== undefined) {
     payload.group_id = groupId
   }

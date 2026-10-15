@@ -6,7 +6,6 @@
 
 import { apiClient } from './client'
 import type { UserPricingInterval, UserSupportedModelPricing } from './channels'
-import type { MixedModelVendor } from '@/utils/mixed-provider-rates'
 
 /** 官方参考价（USD per token，与计费目录同源；字段缺失 = 目录未覆盖）。 */
 export interface PlazaOfficialPricing {
@@ -47,12 +46,6 @@ export interface PlazaTimePricing {
 export interface PlazaModel {
   name: string
   platform: string
-  /** Mixed 模型的厂商绝对倍率，不含用户专属或高峰倍率。 */
-  rate_multiplier?: number
-  /** Mixed 模型计费身份对应的厂商。 */
-  model_vendor?: MixedModelVendor
-  /** 实际计费身份；同一公开别名的不同路由候选分别展示。 */
-  billing_model?: string
   /** 实收口径的展示定价：档位可提供绝对单价或相对基础价倍率；均为标准时段价。 */
   pricing: UserSupportedModelPricing | null
   official_pricing: PlazaOfficialPricing | null

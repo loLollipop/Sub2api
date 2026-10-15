@@ -189,45 +189,6 @@ func TestUpdateAccountPreservesManagedUpstreamBillingProbeStateForUnrelatedEdit(
 	require.Equal(t, "value", updated.Extra["custom"])
 }
 
-func TestUpdateAccountMixedModelMappingPreservesEnabledProbeAndCredentials(t *testing.T) {
-	const accountID = int64(1143)
-	rate := 1.0
-	account := &Account{
-		ID: accountID, Platform: PlatformMixed, Type: AccountTypeAPIKey, Status: StatusActive,
-		RateMultiplier: &rate,
-		Credentials: map[string]any{
-			"api_key": "nvapi-test", "base_url": "https://nvidia.example/v1",
-			"model_mapping": map[string]any{"alias": "old-model"}, "preserved_credential": "keep",
-		},
-		Extra: map[string]any{
-			UpstreamBillingProbeEnabledExtraKey: true, UpstreamBillingRateSyncEnabledExtraKey: false,
-			UpstreamBillingProbeExtraKey: map[string]any{"status": "ok"}, "preserved_setting": true,
-		},
-	}
-	repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{accountID: account}}
-	enabled := true
-	// The editor submits the existing non-sensitive credentials with only the
-	// mapping changed; the redacted API key is retained by the service.
-	credentials := mergeMap(nil, account.Credentials)
-	credentials["model_mapping"] = map[string]any{"alias": "new-model"}
-	delete(credentials, "api_key")
-	updated, err := (&adminServiceImpl{accountRepo: repo}).UpdateAccount(context.Background(), accountID, &UpdateAccountInput{
-		Credentials:  credentials,
-		ProbeEnabled: &enabled,
-	})
-	require.NoError(t, err)
-	require.Equal(t, PlatformMixed, updated.Platform)
-	require.Equal(t, AccountTypeAPIKey, updated.Type)
-	require.Equal(t, rate, *updated.RateMultiplier)
-	require.Equal(t, map[string]any{"alias": "new-model"}, updated.Credentials["model_mapping"])
-	require.Equal(t, "nvapi-test", updated.Credentials["api_key"])
-	require.Equal(t, "https://nvidia.example/v1", updated.Credentials["base_url"])
-	require.Equal(t, "keep", updated.Credentials["preserved_credential"])
-	require.Equal(t, true, updated.Extra[UpstreamBillingProbeEnabledExtraKey])
-	require.Equal(t, false, updated.Extra[UpstreamBillingRateSyncEnabledExtraKey])
-	require.Equal(t, true, updated.Extra["preserved_setting"])
-}
-
 func TestUpdateAccountPreservesGrokBillingSnapshotForUnrelatedEdit(t *testing.T) {
 	accountID := int64(112)
 	billing := &xai.BillingSummary{

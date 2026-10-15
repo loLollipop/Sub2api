@@ -39,8 +39,8 @@ func TestOpenAIAccountPreauthorizationUsesCredentialAndSentModel(t *testing.T) {
 				require.NoError(t, err)
 				ctx := ContextWithBalancePreauthorizationGuard(context.Background(), guard)
 				svc := &OpenAIGatewayService{}
-				key := &APIKey{ID: 7, UserID: 42, GroupID: i64p(9), Group: &Group{ID: 9, Platform: PlatformMixed,
-					RateMultiplier: 9, MixedProviderRateMultipliers: map[string]float64{"openai": 0.15}}}
+				key := &APIKey{ID: 7, UserID: 42, GroupID: i64p(9), Group: &Group{ID: 9, Platform: PlatformOpenAI,
+					RateMultiplier: 0.15}}
 				account := &Account{ID: 3, Platform: PlatformOpenAI, Type: tc.accountType,
 					Credentials: map[string]any{"model_mapping": map[string]any{"channel-alias": tc.wireModel}},
 					Extra:       map[string]any{openAILongContextBillingEnabledKey: true}}
@@ -150,8 +150,8 @@ func TestOpenAIAccountPreauthorizationRebuildsRealPriceHoldAcrossCredentials(t *
 				fixture := newPreauthorizationFixture()
 				bs := NewBillingService(nil, nil)
 				fixture.service.costCalculator = bs
-				group := &Group{ID: 9, Platform: PlatformMixed, LongContextPricingEnabled: true,
-					MixedProviderRateMultipliers: map[string]float64{"openai": 0.15}}
+				group := &Group{ID: 9, Platform: PlatformOpenAI, LongContextPricingEnabled: true,
+					RateMultiplier: 0.15}
 				key := &APIKey{ID: 7, UserID: 42, GroupID: &group.ID, Group: group}
 				svc := &OpenAIGatewayService{billingService: bs, resolver: NewModelPricingResolver(nil, bs)}
 				body := []byte(`{"model":"gpt-6.1-sol","service_tier":"priority","max_output_tokens":16,"input":"` + strings.Repeat(" hello", 300001) + `"}`)

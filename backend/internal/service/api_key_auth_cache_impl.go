@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"math/rand/v2"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 27 // v27: Mixed absolute provider rates
+const apiKeyAuthSnapshotVersion = 28 // v28: native platforms; retired scopes are rejected at authentication
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -401,7 +402,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			Status:                          apiKey.Group.Status,
 			SubscriptionType:                apiKey.Group.SubscriptionType,
 			RateMultiplier:                  apiKey.Group.RateMultiplier,
-			MixedProviderRateMultipliers:    CloneMixedProviderRateMultipliers(apiKey.Group.MixedProviderRateMultipliers),
+			MixedProviderRateMultipliers:    maps.Clone(apiKey.Group.MixedProviderRateMultipliers),
 			DailyLimitUSD:                   apiKey.Group.DailyLimitUSD,
 			WeeklyLimitUSD:                  apiKey.Group.WeeklyLimitUSD,
 			MonthlyLimitUSD:                 apiKey.Group.MonthlyLimitUSD,
@@ -511,7 +512,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			Hydrated:                        true,
 			SubscriptionType:                snapshot.Group.SubscriptionType,
 			RateMultiplier:                  snapshot.Group.RateMultiplier,
-			MixedProviderRateMultipliers:    CloneMixedProviderRateMultipliers(snapshot.Group.MixedProviderRateMultipliers),
+			MixedProviderRateMultipliers:    maps.Clone(snapshot.Group.MixedProviderRateMultipliers),
 			DailyLimitUSD:                   snapshot.Group.DailyLimitUSD,
 			WeeklyLimitUSD:                  snapshot.Group.WeeklyLimitUSD,
 			MonthlyLimitUSD:                 snapshot.Group.MonthlyLimitUSD,

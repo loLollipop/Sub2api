@@ -112,5 +112,11 @@
       "reason": "Adapted to validate the actual channel/account-resolved Anthropic model with original-body facts, not the source public-only gate. Local mapped/native/bridge regressions pass; no production verification performed."
     }
   ],
-  "deployment_repository": "loLollipop/Sub2api"
+  "deployment_repository": "loLollipop/Sub2api",
+  "native_platform_restoration": {
+    "date": "2026-10-16",
+    "source": "kiss-kedaya/sub2api@f7bde184592d6855d4b27d1f705a8aad13f49e3f",
+    "status": "implemented_native_regressions_verified_pending_release_ci",
+    "scope": "Retire local Mixed platform, protocol fallback/probes, provider rates and key category scopes. Restore independent native providers and native forwarding, retaining Command Code/Cline shared provider profiles, TypeSafe isolation and unrelated local fixes. Applied migrations255-266 remain immutable; legacy mixed and non-all scope configurations require explicit operator migration."
+  }
 }

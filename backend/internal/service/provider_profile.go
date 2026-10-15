@@ -208,9 +208,6 @@ func (a *Account) providerProfile() *ProviderProfile {
 	if a == nil {
 		return nil
 	}
-	if native := mixedOfficialProviderView(a); native != nil {
-		return LookupProviderProfile(native.Platform)
-	}
 	return LookupProviderProfile(a.Platform)
 }
 

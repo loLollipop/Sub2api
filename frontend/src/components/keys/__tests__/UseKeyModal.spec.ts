@@ -867,7 +867,7 @@ describe('UseKeyModal', () => {
       .toContain('%userprofile%\\.codex\\codex-models.json')
   })
 
-  it.each(['anthropic', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'mixed', 'opencode_go'] as const)(
+  it.each(['anthropic', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go'] as const)(
     'offers Codex catalog configuration for the %s routed group',
     async (platform) => {
       const wrapper = mount(UseKeyModal, {
@@ -904,10 +904,6 @@ describe('UseKeyModal', () => {
       expect(config).not.toContain('model_catalog_json')
       expect(config).toContain('base_url = "https://example.com/v1"')
       expect(config).toContain('wire_api = "responses"')
-      if (platform === 'mixed') {
-        expect(config).toContain('model = "qwen3.8-27b"')
-        expect(config).toContain('review_model = "qwen3.8-27b"')
-      }
       expect(config).toContain('[features]\napi_key_model_discovery = true')
       expect(config.match(/^\[features\]$/gm)).toHaveLength(1)
 

@@ -9,35 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
-
-func TestProviderCatalogPreservesMixedIdentity(t *testing.T) {
-	spec, ok := domain.LookupPlatform(PlatformMixed)
-	require.True(t, ok)
-	require.Equal(t, domain.PlatformGatewayOpenAI, spec.Gateway)
-	require.False(t, spec.CNProvider)
-	require.Empty(t, spec.LiteLLMProvider)
-	require.Nil(t, LookupProviderProfile(PlatformMixed))
-	require.False(t, IsMultiProtocolAPIKeyProvider(PlatformMixed))
-	for _, entry := range BuildPlatformCatalog().Platforms {
-		if entry.ID == PlatformMixed {
-			require.Nil(t, entry.MultiProtocol)
-		}
-		require.NotEqual(t, "opencode_go", entry.ID)
-		if entry.ID == PlatformTypeSafe {
-			require.Equal(t, domain.PlatformGatewaySystemOne, entry.Gateway)
-			require.Nil(t, entry.MultiProtocol)
-		}
-	}
-	account := &Account{Platform: PlatformMixed, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_key": "test", "base_url": DefaultDeepseekBaseURL}}
-	require.Equal(t, PlatformDeepseek, account.providerProfile().Platform)
-	require.Equal(t, PlatformMixed, account.Platform)
-	account.Credentials["base_url"] = "https://relay.example/v1"
-	require.Nil(t, account.providerProfile())
-}
 
 func TestProviderAccountProbesRejectUntrustedOrigins(t *testing.T) {
 	for _, platform := range []string{PlatformCline, PlatformCommandCode} {

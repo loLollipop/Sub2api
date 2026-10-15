@@ -1,11 +1,5 @@
 export default {
   common: {
-    mixedProviderRates: '按模型厂商设置倍率',
-    mixedRatesInvalid: '请为每个厂商填写 0 至 999999.9999 之间的有效倍率。',
-    mixedProviderRatesHint: '各项为模型单价的绝对计费倍率。用户专属分组倍率优先；高峰和独立媒体倍率沿用各自设置。',
-    mixedVendorOther: '其他模型',
-    mixedRatesNoModels: '暂无已确认的可用模型',
-    mixedRatesUserOverride: '您的专属分组倍率优先适用于各模型厂商。',
     loading: '加载中...',
     submitting: '提交中...',
     justNow: '刚刚',

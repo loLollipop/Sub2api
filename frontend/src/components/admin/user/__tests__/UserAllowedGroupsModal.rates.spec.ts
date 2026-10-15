@@ -11,7 +11,7 @@ enableAutoUnmount(afterEach)
 beforeEach(() => vi.resetAllMocks())
 
 async function open(platform: GroupPlatform, customRate?: number) {
-  const group = { id: 10, name: 'Group', platform, rate_multiplier: platform === 'mixed' ? 9 : 1, status: 'active', subscription_type: 'standard', is_exclusive: false } as Group
+  const group = { id: 10, name: 'Group', platform, rate_multiplier: 1, status: 'active', subscription_type: 'standard', is_exclusive: false } as Group
   mocks.list.mockResolvedValue({ items: [group], total: 1 })
   mocks.update.mockResolvedValue({})
   const user = { id: 42, email: 'user@example.com', group_rates: customRate === undefined ? {} : { 10: customRate } } as AdminUser
@@ -27,18 +27,12 @@ async function open(platform: GroupPlatform, customRate?: number) {
   return wrapper
 }
 
-describe('user-specific Mixed rate editing', () => {
-  it('does not advertise a hidden Mixed total as its default or placeholder', async () => {
-    const wrapper = await open('mixed')
-    expect(wrapper.text()).toContain('common.mixedProviderRates')
-    expect(wrapper.text()).not.toContain('9x')
-    expect(wrapper.get('input[type="number"]').attributes('placeholder')).toBe('')
-  })
-  it.each([['mixed', '0', 0], ['mixed', '0.5', 0.5], ['openai', '0.5', 0.5]] as const)(
+describe('user-specific native rate editing', () => {
+  it.each([['kimi', '0.5', 0.5], ['openai', '0.5', 0.5]] as const)(
     'saves %s override %s', async (platform, input, expected) => {
       const wrapper = await open(platform)
       const field = wrapper.get('input[type="number"]')
-      expect(field.attributes('min')).toBe(platform === 'mixed' ? '0' : '0.001')
+      expect(field.attributes('min')).toBe('0.001')
       await field.setValue(input)
       await wrapper.findAll('button').find(b => b.text() === 'common.save')!.trigger('click')
       await flushPromises()
@@ -46,7 +40,7 @@ describe('user-specific Mixed rate editing', () => {
     }
   )
 
-  it.each([['openai', 0], ['mixed', -1], ['mixed', 1000000], ['mixed', Number.NaN], ['mixed', Infinity], ['mixed', -Infinity]] as const)(
+  it.each([['openai', 0], ['openai', -1], ['openai', 1000000], ['openai', Number.NaN], ['openai', Infinity], ['openai', -Infinity]] as const)(
     'rejects invalid %s override %s before sending', async (platform, value) => {
       const wrapper = await open(platform, value)
       await wrapper.findAll('button').find(b => b.text() === 'common.save')!.trigger('click')
@@ -55,8 +49,8 @@ describe('user-specific Mixed rate editing', () => {
     }
   )
 
-  it('clears a saved Mixed zero with null', async () => {
-    const wrapper = await open('mixed', 0)
+  it('clears a saved native zero with null', async () => {
+    const wrapper = await open('openai', 0)
     await wrapper.get('input[type="number"]').setValue('')
     await wrapper.findAll('button').find(b => b.text() === 'common.save')!.trigger('click')
     await flushPromises()

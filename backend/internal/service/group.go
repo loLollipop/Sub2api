@@ -16,10 +16,7 @@ type GroupCodexModelsManifestConfig = domain.GroupCodexModelsManifestConfig
 type ReasoningEffortMapping = domain.ReasoningEffortMapping
 
 type Group struct {
-	// Computed for the authorized key-creation catalogue, not persisted.
-	SupportedKeyProviders []string
-	SupportedModelVendors []string
-	// Absolute Mixed model-vendor multipliers, persisted independently of model prices.
+	// Legacy storage field; retired vendor multipliers are never used for billing.
 	MixedProviderRateMultipliers map[string]float64
 	ID                           int64
 	Name                         string

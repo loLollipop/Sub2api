@@ -10,8 +10,8 @@ import (
 const maxUserGroupRateMultiplier = 999999.9999
 
 func validateUserGroupRateMultiplier(rate float64) error {
-	if math.IsNaN(rate) || math.IsInf(rate, 0) || rate < 0 || rate > maxUserGroupRateMultiplier {
-		return fmt.Errorf("rate_multiplier must be finite and between 0 and %.4f", maxUserGroupRateMultiplier)
+	if math.IsNaN(rate) || math.IsInf(rate, 0) || rate <= 0 || rate > maxUserGroupRateMultiplier {
+		return fmt.Errorf("rate_multiplier must be finite and greater than 0 and at most %.4f", maxUserGroupRateMultiplier)
 	}
 	return nil
 }

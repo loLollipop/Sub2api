@@ -188,8 +188,6 @@ func groupFromServiceBase(g *service.Group) Group {
 		I18n:                            g.I18n,
 		Platform:                        g.Platform,
 		RateMultiplier:                  g.RateMultiplier,
-		MixedProviderRateMultipliers:    service.CloneMixedProviderRateMultipliers(g.MixedProviderRateMultipliers),
-		SupportedModelVendors:           append([]string{}, g.SupportedModelVendors...),
 		IsExclusive:                     g.IsExclusive,
 		Status:                          g.Status,
 		SubscriptionType:                g.SubscriptionType,

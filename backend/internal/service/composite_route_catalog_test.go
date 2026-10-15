@@ -31,23 +31,6 @@ func TestCompositeRouteCatalogExactAliases(t *testing.T) {
 	require.ElementsMatch(t, []string{"public-any", "public-responses"}, responses)
 }
 
-func TestCompositeRouteCatalogScopeUsesSelectedMappedTarget(t *testing.T) {
-	r := NewCompositeRouteResolver(compositeRouteRepoStub{routes: []CompositeModelRoute{
-		{ID: 1, GroupID: 7, PublicModel: "gpt-safe", UpstreamModel: "gpt-5.4", MatchType: CompositeRouteMatchExact, Enabled: true},
-		{ID: 2, GroupID: 7, PublicModel: "gpt-cross-family", UpstreamModel: "claude-sonnet-4-6", MatchType: CompositeRouteMatchExact, Enabled: true},
-		// Lower-priority same-name route cannot make a forbidden winner visible.
-		{ID: 3, GroupID: 7, PublicModel: "gpt-cross-family", UpstreamModel: "gpt-5.4", MatchType: CompositeRouteMatchExact, Priority: 100, Enabled: true},
-		{ID: 4, GroupID: 7, PublicModel: "deepseek-public", UpstreamModel: "deepseek-v3.2", MatchType: CompositeRouteMatchExact, Enabled: true},
-	}})
-	ctx := ContextWithModelScope(context.Background(), ModelScopeOpenAI)
-	got, err := r.ListExactPublicModels(ctx, 7, CompositeRouteEndpointResponses)
-	require.NoError(t, err)
-	require.Equal(t, []string{"gpt-safe"}, got)
-	got, err = r.ListExactPublicModels(ContextWithModelScope(context.Background(), ModelScopeCN), 7, "")
-	require.NoError(t, err)
-	require.Equal(t, []string{"deepseek-public"}, got)
-}
-
 type compositeCatalogErrorRepo struct{ CompositeModelRouteRepository }
 
 func (compositeCatalogErrorRepo) ListByGroup(context.Context, int64, bool) ([]CompositeModelRoute, error) {
@@ -67,30 +50,4 @@ func TestCompositeRouteCatalogErrorAndCacheInvalidation(t *testing.T) {
 	got, err = r.ListExactPublicModels(context.Background(), 7, "")
 	require.NoError(t, err)
 	require.Equal(t, []string{"after"}, got)
-}
-
-func TestCompositeRouteCatalogScopeDoesNotBorrowAnotherPlatformAccount(t *testing.T) {
-	for _, endpoint := range []string{"", CompositeRouteEndpointResponses} {
-		for _, safeTarget := range []bool{false, true} {
-			mapped := "gpt-5.4"
-			if safeTarget {
-				mapped = "deepseek-v4"
-			}
-			repo := &modelScopeAccountRepo{accounts: []Account{
-				{Platform: PlatformDeepseek, Credentials: map[string]any{"model_mapping": map[string]any{"deepseek-target": mapped}}},
-				{Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Extra: map[string]any{"openai_passthrough": true}},
-			}}
-			svc := &GatewayService{accountRepo: repo, compositeResolver: NewCompositeRouteResolver(compositeRouteRepoStub{routes: []CompositeModelRoute{{
-				GroupID: 7, PublicModel: "deepseek-public", UpstreamModel: "deepseek-target", TargetPlatform: PlatformDeepseek,
-				MatchType: CompositeRouteMatchExact, Enabled: true,
-			}}})}
-			groupID := int64(7)
-			got := svc.FilterModelsForKeyScope(context.Background(), &groupID, ModelScopeCN, []string{"deepseek-public"}, endpoint)
-			if safeTarget {
-				require.Equal(t, []string{"deepseek-public"}, got)
-			} else {
-				require.Empty(t, got)
-			}
-		}
-	}
 }

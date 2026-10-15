@@ -155,34 +155,6 @@ func (s *liveSidebandScopeCache) GetLiveCall(context.Context, string) (*service.
 	return s.record, nil
 }
 
-func TestLiveSidebandScopeNarrowingIsForbiddenBeforeUpgrade(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	groupID := int64(44)
-	cache := &liveSidebandScopeCache{record: &service.LiveCallRecord{
-		CallID: "call_narrowed", APIKeyID: 22, UserID: 33, GroupID: groupID,
-		Model: "gpt-live", Controller: service.LiveControllerPending,
-	}}
-	gateway := service.NewOpenAIGatewayService(
-		nil, nil, nil, nil, nil, nil, cache, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-	)
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/v1/live/call_narrowed", nil)
-	c.Request.Header.Set("Connection", "Upgrade")
-	c.Request.Header.Set("Upgrade", "websocket")
-	c.Request.Header.Set("Sec-WebSocket-Version", "13")
-	c.Request.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
-	c.Params = gin.Params{{Key: "call_id", Value: cache.record.CallID}}
-	key := &service.APIKey{ID: 22, UserID: 33, GroupID: &groupID, ModelScope: service.ModelScopeCN,
-		Group: &service.Group{ID: groupID, Platform: service.PlatformOpenAI, AllowLive: true}}
-	c.Set(string(middleware2.ContextKeyAPIKey), key)
-	c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: key.UserID})
-	(&OpenAIGatewayHandler{gatewayService: gateway}).LiveSideband(c)
-	require.Equal(t, http.StatusForbidden, recorder.Code)
-	require.Equal(t, "MODEL_SCOPE_DENIED", gjson.GetBytes(recorder.Body.Bytes(), "error.code").String())
-	require.Empty(t, recorder.Header().Get("Upgrade"))
-}
-
 func TestLiveStandardModeRejectsBeforeBillingOrUpstream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{RunMode: config.RunModeStandard}

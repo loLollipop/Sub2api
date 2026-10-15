@@ -239,11 +239,11 @@ func deepSeekCallIDScope(platform, model string) bool {
 // DeepSeek, either because the account/group platform is DeepSeek or the model
 // name starts with deepseek. Those upstreams reject a repeated call_id.
 func deepSeekDuplicateCallIDRewrite(account *Account, body []byte) bool {
-	platform := ""
-	if account != nil {
-		platform = account.openAIWirePlatform()
+	model := gjson.GetBytes(body, "model").String()
+	if account == nil {
+		return deepSeekCallIDScope("", model)
 	}
-	return deepSeekCallIDScope(platform, gjson.GetBytes(body, "model").String())
+	return deepSeekCallIDScope(account.Platform, model)
 }
 
 func trimOpenAIEncryptedReasoningItems(reqBody map[string]any) bool {

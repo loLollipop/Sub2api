@@ -1263,7 +1263,6 @@ function generateRoutedCodexFiles(
     zhipu: 'glm-4.7',
     deepseek: 'deepseek-v4-pro',
     minimax: 'MiniMax-M3',
-    mixed: 'qwen3.8-27b',
     composite: 'gpt-5.5'
   }
   const preferredModel = preferredModels[platform] || ''
@@ -1281,7 +1280,6 @@ function generateRoutedCodexFiles(
     minimax: 'MiniMax',
     command_code: 'Command Code',
     cline: 'Cline',
-    mixed: t('admin.accounts.platforms.mixed'),
     composite: 'Composite'
   }
   const label = labels[platform]

@@ -26,7 +26,7 @@ watchSyncEffect(() => {
   const concrete = listPlatforms().map(spec => ({
     value: spec.id as AccountPlatform,
     get label() {
-      return spec.id === 'mixed' ? i18n.global.t('admin.accounts.platforms.mixed') : spec.display_name
+      return spec.display_name
     }
   }))
   CONCRETE_PLATFORM_OPTIONS.splice(0, CONCRETE_PLATFORM_OPTIONS.length, ...concrete)
@@ -35,5 +35,5 @@ watchSyncEffect(() => {
     get label() { return i18n.global.t('admin.groups.platforms.composite') }
   })
   GROUP_CREATION_PLATFORM_OPTIONS.splice(0, GROUP_CREATION_PLATFORM_OPTIONS.length,
-    ...GROUP_PLATFORM_OPTIONS.filter(option => !['kimi', 'zhipu', 'deepseek', 'minimax'].includes(option.value)))
+    ...GROUP_PLATFORM_OPTIONS)
 })

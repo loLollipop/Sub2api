@@ -222,6 +222,9 @@ func (a *Account) EffectiveLoadFactor() int {
 }
 
 func (a *Account) IsSchedulable() bool {
+	if a.Platform == "mixed" {
+		return false
+	}
 	if !a.IsActive() || !a.Schedulable {
 		return false
 	}
@@ -747,9 +750,6 @@ func (a *Account) resolveModelMapping(rawMapping map[string]any) map[string]stri
 		}
 	}
 	if len(result) > 0 {
-		if a.IsMixed() {
-			addDomesticModelAliases(result)
-		}
 		if a.Platform == domain.PlatformAntigravity {
 			ensureAntigravityDefaultPassthroughs(result, antigravityDefaultPassthroughModels)
 			applyAntigravityGemini31ProAliases(result)
@@ -1248,9 +1248,6 @@ func (a *Account) IsCustomErrorCodesEnabled() bool {
 // IsPoolMode 检查 API Key 账号是否启用池模式。
 // 池模式下，上游错误不标记本地账号状态，而是在同一账号上重试。
 func (a *Account) IsPoolMode() bool {
-	if a.IsMixed() {
-		return false
-	}
 	if !a.IsAPIKeyOrBedrock() || a.Credentials == nil {
 		return false
 	}
@@ -1515,14 +1512,8 @@ func (a *Account) IsOpenAIApiKey() bool {
 // 适用 openai 与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）；grok 走 GetGrokBaseURL，
 // 此处对 grok 返回 "" 以保持原有行为。
 func (a *Account) GetOpenAIBaseURL() string {
-	if native := mixedOfficialProviderView(a); native != nil {
-		return native.GetOpenAIBaseURL()
-	}
 	if a.IsCommandCode() || a.IsCline() {
 		return a.GetCNProtocolBaseURL(APIProtocolChatCompletions)
-	}
-	if a.IsMixed() {
-		return normalizeMixedBaseURL(a.GetCredential("base_url"))
 	}
 	if !a.IsOpenAI() && !a.IsMultiProtocolAPIKey() && !a.IsGeminiOpenAIProtocol() {
 		return ""
@@ -1576,9 +1567,6 @@ func (a *Account) IsCodingPlan() bool {
 // Gemini 自定义上游。
 // MiniMax also supports native Responses; Zhipu does not.
 func (a *Account) GetAPIProtocol() string {
-	if native := mixedOfficialProviderView(a); native != nil {
-		return native.GetAPIProtocol()
-	}
 	if a == nil || (!a.IsMultiProtocolAPIKey() && !a.IsGeminiOpenAIProtocol()) {
 		return APIProtocolChatCompletions
 	}
@@ -1649,9 +1637,6 @@ func (a *Account) IsAdaptiveAPIProtocol() bool {
 // adaptive 账号优先使用 api_base_urls 中的分协议地址，缺失时按平台和
 // account_mode 使用官方默认端点。base_url 继续作为 Chat Completions 地址兼容旧字段。
 func (a *Account) GetCNProtocolBaseURL(protocol string) string {
-	if native := mixedOfficialProviderView(a); native != nil {
-		return mixedOfficialDefaultURL(a, native.GetCNProtocolBaseURL(protocol))
-	}
 	if a == nil || (!a.IsMultiProtocolAPIKey() && !a.IsGeminiOpenAIProtocol()) {
 		return ""
 	}
@@ -1716,9 +1701,6 @@ func (a *Account) IsAnthropicProtocol() bool {
 // （上游路径为 {base}/v1/messages）。优先取凭证 base_url，缺失时按
 // 供应商 × 接入模式返回默认端点。非 Anthropic 协议账号返回空串。
 func (a *Account) GetAnthropicProtocolBaseURL() string {
-	if native := mixedOfficialProviderView(a); native != nil {
-		return native.GetAnthropicProtocolBaseURL()
-	}
 	if a == nil || (!a.IsAnthropicProtocol() && !a.IsAdaptiveAPIProtocol()) {
 		return ""
 	}
@@ -1739,9 +1721,6 @@ func (a *Account) GetAnthropicProtocolBaseURL() string {
 // 端点，不能拿来拼 OpenAI 路径，此时返回该供应商 × 模式的 Chat Completions
 // 默认 base（模型同步等协议族共用路径仍可用）。
 func (a *Account) GetOpenAIFormatBaseURL() string {
-	if native := mixedOfficialProviderView(a); native != nil {
-		return mixedOfficialDefaultURL(a, native.GetOpenAIFormatBaseURL())
-	}
 	if a.IsCommandCode() || a.IsCline() {
 		return a.GetCNProtocolBaseURL(APIProtocolChatCompletions)
 	}
@@ -1945,7 +1924,7 @@ func (a *Account) GetOpenAIProtocolAPIKey() string {
 	if a.IsCloudflareOpenAI() {
 		return a.GetCredential("api_key")
 	}
-	if a.IsMixed() || a.IsMultiProtocolAPIKey() || a.IsGeminiOpenAIProtocol() {
+	if a.IsMultiProtocolAPIKey() || a.IsGeminiOpenAIProtocol() {
 		if a.Type != AccountTypeAPIKey {
 			return ""
 		}
@@ -2013,9 +1992,6 @@ func (a *Account) GetOpenAISessionID() string {
 func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapability) bool {
 	if a == nil {
 		return false
-	}
-	if a.IsMixed() {
-		return a.Type == AccountTypeAPIKey && (capability == "" || capability == OpenAIEndpointCapabilityChatCompletions || capability == OpenAIEndpointCapabilityResponses)
 	}
 	if capability == "" {
 		return true

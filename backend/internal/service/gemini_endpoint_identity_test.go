@@ -92,23 +92,3 @@ func TestProjectGeminiCatalogUsesRealMappedTargetsOnly(t *testing.T) {
 	})
 	require.Error(t, err)
 }
-
-func TestProjectGeminiCatalogChecksSelectedAccountsMappedScope(t *testing.T) {
-	ctx := ContextWithModelScope(context.Background(), ModelScopeOther)
-	a := &Account{Platform: PlatformGemini, Credentials: map[string]any{"model_mapping": map[string]any{
-		"gemini-public": "gpt-5.4", "gemini-valid": "gemini-live",
-	}}}
-	res, err := projectGeminiAccountCatalog(ctx, &UpstreamHTTPResult{StatusCode: 200, Body: []byte(`{"models":[{"name":"models/gpt-5.4"},{"name":"models/gemini-live"}]}`)}, a)
-	require.NoError(t, err)
-	require.JSONEq(t, `{"models":[{"name":"models/gemini-valid"}]}`, string(res.Body))
-	// No account mapping is not permission to expose cross-family entries.
-	res, err = projectGeminiAccountCatalog(ctx, &UpstreamHTTPResult{StatusCode: 200, Body: []byte(`{"models":[{"name":"models/gpt-5.4"},{"name":"models/gemini-live"}]}`)}, &Account{Platform: PlatformGemini})
-	require.NoError(t, err)
-	require.JSONEq(t, `{"models":[{"name":"models/gemini-live"}]}`, string(res.Body))
-	upstream := &httpUpstreamRecorder{}
-	svc := newGeminiModelsEndpointsTestService([]Account{*a}, upstream)
-	_, err = svc.SelectAccountForModelsEndpoints(ctx, nil, "gemini-public")
-	require.Error(t, err)
-	_, err = svc.ForwardGetModel(ctx, a, "gemini-public")
-	require.ErrorIs(t, err, ErrModelScopeDenied)
-}

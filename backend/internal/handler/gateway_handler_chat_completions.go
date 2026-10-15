@@ -240,9 +240,6 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 		}
 		if err != nil {
-			if h.handleModelScopeError(c, err, streamStarted) {
-				return
-			}
 			if len(fs.FailedAccountIDs) == 0 {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, groupPlatform)
 				cls = classifySelectionFailureErrorFromGin(c, err, cls)
@@ -410,9 +407,6 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		}
 
 		if err != nil {
-			if h.handleModelScopeError(c, err, streamStarted) {
-				return
-			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, selectionSessionHash, account, err)
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {

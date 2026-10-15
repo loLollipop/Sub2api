@@ -20,13 +20,35 @@ func (geminiBindingUnavailableChannelRepo) ListAll(context.Context) ([]Channel, 
 	return nil, errors.New("policy unavailable")
 }
 
+func TestGeminiCachedContentBindingChannelPolicyUnavailableFailsClosed(t *testing.T) {
+	now := time.Now()
+	group := &Group{ID: 17, Platform: PlatformGemini, Status: StatusActive, Hydrated: true}
+	key := &APIKey{ID: 3, UserID: 5, User: &User{ID: 5, Status: StatusActive}, GroupID: &group.ID, Group: group}
+	record := &GeminiCachedContent{APIKeyID: 3, UserID: 5, GroupID: 17, AccountID: 21, Model: "gemini-live",
+		ChannelMappedModel: "gemini-live", UpstreamModel: "models/gemini-live", ExpireTime: now.Add(time.Hour)}
+	account := &Account{ID: 21, Platform: PlatformGemini, Type: AccountTypeAPIKey, GroupIDs: []int64{17}, Credentials: map[string]any{"api_key": "binding-key"}}
+	var identityErr error
+	record.UpstreamEndpointIdentity, identityErr = GeminiCachedContentEndpointIdentity(account, record.UpstreamModelID())
+	require.NoError(t, identityErr)
+	svc := &GatewayService{channelService: NewChannelService(geminiBindingUnavailableChannelRepo{}, nil, nil, nil, nil)}
+	for i := 0; i < 2; i++ {
+		routed, err := svc.AuthorizeGeminiCachedContent(context.Background(), key, record, account, now)
+		require.ErrorIs(t, err, ErrGeminiCachedContentNotFound)
+		require.Nil(t, routed)
+	}
+}
+
+func (r geminiBindingGroupRepo) GetByIDLite(_ context.Context, id int64) (*Group, error) {
+	return r.groups[id], nil
+}
+
 func TestGeminiCachedContentBindingRechecksChannelPricingRestriction(t *testing.T) {
 	for _, source := range []string{BillingModelSourceRequested, BillingModelSourceChannelMapped, BillingModelSourceUpstream, BillingModelSourceResponse} {
 		for _, allowed := range []bool{false, true} {
 			t.Run(source+"/allowed="+map[bool]string{false: "no", true: "yes"}[allowed], func(t *testing.T) {
 				now := time.Now()
 				group := &Group{ID: 17, Platform: PlatformGemini, Status: StatusActive, Hydrated: true}
-				key := &APIKey{ID: 3, UserID: 5, User: &User{ID: 5, Status: StatusActive}, GroupID: &group.ID, Group: group, ModelScope: ModelScopeOther}
+				key := &APIKey{ID: 3, UserID: 5, User: &User{ID: 5, Status: StatusActive}, GroupID: &group.ID, Group: group, ModelScope: ModelScopeAll}
 				record := &GeminiCachedContent{APIKeyID: 3, UserID: 5, GroupID: 17, AccountID: 21,
 					Model: "gemini-public", ChannelMappedModel: "gemini-mapped", UpstreamModel: "models/gemini-upstream", ExpireTime: now.Add(time.Hour)}
 				account := &Account{ID: 21, Platform: PlatformGemini, Type: AccountTypeAPIKey, GroupIDs: []int64{17}, Credentials: map[string]any{
@@ -63,35 +85,13 @@ func TestGeminiCachedContentBindingRechecksChannelPricingRestriction(t *testing.
 	}
 }
 
-func TestGeminiCachedContentBindingChannelPolicyUnavailableFailsClosed(t *testing.T) {
-	now := time.Now()
-	group := &Group{ID: 17, Platform: PlatformGemini, Status: StatusActive, Hydrated: true}
-	key := &APIKey{ID: 3, UserID: 5, User: &User{ID: 5, Status: StatusActive}, GroupID: &group.ID, Group: group}
-	record := &GeminiCachedContent{APIKeyID: 3, UserID: 5, GroupID: 17, AccountID: 21, Model: "gemini-live",
-		ChannelMappedModel: "gemini-live", UpstreamModel: "models/gemini-live", ExpireTime: now.Add(time.Hour)}
-	account := &Account{ID: 21, Platform: PlatformGemini, Type: AccountTypeAPIKey, GroupIDs: []int64{17}, Credentials: map[string]any{"api_key": "binding-key"}}
-	var identityErr error
-	record.UpstreamEndpointIdentity, identityErr = GeminiCachedContentEndpointIdentity(account, record.UpstreamModelID())
-	require.NoError(t, identityErr)
-	svc := &GatewayService{channelService: NewChannelService(geminiBindingUnavailableChannelRepo{}, nil, nil, nil, nil)}
-	for i := 0; i < 2; i++ {
-		routed, err := svc.AuthorizeGeminiCachedContent(context.Background(), key, record, account, now)
-		require.ErrorIs(t, err, ErrGeminiCachedContentNotFound)
-		require.Nil(t, routed)
-	}
-}
-
-func (r geminiBindingGroupRepo) GetByIDLite(_ context.Context, id int64) (*Group, error) {
-	return r.groups[id], nil
-}
-
 func TestGeminiCachedContentBindingUsesCurrentOwnerAndExactGroup(t *testing.T) {
-	for _, changed := range []string{"none", "owner", "user", "unbound", "group disabled", "account unbound", "account changed", "expired", "allowlist", "scope", "mapping changed", "endpoint changed", "key changed", "missing identity"} {
+	for _, changed := range []string{"none", "owner", "user", "unbound", "group disabled", "account unbound", "account changed", "expired", "allowlist", "mapping changed", "endpoint changed", "key changed", "missing identity"} {
 		t.Run(changed, func(t *testing.T) {
 			now := time.Now()
 			group := &Group{ID: 17, Platform: PlatformGemini, Status: StatusActive, Hydrated: true, RateMultiplier: 0.2}
 			primary := &Group{ID: 9, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, RateMultiplier: 0.15}
-			key := &APIKey{ID: 3, UserID: 5, User: &User{ID: 5, Status: StatusActive}, GroupID: &primary.ID, Group: primary, RouteGroupIDs: []int64{9, 17}, ModelScope: ModelScopeOther}
+			key := &APIKey{ID: 3, UserID: 5, User: &User{ID: 5, Status: StatusActive}, GroupID: &primary.ID, Group: primary, RouteGroupIDs: []int64{9, 17}, ModelScope: ModelScopeAll}
 			record := &GeminiCachedContent{APIKeyID: 3, UserID: 5, GroupID: 17, AccountID: 21, Model: "gemini-live", ChannelMappedModel: "gemini-live", UpstreamModel: "models/gemini-live", ExpireTime: now.Add(time.Hour)}
 			account := &Account{ID: 21, Platform: PlatformGemini, Type: AccountTypeAPIKey, GroupIDs: []int64{17}, Credentials: map[string]any{"api_key": "binding-key"}}
 			var identityErr error
@@ -115,8 +115,6 @@ func TestGeminiCachedContentBindingUsesCurrentOwnerAndExactGroup(t *testing.T) {
 				record.ExpireTime = now
 			case "allowlist":
 				group.ModelAllowlist = GroupModelAllowlist{Enabled: true, Models: []string{"gemini-other"}}
-			case "scope":
-				key.ModelScope = ModelScopeCN
 			case "mapping changed":
 				account.Credentials["model_mapping"] = map[string]any{"gemini-live": "gemini-new"}
 			case "endpoint changed":

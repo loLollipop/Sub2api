@@ -1,11 +1,5 @@
 export default {
   common: {
-    mixedProviderRates: 'Rates by model vendor',
-    mixedRatesInvalid: 'Enter a finite multiplier between 0 and 999999.9999 for every vendor.',
-    mixedProviderRatesHint: 'Each value is an absolute billing multiplier on the model price. A personal group rate takes priority. Peak and independent media rates follow their existing settings.',
-    mixedVendorOther: 'Other models',
-    mixedRatesNoModels: 'No available models confirmed',
-    mixedRatesUserOverride: 'Your personal group rate takes priority for every vendor.',
     loading: 'Loading...',
     submitting: 'Submitting...',
     justNow: 'just now',

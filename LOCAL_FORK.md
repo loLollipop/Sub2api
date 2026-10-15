@@ -36,3 +36,7 @@ EPUSDT 支付接口不再预填第三方站点，需管理员明确填写自己�
 - 已导入的上游版本和完整提交记录在 `maintenance/upstream.lock.json`。同步前先审查该提交到目标提交的差异、迁移、依赖和部署边界。
 - 审查通过后，将变更以维护者自己的单个提交同步到本仓库，保留本地补丁，并更新锁文件；不导入上游 Git 历史。
 - VPS 只接受 `loLollipop/Sub2api` 发布的、已校验的 Linux amd64 制品。生产继续设置 `UPDATE_STRATEGY=disabled`，禁止应用直接替换自身。
+
+## 原生平台恢复（2026-10-16）
+
+Mixed 聚合平台及其协议探测回退、厂商倍率、API Key 四类互斥 scope 已退役。Kimi、智谱、DeepSeek、MiniMax 恢复独立账号与分组入口，Command Code、Cline、TypeSafe 保留既有原生链路。历史 mixed 对象和非 all scope Key 会明确拒绝，需要维护者按已有配置显式迁移；应用不会按域名猜测平台。已应用的 255–266 迁移及存量兼容列保持不变，无自动账务迁移。

@@ -68,8 +68,6 @@ func TestGatewayModelsCompositeExactRouteCatalog(t *testing.T) {
 	}{
 		{name: "ordinary", want: []string{"gpt-existing", "gpt-route", "gpt-responses", "gpt-chat", "gpt-hidden-target", "deepseek-v3.2"}},
 		{name: "codex endpoint", codex: true, want: []string{"gpt-existing", "gpt-route", "gpt-responses", "gpt-hidden-target", "deepseek-v3.2"}},
-		{name: "openai scope", scope: service.ModelScopeOpenAI, want: []string{"gpt-existing", "gpt-route", "gpt-responses", "gpt-chat"}},
-		{name: "codex openai scope", codex: true, scope: service.ModelScopeOpenAI, want: []string{"gpt-existing", "gpt-route", "gpt-responses"}},
 		{name: "allowlist", allowlist: []string{"gpt-route"}, want: []string{"gpt-route"}},
 		{name: "codex allowlist", codex: true, allowlist: []string{"gpt-route", "gpt-chat"}, want: []string{"gpt-route"}},
 	} {

@@ -12,7 +12,6 @@ const concretePlatforms = [
   'zhipu',
   'deepseek',
   'minimax',
-  'mixed',
   'command_code',
   'cline',
   'typesafe'
@@ -21,7 +20,7 @@ const concretePlatforms = [
 describe('platform option catalogs', () => {
   afterEach(resetPlatformCatalog)
 
-  it('updates selectors when the registry changes without exposing legacy creation platforms', () => {
+  it('updates selectors when the registry changes and exposes native providers', () => {
     setPlatformCatalog({
       ...BUILTIN_PLATFORM_CATALOG,
       platforms: [...BUILTIN_PLATFORM_CATALOG.platforms, {
@@ -31,12 +30,12 @@ describe('platform option catalogs', () => {
     for (const options of [CONCRETE_PLATFORM_OPTIONS, GROUP_PLATFORM_OPTIONS, GROUP_CREATION_PLATFORM_OPTIONS]) {
       expect(options.some(option => option.value === 'new_provider')).toBe(true)
     }
-    expect(GROUP_CREATION_PLATFORM_OPTIONS.some(option => option.value === 'kimi')).toBe(false)
+    expect(GROUP_CREATION_PLATFORM_OPTIONS.some(option => option.value === 'kimi')).toBe(true)
   })
 
-  it('consolidates new domestic groups while retaining legacy editing and filters', () => {
+  it('creates each native domestic group independently', () => {
     expect(GROUP_CREATION_PLATFORM_OPTIONS.map(option => option.value)).toEqual([
-      'anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'mixed', 'command_code', 'cline', 'typesafe', 'composite'
+      'anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'command_code', 'cline', 'typesafe', 'composite'
     ])
     for (const platform of ['kimi', 'zhipu', 'deepseek', 'minimax']) {
       expect(GROUP_PLATFORM_OPTIONS.map(option => option.value)).toContain(platform)

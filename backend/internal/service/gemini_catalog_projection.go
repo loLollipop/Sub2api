@@ -69,14 +69,11 @@ func (s *GatewayService) GeminiCatalogRoute(ctx context.Context, group *Group, p
 			return ctx, "", false
 		}
 		model = decision.UpstreamModel
-		if CheckModelScope(ctx, model) != nil {
-			return ctx, "", false
-		}
 		ctx = WithCompositeRouteDecision(ctx, decision)
 	}
 	if s != nil {
 		mapped, _ := s.ResolveChannelMappingAndRestrict(ctx, &group.ID, model)
 		model = mapped.MappedModel
 	}
-	return ctx, model, IsSafeGeminiModelPathSegment(model) && CheckModelScope(ctx, model) == nil
+	return ctx, model, IsSafeGeminiModelPathSegment(model)
 }

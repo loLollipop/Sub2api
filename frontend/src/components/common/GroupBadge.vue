@@ -2,8 +2,7 @@
   <span
     :class="[
       'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
-      badgeClass,
-      vendorRates !== undefined && 'flex-wrap whitespace-normal'
+      badgeClass
     ]"
   >
     <!-- Platform logo -->
@@ -11,8 +10,7 @@
     <!-- Group name -->
     <span :class="truncate ? 'truncate' : 'min-w-0 whitespace-normal [overflow-wrap:anywhere]'">{{ name }}</span>
     <!-- Right side label -->
-    <MixedProviderRates v-if="showRate && vendorRates !== undefined" :rates="vendorRates" :user-override="userRateMultiplier != null" />
-    <span v-else-if="showLabel" :class="labelClass">
+    <span v-if="showLabel" :class="labelClass">
       <template v-if="hasCustomRate">
         <!-- 原倍率删除线 + 专属倍率高亮 -->
         <span class="line-through opacity-50 mr-0.5">{{ rateMultiplier }}x</span>
@@ -35,11 +33,8 @@ import type { SubscriptionType, GroupPlatform } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import PlatformIcon from './PlatformIcon.vue'
-import MixedProviderRates from './MixedProviderRates.vue'
-import type { VendorRate } from '@/utils/mixed-provider-rates'
 
 interface Props {
-  vendorRates?: VendorRate[]
   name: string
   platform?: GroupPlatform
   subscriptionType?: SubscriptionType

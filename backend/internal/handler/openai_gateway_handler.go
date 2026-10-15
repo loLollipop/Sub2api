@@ -76,7 +76,7 @@ func newOpenAIWSUnsupportedModelSwitchError(model string) error {
 }
 
 func shouldReportOpenAIWSProxyAccountFailure(err error) bool {
-	return err != nil && !errors.Is(err, service.ErrModelScopeDenied) && !errors.Is(err, errOpenAIWSUnsupportedModelSwitch) && !service.IsOpenAIWSSessionPreemptedError(err)
+	return err != nil && !errors.Is(err, errOpenAIWSUnsupportedModelSwitch) && !service.IsOpenAIWSSessionPreemptedError(err)
 }
 
 // openAIWSIngressEndedByClient reports whether a finished ingress WebSocket turn
@@ -203,11 +203,11 @@ func resolveOpenAIMessagesDispatchMappedModel(c *gin.Context, apiKey *service.AP
 	if apiKey == nil || apiKey.Group == nil {
 		return ""
 	}
-	// composite 解析到 grok/CN 目标时调度级映射不适用（Group 级映射的 gpt-5.x
+	// composite 解析到 grok/多协议供应商目标时调度级映射不适用（Group 级映射的 gpt-5.x
 	// 默认值是 openai 专属,发给这些上游必错）,模型改写交给账号级 model_mapping。
 	if apiKey.Group.Platform == service.PlatformComposite && c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok &&
-			(platform == service.PlatformMixed || platform == service.PlatformGrok || service.IsMultiProtocolAPIKeyProvider(platform)) {
+			(platform == service.PlatformGrok || service.IsMultiProtocolAPIKeyProvider(platform)) {
 			return ""
 		}
 	}
@@ -328,7 +328,7 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 		return true
 	}
 	// grok/CN 仍豁免。其余分组关掉「允许 messages 分发」就 403。
-	if apiKey.Group.Platform == service.PlatformMixed || messagesDispatchExemptPlatform(apiKey.Group.Platform) {
+	if messagesDispatchExemptPlatform(apiKey.Group.Platform) {
 		return true
 	}
 	if apiKey.Group.IsGrokMessagesDispatchGroup() {
@@ -337,7 +337,7 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 	resolved, resolvedOK := resolvedMessagesDispatchPlatform(c)
 	// OpenAI 平台但名叫 Grok 的分组、以及 Claude Code 把模型写成 grok-* 时，
 	// 路由已把目标解析成 grok/CN，不能再被 openai 分组的 allow_messages_dispatch 开关拦住。
-	if resolvedOK && messagesDispatchExemptPlatform(resolved) {
+	if resolvedOK && (apiKey.Group.Platform == service.PlatformComposite || len(apiKey.CandidateGroupIDs()) <= 1) && messagesDispatchExemptPlatform(resolved) {
 		return true
 	}
 	if apiKey.Group.Platform == service.PlatformComposite {
@@ -362,7 +362,8 @@ func allowInitialOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *servic
 func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
 	return compositeTargetPlatformAllowed(c, apiKey, model,
 		service.PlatformOpenAI, service.PlatformGrok,
-		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformMixed, service.PlatformCommandCode, service.PlatformCline)
+		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax,
+		service.PlatformCline, service.PlatformCommandCode)
 }
 
 // isResponsesWebSocketCompositePlatform 限定 composite 分组在 Responses WebSocket
@@ -783,9 +784,6 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			}
 		}
 		if err != nil {
-			if h.handleModelScopeError(c, err, streamStarted) {
-				return
-			}
 			if failoverClientGone(c) {
 				reqLog.Info("openai.account_select_aborted_client_disconnected", zap.Error(err))
 				return
@@ -968,12 +966,6 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			})
 		}
 		if err != nil {
-			if service.IsMixedLocalRequestError(err) {
-				return
-			}
-			if h.handleModelScopeError(c, err, streamStarted) {
-				return
-			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
 			if result != nil && result.ClientDisconnect {
 				reqLog.Info("openai.client_disconnected",
@@ -1350,11 +1342,6 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	bindOpenAIReasoningEffortPolicyForMessagesRequest(c, apiKey, body)
 	service.CaptureMessagesValidationFacts(c, body)
 	routingModel := service.NormalizeOpenAICompatRequestedModel(reqModel)
-	if apiKey.Group != nil && apiKey.Group.Platform == service.PlatformMixed {
-		routingModel = reqModel
-	} else if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok && platform == service.PlatformMixed {
-		routingModel = reqModel
-	}
 	preferredMappedModel := resolveOpenAIMessagesDispatchMappedModel(c, apiKey, reqModel)
 	reqStream := gjson.GetBytes(body, "stream").Bool()
 
@@ -1511,9 +1498,6 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			}
 		}
 		if err != nil {
-			if h.handleModelScopeError(c, err, streamStarted) {
-				return
-			}
 			if failoverClientGone(c) {
 				reqLog.Info("openai_messages.account_select_aborted_client_disconnected", zap.Error(err))
 				return
@@ -1657,12 +1641,6 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			})
 		}
 		if err != nil {
-			if service.IsMixedLocalRequestError(err) {
-				return
-			}
-			if h.handleModelScopeError(c, err, streamStarted) {
-				return
-			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
 			if result != nil && result.ImageCount > 0 {
 				reqLog.Warn("openai_messages.forward_partial_error_with_image_result",
@@ -2693,11 +2671,6 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			wsForwardModel = openAIChannelForwardModel(channelMappingWS, reqModel)
 		}
 		if err != nil {
-			if errors.Is(err, service.ErrModelScopeDenied) {
-				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
-				closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, service.ErrModelScopeDenied.Message)
-				return
-			}
 			reqLog.Warn("openai.websocket_account_select_failed",
 				zap.Error(openAICompatibleSelectionErrorForLog(err, requestPlatform)),
 				zap.Int("excluded_account_count", len(failedAccountIDs)),
@@ -2934,9 +2907,6 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				}
 				setOpsRequestContext(c, model, true)
 				mapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, model)
-				if !apiKey.AllowsModelScope(model) || !apiKey.AllowsModelScope(mapping.MappedModel) {
-					return "", service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, service.ErrModelScopeDenied.Message, service.ErrModelScopeDenied)
-				}
 				freshAccount, freshOK := h.gatewayService.RefreshSchedulerAccountFreshness(ctx, account, mapping.MappedModel)
 				if !freshOK {
 					return "", service.NewOpenAIWSClientCloseError(coderws.StatusTryAgainLater, "account is no longer schedulable for this model, please reconnect", nil)
@@ -3237,11 +3207,6 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			}
 
 			var closeErr *service.OpenAIWSClientCloseError
-			if errors.Is(err, service.ErrModelScopeDenied) {
-				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
-				closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, service.ErrModelScopeDenied.Message)
-				return
-			}
 			hasClientCloseErr := errors.As(err, &closeErr)
 			if openAIWSIngressEndedByClient(err) {
 				closedFields := []zap.Field{zap.Int64("account_id", account.ID)}
@@ -3958,29 +3923,6 @@ func blockedModelAllowlistCandidate(group *service.Group, candidates []string) s
 	return ""
 }
 
-func blockedAPIKeyModelCandidate(key *service.APIKey, candidates []string) string {
-	if key == nil {
-		return ""
-	}
-	for _, model := range candidates {
-		if !key.AllowsModelScope(model) {
-			return model
-		}
-	}
-	return blockedModelAllowlistCandidate(key.Group, candidates)
-}
-
-func apiKeyModelCandidateCloseError(key *service.APIKey, candidates []string) error {
-	blocked := blockedAPIKeyModelCandidate(key, candidates)
-	if blocked == "" {
-		return nil
-	}
-	if !key.AllowsModelScope(blocked) {
-		return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, service.ErrModelScopeDenied.Message, service.ErrModelScopeDenied)
-	}
-	return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, fmt.Sprintf("Model %q is not available for this group", blocked), nil)
-}
-
 func closeOpenAIClientWS(conn *coderws.Conn, status coderws.StatusCode, reason string) {
 	if conn == nil {
 		return
@@ -4536,4 +4478,19 @@ func summarizeWSCloseErrorForLog(err error) (string, string) {
 		}
 	}
 	return closeStatus, closeReason
+}
+
+func blockedAPIKeyModelCandidate(key *service.APIKey, candidates []string) string {
+	if key == nil {
+		return ""
+	}
+	return blockedModelAllowlistCandidate(key.Group, candidates)
+}
+
+func apiKeyModelCandidateCloseError(key *service.APIKey, candidates []string) error {
+	blocked := blockedAPIKeyModelCandidate(key, candidates)
+	if blocked == "" {
+		return nil
+	}
+	return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, fmt.Sprintf("Model %q is not available for this group", blocked), nil)
 }

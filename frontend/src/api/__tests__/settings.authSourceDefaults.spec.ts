@@ -297,7 +297,12 @@ describe("sanitizePlatformQuotasMap", () => {
 });
 
 describe("platform quota catalog coverage", () => {
-  it.each(['mixed', 'kimi', 'zhipu', 'deepseek', 'minimax', 'command_code', 'cline'])(
+  it("drops retired Mixed platform quotas", () => {
+    for (const transform of [normalizePlatformQuotasMap, sanitizePlatformQuotasMap]) {
+      expect(transform({ mixed: { daily: 0, weekly: 10, monthly: 50 } })).not.toHaveProperty("mixed");
+    }
+  });
+  it.each(['kimi', 'zhipu', 'deepseek', 'minimax', 'command_code', 'cline'])(
     "保留 %s 平台的显式零值和限额",
     (platform) => {
       const limits = { daily: 0, weekly: 10, monthly: 50 };

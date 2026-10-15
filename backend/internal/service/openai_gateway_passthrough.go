@@ -677,9 +677,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesURLForPlatform(account.openAIWirePlatform(), validatedURL)
-		} else if account.IsMixed() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
-			return nil, fmt.Errorf("account requires an explicit Responses endpoint")
+			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL)
 		}
 	}
 	targetURL = appendOpenAIResponsesRequestPathSuffix(targetURL, openAIResponsesRequestPathSuffix(c))

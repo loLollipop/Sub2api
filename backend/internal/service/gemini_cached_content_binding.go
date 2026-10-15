@@ -113,11 +113,9 @@ func (s *GatewayService) AuthorizeGeminiCachedContent(ctx context.Context, key *
 			return nil, ErrGeminiCachedContentNotFound
 		}
 	}
-	ctx = ContextWithModelScope(ctx, key.ModelScope)
 	routeCtx, mapped, ok := s.GeminiCatalogRoute(ctx, routed.Group, record.Model)
 	if !ok || mapped != record.ChannelMappedModel || !account.IsModelSupported(mapped) ||
-		account.GetMappedModel(mapped) != record.UpstreamModelID() ||
-		CheckModelScope(routeCtx, record.Model, record.ChannelMappedModel, record.UpstreamModelID()) != nil {
+		account.GetMappedModel(mapped) != record.UpstreamModelID() {
 		return nil, ErrGeminiCachedContentNotFound
 	}
 	if platform, resolved := ResolvedTargetPlatformFromContext(routeCtx); resolved && platform != account.Platform {

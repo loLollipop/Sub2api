@@ -16,7 +16,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
-	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -172,7 +171,7 @@ func (s *OpenAIGatewayService) openAIChatCompletionsTargetURL(account *Account) 
 		return "", fmt.Errorf("invalid cloudflare account id")
 	}
 	if baseURL == "" {
-		if account.IsMixed() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
+		if account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
 			return "", fmt.Errorf("account requires an explicit Chat Completions endpoint")
 		}
 		baseURL = "https://api.openai.com"
@@ -215,10 +214,6 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	userAgent string,
 	grokCacheIdentity string,
 ) (*http.Response, error) {
-	if account.IsMixed() && c != nil {
-		c.Set(mixedCCAccountContextKey, account)
-		c.Set(mixedCCTargetContextKey, targetURL)
-	}
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	upstreamReq, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, targetURL, bytes.NewReader(body))
 	releaseUpstreamCtx()
@@ -266,11 +261,8 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
-	resp, err := s.doOpenAITextUpstream(ctx, c, upstreamReq, proxyURL, account)
+	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
 	if err != nil {
-		if account.IsMixed() && c.Request.Context().Err() != nil {
-			return nil, c.Request.Context().Err()
-		}
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
 	}
 	return resp, nil
@@ -302,44 +294,24 @@ func (s *OpenAIGatewayService) scanCCStream(
 	logPrefix string,
 	requestID string,
 	startTime time.Time,
-	mixed bool,
 	emit func(*apicompat.ChatCompletionsChunk),
 ) ccStreamScanState {
 	var st ccStreamScanState
-	sawFinishReason := false
-	sawOutput, sawPolicy := false, false
-	if upstreamResponseModelObserverFromContext(c) == nil {
-		beginUpstreamResponseModelObservation(c)
-	}
-	processPayload := func(payload, eventType string) bool {
-		payload = strings.TrimSpace(payload)
-		if payload == "" && (!mixed || !mixedCCPayloadIsError(nil, eventType)) {
-			return false
+
+	scanner := s.newUpstreamSSEScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		payload, ok := extractOpenAISSEDataLine(line)
+		if !ok {
+			continue
 		}
-		if mixed {
-			observeMixedCCPayload(c, []byte(payload), eventType)
-			if usage, ok := extractOpenAIUsageFromJSONBytes([]byte(payload)); ok {
-				st.Usage = usage
-			}
-			if mixedCCPayloadIsError([]byte(payload), eventType) || payload != "[DONE]" && !gjson.Valid(payload) {
-				kind := "upstream_error"
-				if !gjson.Valid(payload) && payload != "" {
-					kind = "invalid_json"
-				}
-				st.Err = newMixedCCFailure(c, []byte(payload), eventType, kind, sawOutput || sawPolicy || mixedCCPayloadHasOutput([]byte(payload)), nil)
-				return true
-			}
+		payload = strings.TrimSpace(payload)
+		if payload == "" {
+			continue
 		}
 		if payload == "[DONE]" {
 			st.SawDone = true
-			if mixed && !sawOutput {
-				st.Err = newMixedCCFailure(c, nil, "", "empty_completion", sawPolicy, nil)
-			}
-			return true
-		}
-		if mixed && mixedCCUnsupportedConversionOutput([]byte(payload)) {
-			st.Err = newMixedCCFailure(c, nil, eventType, "unsupported_conversion_output", true, nil)
-			return true
+			break
 		}
 		// 观察上游 CC chunk 回显的 model / service_tier（计费以回显为准）。
 		// CC chunk 无 type 字段，按 untyped payload 观察（上游约束：只有终止
@@ -354,63 +326,17 @@ func (s *OpenAIGatewayService) scanCCStream(
 
 		var chunk apicompat.ChatCompletionsChunk
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
-			if mixed {
-				st.Err = newMixedCCFailure(c, nil, eventType, "invalid_chunk", sawOutput || sawPolicy, nil)
-				return true
-			}
 			logger.L().Warn(logPrefix+": failed to parse chat stream chunk",
 				zap.Error(err),
 				zap.String("request_id", requestID),
 			)
-			return false
+			continue
 		}
-		output := chatChunkStartsResponsesOutput(&chunk)
-		if mixed {
-			output = mixedCCPayloadHasOutput([]byte(payload))
-			sawOutput = sawOutput || output
-			sawPolicy = sawPolicy || mixedCCPayloadHasPolicy([]byte(payload))
-		}
-		if st.FirstTokenMs == nil && !isOpenAIChatUsageOnlyStreamChunk(payload) && output {
+		if st.FirstTokenMs == nil && !isOpenAIChatUsageOnlyStreamChunk(payload) && chatChunkStartsResponsesOutput(&chunk) {
 			ms := int(time.Since(startTime).Milliseconds())
 			st.FirstTokenMs = &ms
 		}
-		for _, choice := range gjson.Get(payload, "choices").Array() {
-			if strings.TrimSpace(choice.Get("finish_reason").String()) != "" {
-				sawFinishReason = true
-			}
-		}
 		emit(&chunk)
-		return false
-	}
-
-	scanner := s.newUpstreamSSEScanner(resp.Body)
-	var parser openAICompatSSEFrameParser
-	stopped := false
-	for scanner.Scan() {
-		line := scanner.Text()
-		if mixed {
-			frame, ok := parser.AddLine(line)
-			if !ok {
-				continue
-			}
-			stopped = processPayload(frame.Data, frame.EventType)
-		} else if payload, ok := extractOpenAISSEDataLine(line); ok {
-			stopped = processPayload(payload, "")
-		}
-		if stopped {
-			break
-		}
-	}
-	if mixed && !stopped {
-		if frame, ok := parser.Finish(); ok {
-			if scanner.Err() == nil {
-				processPayload(frame.Data, frame.EventType)
-			} else if usage, ok := extractOpenAIUsageFromJSONBytes([]byte(frame.Data)); ok {
-				// A read failure cannot release pending output or complete the
-				// request, but complete metering already received must survive.
-				st.Usage = usage
-			}
-		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -421,16 +347,6 @@ func (s *OpenAIGatewayService) scanCCStream(
 			)
 		}
 		st.Err = err
-	}
-	if mixed && st.Err == nil && !st.SawDone && !sawFinishReason {
-		st.Err = ErrOpenAIUpstreamStreamTruncated
-	}
-	if mixed && st.Err == nil && !sawOutput {
-		st.Err = newMixedCCFailure(c, nil, "", "empty_completion", sawPolicy, nil)
-	}
-	if mixed && st.Err != nil {
-		st.Err = s.recordMixedCCFailure(c, resp, st.Err)
-		st.NonBillableUpstreamError = mixedCCErrorNonBillable(st.Err)
 	}
 	return st
 }
@@ -448,23 +364,8 @@ func (s *OpenAIGatewayService) readCCUpstreamJSONResponse(
 	c *gin.Context,
 	resp *http.Response,
 	writeError compatErrorWriter,
-	mixed ...bool,
 ) (*apicompat.ChatCompletionsResponse, OpenAIUsage, error) {
-	var respBody []byte
-	var err error
-	if len(mixed) > 0 && mixed[0] {
-		var usage OpenAIUsage
-		respBody, usage, err = s.readMixedCCResponse(c, resp)
-		if err == nil && mixedCCUnsupportedConversionOutput(respBody) {
-			err = s.recordMixedCCFailure(c, resp, newMixedCCFailure(c, nil, "", "unsupported_conversion_output", true, nil))
-		}
-		if err != nil {
-			writeError(c, http.StatusBadGateway, "api_error", "Upstream response failed before completion")
-			return nil, usage, err
-		}
-	} else {
-		respBody, err = ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
-	}
+	respBody, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
 	if err != nil {
 		if !errors.Is(err, ErrUpstreamResponseBodyTooLarge) {
 			writeError(c, http.StatusBadGateway, "api_error", "Failed to read upstream response")

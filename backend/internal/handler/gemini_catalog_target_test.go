@@ -66,46 +66,6 @@ func newGeminiCatalogProjectionHandler(platform string, routes []service.Composi
 	}, upstream
 }
 
-func TestGeminiNativeCatalogChannelAndCompositeAliases(t *testing.T) {
-	for _, composite := range []bool{false, true} {
-		platform := service.PlatformGemini
-		mapping := map[string]map[string]string{platform: {"gemini-public": "gemini-live"}}
-		var routes []service.CompositeModelRoute
-		if composite {
-			platform = service.PlatformComposite
-			mapping = map[string]map[string]string{service.PlatformGemini: {"gemini-channel": "gemini-live"}, service.PlatformAntigravity: {"gemini-channel": "gemini-wrong"}}
-			routes = []service.CompositeModelRoute{{GroupID: 45, PublicModel: "gemini-public", UpstreamModel: "gemini-channel", TargetPlatform: service.PlatformGemini, MatchType: service.CompositeRouteMatchExact, Endpoint: service.CompositeRouteEndpointGemini, Enabled: true}}
-		}
-		for _, detail := range []bool{false, true} {
-			h, upstream := newGeminiCatalogProjectionHandler(platform, routes, mapping)
-			rec := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(rec)
-			c.Request = httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
-			// The actual routing middleware defaults list requests to Gemini
-			// before a per-model Composite target is known.
-			c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), service.PlatformGemini))
-			id := int64(45)
-			c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{GroupID: &id, ModelScope: service.ModelScopeOther, Group: &service.Group{ID: id, Platform: platform,
-				ModelAllowlist: service.GroupModelAllowlist{Enabled: true, Models: []string{"gemini-public"}},
-			}})
-			if detail {
-				c.Params = gin.Params{{Key: "model", Value: "gemini-public"}}
-				h.GeminiV1BetaGetModel(c)
-				require.Equal(t, []string{"/v1beta/models/gemini-live"}, upstream.paths)
-			} else {
-				h.GeminiV1BetaListModels(c)
-				require.Contains(t, rec.Body.String(), `"nextPageToken":"next"`)
-				require.Contains(t, rec.Body.String(), `"customEnvelope":42`)
-			}
-			require.Equal(t, 200, rec.Code, rec.Body.String())
-			require.Contains(t, rec.Body.String(), `"name":"models/gemini-public"`)
-			require.Contains(t, rec.Body.String(), `"inputTokenLimit":123`)
-			require.Contains(t, rec.Body.String(), `"custom":{"retained":true}`)
-			require.NotContains(t, rec.Body.String(), `"name":"models/gemini-live"`)
-		}
-	}
-}
-
 func TestGeminiNativeCatalogCannotBorrowAnotherPlatformMetadata(t *testing.T) {
 	routes := []service.CompositeModelRoute{{GroupID: 45, PublicModel: "gemini-public", UpstreamModel: "gemini-live", TargetPlatform: service.PlatformAntigravity, MatchType: service.CompositeRouteMatchExact, Enabled: true}}
 	for _, detail := range []bool{false, true} {
@@ -157,31 +117,6 @@ func TestGeminiNativeCatalogMiddlewareDefaultCannotOverrideCompositeRoute(t *tes
 	h.GeminiV1BetaListModels(c)
 	require.Equal(t, 200, rec.Code)
 	require.NotContains(t, rec.Body.String(), "gemini-live")
-}
-
-func TestGeminiNativeCatalogPrefixChecksIntermediateModelScope(t *testing.T) {
-	routes := []service.CompositeModelRoute{{GroupID: 45, PublicModel: "gemini-", UpstreamModel: "gpt-5.4", TargetPlatform: service.PlatformGemini, MatchType: service.CompositeRouteMatchPrefix, Enabled: true}}
-	mapping := map[string]map[string]string{service.PlatformGemini: {"gemini-public": "gemini-live", "gpt-5.4": "gemini-live"}}
-	for _, detail := range []bool{false, true} {
-		h, upstream := newGeminiCatalogProjectionHandler(service.PlatformComposite, routes, mapping)
-		rec := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(rec)
-		c.Request = httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
-		id := int64(45)
-		c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{GroupID: &id, ModelScope: service.ModelScopeOther, Group: &service.Group{ID: id, Platform: service.PlatformComposite,
-			ModelAllowlist: service.GroupModelAllowlist{Enabled: true, Models: []string{"gemini-public"}},
-		}})
-		if detail {
-			c.Params = gin.Params{{Key: "model", Value: "gemini-public"}}
-			h.GeminiV1BetaGetModel(c)
-			require.Equal(t, 404, rec.Code)
-			require.Empty(t, upstream.paths)
-		} else {
-			h.GeminiV1BetaListModels(c)
-			require.Equal(t, 200, rec.Code)
-			require.NotContains(t, rec.Body.String(), "gemini-public")
-		}
-	}
 }
 
 func TestGeminiNativeModelDetailDoesNotInventSuccess(t *testing.T) {
@@ -241,4 +176,44 @@ func TestGeminiNativeCatalogUsesOpenAICompatibleExplicitMappingsOnly(t *testing.
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	require.Len(t, body.Models, 1)
 	require.Equal(t, "models/gemini-live", body.Models[0].Name)
+}
+
+func TestGeminiNativeCatalogChannelAndCompositeAliases(t *testing.T) {
+	for _, composite := range []bool{false, true} {
+		platform := service.PlatformGemini
+		mapping := map[string]map[string]string{platform: {"gemini-public": "gemini-live"}}
+		var routes []service.CompositeModelRoute
+		if composite {
+			platform = service.PlatformComposite
+			mapping = map[string]map[string]string{service.PlatformGemini: {"gemini-channel": "gemini-live"}, service.PlatformAntigravity: {"gemini-channel": "gemini-wrong"}}
+			routes = []service.CompositeModelRoute{{GroupID: 45, PublicModel: "gemini-public", UpstreamModel: "gemini-channel", TargetPlatform: service.PlatformGemini, MatchType: service.CompositeRouteMatchExact, Endpoint: service.CompositeRouteEndpointGemini, Enabled: true}}
+		}
+		for _, detail := range []bool{false, true} {
+			h, upstream := newGeminiCatalogProjectionHandler(platform, routes, mapping)
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
+			// The actual routing middleware defaults list requests to Gemini
+			// before a per-model Composite target is known.
+			c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), service.PlatformGemini))
+			id := int64(45)
+			c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{GroupID: &id, ModelScope: service.ModelScopeAll, Group: &service.Group{ID: id, Platform: platform,
+				ModelAllowlist: service.GroupModelAllowlist{Enabled: true, Models: []string{"gemini-public"}},
+			}})
+			if detail {
+				c.Params = gin.Params{{Key: "model", Value: "gemini-public"}}
+				h.GeminiV1BetaGetModel(c)
+				require.Equal(t, []string{"/v1beta/models/gemini-live"}, upstream.paths)
+			} else {
+				h.GeminiV1BetaListModels(c)
+				require.Contains(t, rec.Body.String(), `"nextPageToken":"next"`)
+				require.Contains(t, rec.Body.String(), `"customEnvelope":42`)
+			}
+			require.Equal(t, 200, rec.Code, rec.Body.String())
+			require.Contains(t, rec.Body.String(), `"name":"models/gemini-public"`)
+			require.Contains(t, rec.Body.String(), `"inputTokenLimit":123`)
+			require.Contains(t, rec.Body.String(), `"custom":{"retained":true}`)
+			require.NotContains(t, rec.Body.String(), `"name":"models/gemini-live"`)
+		}
+	}
 }

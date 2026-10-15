@@ -576,7 +576,7 @@ func NewOpenAIGatewayService(
 			nil,
 			"service.openai_gateway",
 		),
-		httpUpstream:                        withModelScopeUpstream(httpUpstream),
+		httpUpstream:                        httpUpstream,
 		deferredService:                     deferredService,
 		openAITokenProvider:                 openAITokenProvider,
 		grokTokenProvider:                   grokTokenProvider,

@@ -57,82 +57,14 @@ function mountTable(
 }
 
 describe('PlazaModelPricingTable', () => {
-  it('unconfigured Mixed rows use standard 1x, never the hidden group rate', () => {
-    const wrapper = mountTable([tokenModel()], 9, null, { platform: 'mixed' })
-    const cells = wrapper.findAll('tbody td')
-    expect(cells[1].text()).toContain('$3.00')
-    expect(cells[7].text()).toBe('1x')
-  })
 
-  it('shows separate billing targets for one public alias with stable rows', () => {
-    const wrapper = mountTable([
-      tokenModel({ name: 'kimi-k2', billing_model: 'deepseek-v4-pro', rate_multiplier: 0.8 }),
-      tokenModel({ name: 'kimi-k2', billing_model: 'glm-5', rate_multiplier: 0.4 })
-    ], 9, null, { platform: 'mixed' })
-    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
-    expect(wrapper.text()).toContain('deepseek-v4-pro')
-    expect(wrapper.text()).toContain('glm-5')
-  })
-  it('Mixed rows use their own vendor rates while official prices stay unchanged', () => {
-    const wrapper = mountTable([
-      tokenModel({ name: 'vendor-a', model_vendor: 'openai', rate_multiplier: 0.5 }),
-      tokenModel({ name: 'vendor-b', model_vendor: 'anthropic', rate_multiplier: 2 })
-    ], 9)
-    const rows = wrapper.findAll('tbody tr')
-    const a = rows.find((row) => row.find('td').text() === 'vendor-a')!.findAll('td')
-    const b = rows.find((row) => row.find('td').text() === 'vendor-b')!.findAll('td')
-    expect(a[1].text()).toBe('$1.50')
-    expect(a[2].text()).toBe('$7.50')
-    expect(a[3].text()).toContain('$1.875')
-    expect(a[7].text()).toBe('0.5x')
-    expect(b[1].text()).toBe('$6.00')
-    expect(b[2].text()).toBe('$30.00')
-    expect(b[7].text()).toBe('2x')
-    for (const cells of [a, b]) {
-      expect(cells[4].text()).toBe('$3.00')
-      expect(cells[5].text()).toBe('$15.00')
-      expect(cells[6].text()).toContain('$6.00')
-    }
-  })
 
-  it.each([0, 9])('explicit user rate %s overrides every vendor even when equal to the group rate', (userRate) => {
-    const wrapper = mountTable([
-      tokenModel({ name: 'vendor-a', rate_multiplier: 0.5 }),
-      tokenModel({ name: 'vendor-b', rate_multiplier: 2 })
-    ], 9, userRate)
-    for (const row of wrapper.findAll('tbody tr')) {
-      const cells = row.findAll('td')
-      expect(cells[1].text()).toBe(userRate === 0 ? '$0.00' : '$27.00')
-      expect(cells[7].find('.font-bold').text()).toBe(`${userRate}x`)
-      expect(cells[4].text()).toBe('$3.00')
-    }
-    expect(wrapper.findAll('td .line-through').map((node) => node.text()).sort()).toEqual(['0.5x', '2x'])
-  })
-
-  it('Mixed time periods use the model rate and preserve independent image pricing', () => {
-    const time_pricing = {
-      timezone: 'Asia/Shanghai',
-      periods: [{ start_time: '00:00', end_time: '08:00', multiplier: 0.5 }]
-    }
-    const token = tokenModel({ name: 'vendor-token', rate_multiplier: 2, time_pricing })
-    const image = tokenModel({
-      name: 'vendor-image', rate_multiplier: 7, time_pricing,
-      pricing: { ...tokenModel().pricing!, billing_mode: 'image', per_request_price: 0.2 },
-      official_pricing: null
-    })
-    const wrapper = mountTable([token, image], 9, null, {
-      imageRateIndependent: true, imageRateMultiplier: 0.4
-    })
-    const rows = wrapper.findAll('tbody tr')
-    expect(rows[0].findAll('td')[1].text()).toBe('$6.00')
-    expect(rows[1].findAll('td')[1].text()).toBe('$3.00')
-    expect(rows[1].findAll('td')[7].text()).toBe('1x')
-    expect(rows[2].findAll('td')[1].text()).toContain('$0.08')
-    expect(rows[2].findAll('td').at(-1)!.text()).toBe('0.4x')
-    expect(rows[3].findAll('td')[1].text()).toContain('$0.04')
-    expect(rows[3].findAll('td').at(-1)!.text()).toBe('0.2x')
-    const freeUser = mountTable([image], 9, 0, { imageRateIndependent: true, imageRateMultiplier: 0.4 })
-    expect(freeUser.findAll('tbody tr')[0].findAll('td')[1].text()).toContain('$0.08')
+  it.each([0, 9])('preserves explicit user rate %s', (userRate) => {
+    const wrapper = mountTable([tokenModel()], 9, userRate)
+    const cells = wrapper.find('tbody tr').findAll('td')
+    expect(cells[1].text()).toBe(userRate === 0 ? '$0.00' : '$27.00')
+    expect(cells[4].text()).toBe('$3.00')
+    expect(cells[7].text()).toContain(userRate + 'x')
   })
 
   it('倍率为 1 时展示渠道单价原值($/1M),价格保底 2 位小数', () => {

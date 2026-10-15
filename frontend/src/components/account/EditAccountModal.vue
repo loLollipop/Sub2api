@@ -58,12 +58,9 @@
           <input
             v-model="editBaseUrl"
             type="text"
-            :required="account.platform === 'mixed'"
             class="input"
             :placeholder="
-              account.platform === 'mixed'
-                ? 'https://your-upstream/v1'
-                : account.platform === 'openai'
+              account.platform === 'openai'
                 ? 'https://api.openai.com'
                 : account.platform === 'gemini'
                   ? 'https://generativelanguage.googleapis.com'
@@ -189,8 +186,6 @@
             :placeholder="
               account.type === 'cloudflare'
                 ? 'API Token'
-                : account.platform === 'mixed'
-                  ? 'your-api-key'
                 : account.platform === 'openai'
                 ? 'sk-proj-...'
                 : account.platform === 'gemini'
@@ -333,7 +328,7 @@
         </div>
 
         <!-- Pool Mode Section -->
-        <div v-if="account.platform !== 'mixed'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <div class="mb-3 flex items-center justify-between">
             <div>
               <label class="input-label mb-0">{{ t('admin.accounts.poolMode') }}</label>
@@ -1887,7 +1882,7 @@
       </div>
 
       <div
-        v-if="(account?.platform === 'anthropic' || account?.platform === 'mixed') && account?.type === 'apikey'"
+        v-if="account?.platform === 'anthropic' && account?.type === 'apikey'"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div class="flex items-center justify-between gap-4">
@@ -3048,9 +3043,8 @@ const handleOllamaCloudUsageUpdated = (state: OllamaCloudUsageState) => {
 
 // Platform-specific hint for Base URL
 const baseUrlHint = computed(() => {
+  if (props.account?.platform === 'typesafe') return t('admin.accounts.typesafeHint')
   if (!props.account) return t('admin.accounts.baseUrlHint')
-  if (props.account.platform === 'typesafe') return t('admin.accounts.typesafeHint')
-  if (props.account.platform === 'mixed') return t('admin.accounts.mixedBaseUrlRequired')
   if (props.account.platform === 'openai') return t('admin.accounts.openai.baseUrlHint')
   if (props.account.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
   if (props.account.platform === 'grok') return ''
@@ -3711,7 +3705,6 @@ const tempUnschedPresets = computed(() => [
 const defaultBaseUrl = computed(() => {
   if (props.account && isMultiProtocolApiKeyPlatform(props.account.platform)) return defaultCNBaseUrl(props.account.platform, editAccountMode.value, editApiProtocol.value)
   if (props.account?.platform === 'typesafe') return 'https://api.typesafe.ai'
-  if (props.account?.platform === 'mixed') return ''
   if (props.account?.platform === 'openai') return 'https://api.openai.com'
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
@@ -3970,11 +3963,6 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       openAICompactModelMappings.value = Object.entries(compactMappings).map(([from, to]) => ({ from, to }))
     }
   }
-  if (newAccount.platform === 'mixed' && newAccount.type === 'apikey') {
-    anthropicAPIKeyAuthScheme.value = extra?.anthropic_apikey_auth_scheme === 'authorization_bearer'
-      ? 'authorization_bearer'
-      : 'x_api_key'
-  }
   if (newAccount.platform === 'anthropic' && newAccount.type === 'apikey') {
     anthropicPassthroughEnabled.value = extra?.anthropic_passthrough === true
     anthropicAPIKeyAuthScheme.value = extra?.anthropic_apikey_auth_scheme === 'authorization_bearer'
@@ -4160,11 +4148,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       }
     }
     const platformDefaultUrl =
-      newAccount.platform === 'typesafe'
-        ? 'https://api.typesafe.ai'
-        : newAccount.platform === 'mixed'
-        ? ''
-        : newAccount.platform === 'openai'
+      newAccount.platform === 'typesafe' ? 'https://api.typesafe.ai' :
+      newAccount.platform === 'openai'
         ? 'https://api.openai.com'
         : newAccount.platform === 'gemini'
           ? 'https://generativelanguage.googleapis.com'
@@ -4861,10 +4846,6 @@ const handleSubmit = async () => {
     if (props.account.type === 'apikey' || props.account.type === 'cloudflare') {
       const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
       const newBaseUrl = editBaseUrl.value.trim() || defaultBaseUrl.value
-      if (props.account.platform === 'mixed' && !newBaseUrl) {
-        appStore.showError(t('admin.accounts.mixedBaseUrlRequired'))
-        return
-      }
       const shouldApplyModelMapping = !(props.account.platform === 'openai' && openaiPassthroughEnabled.value)
 
       // Always update credentials for apikey type to handle model mapping changes
@@ -5393,17 +5374,6 @@ const handleSubmit = async () => {
         delete newExtra.web_search_emulation
       } else {
         newExtra.web_search_emulation = webSearchEmulationMode.value
-      }
-      updatePayload.extra = newExtra
-    }
-
-    if (props.account.platform === 'mixed' && props.account.type === 'apikey') {
-      const currentExtra = (updatePayload.extra as Record<string, unknown>) || (props.account.extra as Record<string, unknown>) || {}
-      const newExtra: Record<string, unknown> = { ...currentExtra }
-      if (anthropicAPIKeyAuthScheme.value === 'authorization_bearer') {
-        newExtra.anthropic_apikey_auth_scheme = 'authorization_bearer'
-      } else {
-        delete newExtra.anthropic_apikey_auth_scheme
       }
       updatePayload.extra = newExtra
     }

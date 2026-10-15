@@ -998,8 +998,6 @@ func cloneSchedulerGroup(group *Group) *Group {
 	cp.FallbackGroupIDOnInvalidRequest = cloneGroupValuePointer(group.FallbackGroupIDOnInvalidRequest)
 	cp.ModelRouting = cloneGroupModelRouting(group.ModelRouting)
 	cp.VideoModelPrices = cloneGroupVideoModelPrices(group.VideoModelPrices)
-	cp.MixedProviderRateMultipliers = CloneMixedProviderRateMultipliers(group.MixedProviderRateMultipliers)
-	cp.SupportedModelVendors = append([]string(nil), group.SupportedModelVendors...)
 	cp.SupportedModelScopes = append([]string(nil), group.SupportedModelScopes...)
 	if group.ModelPricing != nil {
 		cp.ModelPricing = make([]ChannelModelPricing, len(group.ModelPricing))
@@ -1324,7 +1322,7 @@ func (s *SchedulerSnapshotService) handleBulkAccountEvent(ctx context.Context, p
 		}
 		accountGroupIDs := s.normalizeGroupIDs(account.GroupIDs)
 		switch account.Platform {
-		case PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed, PlatformCommandCode, PlatformCline, PlatformTypeSafe:
+		case PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformCline, PlatformCommandCode, PlatformTypeSafe:
 			addPlatformGroups(account.Platform, accountGroupIDs)
 		case PlatformAntigravity:
 			// 批量更新可能刚关闭 mixed_scheduling，仍需清理两个兼容平台的旧快照。

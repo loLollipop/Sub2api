@@ -283,9 +283,8 @@
             </div>
           </template>
 
-          <template #cell-rate_multiplier="{ value, row }">
-            <MixedProviderRates v-if="row.platform === 'mixed'" :rates="mixedModelVendors.map(vendor => ({ vendor, rate: row.mixed_provider_rate_multipliers?.[vendor] ?? 1 }))" />
-            <span v-else class="text-sm text-gray-700 dark:text-gray-300"
+          <template #cell-rate_multiplier="{ value }">
+            <span class="text-sm text-gray-700 dark:text-gray-300"
               >{{ value }}x</span
             >
           </template>
@@ -634,8 +633,7 @@
           <p class="input-hint">{{ t("admin.groups.copyAccounts.hint") }}</p>
         </div>
         <template v-if="!authStore.isSimpleMode">
-        <MixedProviderRateFields v-if="createForm.platform === 'mixed'" v-model="createForm.mixed_provider_rate_multipliers" />
-        <div v-else>
+        <div>
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
           }}</label>
@@ -1641,7 +1639,7 @@
 
         <!-- 跨协议转换开关：所有平台的分组都有（Anthropic 协议族 <-> OpenAI 协议族）。
              账号有原生端点时始终先走原生转发，开关只决定"没有原生端点时"能否转换兜底。 -->
-        <div v-if="createForm.platform !== 'mixed'" class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4">
+        <div class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4">
           <div class="flex items-center justify-between">
             <label class="text-sm text-gray-600 dark:text-gray-400">{{
               t("admin.groups.openaiMessages.crossProtocolEnabled")
@@ -2288,8 +2286,7 @@
             {{ t("admin.groups.copyAccounts.hintEdit") }}
           </p>
         </div>
-        <MixedProviderRateFields v-if="editForm.platform === 'mixed'" v-model="editForm.mixed_provider_rate_multipliers" />
-        <div v-else>
+        <div>
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
           }}</label>
@@ -3306,7 +3303,7 @@
 
         <!-- 跨协议转换开关：所有平台的分组都有（Anthropic 协议族 <-> OpenAI 协议族）。
              账号有原生端点时始终先走原生转发，开关只决定"没有原生端点时"能否转换兜底。 -->
-        <div v-if="editForm.platform !== 'mixed'" class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4">
+        <div class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4">
           <div class="flex items-center justify-between">
             <label class="text-sm text-gray-600 dark:text-gray-400">{{
               t("admin.groups.openaiMessages.crossProtocolEnabled")
@@ -4317,9 +4314,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
-import MixedProviderRateFields from "@/components/admin/group/MixedProviderRateFields.vue";
-import MixedProviderRates from "@/components/common/MixedProviderRates.vue";
-import { initializeMixedProviderRates, validMixedProviderRates, mixedModelVendors, type MixedProviderRates as MixedProviderRateMap } from "@/utils/mixed-provider-rates";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
@@ -5002,7 +4996,6 @@ const createForm = reactive({
   i18n: {} as GroupI18n,
   platform: "anthropic" as GroupPlatform,
   rate_multiplier: 1.0,
-  mixed_provider_rate_multipliers: initializeMixedProviderRates() as MixedProviderRateMap,
   is_exclusive: false,
   subscription_type: "standard" as SubscriptionType,
   daily_limit_usd: null as number | null,
@@ -5377,7 +5370,6 @@ const editForm = reactive({
   i18n: {} as GroupI18n,
   platform: "anthropic" as GroupPlatform,
   rate_multiplier: 1.0,
-  mixed_provider_rate_multipliers: initializeMixedProviderRates() as MixedProviderRateMap,
   is_exclusive: false,
   status: "active" as "active" | "inactive",
   subscription_type: "standard" as SubscriptionType,
@@ -5844,7 +5836,6 @@ const closeCreateModal = () => {
   createForm.i18n = {};
   createForm.platform = "anthropic";
   createForm.rate_multiplier = 1.0;
-  createForm.mixed_provider_rate_multipliers = initializeMixedProviderRates();
   createForm.is_exclusive = false;
   createForm.subscription_type = "standard";
   createForm.daily_limit_usd = null;
@@ -5943,10 +5934,6 @@ const validateProfitControlForm = (form: ProfitControlFormState): boolean => {
 };
 
 const handleCreateGroup = async () => {
-  if (createForm.platform === 'mixed' && !validMixedProviderRates(createForm.mixed_provider_rate_multipliers)) {
-    appStore.showError(t('common.mixedRatesInvalid'));
-    return;
-  }
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
     return;
@@ -5981,7 +5968,6 @@ const handleCreateGroup = async () => {
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createGroupForm,
-      mixed_provider_rate_multipliers: createForm.platform === "mixed" ? initializeMixedProviderRates(createForm.mixed_provider_rate_multipliers) : undefined,
       force_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
         createForm.force_openai_fast,
@@ -6132,7 +6118,6 @@ const handleEdit = async (group: AdminGroup) => {
   );
   editForm.platform = group.platform;
   editForm.rate_multiplier = group.rate_multiplier;
-  editForm.mixed_provider_rate_multipliers = initializeMixedProviderRates(group.mixed_provider_rate_multipliers);
   editForm.is_exclusive = group.is_exclusive;
   editForm.status = group.status;
   editForm.subscription_type = group.subscription_type || "standard";
@@ -6301,10 +6286,6 @@ const closeEditModal = () => {
 };
 
 const handleUpdateGroup = async () => {
-  if (editForm.platform === 'mixed' && !validMixedProviderRates(editForm.mixed_provider_rate_multipliers)) {
-    appStore.showError(t('common.mixedRatesInvalid'));
-    return;
-  }
   if (!editingGroup.value || !showEditModal.value) return;
   if (!editForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
@@ -6344,7 +6325,6 @@ const handleUpdateGroup = async () => {
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
       ...editForm,
-      mixed_provider_rate_multipliers: editForm.platform === "mixed" ? initializeMixedProviderRates(editForm.mixed_provider_rate_multipliers) : undefined,
       force_openai_fast: normalizeGroupOpenAIFast(
         editForm.platform,
         editForm.force_openai_fast,

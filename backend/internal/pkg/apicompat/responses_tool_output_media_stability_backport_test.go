@@ -20,10 +20,11 @@ func TestGatewayStabilityResponsesDuplicatePairs(t *testing.T) {
 	]`), &input))
 	out, changed := DedupeResponsesCallIDs(input)
 	require.True(t, changed)
-	items := out.([]any)
+	items, ok := out.([]any)
+	require.True(t, ok)
 	require.Len(t, items, 5)
-	require.Equal(t, "first", items[2].(map[string]any)["output"])
-	require.Equal(t, "parallel", items[3].(map[string]any)["output"])
+	require.Equal(t, "first", responseItemField(t, items, 2, "output"))
+	require.Equal(t, "parallel", responseItemField(t, items, 3, "output"))
 	again, changed := DedupeResponsesCallIDs(out)
 	require.False(t, changed)
 	require.Equal(t, out, again)
@@ -42,15 +43,18 @@ func TestGatewayStabilityChatDuplicatePairsLeaveNoEmptyTurn(t *testing.T) {
 			]`), &input))
 			out, changed := DedupeChatToolCallIDs(input)
 			require.True(t, changed)
-			items := out.([]any)
+			items, ok := out.([]any)
+			require.True(t, ok)
 			want := 3
 			if content == `,"content":"visible"` || content == `,"text":"visible"` {
 				want++
-				require.NotContains(t, items[2].(map[string]any), "tool_calls")
+				message, ok := items[2].(map[string]any)
+				require.True(t, ok)
+				require.NotContains(t, message, "tool_calls")
 			}
 			require.Len(t, items, want)
-			require.Equal(t, "first", items[1].(map[string]any)["content"])
-			require.Equal(t, "parallel", items[len(items)-1].(map[string]any)["content"])
+			require.Equal(t, "first", responseItemField(t, items, 1, "content"))
+			require.Equal(t, "parallel", responseItemField(t, items, len(items)-1, "content"))
 			again, changed := DedupeChatToolCallIDs(out)
 			require.False(t, changed)
 			require.Equal(t, out, again)
@@ -64,7 +68,10 @@ func TestGatewayStabilityChatSingleTurnDuplicatePreservesFirst(t *testing.T) {
 	}}}
 	out, changed := DedupeChatToolCallIDs(input)
 	require.True(t, changed)
-	require.Len(t, out.([]any)[0].(map[string]any)["tool_calls"], 1)
+	items, ok := out.([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+	require.Len(t, responseItemField(t, items, 0, "tool_calls"), 1)
 }
 
 func TestGatewayStabilityDuplicateOrphans(t *testing.T) {

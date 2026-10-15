@@ -602,8 +602,6 @@ func (s *OpenAIGatewayService) ProxyLiveSideband(
 				errCh <- readErr
 				return
 			}
-			if messageType == coderws.MessageText {
-			}
 			if writeErr := upstream.WriteFrame(proxyCtx, messageType, payload); writeErr != nil {
 				errCh <- writeErr
 				return

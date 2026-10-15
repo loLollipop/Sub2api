@@ -340,21 +340,6 @@ func TestGetLiveCallForIdentityRejectsMismatchedCaller(t *testing.T) {
 	require.Equal(t, record.AccountID, loaded.AccountID)
 }
 
-type liveScopeRelayStore struct {
-	*liveTestStore
-	observerDone chan struct{}
-}
-
-func (s *liveScopeRelayStore) ClaimLiveController(ctx context.Context, hash, controller, owner string) (bool, error) {
-	if controller == LiveControllerObserver {
-		// A rejected frame hands the session back to its observer. Keep this
-		// test observer finite and wait for it so no background reconnect leaks.
-		close(s.observerDone)
-		return false, nil
-	}
-	return s.liveTestStore.ClaimLiveController(ctx, hash, controller, owner)
-}
-
 func TestProxyLiveSidebandForwardsTextAndBinary(t *testing.T) {
 	account := &Account{
 		ID:          11,

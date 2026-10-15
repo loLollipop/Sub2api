@@ -34,7 +34,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	defaultMappedModel string,
 ) (*OpenAIForwardResult, error) {
 	if account != nil && account.Platform == "mixed" {
-		return nil, fmt.Errorf("Mixed has been retired; configure an explicit native platform")
+		return nil, fmt.Errorf("mixed has been retired; configure an explicit native platform")
 	}
 	// Preserve the existing platform-scoped repairs for invalid tool schemas.
 	// This is shared validation, not protocol conversion; valid schemas and

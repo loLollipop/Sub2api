@@ -437,9 +437,7 @@ func (s *GeminiMessagesCompatService) GeminiOpenAIModelIDs(ctx context.Context, 
 	for i := range accounts {
 		account := &accounts[i]
 		if account.IsGeminiOpenAIProtocol() {
-			for _, id := range configuredGeminiModelIDs(account) {
-				ids = append(ids, id)
-			}
+			ids = append(ids, configuredGeminiModelIDs(account)...)
 		}
 	}
 	return dedupeAndSortModelIDs(ids), nil

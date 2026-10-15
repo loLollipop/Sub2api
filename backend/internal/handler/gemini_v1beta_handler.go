@@ -154,8 +154,6 @@ func (h *GatewayHandler) filterGeminiIDsForGroup(ctx context.Context, apiKey *se
 		return nil // A cold group-policy projection cannot establish its allowlist.
 	}
 	allowed := ids
-	if h.gatewayService != nil {
-	}
 	filtered := make([]string, 0, len(allowed))
 	for _, id := range allowed {
 		if !group.ModelAllowlistEnabled() || group.ModelAllowlist.Allows(id) {

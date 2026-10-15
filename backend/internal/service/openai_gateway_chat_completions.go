@@ -60,7 +60,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	defaultMappedModel string,
 ) (*OpenAIForwardResult, error) {
 	if account != nil && account.Platform == "mixed" {
-		return nil, fmt.Errorf("Mixed has been retired; configure an explicit native platform")
+		return nil, fmt.Errorf("mixed has been retired; configure an explicit native platform")
 	}
 	clientCtx := ctx
 	ctx = context.WithoutCancel(ctx)

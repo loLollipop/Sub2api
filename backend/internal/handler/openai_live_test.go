@@ -145,16 +145,6 @@ func TestLiveCreateIdentityMismatchIsForbidden(t *testing.T) {
 	require.Equal(t, "permission_error", gjson.GetBytes(recorder.Body.Bytes(), "error.type").String())
 }
 
-type liveSidebandScopeCache struct {
-	service.GatewayCache
-	service.LiveCallStore
-	record *service.LiveCallRecord
-}
-
-func (s *liveSidebandScopeCache) GetLiveCall(context.Context, string) (*service.LiveCallRecord, error) {
-	return s.record, nil
-}
-
 func TestLiveStandardModeRejectsBeforeBillingOrUpstream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{RunMode: config.RunModeStandard}

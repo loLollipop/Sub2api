@@ -21,7 +21,7 @@ import (
 // Forward forwards request to OpenAI API
 func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
 	if account != nil && account.Platform == "mixed" {
-		return nil, fmt.Errorf("Mixed has been retired; configure an explicit native platform")
+		return nil, fmt.Errorf("mixed has been retired; configure an explicit native platform")
 	}
 	beginUpstreamResponseModelObservation(c)
 	ClearActualOpenAIUpstreamEndpoint(c)

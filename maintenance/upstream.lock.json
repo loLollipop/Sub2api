@@ -17,9 +17,9 @@
     "evidence": ".artifacts/full-upstream-implementation-20261015/secondary-v2.1.16-review.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
-  "checkpoint_meaning": "Reviewed source history, not a complete merge. Cumulative synchronization is in development; feature status and outstanding verification are recorded below. Not release-approved.",
+  "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
   "cumulative_sync": {
-    "status": "in_progress_not_release_approved",
+    "status": "selective_sync_recorded_with_explicit_deferrals",
     "source_head": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
     "implemented_with_local_regression": [
       "Cline/Command Code using shared provider registry; preserve Mixed and credential destinations",
@@ -32,7 +32,7 @@
     "implemented_with_selected_regression": [
       "TypeSafe moderation: default off, independent profiles/key health, frozen queue and uncached send-time authorization; optional safe model metadata, both-engine local image-identifier filtering, full skipped-image counts and score-preserving regressions"
     ],
-    "partial_implementation_not_release_approved": ["Native System One forwarding/response decoding restored to the source implementation; local Mixed/scope/target-route adaptations remain. No bespoke native reconciliation or financial recovery subsystem; post-rollback selected backend regression, full TypeSafe package tests and server build passed"],
+    "source_implementation_with_local_adaptations": ["Native System One forwarding/response decoding restored to the source implementation; local Mixed/scope/target-route adaptations remain. No bespoke native reconciliation or financial recovery subsystem; post-rollback selected backend regression, full TypeSafe package tests and server build passed"],
     "reverted_local_mechanisms_by_user_request": ["Custom System One journal, manual resolution APIs, worker, migration267 and native-only hold markers", "Custom Gemini cache operation journal/migration262 and v2 frozen-price layer", "Experimental durable-image store and this continuation's Redis CAS/billing-recovery extensions"],
     "excluded_by_user": ["LinuxDo OAuth referral propagation", "Multi-code affiliate expansion and per-code rebate statistics"],
     "verification_limits": ["Full frontend387 files/3095 tests, typecheck/lint/build and Mixed1004 HTTP/SSE tests/subtests passed", "PostgreSQL16 production-schema-only rehearsal applied ten migrations twice; final backend/CI and live acceptance remain separate gates"],

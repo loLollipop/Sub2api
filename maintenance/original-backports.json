@@ -11,7 +11,7 @@
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
-    "status": "in_progress_not_release_approved",
+    "status": "selective_sync_recorded_with_explicit_deferrals",
     "source_head": "1b2243a4f50621508e79aef4b498a2937a6238ee",
     "implemented_with_local_regression": [
       "Toolchain, cooldown scopes and frontend lifecycle fixes",

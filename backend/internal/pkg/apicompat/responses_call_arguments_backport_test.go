@@ -8,7 +8,7 @@ import (
 
 func TestDedupeResponsesCallIDsRetainsLaterRealArguments(t *testing.T) {
 	for _, blank := range []any{nil, "", " \n ", "null", "{}", " { \n } "} {
-		t.Run(testArgumentLabel(blank), func(t *testing.T) {
+		t.Run(testArgumentLabel(t, blank), func(t *testing.T) {
 			const arguments = `{"path":"src/main.go","line":9007199254740993}`
 			input := []any{
 				map[string]any{"type": "function_call", "id": "call_a", "call_id": "call_a", "arguments": blank},
@@ -22,7 +22,8 @@ func TestDedupeResponsesCallIDsRetainsLaterRealArguments(t *testing.T) {
 
 			out, changed := DedupeResponsesCallIDs(input)
 			require.True(t, changed)
-			items := out.([]any)
+			items, ok := out.([]any)
+			require.True(t, ok)
 			require.Len(t, items, 5)
 			require.Equal(t, arguments, responseItemField(t, items, 0, "arguments"))
 			require.Equal(t, "read", responseItemField(t, items, 0, "name"))
@@ -40,7 +41,7 @@ func TestDedupeResponsesCallIDsRetainsLaterRealArguments(t *testing.T) {
 
 func TestDedupeChatToolCallIDsRetainsLaterRealArguments(t *testing.T) {
 	for _, blank := range []any{nil, "", " \n ", "null", "{}", " { \n } "} {
-		t.Run(testArgumentLabel(blank), func(t *testing.T) {
+		t.Run(testArgumentLabel(t, blank), func(t *testing.T) {
 			const arguments = `{"command":"pwd"}`
 			firstFunction := map[string]any{"arguments": blank}
 			messages := []any{
@@ -58,14 +59,18 @@ func TestDedupeChatToolCallIDsRetainsLaterRealArguments(t *testing.T) {
 
 			out, changed := DedupeChatToolCallIDs(messages)
 			require.True(t, changed)
-			items := out.([]any)
+			items, ok := out.([]any)
+			require.True(t, ok)
 			require.Len(t, items, 4)
 			require.Equal(t, arguments, firstFunction["arguments"])
 			require.Equal(t, "run", firstFunction["name"])
 			require.Equal(t, "before", responseItemField(t, items, 0, "content"))
 			require.Equal(t, "{}", responseItemField(t, items, 1, "content"))
 			require.Equal(t, "after", responseItemField(t, items, 2, "content"))
-			calls := items[2].(map[string]any)["tool_calls"].([]any)
+			message, ok := items[2].(map[string]any)
+			require.True(t, ok)
+			calls, ok := message["tool_calls"].([]any)
+			require.True(t, ok)
 			require.Len(t, calls, 1)
 			require.Equal(t, "call_b", responseItemField(t, calls, 0, "id"))
 			same, changed := DedupeChatToolCallIDs(out)
@@ -75,11 +80,14 @@ func TestDedupeChatToolCallIDsRetainsLaterRealArguments(t *testing.T) {
 	}
 }
 
-func testArgumentLabel(value any) string {
+func testArgumentLabel(t *testing.T, value any) string {
+	t.Helper()
 	if value == nil {
 		return "null"
 	}
-	return "string_" + value.(string)
+	label, ok := value.(string)
+	require.True(t, ok)
+	return "string_" + label
 }
 
 func TestDedupeFunctionArgumentsPreservesMeaningfulAndConflictingCalls(t *testing.T) {
@@ -106,7 +114,9 @@ func TestDedupeFunctionArgumentsPreservesMeaningfulAndConflictingCalls(t *testin
 				map[string]any{"type": tc.nextType, "call_id": "call_a", "name": tc.nextName, "arguments": tc.nextArgs},
 			})
 			require.True(t, changed)
-			require.Len(t, out.([]any), 1)
+			items, ok := out.([]any)
+			require.True(t, ok)
+			require.Len(t, items, 1)
 			require.Equal(t, tc.firstArgs, first["arguments"])
 			require.Equal(t, tc.firstName, first["name"])
 		})
@@ -127,11 +137,15 @@ func TestDedupeFunctionArgumentsPreservesMeaningfulAndConflictingCalls(t *testin
 				map[string]any{"role": "tool", "tool_call_id": "call_a", "content": "{}"},
 			})
 			require.True(t, changed)
-			items := out.([]any)
+			items, ok := out.([]any)
+			require.True(t, ok)
 			require.Len(t, items, 2)
-			calls := items[0].(map[string]any)["tool_calls"].([]any)
+			message, ok := items[0].(map[string]any)
+			require.True(t, ok)
+			calls, ok := message["tool_calls"].([]any)
+			require.True(t, ok)
 			require.Len(t, calls, 1)
-			require.Equal(t, "call_a", calls[0].(map[string]any)["id"])
+			require.Equal(t, "call_a", responseItemField(t, calls, 0, "id"))
 			require.Equal(t, tc.firstArgs, firstFunction["arguments"])
 			require.Equal(t, tc.firstName, firstFunction["name"])
 			require.Equal(t, "{}", responseItemField(t, items, 1, "content"))
@@ -150,9 +164,17 @@ func TestDedupeChatToolCallIDsRetainsArgumentsWithinOneTurn(t *testing.T) {
 		}},
 	})
 	require.True(t, changed)
-	calls := out.([]any)[0].(map[string]any)["tool_calls"].([]any)
+	items, ok := out.([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+	message, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	calls, ok := message["tool_calls"].([]any)
+	require.True(t, ok)
 	require.Len(t, calls, 2)
-	require.Equal(t, arguments, first["function"].(map[string]any)["arguments"])
+	function, ok := first["function"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, arguments, function["arguments"])
 	require.Equal(t, "call_a", first["id"])
-	require.Equal(t, "call_b", calls[1].(map[string]any)["id"])
+	require.Equal(t, "call_b", responseItemField(t, calls, 1, "id"))
 }

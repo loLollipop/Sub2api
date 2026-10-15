@@ -89,7 +89,7 @@ func (s *AccountTestService) testTypeSafeAccountConnection(c *gin.Context, accou
 
 	decoded, err := typesafe.DecodeSystemOneResponse(resp.Body)
 	mediaType, _, mediaErr := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	if mediaErr != nil || (mediaType != "application/json" && !(strings.HasPrefix(mediaType, "application/") && strings.HasSuffix(mediaType, "+json"))) {
+	if mediaErr != nil || (mediaType != "application/json" && (!strings.HasPrefix(mediaType, "application/") || !strings.HasSuffix(mediaType, "+json"))) {
 		return s.sendErrorAndEnd(c, "Invalid System One JSON response media type")
 	}
 	if err != nil {

@@ -463,16 +463,6 @@ func testConnectionHandleError(
 	return nil
 }
 
-// buildGeminiTestRequest 构建 Gemini 格式测试请求
-// 默认使用最小 token；质量提示词会提升输出上限。
-func (s *AntigravityGatewayService) buildGeminiTestRequest(projectID, model string, prompts ...string) ([]byte, error) {
-	prompt := ""
-	if len(prompts) > 0 {
-		prompt = prompts[0]
-	}
-	return s.buildGeminiTestRequestWithPrompt(projectID, model, prompt)
-}
-
 func (s *AntigravityGatewayService) buildGeminiTestRequestWithPrompt(projectID, model string, rawPrompt string) ([]byte, error) {
 	if isImageGenerationModel(model) {
 		imagePrompt := strings.TrimSpace(rawPrompt)

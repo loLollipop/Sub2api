@@ -11,6 +11,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Compatibility helpers keep existing default-policy cases on the production
+// policy-aware implementation without adding unused production entry points.
+func resolveAccountStatsCost(
+	ctx context.Context,
+	channelService *ChannelService,
+	billingService *BillingService,
+	accountID int64,
+	groupID int64,
+	upstreamModel string,
+	tokens UsageTokens,
+	requestCount int,
+	totalCost float64,
+	serviceTier string,
+	pricingAt time.Time,
+	reasoningEfforts ...string,
+) *float64 {
+	return resolveAccountStatsCostWithPolicy(ctx, channelService, billingService, accountID, groupID,
+		upstreamModel, tokens, requestCount, totalCost, serviceTier, pricingAt, AccountStatsPricingPolicy{}, reasoningEfforts...)
+}
+
+func tryModelFilePricing(billingService *BillingService, model string, tokens UsageTokens, serviceTier string, pricingAt time.Time, reasoningEfforts ...string) *float64 {
+	return tryModelFilePricingWithPolicy(billingService, model, tokens, serviceTier, pricingAt, AccountStatsPricingPolicy{}, reasoningEfforts...)
+}
+
 // ---------------------------------------------------------------------------
 // matchAccountStatsRule
 // ---------------------------------------------------------------------------

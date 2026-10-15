@@ -13,7 +13,7 @@ type AccountStatsPricingPolicy struct {
 	DisableModelLongContextPricing bool
 }
 
-// resolveAccountStatsCost 计算账号统计定价费用。
+// resolveAccountStatsCostWithPolicy 计算账号统计定价费用。
 // 返回 nil 表示不覆盖，使用默认公式（total_cost × account_rate_multiplier）。
 //
 // 优先级（先命中为准）：
@@ -27,24 +27,6 @@ type AccountStatsPricingPolicy struct {
 // serviceTier 是最终参与用户计费的 OpenAI 服务层级，用于优先级 3。
 // pricingAt 与本次客户计费使用同一时刻，避免跨峰谷请求的成本与售价错位。
 // reasoningEffort 是最终转发等级；Fable 5.1 max 默认按 3 倍额度消耗。
-func resolveAccountStatsCost(
-	ctx context.Context,
-	channelService *ChannelService,
-	billingService *BillingService,
-	accountID int64,
-	groupID int64,
-	upstreamModel string,
-	tokens UsageTokens,
-	requestCount int,
-	totalCost float64,
-	serviceTier string,
-	pricingAt time.Time,
-	reasoningEfforts ...string,
-) *float64 {
-	return resolveAccountStatsCostWithPolicy(ctx, channelService, billingService, accountID, groupID,
-		upstreamModel, tokens, requestCount, totalCost, serviceTier, pricingAt, AccountStatsPricingPolicy{}, reasoningEfforts...)
-}
-
 func resolveAccountStatsCostWithPolicy(
 	ctx context.Context, channelService *ChannelService, billingService *BillingService,
 	accountID, groupID int64, upstreamModel string, tokens UsageTokens, requestCount int,
@@ -87,14 +69,10 @@ func resolveAccountStatsCostWithPolicy(
 	return nil
 }
 
-// tryModelFilePricing 使用模型定价文件（LiteLLM/fallback）中的价格计算费用。
+// tryModelFilePricingWithPolicy 使用模型定价文件（LiteLLM/fallback）中的价格计算费用。
 // 与用户计费共用同一条定价管线，避免这里维护第二份"单价 × token 数"实现后，
 // 每加一个定价特性都要手工镜像一次。解析器不配置渠道或分组，保持优先级 3 的
 // 语义：只取模型定价文件，不引入自定义售价。
-func tryModelFilePricing(billingService *BillingService, model string, tokens UsageTokens, serviceTier string, pricingAt time.Time, reasoningEfforts ...string) *float64 {
-	return tryModelFilePricingWithPolicy(billingService, model, tokens, serviceTier, pricingAt, AccountStatsPricingPolicy{}, reasoningEfforts...)
-}
-
 func tryModelFilePricingWithPolicy(billingService *BillingService, model string, tokens UsageTokens, serviceTier string, pricingAt time.Time, policy AccountStatsPricingPolicy, reasoningEfforts ...string) *float64 {
 	reasoningEffort := ""
 	if len(reasoningEfforts) > 0 {

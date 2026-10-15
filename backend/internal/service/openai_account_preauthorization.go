@@ -83,7 +83,7 @@ func (s *OpenAIGatewayService) repriceOpenAIFinalHTTPRequest(ctx context.Context
 	if err != nil {
 		return &openAIAccountPreauthorizationError{balancePreauthorizationUnavailable(err)}
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	body, err := io.ReadAll(reader)
 	if err != nil {
 		return &openAIAccountPreauthorizationError{balancePreauthorizationUnavailable(err)}

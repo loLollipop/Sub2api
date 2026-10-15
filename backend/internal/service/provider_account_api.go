@@ -18,11 +18,6 @@ func isOfficialProviderOrigin(u *url.URL, host string) bool {
 		u.Fragment == "" && u.Opaque == "" && u.RawPath == ""
 }
 
-func isOfficialCommandCodeHost(target string) bool {
-	u, err := url.Parse(strings.TrimSpace(target))
-	return err == nil && isOfficialProviderOrigin(u, "api.commandcode.ai")
-}
-
 func (a *Account) providerAccountAPIOriginAllowed(host string) bool {
 	values := []string{a.GetOpenAIBaseURL()}
 	if base := strings.TrimSpace(a.GetCredential("base_url")); base != "" {

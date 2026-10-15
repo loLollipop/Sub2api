@@ -313,7 +313,7 @@ func (s *OpenAIGatewayService) scanCCStream(
 	}
 	processPayload := func(payload, eventType string) bool {
 		payload = strings.TrimSpace(payload)
-		if payload == "" && !(mixed && mixedCCPayloadIsError(nil, eventType)) {
+		if payload == "" && (!mixed || !mixedCCPayloadIsError(nil, eventType)) {
 			return false
 		}
 		if mixed {

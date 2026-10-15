@@ -1,7 +1,6 @@
 package service
 
 import (
-	"net/url"
 	"strings"
 )
 
@@ -54,15 +53,6 @@ func clineWalletRateLimitKey(model string) string {
 	default:
 		return clineCreditsRateLimitKey
 	}
-}
-
-// isOfficialClineHost 报告 URL 是否指向官方 Cline API 主机。
-func isOfficialClineHost(target string) bool {
-	parsed, err := url.Parse(strings.TrimSpace(target))
-	if err != nil {
-		return false
-	}
-	return isOfficialProviderOrigin(parsed, clineAPIHost)
 }
 
 // clineAccountAPISupported 报告账号能否查询积分余额与 ClinePass 用量：API Key 账号且

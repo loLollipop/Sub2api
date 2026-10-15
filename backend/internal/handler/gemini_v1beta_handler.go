@@ -31,8 +31,6 @@ import (
 // 匹配格式: /Users/xxx/.gemini/tmp/[64位十六进制哈希]
 var geminiCLITmpDirRegex = regexp.MustCompile(`/\.gemini/tmp/([A-Fa-f0-9]{64})`)
 
-var errGeminiStudioAntigravityFallback = errors.New("gemini studio antigravity fallback")
-
 func geminiNativePlatformAllowed(c *gin.Context, apiKey *service.APIKey) bool {
 	switch effectiveAPIKeyPlatform(c, apiKey) {
 	case service.PlatformGemini, service.PlatformAntigravity:
@@ -55,32 +53,6 @@ func geminiStudioGroupIDs(apiKey *service.APIKey) []int64 {
 		return []int64{apiKey.Group.ID}
 	}
 	return nil
-}
-
-func (h *GatewayHandler) selectGeminiStudioAccount(ctx context.Context, apiKey *service.APIKey) (*service.Account, error) {
-	if h == nil || h.geminiCompatService == nil {
-		return nil, service.ErrNoAvailableAccounts
-	}
-	var lastErr error
-	sawAntigravity := false
-	for _, id := range geminiStudioGroupIDs(apiKey) {
-		gid := id
-		account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(ctx, &gid)
-		if err == nil {
-			return account, nil
-		}
-		lastErr = err
-		if hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(ctx, &gid); hasAntigravity {
-			sawAntigravity = true
-		}
-	}
-	if sawAntigravity {
-		return nil, errGeminiStudioAntigravityFallback
-	}
-	if lastErr == nil {
-		lastErr = service.ErrNoAvailableAccounts
-	}
-	return nil, lastErr
 }
 
 // GeminiV1BetaListModels proxies:
@@ -1111,35 +1083,6 @@ func writeUpstreamResponse(c *gin.Context, res *service.UpstreamHTTPResult) {
 		contentType = "application/json"
 	}
 	c.Data(res.StatusCode, contentType, res.Body)
-}
-
-func shouldFallbackGeminiModels(res *service.UpstreamHTTPResult) bool {
-	if res == nil {
-		return true
-	}
-	if res.StatusCode != http.StatusUnauthorized && res.StatusCode != http.StatusForbidden {
-		return false
-	}
-	if strings.Contains(strings.ToLower(res.Headers.Get("Www-Authenticate")), "insufficient_scope") {
-		return true
-	}
-	if strings.Contains(strings.ToLower(string(res.Body)), "insufficient authentication scopes") {
-		return true
-	}
-	if strings.Contains(strings.ToLower(string(res.Body)), "access_token_scope_insufficient") {
-		return true
-	}
-	return false
-}
-
-func shouldFallbackGeminiModel(modelName string, res *service.UpstreamHTTPResult) bool {
-	if shouldFallbackGeminiModels(res) {
-		return true
-	}
-	if res == nil || res.StatusCode != http.StatusNotFound {
-		return false
-	}
-	return gemini.HasFallbackModel(modelName)
 }
 
 // extractGeminiCLISessionHash 从 Gemini CLI 请求中提取会话标识。

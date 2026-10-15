@@ -128,7 +128,7 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	profileResp.User.Localized(c.GetHeader("Accept-Language"))
+	profileResp.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 
@@ -193,7 +193,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	profileResp.User.Localized(c.GetHeader("Accept-Language"))
+	profileResp.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 
@@ -313,7 +313,7 @@ func (h *UserHandler) BindEmailIdentity(c *gin.Context) {
 		return
 	}
 
-	profileResp.User.Localized(c.GetHeader("Accept-Language"))
+	profileResp.Localized(c.GetHeader("Accept-Language"))
 	response.Success(c, profileResp)
 }
 

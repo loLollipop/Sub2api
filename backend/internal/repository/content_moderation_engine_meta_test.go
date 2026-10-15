@@ -17,7 +17,7 @@ func TestContentModerationRepositoryNullableEngineMeta(t *testing.T) {
 		t.Run(map[bool]string{true: "historical_record", false: "typesafe_record"}[meta == nil], func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			repo := NewContentModerationRepository(db)
 			var expectedMeta driver.Value
 			if meta != nil {

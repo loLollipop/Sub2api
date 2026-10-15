@@ -160,8 +160,8 @@ func moderationImageModelComparisonText(images []string) string {
 				return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' && r != ':'
 			}) {
 				if len(fragment) >= 4 {
-					comparison.WriteByte(' ')
-					comparison.WriteString(fragment)
+					_ = comparison.WriteByte(' ')
+					_, _ = comparison.WriteString(fragment)
 				}
 			}
 		}

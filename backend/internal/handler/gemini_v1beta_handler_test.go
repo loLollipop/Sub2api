@@ -6,14 +6,47 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/gemini"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+// Legacy fallback predicates are exercised only by compatibility tests; live
+// catalog handlers now resolve group models directly.
+func shouldFallbackGeminiModels(res *service.UpstreamHTTPResult) bool {
+	if res == nil {
+		return true
+	}
+	if res.StatusCode != http.StatusUnauthorized && res.StatusCode != http.StatusForbidden {
+		return false
+	}
+	if strings.Contains(strings.ToLower(res.Headers.Get("Www-Authenticate")), "insufficient_scope") {
+		return true
+	}
+	if strings.Contains(strings.ToLower(string(res.Body)), "insufficient authentication scopes") {
+		return true
+	}
+	if strings.Contains(strings.ToLower(string(res.Body)), "access_token_scope_insufficient") {
+		return true
+	}
+	return false
+}
+
+func shouldFallbackGeminiModel(modelName string, res *service.UpstreamHTTPResult) bool {
+	if shouldFallbackGeminiModels(res) {
+		return true
+	}
+	if res == nil || res.StatusCode != http.StatusNotFound {
+		return false
+	}
+	return gemini.HasFallbackModel(modelName)
+}
 
 func TestGeminiV1BetaListModels_AllowlistFiltersNativeResponse(t *testing.T) {
 	body := []byte(`{"models":[{"name":"models/gemini-2.5-pro"},{"name":"models/gemini-2.5-flash"}],"nextPageToken":"next"}`)

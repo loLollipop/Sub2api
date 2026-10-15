@@ -536,8 +536,8 @@ func TestStructuredInputErrorReadPreservesLegacyLimitAndBoundsCompleteness(t *te
 	for _, completeness := range []bool{false, true} {
 		t.Run(fmt.Sprintf("completeness=%t", completeness), func(t *testing.T) {
 			reader, writer := io.Pipe()
-			defer writer.Close()
-			defer reader.Close()
+			defer func() { _ = writer.Close() }()
+			defer func() { _ = reader.Close() }()
 			written := make(chan error, 1)
 			go func() {
 				_, err := io.WriteString(writer, prefix)
@@ -582,8 +582,8 @@ func TestStructuredInputErrorReadPreservesLegacyLimitAndBoundsCompleteness(t *te
 func TestStructuredInputErrorReadStopsAtInternalDeadline(t *testing.T) {
 	svc := &OpenAIGatewayService{cfg: structuredInputRetryTestConfig()}
 	reader, writer := io.Pipe()
-	defer writer.Close()
-	defer reader.Close()
+	defer func() { _ = writer.Close() }()
+	defer func() { _ = reader.Close() }()
 	done := make(chan bool, 1)
 	go func() {
 		_, _, complete := svc.readOpenAIUpstreamErrorWithCompleteness(context.Background(), &http.Response{Body: reader})
@@ -604,8 +604,8 @@ func TestForwardAsChatCompletions_StructuredInputStalledErrorCancellation(t *tes
 		t.Run(fmt.Sprintf("request_context=%t", cancelRequest), func(t *testing.T) {
 			body := []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}],"stream":false}`)
 			reader, writer := io.Pipe()
-			defer writer.Close()
-			defer reader.Close()
+			defer func() { _ = writer.Close() }()
+			defer func() { _ = reader.Close() }()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			c, _ := gin.CreateTestContext(httptest.NewRecorder())

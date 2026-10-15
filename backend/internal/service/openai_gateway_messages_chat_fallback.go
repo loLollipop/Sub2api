@@ -13,7 +13,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
-	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -82,9 +81,6 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 		chatReq.StreamOptions = &apicompat.ChatStreamOptions{IncludeUsage: true}
 	}
 
-	convertedEffort := chatReq.ReasoningEffort
-	reasoningEffort := &convertedEffort
-	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, billingModel)
 	serviceTier := extractOpenAIServiceTierFromBody(body)
 
 	chatBody, err := json.Marshal(chatReq)
@@ -105,9 +101,6 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 		}
 		if changed {
 			chatBody = policyBody
-			if effectiveEffort := strings.TrimSpace(gjson.GetBytes(chatBody, "reasoning_effort").String()); effectiveEffort != "" {
-				reasoningEffort = &effectiveEffort
-			}
 		}
 	}
 	// Unlike forwardResponsesViaRawChatCompletions, applyOpenAIFastPolicyToBody
@@ -124,7 +117,7 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	)
 
 	// 3. Build and send upstream request via the shared CC pipeline
-	reasoningEffort = finalOpenAIAttemptReasoningEffort(chatBody, upstreamModel, billingModel, originalModel)
+	reasoningEffort := finalOpenAIAttemptReasoningEffort(chatBody, upstreamModel, billingModel, originalModel)
 	apiKey, targetURL, err := s.resolveCCFallbackTarget(account)
 	if err != nil {
 		return nil, err

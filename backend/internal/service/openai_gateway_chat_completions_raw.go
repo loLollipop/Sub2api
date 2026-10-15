@@ -107,10 +107,6 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletionsWithStartTime(
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
-	reasoningEffort := extractOpenAIReasoningEffortFromBody(body, upstreamModel, billingModel, originalModel)
-	// 国产模型默认 effort 补充：需要 mappedModel 判定，推迟到 billingModel 算出之后。
-	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, billingModel)
-
 	// 3. Rewrite model in body (no protocol conversion)
 	upstreamBody := body
 	if upstreamModel != originalModel {
@@ -191,7 +187,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletionsWithStartTime(
 	}
 	upstreamBody = applyOllamaCloudRawChatCompletionsRequest(account, upstreamBody)
 	upstreamBody = clampOllamaCloudUpstreamMaxTokens(account, upstreamBody)
-	reasoningEffort = finalOpenAIAttemptReasoningEffort(upstreamBody, upstreamModel, billingModel, originalModel)
+	reasoningEffort := finalOpenAIAttemptReasoningEffort(upstreamBody, upstreamModel, billingModel, originalModel)
 
 	logger.L().Debug("openai chat_completions raw: forwarding without protocol conversion",
 		zap.Int64("account_id", account.ID),

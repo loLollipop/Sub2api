@@ -108,7 +108,7 @@ func serveInfiniteCanvasFile(c *gin.Context, staticDir string, fileServer http.H
 	if err != nil {
 		return false
 	}
-	info, err := os.Stat(staticRoot)
+	info, err := os.Stat(staticRoot) //nolint:gosec // G703: root comes only from operator startup configuration, never HTTP input.
 	if err != nil || !info.IsDir() {
 		return false
 	}
@@ -120,16 +120,16 @@ func serveInfiniteCanvasFile(c *gin.Context, staticDir string, fileServer http.H
 	clean := path.Clean("/" + rel)
 	full := filepath.Join(staticRoot, filepath.FromSlash(strings.TrimPrefix(clean, "/")))
 	relative, err := filepath.Rel(staticRoot, full)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	if err != nil || !filepath.IsLocal(relative) {
 		return false
 	}
-	if st, err := os.Stat(full); err == nil && !st.IsDir() {
+	if st, err := os.Stat(full); err == nil && !st.IsDir() { //nolint:gosec // G703: filepath.Rel and IsLocal confine the request path to the operator-configured root.
 		fileServer.ServeHTTP(c.Writer, c.Request)
 		c.Abort()
 		return true
 	}
 	index := filepath.Join(staticRoot, "index.html")
-	if _, err := os.Stat(index); err != nil {
+	if _, err := os.Stat(index); err != nil { //nolint:gosec // G703: fixed index.html under the operator-configured root; no HTTP path input.
 		return false
 	}
 	c.File(index)

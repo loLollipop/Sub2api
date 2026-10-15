@@ -14,6 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Retain the default channel-pricing adapter only for its unit-test callers.
+func (s *BillingService) calculateCostWithServiceTierPolicy(
+	model string,
+	tokens UsageTokens,
+	rateMultiplier float64,
+	serviceTier string,
+	longContextBillingEnabled bool,
+) (*CostBreakdown, error) {
+	return s.calculateCostInternalWithPolicy(model, tokens, rateMultiplier, serviceTier, nil, longContextBillingEnabled)
+}
+
 // captureStdLog 重定向 stdlib log 输出到 buffer,返回该 buffer;通过 t.Cleanup 还原。
 // 用于断言 GetModelPricing 的 fallback warn(log.Printf)打了几次。
 func captureStdLog(t *testing.T) *bytes.Buffer {

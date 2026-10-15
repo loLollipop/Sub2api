@@ -59,7 +59,16 @@ func TestServeInfiniteCanvasFile_TraversalCannotSelectOutsideFile(t *testing.T) 
 				t.Fatal("traversal selected an existing file outside the static root")
 			})
 			if serveInfiniteCanvasFile(c, root, fileServer) {
-				require.Equal(t, "canvas index", rec.Body.String())
+				switch rec.Code {
+				case http.StatusOK:
+					require.Equal(t, "canvas index", rec.Body.String())
+				case http.StatusBadRequest:
+					// net/http may reject a dot-segment URL before serving
+					// the SPA fallback; rejection also preserves confinement.
+					require.NotContains(t, rec.Body.String(), "outside secret")
+				default:
+					t.Fatalf("unexpected traversal response status: %d", rec.Code)
+				}
 			} else {
 				require.Empty(t, rec.Body.String())
 			}

@@ -432,13 +432,13 @@ func inflightBillingModelCandidates(ctx context.Context, deps inflightEstimateDe
 	return primary, fallbacks, upstreamInput
 }
 
-func (d inflightEstimateDeps) rates(ctx context.Context, apiKey *APIKey, model string) (text, image float64) {
+func (d inflightEstimateDeps) rates(ctx context.Context, apiKey *APIKey) (text, image float64) {
 	rate := 1.0
 	if d.cfg != nil && d.cfg.Default.RateMultiplier > 0 {
 		rate = d.cfg.Default.RateMultiplier
 	}
 	if apiKey != nil && apiKey.GroupID != nil && apiKey.Group != nil {
-		rate = apiKey.Group.RateMultiplierForModel(model)
+		rate = apiKey.Group.RateMultiplier
 		if d.userGroupRate != nil && apiKey.User != nil {
 			rate = d.userGroupRate(ctx, apiKey.User.ID, *apiKey.GroupID, rate)
 		}
@@ -598,71 +598,38 @@ func (d inflightEstimateDeps) estimate(ctx context.Context, apiKey *APIKey, req 
 		// 非计量请求（媒体状态查询、custom-voices 等）：无需预留，也不算「无法定价」。
 		return 0, true
 	}
-	textRate, imageRate := d.rates(ctx, apiKey, req.Model)
-	mixed := apiKey.Group != nil && apiKey.Group.Platform == PlatformMixed
-	if textRate <= 0 && imageRate <= 0 && !mixed {
+	textRate, imageRate := d.rates(ctx, apiKey)
+	if textRate <= 0 && imageRate <= 0 {
 		// 免费分组：不计费，也无需预留。
 		return 0, true
 	}
 	primary, fallbacks, upstreamInput := inflightBillingModelCandidates(ctx, d, apiKey, req.Model)
-	billingSource := ""
-	fixedChannelIdentity := false
-	if mixed && d.resolveMapping != nil && apiKey.GroupID != nil {
-		mapping := d.resolveMapping(ctx, *apiKey.GroupID, req.Model)
-		billingSource = mapping.BillingModelSource
-		fixedChannelIdentity = billingSource == BillingModelSourceChannelMapped && mapping.MappedModel != "" && mapping.MappedModel != req.Model
-		if fixedChannelIdentity {
-			primary = []string{mapping.MappedModel}
-		}
-	}
-	upstream := billingSource == "" || billingSource == BillingModelSourceUpstream
-	allCandidatesFree := true
-	bestOf := func(models []string) (float64, bool) {
+	bestOf := func(models []string) float64 {
 		best := 0.0
-		priced := false
 		for _, m := range models {
-			candidateText, candidateImage := textRate, imageRate
-			if mixed {
-				m = mixedBillingPricingIdentity(ctx, d.billing, d.resolver, apiKey.GroupID, apiKey.Group, m, upstream)
-				candidateText, candidateImage = d.rates(ctx, apiKey, m)
-			}
-			allCandidatesFree = allCandidatesFree && candidateText <= 0 && candidateImage <= 0
-			c, candidatePriced := d.estimateOne(ctx, apiKey, m, req, candidateText, candidateImage)
-			priced = priced || candidatePriced
+			c, _ := d.estimateOne(ctx, apiKey, m, req, textRate, imageRate)
 			if c > best {
 				best = c
 			}
 		}
-		return best, priced
+		return best
 	}
-	best, priced := bestOf(primary)
-	// A priced explicit identity wins, even when its vendor is free. Do not
-	// reserve account targets that neither usage billing path will charge.
-	if mixed && (billingSource == BillingModelSourceRequested || fixedChannelIdentity) && priced {
-		return best, true
-	}
+	best := bestOf(primary)
 	// composite 分组：计费侧除非别名有显式渠道价，否则按实际转发的具体模型计费；
 	// 别名本身可能命中家族模糊价（低估），因此与候选具体模型一起取最高。
 	composite := apiKey.Group != nil && apiKey.Group.Platform == PlatformComposite
-	if best <= 0 || composite || mixed {
+	if best <= 0 || composite {
 		// 与 billableModelWithFallback 同口径：首选模型无价时回退到实际转发模型。
-		c, fallbackPriced := bestOf(fallbacks)
-		priced = priced || fallbackPriced
+		c := bestOf(fallbacks)
 		if c > best {
 			best = c
 		}
-		// Mixed rates may differ after account mapping, even if the public alias
-		// is priced. Read those candidates from the scheduler snapshot too.
-		if (best <= 0 || composite || mixed) && d.accountMappedModels != nil {
-			c, mappedPriced := bestOf(d.accountMappedModels(ctx, apiKey, upstreamInput))
-			priced = priced || mappedPriced
+		if (best <= 0 || composite) && d.accountMappedModels != nil {
+			c := bestOf(d.accountMappedModels(ctx, apiKey, upstreamInput))
 			if c > best {
 				best = c
 			}
 		}
-	}
-	if mixed && (priced || allCandidatesFree) {
-		return best, true
 	}
 	if best <= 0 {
 		logInflightUnpriced(req.Model, apiKey.GroupID)

@@ -16,7 +16,7 @@ import (
 func TestUpstreamBillingProbeIdentityCoversAllAPIKeyPlatforms(t *testing.T) {
 	for _, platform := range []string{
 		PlatformOpenAI, PlatformGrok, PlatformAnthropic, PlatformGemini, PlatformAntigravity,
-		PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformMixed,
+		PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax,
 	} {
 		require.True(t, IsUpstreamBillingProbeIdentity(platform, AccountTypeAPIKey), platform)
 		require.True(t, isUpstreamBillingProbeAccount(&Account{Platform: platform, Type: AccountTypeAPIKey}), platform)
@@ -24,69 +24,9 @@ func TestUpstreamBillingProbeIdentityCoversAllAPIKeyPlatforms(t *testing.T) {
 	require.False(t, IsUpstreamBillingProbeIdentity(PlatformOpenAI, AccountTypeOAuth))
 	require.False(t, IsUpstreamBillingProbeIdentity(PlatformGrok, AccountTypeOAuth))
 	require.False(t, IsUpstreamBillingProbeIdentity(PlatformAnthropic, AccountTypeBedrock))
-	for _, accountType := range []string{AccountTypeOAuth, AccountTypeBedrock, AccountTypeUpstream, "", "future-type"} {
-		require.False(t, IsUpstreamBillingProbeIdentity(PlatformMixed, accountType), accountType)
-	}
 	require.False(t, IsUpstreamBillingProbeIdentity("", AccountTypeAPIKey))
 	require.False(t, IsUpstreamBillingProbeIdentity("future-platform", AccountTypeAPIKey))
 	require.False(t, isUpstreamBillingProbeAccount(nil))
-}
-
-func TestUpstreamBillingProbeMixedUsesConfiguredBillingURLWithoutRedirects(t *testing.T) {
-	account := &Account{
-		ID: 153, Platform: PlatformMixed, Type: AccountTypeAPIKey, Status: StatusActive,
-		Credentials: map[string]any{"api_key": "nvapi-test", "base_url": "https://nvidia.example/v1"},
-		Extra:       map[string]any{UpstreamBillingProbeEnabledExtraKey: true, UpstreamBillingRateSyncEnabledExtraKey: false},
-	}
-	repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{account.ID: account}}
-	upstream := &httpUpstreamRecorder{resp: &http.Response{
-		StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}},
-		Body: upstreamBillingProbeValidBody(),
-	}}
-	svc := newUpstreamBillingProbeTestService(repo, upstream, &upstreamBillingProbeSettingRepo{})
-	snapshot, err := svc.ProbeAccount(context.Background(), account.ID)
-	require.NoError(t, err)
-	require.Equal(t, UpstreamBillingProbeStatusOK, snapshot.Status)
-	require.Len(t, upstream.requests, 1)
-	require.Equal(t, http.MethodGet, upstream.lastReq.Method)
-	require.Equal(t, "https://nvidia.example/v1/sub2api/billing", upstream.lastReq.URL.String())
-	require.Equal(t, "Bearer nvapi-test", upstream.lastReq.Header.Get("Authorization"))
-	require.True(t, HTTPUpstreamRedirectsDisabled(upstream.lastReq.Context()))
-	require.Equal(t, HTTPUpstreamProfileDefault, HTTPUpstreamProfileFromContext(upstream.lastReq.Context()))
-	require.Equal(t, false, repo.accounts[account.ID].Extra[UpstreamBillingRateSyncEnabledExtraKey])
-}
-
-func TestUpstreamBillingProbeMixedFullEndpointBasesUseConfiguredRoot(t *testing.T) {
-	for _, tc := range []struct{ base, want string }{
-		{"https://relay.example/v1/chat/completions", "https://relay.example/v1/sub2api/billing"},
-		{"https://relay.example/v1/responses", "https://relay.example/v1/sub2api/billing"},
-		{"https://relay.example/v1/messages", "https://relay.example/v1/sub2api/billing"},
-		{"https://relay.example/gateway/v2/chat/completions", "https://relay.example/gateway/v2/sub2api/billing"},
-		{"https://relay.example/gateway/v2/responses/", "https://relay.example/gateway/v2/sub2api/billing"},
-		{"https://relay.example/gateway/v2/messages", "https://relay.example/gateway/v2/sub2api/billing"},
-		{"https://relay.example/gateway/chat/completions", "https://relay.example/gateway/v1/sub2api/billing"},
-	} {
-		t.Run(tc.base, func(t *testing.T) {
-			account := &Account{
-				ID: 153, Platform: PlatformMixed, Type: AccountTypeAPIKey, Status: StatusActive,
-				Credentials: map[string]any{"api_key": "nvapi-test", "base_url": tc.base},
-				Extra:       map[string]any{UpstreamBillingProbeEnabledExtraKey: true, UpstreamBillingRateSyncEnabledExtraKey: false},
-			}
-			repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{account.ID: account}}
-			upstream := &httpUpstreamRecorder{resp: &http.Response{
-				StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}},
-				Body: upstreamBillingProbeValidBody(),
-			}}
-			snapshot, err := newUpstreamBillingProbeTestService(repo, upstream, &upstreamBillingProbeSettingRepo{}).ProbeAccount(context.Background(), account.ID)
-			require.NoError(t, err)
-			require.Equal(t, UpstreamBillingProbeStatusOK, snapshot.Status)
-			require.Len(t, upstream.requests, 1)
-			require.Equal(t, tc.want, upstream.lastReq.URL.String())
-			require.True(t, HTTPUpstreamRedirectsDisabled(upstream.lastReq.Context()))
-			require.Equal(t, tc.base, account.GetCredential("base_url"))
-			require.Equal(t, false, account.Extra[UpstreamBillingRateSyncEnabledExtraKey])
-		})
-	}
 }
 
 func TestBuildUpstreamBillingRateSnapshotItemsPreservesAllAPIKeyPlatforms(t *testing.T) {
@@ -207,9 +147,6 @@ func TestUpstreamBillingProbeOfficialAPIBaseURLIsUnsupportedWithoutRequest(t *te
 		baseURL  string
 	}{
 		{PlatformAnthropic, "https://api.anthropic.com"},
-		{PlatformMixed, "https://api.anthropic.com"},
-		{PlatformMixed, "https://api.deepseek.com/v1"},
-		{PlatformMixed, ""},
 		{PlatformAnthropic, "https://api.anthropic.com:443"},
 		{PlatformAnthropic, "https://api.anthropic.com./"},
 		{PlatformAnthropic, "HTTPS://API.ANTHROPIC.COM/"},

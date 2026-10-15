@@ -69,8 +69,6 @@ vi.mock('vue-i18n', async () => {
 })
 
 import CreateAccountModal from '../CreateAccountModal.vue'
-import enAccountMessages from '@/i18n/locales/en/admin/accounts'
-import zhAccountMessages from '@/i18n/locales/zh/admin/accounts'
 
 const BaseDialogStub = defineComponent({
   name: 'BaseDialog',
@@ -256,6 +254,18 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(wrapper.find('[data-testid="vertex-api-key-input"]').exists()).toBe(false)
     wrapper.unmount()
   })
+  it.each(['kimi', 'zhipu', 'deepseek', 'minimax'])('creates an independent %s native account', async (platform) => {
+    createAccountMock.mockResolvedValue({ id: 42, platform, type: 'apikey' })
+    const wrapper = mountModal()
+    await wrapper.get(`[data-testid="platform-button-${platform}"]`).trigger('click')
+    await flushPromises()
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('native provider')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('native-provider-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({ platform, type: 'apikey', credentials: { api_key: 'native-provider-key' } })
+    wrapper.unmount()
+  })
   it.each(['command_code', 'cline'])('creates catalog provider %s with its native endpoints and protocol rules', async (platform) => {
     createAccountMock.mockResolvedValue({ id: 42, platform, type: 'apikey' })
     const wrapper = mountModal()
@@ -299,72 +309,8 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
   afterEach(() => vi.useRealTimers())
 
-  it('labels the generic creation entry Mixed Group with its own decorative logo', () => {
-    for (const messages of [enAccountMessages, zhAccountMessages]) {
-      expect(messages.accounts.domesticCreateLabel).toBe('Mixed Group')
-      expect(messages.accounts.platforms.mixed).toBe('Mixed Group')
-    }
-    const wrapper = mountModal()
-    const button = wrapper.get('[data-testid="platform-mixed"]')
-    expect(button.text()).toContain('admin.accounts.domesticCreateLabel')
-    expect(button.attributes('type')).toBe('button')
-    expect(button.findAllComponents({ name: 'PlatformIcon' }).map((icon) => icon.props('platform')))
-      .toEqual(['mixed'])
-    expect(button.findAllComponents({ name: 'PlatformIcon' }).every((icon) => icon.attributes('aria-hidden') === 'true')).toBe(true)
-    wrapper.unmount()
-  })
 
-  it('creates Domestic with explicit credentials and persists previewed model metadata without billing scans', async () => {
-    const wrapper = mountModal()
-    await wrapper.get('[data-testid="platform-mixed"]').trigger('click')
-    await flushPromises()
-    expect(wrapper.findComponent(OAuthAuthorizationFlowStub).exists()).toBe(false)
-    expect(wrapper.find('[data-testid="upstream-billing-auto-probe"]').exists()).toBe(false)
-    const base = wrapper.get<HTMLInputElement>('input[placeholder="https://your-upstream/v1"]')
-    expect(base.element.value).toBe('')
-    expect(base.attributes('required')).toBeDefined()
-    await wrapper.get('form#create-account-form input[type="text"]').setValue('mixed upstream')
-    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
-    await wrapper.get('form#create-account-form').trigger('submit.prevent')
-    await flushPromises()
-    expect(createAccountMock).not.toHaveBeenCalled()
-    await base.setValue('https://relay.example/v1')
-    await wrapper.get('[data-testid="model-whitelist-selector"]').trigger('click')
-    await wrapper.get('form#create-account-form').trigger('submit.prevent')
-    await flushPromises()
-    expect(createAccountMock).toHaveBeenCalledTimes(1)
-    const payload = createAccountMock.mock.calls[0]?.[0]
-    expect(payload.platform).toBe('mixed')
-    expect(payload.type).toBe('apikey')
-    expect(payload.credentials.base_url).toBe('https://relay.example/v1')
-    expect(payload.credentials.api_key).toBe('test-api-key')
-    expect(payload.credentials.api_protocol).toBeUndefined()
-    expect(payload.credentials.pool_mode).toBeUndefined()
-    expect(payload.upstream_billing_probe_enabled).toBe(false)
-    expect(probeUpstreamBillingMock).not.toHaveBeenCalled()
-    expect(syncUpstreamModelsMock).toHaveBeenCalledTimes(1)
-    expect(syncUpstreamModelsMock).toHaveBeenCalledWith(42)
-    wrapper.unmount()
-  })
 
-  it('supports native Messages bearer auth for Mixed without enabling passthrough or search', async () => {
-    const wrapper = mountModal()
-    await wrapper.get('[data-testid="platform-mixed"]').trigger('click')
-    await flushPromises()
-    await wrapper.get('form#create-account-form input[type="text"]').setValue('mixed bearer')
-    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
-    await wrapper.get('input[placeholder="https://your-upstream/v1"]').setValue('https://relay.example/v1')
-    await wrapper.get('[data-testid="anthropic-api-key-auth-scheme"]').setValue('authorization_bearer')
-    await wrapper.get('form#create-account-form').trigger('submit.prevent')
-    await flushPromises()
-    expect(createAccountMock).toHaveBeenCalledTimes(1)
-    const payload = createAccountMock.mock.calls[0]?.[0]
-    expect(payload.extra.anthropic_apikey_auth_scheme).toBe('authorization_bearer')
-    expect(payload.extra.anthropic_passthrough).toBeUndefined()
-    expect(payload.extra.web_search_emulation).toBeUndefined()
-    expect(syncUpstreamModelsMock).not.toHaveBeenCalled()
-    wrapper.unmount()
-  })
 
   it('accepts zero priority and rejects negative or fractional input', async () => {
     const wrapper = mountModal()
@@ -642,20 +588,6 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(payload?.credentials?.tier_id).toBeUndefined()
   })
 
-  it('consolidates domestic account creation under the existing mixed platform', async () => {
-    const wrapper = mountModal()
-    const labels = wrapper.findAll('button').map(button => button.text())
-    for (const provider of ['Kimi', 'Zhipu GLM', 'DeepSeek', 'MiniMax']) {
-      expect(labels).not.toContain(provider)
-    }
-    await wrapper.get('[data-testid="platform-mixed"]').trigger('click')
-    await wrapper.get('input[placeholder="https://your-upstream/v1"]').setValue('https://mimo.example/v1')
-    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-domestic')
-    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('syncCredentials')).toMatchObject({
-      platform: 'mixed', type: 'apikey', base_url: 'https://mimo.example/v1', api_key: 'sk-domestic'
-    })
-    wrapper.unmount()
-  })
 
   it('previews Gemini custom OpenAI-compatible upstreams as chat completions', async () => {
     const wrapper = mountModal([{ id: 9, platform: 'gemini' }])

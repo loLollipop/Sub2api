@@ -1259,9 +1259,6 @@ func (s *GatewayService) isAccountSchedulableForModelSelection(ctx context.Conte
 	if account == nil {
 		return false
 	}
-	if !gatewayAccountAllowsModelScope(ctx, account, requestedModel) {
-		return false
-	}
 	return account.IsSchedulableForModelWithContext(ctx, requestedModel)
 }
 

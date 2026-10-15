@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -102,20 +101,14 @@ func (s *OpenAIGatewayService) forwardAnthropicViaNativeAnthropicEndpoint(
 	if err := s.repriceOpenAIFinalAttempt(ctx, account, forwardedBody, billingModel, upstreamModel); err != nil {
 		return nil, err
 	}
-	resp, err := s.doOpenAITextUpstream(ctx, c, upstreamReq, proxyURL, account)
+	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, true)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
-		respBody, upstreamMsg, readErr := s.readOpenAIProtocolError(resp, account)
-		if readErr != nil {
-			return nil, readErr
-		}
-		if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolAnthropic, resp.StatusCode, respBody, false); fallbackErr != nil {
-			return nil, fallbackErr
-		}
+		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
 		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
 			return nil, foErr
 		}
@@ -134,22 +127,12 @@ func (s *OpenAIGatewayService) forwardAnthropicViaNativeAnthropicEndpoint(
 // 第三方端点保持朴素路径，不附加 ?beta=true。
 func (s *OpenAIGatewayService) nativeAnthropicTargetURL(account *Account) (string, error) {
 	baseURL := strings.TrimSpace(account.GetAnthropicProtocolBaseURL())
-	if baseURL == "" && genericOpenAIProtocolFallbackAccount(account) {
-		var err error
-		baseURL, err = genericOpenAIAnthropicBaseURL(account)
-		if err != nil {
-			return "", err
-		}
-	}
 	if baseURL == "" {
 		return "", fmt.Errorf("account %d has no anthropic protocol base url", account.ID)
 	}
 	validatedURL, err := s.validateUpstreamBaseURL(baseURL)
 	if err != nil {
 		return "", fmt.Errorf("invalid base_url: %w", err)
-	}
-	if genericOpenAIProtocolFallbackAccount(account) {
-		return buildOpenAIEndpointURL(validatedURL, "/v1/messages"), nil
 	}
 	u, err := url.Parse(validatedURL)
 	if err != nil {
@@ -224,9 +207,6 @@ func (s *OpenAIGatewayService) buildNativeAnthropicUpstreamRequest(
 	req.Header.Del("x-goog-api-key")
 	req.Header.Del("cookie")
 	authBaseURL := account.GetAnthropicProtocolBaseURL()
-	if genericOpenAIProtocolFallbackAccount(account) {
-		authBaseURL, _ = genericOpenAIAnthropicBaseURL(account)
-	}
 	setAnthropicAPIKeyAuthHeader(req.Header, account, apiKey, authBaseURL)
 
 	if getHeaderRaw(req.Header, "content-type") == "" {
@@ -260,23 +240,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicBufferedResponse(
 		s.rateLimitService.UpdateSessionWindow(ctx, account, resp.Header)
 	}
 
-	var body []byte
-	var err error
-	if account.IsMixed() {
-		body, err = s.readMixedUpstreamBody(resp)
-		usage := parseClaudeUsageFromResponseBody(body)
-		if err == nil && (!gjson.ValidBytes(body) || mixedPayloadIsError(body, "") || gjson.GetBytes(body, "type").String() != "message" || strings.TrimSpace(gjson.GetBytes(body, "stop_reason").String()) == "") {
-			err = fmt.Errorf("upstream Anthropic response failed or incomplete")
-		}
-		if err != nil {
-			writeMixedStreamFailure(c, APIProtocolAnthropic, err)
-			result := s.nativeAnthropicStreamResult(c, resp, usage, nil, false, originalModel, billingModel, upstreamModel, reasoningEffort, startTime)
-			result.Stream = false
-			return result, err
-		}
-	} else {
-		body, err = ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
-	}
+	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
 	if err != nil {
 		return nil, err
 	}
@@ -308,17 +272,6 @@ func (s *OpenAIGatewayService) handleNativeAnthropicBufferedResponse(
 		contentType = "application/json"
 	}
 	body = reverseToolNamesIfPresent(c, body)
-	if account.IsMixed() && gjson.GetBytes(body, "stop_reason").String() == "end_turn" {
-		for _, block := range gjson.GetBytes(body, "content").Array() {
-			if block.Get("type").String() == "tool_use" {
-				body, err = sjson.SetBytes(body, "stop_reason", "tool_use")
-				if err != nil {
-					return nil, err
-				}
-				break
-			}
-		}
-	}
 	c.Data(resp.StatusCode, contentType, body)
 
 	return &OpenAIForwardResult{
@@ -385,7 +338,6 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 	var firstTokenMs *int
 	clientDisconnected := false
 	sawTerminalEvent := false
-	sawMixedToolUse := false
 	pendingErrorHeader := ""
 
 	scanner := bufio.NewScanner(newUpstreamErrorFrameReader(resp.Body, resolveUpstreamResponseReadLimit(s.cfg)))
@@ -468,18 +420,11 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 		keepaliveTimer.Reset(keepaliveInterval)
 	}
 	inPartialEvent := false
-	failMixed := func(cause error) (*OpenAIForwardResult, error) {
-		writeMixedStreamFailure(c, APIProtocolAnthropic, cause)
-		return s.nativeAnthropicStreamResult(c, resp, usage, firstTokenMs, clientDisconnected, originalModel, billingModel, upstreamModel, reasoningEffort, startTime), cause
-	}
 
 	for {
 		select {
 		case ev, ok := <-events:
 			if !ok {
-				if account.IsMixed() && !sawTerminalEvent {
-					return failMixed(ErrOpenAIUpstreamStreamTruncated)
-				}
 				if !clientDisconnected {
 					flusher.Flush()
 				}
@@ -490,9 +435,6 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 				return s.nativeAnthropicStreamResult(c, resp, usage, firstTokenMs, clientDisconnected, originalModel, billingModel, upstreamModel, reasoningEffort, startTime), nil
 			}
 			if ev.err != nil {
-				if account.IsMixed() && !sawTerminalEvent {
-					return failMixed(mixedStreamReadFailure(ev.err))
-				}
 				if sawTerminalEvent {
 					return s.nativeAnthropicStreamResult(c, resp, usage, firstTokenMs, clientDisconnected, originalModel, billingModel, upstreamModel, reasoningEffort, startTime), nil
 				}
@@ -513,39 +455,12 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 			}
 
 			line := ev.line
-			eventType, eventLine := extractOpenAISSEEventLine(line)
-			if strings.TrimSpace(line) == "event: error" || account.IsMixed() && eventLine && eventType == "error" {
+			if strings.TrimSpace(line) == "event: error" {
 				pendingErrorHeader = line
 				continue
 			}
 			if data, ok := extractAnthropicSSEDataLine(line); ok {
 				trimmed := strings.TrimSpace(data)
-				if account.IsMixed() {
-					parseSSEUsagePassthrough(data, usage)
-					if mixedPayloadIsError([]byte(data), "") || pendingErrorHeader != "" {
-						// An error event may be the only event carrying usage.
-						var event apicompat.AnthropicStreamEvent
-						if json.Unmarshal([]byte(data), &event) == nil && event.Usage != nil {
-							mergeAnthropicUsage(usage, *event.Usage)
-						}
-						return failMixed(fmt.Errorf("upstream Anthropic stream failed"))
-					}
-					if gjson.Get(data, "content_block.type").String() == "tool_use" {
-						sawMixedToolUse = true
-					}
-					for _, block := range gjson.Get(data, "message.content").Array() {
-						if block.Get("type").String() == "tool_use" {
-							sawMixedToolUse = true
-						}
-					}
-					if sawMixedToolUse && gjson.Get(data, "delta.stop_reason").String() == "end_turn" {
-						normalized, normErr := sjson.Set(data, "delta.stop_reason", "tool_use")
-						if normErr != nil {
-							return nil, normErr
-						}
-						data, trimmed, line = normalized, normalized, "data: "+normalized
-					}
-				}
 				if upstreamFinancialFailureEnvelope([]byte(data)) || pendingErrorHeader != "" && IsUpstreamFinancialError(0, []byte(data)) {
 					setOpsUpstreamError(c, http.StatusBadGateway, extractUpstreamErrorMessage([]byte(data)), "")
 					if !clientDisconnected {
@@ -554,7 +469,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 					return s.nativeAnthropicStreamResult(c, resp, usage, firstTokenMs, clientDisconnected, originalModel, billingModel, upstreamModel, reasoningEffort, startTime), nil
 				}
 				observer.ObserveAnthropic([]byte(trimmed))
-				if account.IsMixed() && gjson.Valid(trimmed) && gjson.Get(trimmed, "type").String() == "message_stop" || !account.IsMixed() && anthropicStreamEventIsTerminal("", trimmed) {
+				if anthropicStreamEventIsTerminal("", trimmed) {
 					sawTerminalEvent = true
 				}
 				if firstTokenMs == nil && trimmed != "" && trimmed != "[DONE]" {
@@ -564,7 +479,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 				parseSSEUsagePassthrough(data, usage)
 			} else {
 				trimmed := strings.TrimSpace(line)
-				if !account.IsMixed() && strings.HasPrefix(trimmed, "event:") && anthropicStreamEventIsTerminal(strings.TrimSpace(strings.TrimPrefix(trimmed, "event:")), "") {
+				if strings.HasPrefix(trimmed, "event:") && anthropicStreamEventIsTerminal(strings.TrimSpace(strings.TrimPrefix(trimmed, "event:")), "") {
 					sawTerminalEvent = true
 				}
 			}
@@ -596,9 +511,6 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
 			if time.Since(lastRead) < streamInterval {
 				continue
-			}
-			if account.IsMixed() {
-				return failMixed(fmt.Errorf("stream data interval timeout"))
 			}
 			if clientDisconnected {
 				return s.nativeAnthropicStreamResult(c, resp, usage, firstTokenMs, clientDisconnected, originalModel, billingModel, upstreamModel, reasoningEffort, startTime),

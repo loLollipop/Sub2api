@@ -540,7 +540,7 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'mixed' | 'command_code' | 'cline' | 'typesafe' | 'composite'
+export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'cline' | 'command_code' | 'typesafe' | 'composite'
 
 export type VideoModelPrices = Record<string, Record<string, number>>
 
@@ -573,9 +573,6 @@ export type GroupI18n = Record<string, GroupLocaleText>
 
 // 用户侧接口返回的 name / description 已由后端按请求语言（Accept-Language）选好
 export interface Group {
-  mixed_provider_rate_multipliers?: import('@/utils/mixed-provider-rates').MixedProviderRates | null
-  supported_model_vendors?: import('@/utils/mixed-provider-rates').MixedModelVendor[] | null
-  supported_key_providers?: Array<'openai' | 'anthropic' | 'cn' | 'other'>
   id: number
   name: string
   description: string | null
@@ -746,7 +743,6 @@ export interface CompositeRouteDecision {
 }
 
 export interface ApiKey {
-  model_scope?: 'all' | 'openai' | 'anthropic' | 'cn' | 'other'
   id: number
   user_id: number
   key: string
@@ -782,7 +778,6 @@ export interface ApiKey {
 }
 
 export interface CreateApiKeyRequest {
-  model_scope?: 'all' | 'openai' | 'anthropic' | 'cn' | 'other'
   name: string
   group_id?: number | null
   group_ids?: number[]
@@ -798,7 +793,6 @@ export interface CreateApiKeyRequest {
 }
 
 export interface UpdateApiKeyRequest {
-  model_scope?: 'all' | 'openai' | 'anthropic' | 'cn' | 'other'
   name?: string
   group_id?: number | null
   group_ids?: number[]
@@ -816,7 +810,6 @@ export interface UpdateApiKeyRequest {
 }
 
 export interface CreateGroupRequest {
-  mixed_provider_rate_multipliers?: import('@/utils/mixed-provider-rates').MixedProviderRates
   name: string
   description?: string | null
   i18n?: GroupI18n
@@ -884,7 +877,6 @@ export interface CreateGroupRequest {
 }
 
 export interface UpdateGroupRequest {
-  mixed_provider_rate_multipliers?: import('@/utils/mixed-provider-rates').MixedProviderRates
   name?: string
   description?: string | null
   i18n?: GroupI18n
@@ -953,7 +945,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'mixed' | 'command_code' | 'cline' | 'typesafe'
+export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'cline' | 'command_code' | 'typesafe'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'cloudflare' | 'upstream' | 'bedrock' | 'service_account'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'

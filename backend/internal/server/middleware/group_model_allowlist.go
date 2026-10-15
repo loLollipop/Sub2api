@@ -32,15 +32,7 @@ import (
 func GroupModelAllowlist() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey, ok := GetAPIKeyFromContext(c)
-		if !ok || apiKey == nil {
-			c.Next()
-			return
-		}
-		if c.Request != nil {
-			c.Request = c.Request.WithContext(service.ContextWithModelScope(c.Request.Context(), apiKey.ModelScope))
-		}
-		allowlistEnabled := apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled()
-		if !allowlistEnabled && service.NormalizeModelScope(apiKey.ModelScope) == service.ModelScopeAll {
+		if !ok || apiKey == nil || apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled() {
 			c.Next()
 			return
 		}
@@ -79,7 +71,7 @@ func GroupModelAllowlist() gin.HandlerFunc {
 
 		blocked := ""
 		for _, candidate := range models {
-			if !apiKey.AllowsModelScope(candidate) || (allowlistEnabled && !apiKey.Group.ModelAllowlist.Allows(candidate)) {
+			if !apiKey.Group.ModelAllowlist.Allows(candidate) {
 				blocked = candidate
 				break
 			}

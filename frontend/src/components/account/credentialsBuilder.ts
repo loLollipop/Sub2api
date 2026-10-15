@@ -43,7 +43,11 @@ export interface HeaderOverrideRow {
 
 /** 请求头覆写资格（与后端 IsHeaderOverrideEligible 保持一致） */
 export function isHeaderOverrideCapable(platform: string, type: string): boolean {
-  if (platform === 'anthropic' || platform === 'openai' || platform === 'mixed' || isMultiProtocolApiKeyPlatform(platform)) {
+  if (
+    platform === 'anthropic' ||
+    platform === 'openai' ||
+    isMultiProtocolApiKeyPlatform(platform)
+  ) {
     return type === 'apikey' || (platform === 'openai' && type === 'cloudflare')
   }
   if (platform === 'grok') {

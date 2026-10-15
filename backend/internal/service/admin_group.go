@@ -291,8 +291,6 @@ func defaultModelsListCandidateIDs(platform string) []string {
 	switch platform {
 	case PlatformTypeSafe:
 		return []string{"jev-latest"}
-	case PlatformMixed:
-		return nil
 	case PlatformOpenAI:
 		return openai.DefaultModelIDs()
 	case PlatformGemini:
@@ -401,9 +399,6 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		normalizeCreateGroupInputForSimpleMode(input)
 	}
-	if NormalizeGroupPlatform(input.Platform) == PlatformMixed {
-		input.RateMultiplier = 1 // Mixed billing uses only absolute vendor rates.
-	}
 	if input.RateMultiplier <= 0 {
 		return nil, errors.New("rate_multiplier must be > 0")
 	}
@@ -411,9 +406,6 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	platform := NormalizeGroupPlatform(input.Platform)
 	i18n, err := normalizeGroupI18n(input.I18n)
 	if err != nil {
-		return nil, err
-	}
-	if err := ValidateMixedProviderRateMultipliers(input.MixedProviderRateMultipliers); err != nil {
 		return nil, err
 	}
 	// 固定账号 manifest 配置：账号绑定发生在创建之后，创建时无法校验成员关系，
@@ -588,7 +580,6 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		I18n:                            i18n,
 		Platform:                        platform,
 		RateMultiplier:                  input.RateMultiplier,
-		MixedProviderRateMultipliers:    CloneMixedProviderRateMultipliers(input.MixedProviderRateMultipliers),
 		IsExclusive:                     input.IsExclusive,
 		Status:                          StatusActive,
 		SubscriptionType:                subscriptionType,
@@ -647,12 +638,6 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		MaxReasoningEffort:          maxReasoningEffort,
 		MaxReasoningEffortOverLimit: maxReasoningEffortOverLimit,
 		ReasoningEffortMappings:     reasoningEffortMappings,
-	}
-	if group.Platform == PlatformMixed {
-		group.RequireOAuthOnly = false
-		group.RequirePrivacySet = false
-		group.AllowImageGeneration = false
-		group.AllowBatchImageGeneration = false
 	}
 	sanitizeGroupMessagesDispatchFields(group)
 	sanitizeGroupOpenAIFast(group)
@@ -801,20 +786,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 
 	// 渠道缓存里存了 groupID → platform 的映射，改了平台要让它失效（见函数末尾）
 	previousPlatform := group.Platform
-	if input.Platform != "" && input.Platform != previousPlatform && (input.Platform == PlatformMixed || previousPlatform == PlatformMixed) {
-		if s.accountRepo == nil {
-			return nil, errors.New("account repository not configured")
-		}
-		accounts, err := s.accountRepo.ListByGroup(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		for _, account := range accounts {
-			if (input.Platform == PlatformMixed && (!account.IsMixed() || account.Type != AccountTypeAPIKey)) || (account.IsMixed() && input.Platform != PlatformMixed && input.Platform != PlatformComposite) {
-				return nil, infraerrors.BadRequest("MIXED_PLATFORM_BINDING_MISMATCH", "Move incompatible accounts before changing a group to or from Mixed")
-			}
-		}
-	}
 
 	if input.Name != "" {
 		group.Name = input.Name
@@ -832,17 +803,11 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.Platform != "" {
 		group.Platform = input.Platform
 	}
-	if input.RateMultiplier != nil && group.Platform != PlatformMixed {
+	if input.RateMultiplier != nil {
 		if *input.RateMultiplier <= 0 {
 			return nil, errors.New("rate_multiplier must be > 0")
 		}
 		group.RateMultiplier = *input.RateMultiplier
-	}
-	if input.MixedProviderRateMultipliers != nil {
-		if err := ValidateMixedProviderRateMultipliers(input.MixedProviderRateMultipliers); err != nil {
-			return nil, err
-		}
-		group.MixedProviderRateMultipliers = CloneMixedProviderRateMultipliers(input.MixedProviderRateMultipliers)
 	}
 	if input.IsExclusive != nil {
 		group.IsExclusive = *input.IsExclusive
@@ -1102,12 +1067,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		}
 		group.ReasoningEffortMappings = reasoningEffortMappings
 	}
-	if group.Platform == PlatformMixed {
-		group.RequireOAuthOnly = false
-		group.RequirePrivacySet = false
-		group.AllowImageGeneration = false
-		group.AllowBatchImageGeneration = false
-	}
 	sanitizeGroupMessagesDispatchFields(group)
 	sanitizeGroupOpenAIFast(group)
 	if group.Platform != PlatformOpenAI && group.Platform != PlatformComposite {
@@ -1335,16 +1294,9 @@ func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, gro
 	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationMultiplier); err != nil {
 		return err
 	}
-	zeroValidated := false
 	for _, e := range entries {
 		if err := validateUserGroupRateMultiplier(e.RateMultiplier); err != nil {
 			return fmt.Errorf("%w (user_id=%d)", err, e.UserID)
-		}
-		if e.RateMultiplier == 0 && !zeroValidated {
-			if err := s.validateZeroUserGroupRate(ctx, groupID); err != nil {
-				return err
-			}
-			zeroValidated = true
 		}
 	}
 	if s.userGroupRateRepo == nil {

@@ -89,21 +89,6 @@ describe('ModelWhitelistSelector', () => {
     expect(showError).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsError: Vertex keys cannot list models')
     wrapper.unmount()
   })
-  it.each([true, false])('syncs domestic models using saved account=%s without rewriting upstream IDs', async (saved) => {
-    const models = ['deepseek-ai/deepseek-v4-flash', 'xiaomi/mimo-v2', 'Agents-A1']
-    syncUpstreamModels.mockResolvedValue({ models })
-    syncUpstreamModelsPreview.mockResolvedValue({ models })
-    const credentials = { platform: 'mixed', type: 'apikey', base_url: 'https://relay.example/v1', api_key: 'sk-example' }
-    const wrapper = mountSelector({ platform: 'mixed', ...(saved ? { accountId: 1271 } : { syncCredentials: credentials }) })
-    const button = wrapper.findAll('button').find(button => button.text() === 'admin.accounts.syncUpstreamModels')
-    expect(button).toBeDefined()
-    await button!.trigger('click')
-    await flushPromises()
-    expect(wrapper.emitted('update:modelValue')).toEqual([[models]])
-    if (saved) expect(syncUpstreamModels).toHaveBeenCalledWith(1271)
-    else expect(syncUpstreamModelsPreview).toHaveBeenCalledWith(credentials)
-    wrapper.unmount()
-  })
 
   beforeEach(() => {
     copyToClipboard.mockClear()

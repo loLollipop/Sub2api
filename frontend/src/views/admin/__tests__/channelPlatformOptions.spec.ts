@@ -8,6 +8,7 @@ describe('Composite channel platform options', () => {
     const source = readFileSync(resolve('src/views/admin/ChannelsView.vue'), 'utf8')
     expect(source).toContain('const compositePlatforms = platformOrder')
     expect(source).toContain('listPlatformIds()')
-    expect(listPlatformIds()).toEqual(expect.arrayContaining(['kimi', 'zhipu', 'deepseek', 'minimax', 'mixed', 'command_code', 'cline']))
+    expect(listPlatformIds()).toEqual(expect.arrayContaining(['kimi', 'zhipu', 'deepseek', 'minimax', 'command_code', 'cline']))
+    expect(listPlatformIds()).not.toContain('mixed')
   })
 })

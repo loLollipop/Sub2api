@@ -323,9 +323,6 @@ func (s *GatewayService) UpstreamPlatformForModel(ctx context.Context, apiKey *A
 	if apiKey.Group != nil && apiKey.Group.Platform == PlatformTypeSafe && !apiKey.UsesRequestTargetPlatform() {
 		return "", false
 	}
-	if apiKey.Group != nil && apiKey.Group.Platform == PlatformMixed && !apiKey.UsesRequestTargetPlatform() {
-		return PlatformMixed, true
-	}
 	ids := apiKey.CandidateGroupIDs()
 	if len(ids) == 0 && apiKey.Group != nil && apiKey.Group.ID > 0 {
 		ids = []int64{apiKey.Group.ID}
@@ -440,8 +437,7 @@ func upstreamPlatformCatalogMatch(ctx context.Context, apiKey *APIKey, model str
 			}
 			// Match the existing candidate iterator: a channel alias does not
 			// bypass authorization of either the public or mapped model.
-			if catalogModel == "" || !ValidModelScope(apiKey.ModelScope) ||
-				!apiKey.AllowsModelScope(model) || !apiKey.AllowsModelScope(catalogModel) {
+			if catalogModel == "" {
 				continue
 			}
 		}
@@ -476,9 +472,6 @@ func shouldContinueAlongKeyRoutes(err error) bool {
 func ContextWithAPIKeyRoute(ctx context.Context, key *APIKey) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
-	}
-	if key != nil && NormalizeModelScope(key.ModelScope) != ModelScopeAll {
-		ctx = ContextWithModelScope(ctx, key.ModelScope)
 	}
 	if key == nil || key.GroupID == nil || key.Group == nil || key.Group.ID != *key.GroupID {
 		return ctx
@@ -585,7 +578,7 @@ func (r *apiKeyRouteIterator) loadNext() bool {
 				continue
 			}
 		}
-		if routed == nil || routed.Group == nil || !groupAllowsRequestedModel(routed.Group, r.requestedModel) {
+		if routed == nil || routed.Group == nil || routed.Group.Platform == "mixed" || !groupAllowsRequestedModel(routed.Group, r.requestedModel) {
 			continue
 		}
 		if OpenAIImageGenerationIntentFromContext(r.ctx) && !GroupAllowsImageGeneration(routed.Group) {
@@ -602,12 +595,6 @@ func (r *apiKeyRouteIterator) loadNext() bool {
 		}
 		// Capability-only selection uses an empty model placeholder. The actual
 		// Live/Realtime model is checked by its executor before upstream access.
-		if !ValidModelScope(routed.ModelScope) ||
-			(r.requestedModel != "" && (!routed.AllowsModelScope(r.requestedModel) || !routed.AllowsModelScope(model))) ||
-			(model != "" && !routed.AllowsModelScope(model)) {
-			r.err = ErrModelScopeDenied
-			continue
-		}
 		cat := r.catalog(routeCtx, routed.GroupID)
 		presence := catalogHasRequestedModel(cat, r.requestedModel)
 		if presence != groupCatalogModelPresent && model != r.requestedModel &&

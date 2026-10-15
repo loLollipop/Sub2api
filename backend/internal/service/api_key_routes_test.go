@@ -342,28 +342,6 @@ func TestUpstreamPlatformForModel_GeminiGroupOpenAIAccount(t *testing.T) {
 	require.Equal(t, PlatformOpenAI, platform)
 }
 
-func TestUpstreamPlatformForModel_PreservesCatalogPriority(t *testing.T) {
-	id := int64(1)
-	var accounts []Account
-	for i, platform := range []string{PlatformAnthropic, PlatformCommandCode, PlatformCline, PlatformMixed, PlatformGrok, PlatformOpenAI} {
-		accounts = append(accounts, Account{ID: int64(i + 1), Platform: platform, Credentials: map[string]any{
-			"model_mapping": map[string]any{"opaque-model": "opaque-model", "grok-4.7": "grok-4.7"},
-		}})
-	}
-	svc := &GatewayService{accountRepo: &modelsListAccountRepoStub{byGroup: map[int64][]Account{id: accounts}}}
-	key := &APIKey{GroupID: &id, Group: &Group{ID: id, Platform: PlatformOpenAI}}
-	platform, ok := svc.UpstreamPlatformForModel(context.Background(), key, "opaque-model")
-	require.True(t, ok)
-	require.Equal(t, PlatformOpenAI, platform)
-	platform, ok = svc.UpstreamPlatformForModel(context.Background(), key, "grok-4.7")
-	require.True(t, ok)
-	require.Equal(t, PlatformGrok, platform)
-	key.Group.Platform = PlatformMixed
-	platform, ok = svc.UpstreamPlatformForModel(context.Background(), key, "opaque-model")
-	require.True(t, ok)
-	require.Equal(t, PlatformMixed, platform, "single Mixed groups retain their existing dispatch")
-}
-
 func TestOpenAIUpstreamPlatformForModel_RequiresAccountCatalog(t *testing.T) {
 	primaryID := int64(1)
 	for _, upstream := range []string{PlatformOpenAI, PlatformCommandCode, PlatformCline} {
@@ -385,51 +363,6 @@ func TestOpenAIUpstreamPlatformForModel_RequiresAccountCatalog(t *testing.T) {
 			platform, ok = (&OpenAIGatewayService{}).UpstreamPlatformForModel(context.Background(), key, "gpt-5.4")
 			require.False(t, ok, "an unavailable catalog must fail closed")
 			require.Empty(t, platform)
-		})
-	}
-}
-
-func TestUpstreamPlatformCatalogMatch_ChannelAliasKeepsAdmission(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		scope      string
-		allowlist  []string
-		mapped     string
-		restricted bool
-		want       bool
-	}{
-		{name: "mapped model in catalog", mapped: "gpt-5.1", want: true},
-		{name: "public allowlist retained", mapped: "gpt-5.1", allowlist: []string{"gpt-other"}},
-		{name: "mapped scope retained", mapped: "claude-sonnet-4", scope: ModelScopeOpenAI},
-		{name: "restricted alias", mapped: "gpt-5.1", restricted: true},
-		{name: "empty mapping", mapped: ""},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			group := &Group{ID: 2, Platform: PlatformOpenAI}
-			if tc.allowlist != nil {
-				group.ModelAllowlist = GroupModelsListConfig{Enabled: true, Models: tc.allowlist}
-			}
-			key := &APIKey{GroupID: &group.ID, Group: group, ModelScope: tc.scope}
-			platform, matched, _ := upstreamPlatformCatalogMatch(context.Background(), key, "gpt-public", []int64{2},
-				func(context.Context, int64) *Group { return group },
-				func(_ context.Context, groupID *int64, platform string) []string {
-					require.Equal(t, group.ID, *groupID)
-					if platform == PlatformOpenAI {
-						return []string{tc.mapped}
-					}
-					return nil
-				},
-				func(_ context.Context, groupID *int64, model string) (ChannelMappingResult, bool) {
-					require.Equal(t, group.ID, *groupID)
-					require.Equal(t, "gpt-public", model)
-					return ChannelMappingResult{Mapped: true, MappedModel: tc.mapped}, tc.restricted
-				})
-			require.Equal(t, tc.want, matched)
-			if tc.want {
-				require.Equal(t, PlatformOpenAI, platform)
-			} else {
-				require.Empty(t, platform)
-			}
 		})
 	}
 }
@@ -564,4 +497,66 @@ func TestGroupPassthroughsRequestedModel(t *testing.T) {
 	require.True(t, groupPassthroughsRequestedModel(openaiGroup, "gpt-5.9", map[string]struct{}{PlatformOpenAI: {}}))
 	require.False(t, groupPassthroughsRequestedModel(allowlisted, "grok-4.7", map[string]struct{}{PlatformGrok: {}}))
 	require.False(t, groupPassthroughsRequestedModel(openaiGroup, "grok-imagine-video-1.5", map[string]struct{}{PlatformOpenAI: {}}))
+}
+
+func TestUpstreamPlatformForModel_PreservesCatalogPriority(t *testing.T) {
+	id := int64(1)
+	var accounts []Account
+	for i, platform := range []string{PlatformAnthropic, PlatformCommandCode, PlatformCline, PlatformGrok, PlatformOpenAI} {
+		accounts = append(accounts, Account{ID: int64(i + 1), Platform: platform, Credentials: map[string]any{
+			"model_mapping": map[string]any{"opaque-model": "opaque-model", "grok-4.7": "grok-4.7"},
+		}})
+	}
+	svc := &GatewayService{accountRepo: &modelsListAccountRepoStub{byGroup: map[int64][]Account{id: accounts}}}
+	key := &APIKey{GroupID: &id, Group: &Group{ID: id, Platform: PlatformOpenAI}}
+	platform, ok := svc.UpstreamPlatformForModel(context.Background(), key, "opaque-model")
+	require.True(t, ok)
+	require.Equal(t, PlatformOpenAI, platform)
+	platform, ok = svc.UpstreamPlatformForModel(context.Background(), key, "grok-4.7")
+	require.True(t, ok)
+	require.Equal(t, PlatformGrok, platform)
+}
+
+func TestUpstreamPlatformCatalogMatch_ChannelAliasKeepsAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		scope      string
+		allowlist  []string
+		mapped     string
+		restricted bool
+		want       bool
+	}{
+		{name: "mapped model in catalog", mapped: "gpt-5.1", want: true},
+		{name: "public allowlist retained", mapped: "gpt-5.1", allowlist: []string{"gpt-other"}},
+		{name: "restricted alias", mapped: "gpt-5.1", restricted: true},
+		{name: "empty mapping", mapped: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			group := &Group{ID: 2, Platform: PlatformOpenAI}
+			if tc.allowlist != nil {
+				group.ModelAllowlist = GroupModelsListConfig{Enabled: true, Models: tc.allowlist}
+			}
+			key := &APIKey{GroupID: &group.ID, Group: group, ModelScope: tc.scope}
+			platform, matched, _ := upstreamPlatformCatalogMatch(context.Background(), key, "gpt-public", []int64{2},
+				func(context.Context, int64) *Group { return group },
+				func(_ context.Context, groupID *int64, platform string) []string {
+					require.Equal(t, group.ID, *groupID)
+					if platform == PlatformOpenAI {
+						return []string{tc.mapped}
+					}
+					return nil
+				},
+				func(_ context.Context, groupID *int64, model string) (ChannelMappingResult, bool) {
+					require.Equal(t, group.ID, *groupID)
+					require.Equal(t, "gpt-public", model)
+					return ChannelMappingResult{Mapped: true, MappedModel: tc.mapped}, tc.restricted
+				})
+			require.Equal(t, tc.want, matched)
+			if tc.want {
+				require.Equal(t, PlatformOpenAI, platform)
+			} else {
+				require.Empty(t, platform)
+			}
+		})
+	}
 }

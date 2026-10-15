@@ -3,12 +3,6 @@ import { cnBalanceCellVisible, cnQuotaCellVisible, providerNativeProtocols, prov
 import { BUILTIN_PLATFORM_CATALOG } from '@/constants/platformCatalog'
 
 describe('provider catalog capabilities', () => {
-  it('keeps Mixed outside provider profiles and excludes unsupported platforms', () => {
-    expect(BUILTIN_PLATFORM_CATALOG.platforms.find(spec => spec.id === 'mixed')?.multi_protocol).toBeUndefined()
-    expect(BUILTIN_PLATFORM_CATALOG.platforms.some(spec => spec.id === 'opencode_go')).toBe(false)
-    expect(providerNativeProtocols('cline')).toEqual(['chat_completions'])
-    expect(providerNativeProtocols('command_code')).toEqual(['chat_completions', 'anthropic', 'responses'])
-  })
 
   it('registers TypeSafe only as a native System One gateway', () => {
     const platform = BUILTIN_PLATFORM_CATALOG.platforms.find(spec => spec.id === 'typesafe')

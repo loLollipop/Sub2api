@@ -142,13 +142,13 @@ describe('UserPlatformQuotaModal', () => {
     const [uid, payload] = apiMocks.updatePlatformQuotas.mock.calls[0]
     expect(uid).toBe(99)
     expect(payload.map((item: { platform: string }) => item.platform)).toEqual(listPlatformIds())
-    expect(payload).toContainEqual({ platform: 'mixed', daily_limit_usd: null, weekly_limit_usd: null, monthly_limit_usd: null })
+    expect(payload).not.toContainEqual(expect.objectContaining({ platform: 'mixed' }))
     const openai = payload.find((p: any) => p.platform === 'openai')
     expect(openai.weekly_limit_usd).toBe(20)
   })
 
-  it('保留 Mixed 和原生供应商平台的限额并保存', async () => {
-    const platforms = ['mixed', 'kimi', 'zhipu', 'deepseek', 'minimax', 'command_code', 'cline']
+  it('保留原生供应商平台的限额并保存', async () => {
+    const platforms = ['kimi', 'zhipu', 'deepseek', 'minimax', 'command_code', 'cline']
     const limits = platforms.map((platform, index) => ({
       platform, daily_limit_usd: 0, weekly_limit_usd: index + 1, monthly_limit_usd: 50,
     }))

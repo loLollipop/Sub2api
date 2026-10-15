@@ -50,7 +50,7 @@ func (s *pricingProviderStub) BalancePreauthorizationCostInput(_ context.Context
 }
 
 func TestPreauthorizeTextFreeFastInitialTier(t *testing.T) {
-	for _, platform := range []string{service.PlatformOpenAI, service.PlatformComposite, service.PlatformMixed} {
+	for _, platform := range []string{service.PlatformOpenAI, service.PlatformComposite} {
 		for _, tier := range []string{"priority", " FAST ", "ultrafast", "flex"} {
 			t.Run(platform+"/"+tier, func(t *testing.T) {
 				preauthorizer := &preauthorizerStub{requires: true}
@@ -61,7 +61,7 @@ func TestPreauthorizeTextFreeFastInitialTier(t *testing.T) {
 					[]byte(`{"model":"gpt-6.1-sol"}`), "gpt-6.1-sol", time.Unix(123, 0), tier)
 				require.NoError(t, err)
 				want := strings.ToLower(strings.TrimSpace(tier))
-				if platform != service.PlatformMixed && (want == "priority" || want == "fast") {
+				if want == "priority" || want == "fast" {
 					want = ""
 				}
 				require.Equal(t, want, pricing.lastTier)

@@ -442,12 +442,6 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	}
 	finalizeStream := func() (*openaiStreamingResult, error) {
 		observeClientCancellation()
-		if account != nil && account.IsMixed() && !sawTerminalEvent {
-			flushPending("Client disconnected during final flush, returning collected usage")
-			cause := ErrOpenAIUpstreamStreamTruncated
-			writeMixedStreamFailure(c, APIProtocolResponses, cause)
-			return resultWithUsage(), cause
-		}
 		if stageFirstOutput && eventInProgress {
 			// EOF dispatches the final SSE event even without a trailing blank line.
 			completeGuardedEvent(true)
@@ -508,12 +502,6 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		observeClientCancellation()
 		if scanErr == nil {
 			return nil, nil, false
-		}
-		if account != nil && account.IsMixed() && !sawTerminalEvent {
-			flushPending("Client disconnected during read-error flush, returning collected usage")
-			cause := mixedStreamReadFailure(scanErr)
-			writeMixedStreamFailure(c, APIProtocolResponses, cause)
-			return resultWithUsage(), cause, true
 		}
 		if clientDisconnected {
 			if sawTerminalEvent {
@@ -613,34 +601,6 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				suppressCurrentEvent = true
 			}
 			observer.ObserveOpenAIFrame(frame)
-			if account != nil && account.IsMixed() && strings.TrimSpace(data) == "[DONE]" && !sawTerminalEvent {
-				flushPending("Client disconnected during incomplete-stream flush, returning collected usage")
-				streamEarlyErr = ErrOpenAIUpstreamStreamTruncated
-				writeMixedStreamFailure(c, APIProtocolResponses, streamEarlyErr)
-				return
-			}
-			if account != nil && account.IsMixed() && mixedPayloadIsError(dataBytes, eventType) {
-				s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
-				// Keep the existing pre-generation request-error billing rule on
-				// this early Mixed exit too. Never make partial/policy output free.
-				outputStarted := responsesSemanticOutputSeen || openAIStreamClientOutputStarted(c, clientOutputStarted) ||
-					len(frame.root.Get("response.output").Array()) > 0
-				if !outputStarted && !mixedCCPayloadHasPolicy(dataBytes) &&
-					isOpenAINonBillableRequestError(extractOpenAISSEErrorMessage(dataBytes), dataBytes) {
-					nonBillableUpstreamError = true
-				}
-				flushPending("Client disconnected during failure flush, returning collected usage")
-				streamEarlyErr = fmt.Errorf("upstream Responses stream failed")
-				writeMixedStreamFailure(c, APIProtocolResponses, streamEarlyErr)
-				return
-			}
-			if account != nil && account.IsMixed() && strings.TrimSpace(data) != "[DONE]" &&
-				openAIStreamEventIsTerminalWithType(data, eventType) && !mixedValidResponsesTerminal(dataBytes, eventType) {
-				flushPending("Client disconnected during invalid-terminal flush, returning collected usage")
-				streamEarlyErr = ErrOpenAIUpstreamStreamTruncated
-				writeMixedStreamFailure(c, APIProtocolResponses, streamEarlyErr)
-				return
-			}
 			// 初始上游 data 的 type 只解析一次：原始值保持终止事件的精确匹配，规范化值供后续分支复用。
 			if openAIStreamEventIsTerminalWithType(data, eventType) {
 				sawTerminalEvent = true
@@ -1822,22 +1782,8 @@ func openAICacheCreationTokensFromUsage(value gjson.Result) int {
 }
 
 func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
-	var body []byte
-	var err error
-	if account != nil && account.IsMixed() {
-		body, err = s.readMixedUpstreamBody(resp)
-	} else {
-		body, err = ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
-	}
+	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
 	if err != nil {
-		if account != nil && account.IsMixed() {
-			usage := s.parseSSEUsageFromBody(string(body))
-			if jsonUsage, ok := extractOpenAIUsageFromJSONBytes(body); ok {
-				*usage = jsonUsage
-			}
-			writeMixedStreamFailure(c, APIProtocolResponses, err)
-			return &openaiNonStreamingResult{OpenAIUsage: usage, usage: usage}, err
-		}
 		return nil, err
 	}
 	if upstreamFinancialFailureEnvelope(body) {
@@ -1884,16 +1830,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	}
 
 	usageValue, usageOK := extractOpenAIUsageFromJSONBytes(body)
-	if account != nil && account.IsMixed() && (mixedPayloadIsError(body, "") || !gjson.ValidBytes(body) ||
-		(gjson.GetBytes(body, "status").String() != "completed" && gjson.GetBytes(body, "status").String() != "incomplete") ||
-		!gjson.GetBytes(body, "output").IsArray()) {
-		cause := fmt.Errorf("upstream Responses response failed or invalid")
-		writeMixedStreamFailure(c, APIProtocolResponses, cause)
-		return &openaiNonStreamingResult{OpenAIUsage: &usageValue, usage: &usageValue}, cause
-	}
-	// Completion evidence is independent of metering. Some compatible
-	// providers omit usage; preserve their valid result and existing warning.
-	if !usageOK && (account == nil || !account.IsMixed()) {
+	if !usageOK {
 		if bodyLooksLikeSSE {
 			return s.handleSSEToJSON(resp, c, account, body, originalModel, mappedModel)
 		}
@@ -1904,11 +1841,6 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 			if err := c.Request.Context().Err(); err != nil {
 				return nil, err
 			}
-		}
-		if account != nil && account.IsMixed() {
-			cause := fmt.Errorf("parse response: invalid json response")
-			writeMixedStreamFailure(c, APIProtocolResponses, cause)
-			return &openaiNonStreamingResult{OpenAIUsage: &usageValue, usage: &usageValue}, cause
 		}
 		if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices && account != nil && !IsResponseCommitted(c) {
 			// Invalid JSON or missing usage is not evidence of credential failure.
@@ -1998,35 +1930,6 @@ func bodyHasSSEFraming(body []byte) bool {
 func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Context, account *Account, body []byte, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
 	bodyText := string(body)
 	terminalType, terminalPayload, terminalOK := extractOpenAISSETerminalEvent(bodyText)
-	if account != nil && account.IsMixed() {
-		failed := !terminalOK || !mixedValidResponsesTerminal(terminalPayload, terminalType)
-		// Keep the explicit SSE event name independently of payload.type:
-		// a vendor-specific type must never conceal a named error event.
-		var parser openAICompatSSEFrameParser
-		validateFrame := func(frame openAICompatSSEFrame, ok bool) {
-			if !ok {
-				return
-			}
-			data := []byte(frame.Data)
-			failed = failed || mixedPayloadIsError(data, frame.EventType)
-			for _, eventType := range []string{frame.EventType, effectiveOpenAISSEEventType(data, frame.EventType)} {
-				switch eventType {
-				case "response.completed", "response.done", "response.incomplete":
-					failed = failed || !mixedValidResponsesTerminal(data, eventType)
-				}
-			}
-		}
-		for _, line := range strings.Split(bodyText, "\n") {
-			validateFrame(parser.AddLine(strings.TrimRight(line, "\r")))
-		}
-		validateFrame(parser.Finish())
-		if failed {
-			cause := fmt.Errorf("upstream Responses stream failed or ended without terminal event")
-			usage := s.parseSSEUsageFromBody(bodyText)
-			writeMixedStreamFailure(c, APIProtocolResponses, cause)
-			return &openaiNonStreamingResult{OpenAIUsage: usage, usage: usage}, cause
-		}
-	}
 	if terminalOK && (terminalType == "response.failed" || terminalType == "error") {
 		msg := extractOpenAISSEErrorMessage(terminalPayload)
 		if msg == "" {
@@ -2042,12 +1945,6 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 		return nil, s.writeOpenAINonStreamingProtocolError(resp, c, msg)
 	}
 	finalResponse, ok := extractCodexFinalResponse(bodyText)
-	if account != nil && account.IsMixed() {
-		// Return the same terminal response whose structure was validated,
-		// not the legacy helper's first potentially conflicting terminal.
-		finalResponse = []byte(gjson.GetBytes(terminalPayload, "response").Raw)
-		ok = true
-	}
 
 	usage := s.parseSSEUsageFromBody(bodyText)
 	if ok {

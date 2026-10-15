@@ -50,17 +50,6 @@ func TestAllowOpenAICompatibleMessagesDispatch_OpenAIGroupResolvedGrok(t *testin
 		"Claude Code 打 grok-* 时，OpenAI 平台的 Grok 分组不能再 403")
 }
 
-func TestMixedMessagesDispatchRequiresActualMixedGroup(t *testing.T) {
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
-	c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), service.PlatformMixed))
-	for _, platform := range []string{service.PlatformMixed, service.PlatformComposite, service.PlatformOpenAI} {
-		key := &service.APIKey{Group: &service.Group{Platform: platform}}
-		require.Equal(t, platform == service.PlatformMixed, allowOpenAICompatibleMessagesDispatch(c, key), platform)
-		require.Equal(t, platform == service.PlatformMixed, service.CrossProtocolConversionAllowed(key), platform)
-	}
-}
-
 func TestAllowOpenAICompatibleMessagesDispatch_CompositeResolvedTargets(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -118,4 +107,28 @@ func TestAllowOpenAICompatibleMessagesDispatch_SmartRoutingResolvedOpenAI(t *tes
 	ensureCompositeTargetPlatform(c, apiKey, "gpt-5")
 	require.False(t, allowOpenAICompatibleMessagesDispatch(c, apiKey),
 		"未解析到后续分组时，主分组开关关掉就拒绝")
+}
+
+func TestNativeProviderCompositeMessagesPreservesModel(t *testing.T) {
+	for _, platform := range []string{service.PlatformCline, service.PlatformCommandCode} {
+		t.Run(platform, func(t *testing.T) {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+			c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), platform))
+			key := &service.APIKey{Group: &service.Group{Platform: service.PlatformComposite}}
+			require.True(t, allowOpenAICompatibleMessagesDispatch(c, key))
+			require.Empty(t, resolveOpenAIMessagesDispatchMappedModel(c, key, "claude-opus-4-6"))
+		})
+	}
+}
+
+func TestNativeProviderMessagesCandidateDoesNotBorrowTargetPermission(t *testing.T) {
+	for _, platform := range []string{service.PlatformCline, service.PlatformCommandCode} {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+		c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), platform))
+		primary := &service.Group{ID: 1, Platform: service.PlatformOpenAI}
+		key := &service.APIKey{GroupID: &primary.ID, Group: primary, RouteGroupIDs: []int64{1, 2}}
+		require.False(t, allowOpenAICompatibleMessagesDispatch(c, key), platform)
+	}
 }

@@ -59,9 +59,6 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelsEndpoints(ctx contex
 		if len(requestedModel) > 0 && !acc.IsModelSupported(requestedModel[0]) {
 			continue
 		}
-		if len(requestedModel) > 0 && CheckModelScope(ctx, requestedModel[0], acc.GetMappedModel(requestedModel[0])) != nil {
-			continue
-		}
 		if selected == nil {
 			selected = acc
 			continue
@@ -148,9 +145,6 @@ func (s *GeminiMessagesCompatService) ForwardListModels(ctx context.Context, acc
 	if account.IsVertexAPIKey() {
 		models := make([]gemini.Model, 0)
 		for _, id := range configuredGeminiModelIDs(account) {
-			if CheckModelScope(ctx, id, account.GetMappedModel(id)) != nil {
-				continue
-			}
 			models = append(models, gemini.FallbackModel(id))
 		}
 		return geminiModelsJSONResult(http.StatusOK, gemini.ModelsListResponse{Models: models})
@@ -187,9 +181,6 @@ func (s *GeminiMessagesCompatService) ForwardGetModel(ctx context.Context, accou
 		return geminiModelNotFound(model)
 	}
 	upstreamModel := account.GetMappedModel(model)
-	if err := CheckModelScope(ctx, model, upstreamModel); err != nil {
-		return nil, err
-	}
 	if !IsSafeGeminiModelPathSegment(upstreamModel) {
 		return nil, errors.New("invalid mapped model")
 	}
@@ -391,7 +382,7 @@ func projectGeminiAccountCatalog(ctx context.Context, res *UpstreamHTTPResult, a
 	if res == nil || res.StatusCode != http.StatusOK {
 		return res, nil
 	}
-	if len(account.GetModelMapping()) == 0 && ModelScopeFromContext(ctx) == ModelScopeAll {
+	if len(account.GetModelMapping()) == 0 {
 		return res, nil
 	}
 	var envelope map[string]json.RawMessage
@@ -419,9 +410,6 @@ func projectGeminiAccountCatalog(ctx context.Context, res *UpstreamHTTPResult, a
 			}
 		}
 		for _, public := range dedupeAndSortModelIDs(publicIDs) {
-			if CheckModelScope(ctx, public, id) != nil {
-				continue
-			}
 			copy := make(map[string]json.RawMessage, len(model))
 			for key, value := range model {
 				copy[key] = value
@@ -449,11 +437,7 @@ func (s *GeminiMessagesCompatService) GeminiOpenAIModelIDs(ctx context.Context, 
 	for i := range accounts {
 		account := &accounts[i]
 		if account.IsGeminiOpenAIProtocol() {
-			for _, id := range configuredGeminiModelIDs(account) {
-				if CheckModelScope(ctx, id, account.GetMappedModel(id)) == nil {
-					ids = append(ids, id)
-				}
-			}
+			ids = append(ids, configuredGeminiModelIDs(account)...)
 		}
 	}
 	return dedupeAndSortModelIDs(ids), nil

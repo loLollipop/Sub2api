@@ -509,7 +509,6 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'doubao': return doubaoModels
     case 'minimax': return minimaxModels
     case 'typesafe': return ['jev-latest']
-    case 'mixed': return []
     case 'baidu': return baiduModels
     case 'spark': return sparkModels
     case 'hunyuan': return hunyuanModels
@@ -520,8 +519,6 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'typesafe') return [{ label: 'Jev Latest', from: 'jev-latest', to: 'jev-latest', color: 'bg-slate-100 text-slate-700' }]
-  if (platform === 'mixed' || getProviderProfile(platform)) return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

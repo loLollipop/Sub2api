@@ -2831,20 +2831,6 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
-	// Mixed uses the configured catalog. Opening the test picker must not probe
-	// models or invent provider defaults for a multi-model upstream.
-	if account.IsMixed() {
-		models := make([]openai.Model, 0)
-		for model := range account.GetModelMapping() {
-			if strings.Contains(model, "*") {
-				continue
-			}
-			models = append(models, openai.Model{ID: model, DisplayName: model})
-		}
-		sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
-		response.Success(c, models)
-		return
-	}
 	// Handle OpenAI accounts
 	if account.IsOpenAI() {
 		// Prefer the shared, account-keyed upstream catalog. If discovery fails,

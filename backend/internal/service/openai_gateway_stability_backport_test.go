@@ -17,19 +17,6 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func TestGatewayStabilityImageBridgePlatformGuard(t *testing.T) {
-	svc := &OpenAIGatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{CodexImageGenerationBridgeEnabled: true}}}
-	for _, platform := range []string{PlatformOpenAI, PlatformKimi, PlatformDeepseek, PlatformMiniMax, PlatformZhipu, PlatformMixed, PlatformAnthropic} {
-		t.Run(platform, func(t *testing.T) {
-			account := &Account{Platform: platform, Extra: map[string]any{featureKeyCodexImageGenerationBridge: true}}
-			require.Equal(t, platform == PlatformOpenAI, svc.isCodexImageGenerationBridgeEnabled(context.Background(), account, nil))
-		})
-	}
-	require.False(t, svc.isCodexImageGenerationBridgeEnabled(context.Background(), nil, nil))
-	account := &Account{Platform: PlatformOpenAI, Extra: map[string]any{featureKeyCodexImageGenerationBridge: false}}
-	require.False(t, svc.isCodexImageGenerationBridgeEnabled(context.Background(), account, nil))
-}
-
 func TestGatewayStabilityOverloadedWrapping(t *testing.T) {
 	for _, upstreamStatus := range []int{500, 502, 503, 504, 529} {
 		status, kind, _, _ := WrapUpstreamErrorForClient(upstreamStatus, []byte(`{"error":{"type":"overloaded_error","message":"Overloaded"}}`))
@@ -121,4 +108,17 @@ func TestGatewayStabilityCompleteJSONArgumentsRemainUntouched(t *testing.T) {
 	out, changed := dedupeRepeatedJSONArgumentString(value + value)
 	require.True(t, changed)
 	require.Equal(t, value, out)
+}
+
+func TestGatewayStabilityImageBridgePlatformGuard(t *testing.T) {
+	svc := &OpenAIGatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{CodexImageGenerationBridgeEnabled: true}}}
+	for _, platform := range []string{PlatformOpenAI, PlatformKimi, PlatformDeepseek, PlatformMiniMax, PlatformZhipu, PlatformAnthropic} {
+		t.Run(platform, func(t *testing.T) {
+			account := &Account{Platform: platform, Extra: map[string]any{featureKeyCodexImageGenerationBridge: true}}
+			require.Equal(t, platform == PlatformOpenAI, svc.isCodexImageGenerationBridgeEnabled(context.Background(), account, nil))
+		})
+	}
+	require.False(t, svc.isCodexImageGenerationBridgeEnabled(context.Background(), nil, nil))
+	account := &Account{Platform: PlatformOpenAI, Extra: map[string]any{featureKeyCodexImageGenerationBridge: false}}
+	require.False(t, svc.isCodexImageGenerationBridgeEnabled(context.Background(), account, nil))
 }

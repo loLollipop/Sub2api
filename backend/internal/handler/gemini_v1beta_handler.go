@@ -68,7 +68,7 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
-	ctx := service.ContextWithModelScope(c.Request.Context(), apiKey.ModelScope)
+	ctx := c.Request.Context()
 	localModels := make([]gemini.Model, 0)
 	var response, failure *service.UpstreamHTTPResult
 	for _, groupID := range geminiStudioGroupIDs(apiKey) {
@@ -153,10 +153,7 @@ func (h *GatewayHandler) filterGeminiIDsForGroup(ctx context.Context, apiKey *se
 	if group == nil {
 		return nil // A cold group-policy projection cannot establish its allowlist.
 	}
-	allowed := service.FilterModelScope(apiKey.ModelScope, ids)
-	if h.gatewayService != nil {
-		allowed = h.gatewayService.FilterModelsForKeyScope(ctx, &groupID, apiKey.ModelScope, allowed, service.CompositeRouteEndpointGemini)
-	}
+	allowed := ids
 	filtered := make([]string, 0, len(allowed))
 	for _, id := range allowed {
 		if !group.ModelAllowlistEnabled() || group.ModelAllowlist.Allows(id) {
@@ -203,7 +200,7 @@ func (h *GatewayHandler) filterGeminiCatalogForGroup(ctx context.Context, apiKey
 			continue
 		}
 		routeCtx, target, ok := h.gatewayService.GeminiCatalogRoute(ctx, group, public)
-		if !ok || len(service.FilterModelScope(apiKey.ModelScope, []string{target})) == 0 {
+		if !ok {
 			continue
 		}
 		if platform, resolved := service.ResolvedTargetPlatformFromContext(routeCtx); resolved && platform != catalogPlatform {
@@ -386,7 +383,7 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		googleError(c, http.StatusBadRequest, "Invalid model in URL")
 		return
 	}
-	ctx := service.ContextWithModelScope(c.Request.Context(), apiKey.ModelScope)
+	ctx := c.Request.Context()
 	var failure *service.UpstreamHTTPResult
 	sawTransportError := false
 	for _, groupID := range geminiStudioGroupIDs(apiKey) {
@@ -395,7 +392,7 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		}
 		routeCtx, target, targetOK := h.gatewayService.GeminiCatalogRoute(ctx, h.groupForModelsList(ctx, apiKey, groupID), publicModel)
 		model = target
-		if !targetOK || len(service.FilterModelScope(apiKey.ModelScope, []string{model})) == 0 {
+		if !targetOK {
 			continue
 		}
 		platform, resolved := service.ResolvedTargetPlatformFromContext(routeCtx)
@@ -744,9 +741,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			modelName = openAIChannelForwardModel(channelMapping, reqModel)
 		}
 		if err != nil {
-			if handleGeminiModelScopeError(c, err, streamStarted) {
-				return
-			}
 			if len(fs.FailedAccountIDs) == 0 {
 				diagPlatform := service.PlatformGemini
 				if p := effectiveAPIKeyPlatform(c, apiKey); p == service.PlatformAntigravity {
@@ -928,9 +922,6 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			})
 		}
 		if err != nil {
-			if handleGeminiModelScopeError(c, err, streamStarted) {
-				return
-			}
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionKey, account, err)
 			var failoverErr *service.UpstreamFailoverError
 			if result == nil && errors.As(err, &failoverErr) {

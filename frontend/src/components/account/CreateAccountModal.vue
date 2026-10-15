@@ -154,22 +154,19 @@
             <PlatformIcon :platform="spec.id as AccountPlatform" size="sm" />{{ spec.display_name }}
           </button>
         </div>
-        <!-- One generic entry for API-key relays with multiple model providers. -->
         <div class="mt-2 flex flex-wrap rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
           <button
             type="button"
-            data-testid="platform-mixed"
-            :aria-pressed="form.platform === 'mixed'"
-            @click="form.platform = 'mixed'"
+            data-testid="platform-button-typesafe" @click="form.platform = 'typesafe'"
             :class="[
-              'flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-md px-3 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-700',
-              form.platform === 'mixed'
-                ? 'bg-white text-violet-600 shadow-sm dark:bg-dark-600 dark:text-violet-400'
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'typesafe'
+                ? 'bg-white text-sky-600 shadow-sm dark:bg-dark-600 dark:text-sky-400'
                 : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
             ]"
           >
-            <PlatformIcon platform="mixed" size="md" aria-hidden="true" />
-            <span class="min-w-0 leading-5">{{ t('admin.accounts.domesticCreateLabel') }}</span>
+            <PlatformIcon platform="typesafe" size="sm" />
+            TypeSafe / Jev
           </button>
         </div>
       </div>
@@ -1331,7 +1328,6 @@
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
           <input
             v-model="apiKeyBaseUrl"
-            :required="form.platform === 'mixed'"
             type="text"
             class="input"
             :placeholder="apiKeyBaseUrlPlaceholder"
@@ -1386,7 +1382,7 @@
 
         <!-- 上游倍率自动探测：Cloudflare 没有这套探测接口 -->
         <div
-          v-if="form.type !== 'cloudflare' && form.platform !== 'mixed'"
+          v-if="form.type !== 'cloudflare'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -1555,7 +1551,7 @@
         </div>
 
         <!-- Pool Mode Section -->
-        <div v-if="form.platform !== 'mixed'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <div class="mb-3 flex items-center justify-between">
             <div>
               <label class="input-label mb-0">{{ t('admin.accounts.poolMode') }}</label>
@@ -3091,7 +3087,7 @@
       </div>
 
       <div
-        v-if="(form.platform === 'anthropic' || form.platform === 'mixed') && accountCategory === 'apikey'"
+        v-if="form.platform === 'anthropic' && accountCategory === 'apikey'"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div class="flex items-center justify-between gap-4">
@@ -3936,7 +3932,6 @@ const withUpstreamRequestIdHeader = <T extends Record<string, unknown> | undefin
 
 const baseUrlHint = computed(() => {
   if (form.platform === 'typesafe') return t('admin.accounts.typesafeHint')
-  if (form.platform === 'mixed') return t('admin.accounts.mixedHint')
   if (isGeminiProtocolAccount.value) return t('admin.accounts.gemini.accountType.customProtocolHint')
   if (form.platform === 'openai') return t('admin.accounts.openai.baseUrlHint')
   if (form.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
@@ -3945,7 +3940,6 @@ const baseUrlHint = computed(() => {
 })
 
 const apiKeyHint = computed(() => {
-  if (form.platform === 'mixed') return ''
   if (form.type === 'cloudflare') return ''
   if (isGeminiProtocolAccount.value) return t('admin.accounts.openai.apiKeyHint')
   if (form.platform === 'openai') return t('admin.accounts.openai.apiKeyHint')
@@ -3962,8 +3956,6 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
   switch (form.platform) {
     case 'typesafe':
       return 'https://api.typesafe.ai'
-    case 'mixed':
-      return 'https://your-upstream/v1'
     case 'openai':
       return 'https://api.openai.com'
     case 'gemini':
@@ -3992,8 +3984,7 @@ const apiKeyValuePlaceholder = computed(() => {
     case 'minimax':
       return 'sk-...'
     case 'typesafe':
-    case 'mixed':
-      return 'your-api-key'
+      return 'ts-...'
     default:
       return 'sk-ant-...'
   }
@@ -4099,7 +4090,7 @@ const adaptiveBaseUrls = ref<Record<CnNativeApiProtocol, string>>({
 })
 const geminiUseCustomProtocol = ref(false)
 const isCNPlatform = computed(() => isCNProviderPlatform(form.platform))
-const genericProviderPlatforms = computed(() => listPlatforms().filter(spec => (spec.multi_protocol && !spec.cn_provider) || spec.gateway === 'systemone'))
+const genericProviderPlatforms = computed(() => listPlatforms().filter(spec => spec.multi_protocol))
 const providerRules = ref<ProviderProtocolRuleRow[]>([])
 const isGeminiProtocolAccount = computed(
   () => form.platform === 'gemini' && accountCategory.value === 'apikey' && geminiUseCustomProtocol.value
@@ -4739,7 +4730,7 @@ watch(
 watch(
   [accountCategory, addMethod, antigravityAccountType, () => form.platform],
   ([category, method, agType]) => {
-    if (form.platform === 'mixed' || isMultiProtocolApiKeyPlatform(form.platform)) {
+    if (isMultiProtocolApiKeyPlatform(form.platform) || form.platform === 'typesafe') {
       form.type = 'apikey'
       return
     }
@@ -4837,13 +4828,6 @@ watch(
       apiKeyBaseUrl.value = 'https://api.typesafe.ai'
       allowedModels.value = ['jev-latest']
       modelRestrictionMode.value = 'whitelist'
-      poolModeEnabled.value = false
-      upstreamBillingAutoProbeEnabled.value = false
-    }
-    if (newPlatform === 'mixed') {
-      accountCategory.value = 'apikey'
-      form.type = 'apikey'
-      apiKeyBaseUrl.value = ''
       poolModeEnabled.value = false
       upstreamBillingAutoProbeEnabled.value = false
     }
@@ -5486,15 +5470,6 @@ const buildOpenAICodexImportExtra = (): Record<string, unknown> | undefined => {
 }
 
 const buildAnthropicExtra = (base?: Record<string, unknown>): Record<string, unknown> | undefined => {
-  if (form.platform === 'mixed' && accountCategory.value === 'apikey') {
-    const extra: Record<string, unknown> = { ...(base || {}) }
-    if (anthropicAPIKeyAuthScheme.value === 'authorization_bearer') {
-      extra.anthropic_apikey_auth_scheme = 'authorization_bearer'
-    } else {
-      delete extra.anthropic_apikey_auth_scheme
-    }
-    return Object.keys(extra).length > 0 ? extra : undefined
-  }
   if (form.platform !== 'anthropic' || accountCategory.value !== 'apikey') {
     return base
   }
@@ -5809,11 +5784,7 @@ const handleSubmit = async () => {
   }
 
   // Determine default base URL based on platform
-  if (form.platform === 'mixed' && !apiKeyBaseUrl.value.trim()) {
-    appStore.showError(t('admin.accounts.mixedBaseUrlRequired'))
-    return
-  }
-  const defaultBaseUrl = form.platform === 'mixed' ? '' : form.platform === 'openai'
+  const defaultBaseUrl = form.platform === 'openai'
     ? 'https://api.openai.com'
     : form.platform === 'gemini'
       ? 'https://generativelanguage.googleapis.com'
@@ -5886,7 +5857,7 @@ const handleSubmit = async () => {
   }
 
   // Add pool mode if enabled
-  if (form.platform !== 'mixed' && poolModeEnabled.value) {
+  if (poolModeEnabled.value) {
     credentials.pool_mode = true
     credentials.pool_mode_retry_count = normalizePoolModeRetryCount(poolModeRetryCount.value)
     const parsedRetryStatusCodes = parsePoolModeRetryStatusCodes(poolModeRetryStatusCodesInput.value)

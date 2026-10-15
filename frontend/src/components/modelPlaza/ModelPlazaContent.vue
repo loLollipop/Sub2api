@@ -72,7 +72,7 @@ import DOMPurify from 'dompurify'
 import Icon from '@/components/icons/Icon.vue'
 import PlazaFilterBar from './PlazaFilterBar.vue'
 import PlazaGroupSection from './PlazaGroupSection.vue'
-import type { ModelPlazaGroup, ModelPlazaResponse, PlazaModel } from '@/api/modelPlaza'
+import type { ModelPlazaGroup, ModelPlazaResponse } from '@/api/modelPlaza'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
@@ -100,22 +100,9 @@ const descriptionHtml = computed(() => {
   return DOMPurify.sanitize(marked.parse(md) as string)
 })
 
-/** Mixed 模型按行取倍率，图片独立倍率优先于用户/厂商倍率。 */
-function effectiveRate(g: ModelPlazaGroup, m?: PlazaModel): number {
-  if (m?.pricing?.billing_mode === 'image' && g.image_rate_independent) {
-    return g.image_rate_multiplier ?? 1
-  }
-  return g.user_rate_multiplier ?? m?.rate_multiplier ?? (g.platform === 'mixed' ? 1 : g.rate_multiplier)
-}
-
-function groupRates(g: ModelPlazaGroup): number[] {
-  return g.platform === 'mixed'
-    ? [...new Set(g.models.map((m) => effectiveRate(g, m)))].sort((a, b) => a - b)
-    : [effectiveRate(g)]
-}
-
-function minimumRate(g: ModelPlazaGroup): number {
-  return groupRates(g)[0] ?? Infinity
+/** 生效倍率 = 用户专属倍率 ?? 分组默认倍率。 */
+function effectiveRate(g: ModelPlazaGroup): number {
+  return g.user_rate_multiplier ?? g.rate_multiplier
 }
 
 const platforms = computed(() =>
@@ -127,14 +114,14 @@ const groupOptions = computed(() =>
     id: g.id,
     name: g.name,
     platform: g.platform,
-    rate: minimumRate(g),
-    rates: groupRates(g)
+    rate: effectiveRate(g),
+    rates: [effectiveRate(g)]
   }))
 )
 
 /** 全量生效倍率;当前组合下不可用的项由 FilterBar 置灰而非隐藏。 */
 const rates = computed(() =>
-  [...new Set((props.response?.groups ?? []).flatMap(groupRates))].sort((a, b) => a - b)
+  [...new Set((props.response?.groups ?? []).map(effectiveRate))].sort((a, b) => a - b)
 )
 
 /** 数据刷新后选中的倍率可能不复存在,重置为全部。 */
@@ -153,13 +140,7 @@ const filteredGroups = computed(() => {
     groups = groups.filter((g) => g.id === selectedGroupId.value)
   }
   if (selectedRate.value !== 'all') {
-    groups = groups.map((g) => g.platform === 'mixed'
-      ? { ...g, models: g.models.filter((m) => effectiveRate(g, m) === selectedRate.value) }
-      : g
-    ).filter((g) => g.platform === 'mixed'
-      ? g.models.length > 0
-      : effectiveRate(g) === selectedRate.value
-    )
+    groups = groups.filter((g) => effectiveRate(g) === selectedRate.value)
   }
   // 模型名搜索:分组内只留命中的模型,整组无命中则隐藏该分组。
   const q = searchQuery.value.trim().toLowerCase()
@@ -170,7 +151,7 @@ const filteredGroups = computed(() => {
   }
   // 专属倍率会改变生效值,不能只依赖后端按默认倍率的排序。
   return [...groups].sort(
-    (a, b) => minimumRate(a) - minimumRate(b) || a.name.localeCompare(b.name)
+    (a, b) => effectiveRate(a) - effectiveRate(b) || a.name.localeCompare(b.name)
   )
 })
 </script>

@@ -77,11 +77,6 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "System One aliases must preserve jev-latest")
 		return
 	}
-	c.Request = c.Request.WithContext(service.ContextWithModelScope(c.Request.Context(), apiKey.ModelScope))
-	if err := service.CheckModelScope(c.Request.Context(), model, model); err != nil {
-		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Model is not available for this key")
-		return
-	}
 	// Run the existing audit gates on all native semantic content without
 	// changing the native body delivered to the provider.
 	auditBody, _ := json.Marshal(map[string]any{"model": model, "messages": []any{map[string]any{"role": "user", "content": string(body)}}})

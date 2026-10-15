@@ -251,6 +251,15 @@ func TestResolveOpenAIUpstreamEndpointPrefersForwardResult(t *testing.T) {
 // responsesSubpathSuffix
 // ──────────────────────────────────────────────────────────
 
+func TestNativeProviderErrorEndpointUsesActualUpstream(t *testing.T) {
+	for _, platform := range []string{service.PlatformCline, service.PlatformCommandCode} {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+		service.SetActualOpenAIUpstreamEndpoint(c, EndpointChatCompletions)
+		require.Equal(t, EndpointChatCompletions, GetUpstreamEndpoint(c, platform), platform)
+	}
+}
+
 func TestResponsesSubpathSuffix(t *testing.T) {
 	tests := []struct {
 		raw  string

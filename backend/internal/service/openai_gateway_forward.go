@@ -20,15 +20,12 @@ import (
 
 // Forward forwards request to OpenAI API
 func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
-	return s.forwardWithProtocolFallback(ctx, c, account, body, APIProtocolResponses, "", "", func(attemptCtx context.Context) (*OpenAIForwardResult, error) {
-		return s.forwardOpenAIResponses(attemptCtx, c, account, body)
-	})
-}
-
-func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
+	if account != nil && account.Platform == "mixed" {
+		return nil, fmt.Errorf("mixed has been retired; configure an explicit native platform")
+	}
 	beginUpstreamResponseModelObservation(c)
 	ClearActualOpenAIUpstreamEndpoint(c)
-	if shouldPreemptivelyConvertInboundResponsesToChat(account) && !forcedOpenAIResponsesProtocol(ctx) {
+	if shouldPreemptivelyConvertInboundResponsesToChat(account) {
 		SetActualOpenAIUpstreamEndpoint(c, "/v1/chat/completions")
 	}
 	filteredBody, filterErr := filterOpenAIResponsesNoneReasoningEffortForAccount(account, body)
@@ -146,7 +143,7 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 	}
 
 	nativeCNResponses := account.usesNativeResponsesUpstream()
-	nativeDeepSeekResponses := account.openAIWirePlatform() == PlatformDeepseek && nativeCNResponses
+	nativeDeepSeekResponses := account.Platform == PlatformDeepseek && nativeCNResponses
 	if nativeDeepSeekResponses && account.Type == AccountTypeAPIKey && !compactPath &&
 		needsOpenAIResponsesClientToolAdaptation(body) {
 		adaptedBody, mapping, adaptErr := adaptOpenAIResponsesClientTools(body)
@@ -193,9 +190,7 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 		}
 		return s.forwardResponsesViaNativeAnthropic(ctx, c, account, body, reqModel)
 	case APIProtocolChatCompletions:
-		if !forcedOpenAIResponsesProtocol(ctx) {
-			return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
-		}
+		return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
 	}
 	if account.IsOpenAI() && (account.IsOpenAIApiKey() || account.IsOpenAIOAuthLike()) {
 		normalizedReasoningBody, reasoningChanged, reasoningErr := normalizeOpenAIResponsesReasoningContentReplay(body)
@@ -588,8 +583,8 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 	if !isCodexCLI {
 		maxOutputTokens := requestRoot.Get("max_output_tokens")
 		if maxOutputTokens.Exists() {
-			switch account.openAIWirePlatform() {
-			case PlatformOpenAI, PlatformDeepseek, PlatformMixed:
+			switch account.Platform {
+			case PlatformOpenAI, PlatformDeepseek:
 				// Preserve Responses-native output limits unless the selected upstream
 				// explicitly rejects the field in the bounded HTTP retry loop below.
 			case PlatformAnthropic:
@@ -1143,16 +1138,7 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 				_ = resp.Body.Close()
 				return nil, clientErr
 			}
-			var respBody []byte
-			if account.IsMixed() {
-				var readErr error
-				respBody, _, readErr = s.readOpenAIProtocolError(resp, account)
-				if readErr != nil {
-					return nil, readErr
-				}
-			} else {
-				respBody = s.readUpstreamErrorBody(resp)
-			}
+			respBody := s.readUpstreamErrorBody(resp)
 			_ = resp.Body.Close()
 			if clientErr := clientCtx.Err(); clientErr != nil {
 				return nil, clientErr
@@ -1162,16 +1148,6 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 			upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 			upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
 			upstreamCode := extractUpstreamErrorCode(respBody)
-			if fallbackErr := s.protocolRefusalFallback(ctx, c, account, APIProtocolResponses, resp.StatusCode, respBody,
-				shouldFallbackOpenAIResponsesToChatOnUnsupportedEndpoint(account, c, resp.StatusCode)); fallbackErr != nil {
-				return nil, fallbackErr
-			}
-			if account.IsMixed() {
-				if failoverErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); failoverErr != nil {
-					return nil, failoverErr
-				}
-				return s.handleErrorResponse(ctx, resp, c, account, body, resolveOpenAIErrorSchedulingModel(billingModel, upstreamModel))
-			}
 			if !responsesLiteParallelToolCallsRetryTried &&
 				resp.StatusCode == http.StatusBadRequest &&
 				isOpenAIResponsesLiteParallelToolCallsError(respBody) {
@@ -1256,7 +1232,7 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 				)
 				continue
 			}
-			if openAIProtocolFallbackFromContext(ctx) == nil && shouldFallbackOpenAIResponsesToChatOnUnsupportedEndpoint(account, c, resp.StatusCode) {
+			if shouldFallbackOpenAIResponsesToChatOnUnsupportedEndpoint(account, c, resp.StatusCode) {
 				logger.LegacyPrintf(
 					"service.openai_gateway",
 					"[OpenAI] /v1/responses unsupported, falling back to /v1/chat/completions (account: %s, status: %d)",
@@ -1407,20 +1383,11 @@ func (s *OpenAIGatewayService) forwardOpenAIResponses(ctx context.Context, c *gi
 					}
 					return s.handleErrorResponse(ctx, compactResp, c, account, body, resolveOpenAIErrorSchedulingModel(billingModel, upstreamModel))
 				}
-				if account.IsMixed() {
-					return buildForwardResult(), err
-				}
 				return preserveOpenAIStreamingResultOnError(buildForwardResult(), err)
 			}
 		} else {
 			nonStreamResult, err := s.handleNonStreamingResponse(ctx, resp, c, account, originalModel, upstreamModel)
 			if err != nil {
-				if account.IsMixed() {
-					if nonStreamResult != nil {
-						usage = nonStreamResult.usage
-					}
-					return buildForwardResult(), err
-				}
 				if clientErr := clientCtx.Err(); clientErr != nil {
 					return nil, clientErr
 				}
@@ -1604,7 +1571,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 			baseURL = account.GetCNProtocolBaseURL(APIProtocolResponses)
 		}
 		if baseURL == "" {
-			if account.IsMixed() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
+			if account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
 				return nil, fmt.Errorf("account requires an explicit Responses endpoint")
 			}
 			targetURL = openaiPlatformAPIURL
@@ -1613,7 +1580,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesURLForPlatform(account.openAIWirePlatform(), validatedURL)
+			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL)
 		}
 	default:
 		targetURL = openaiPlatformAPIURL

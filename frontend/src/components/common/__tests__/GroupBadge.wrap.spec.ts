@@ -17,14 +17,9 @@ describe('complete account group names', () => {
     expect(full.text()).toBe('A very long group name')
   })
 
-  it('keeps Mixed vendor prices in the full-name layout', () => {
-    const rates = [{ vendor: 'kimi' as const, rate: 0 }]
-    const wrapper = mount(GroupBadge, { props: { name: 'Mixed', platform: 'mixed', truncate: false, vendorRates: rates }, global })
-    expect(wrapper.getComponent({ name: 'MixedProviderRates' }).props('rates')).toEqual(rates)
-  })
 
   it('does not clip the account group rows and preserves the overflow counter', () => {
-    const groups = [1, 2, 3].map(id => ({ id, name: `Long group ${id}`, platform: 'mixed' } as Group))
+    const groups = [1, 2, 3].map(id => ({ id, name: `Long group ${id}`, platform: 'kimi' } as Group))
     const wrapper = mount(AccountGroupsCell, { props: { groups, maxDisplay: 2 }, global })
     expect(wrapper.getComponent(GroupBadge).props('truncate')).toBe(false)
     expect(wrapper.get('button').text()).toBe('+2')

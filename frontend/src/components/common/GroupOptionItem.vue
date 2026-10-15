@@ -20,14 +20,13 @@
       >
         {{ description }}
       </span>
-      <MixedProviderRates v-if="vendorRates !== undefined" class="mt-2" :rates="vendorRates" :user-override="userRateMultiplier != null" />
     </div>
 
     <!-- Right: rate pill + checkmark (vertically centered to first row) -->
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
       <div class="flex shrink-0 flex-col items-end gap-1">
         <!-- Rate pill (platform color) -->
-        <span v-if="vendorRates === undefined && rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
+        <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
           <template v-if="hasCustomRate">
             <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>
             <span class="font-bold">{{ userRateMultiplier }}x</span>
@@ -56,8 +55,6 @@ import Icon from '@/components/icons/Icon.vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import GroupBadge from './GroupBadge.vue'
-import MixedProviderRates from './MixedProviderRates.vue'
-import type { VendorRate } from '@/utils/mixed-provider-rates'
 import type { SubscriptionType, GroupPlatform } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
@@ -65,7 +62,6 @@ import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 const { t } = useI18n()
 
 interface Props {
-  vendorRates?: VendorRate[]
   name: string
   platform: GroupPlatform
   subscriptionType?: SubscriptionType

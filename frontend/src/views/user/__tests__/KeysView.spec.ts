@@ -335,7 +335,7 @@ describe('user KeysView column settings', () => {
     await wrapper.get('[data-tour="key-form-name"]').setValue('Provider key')
     const groupSelect = wrapper.getComponent('[data-tour="key-form-group"]')
     expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([1])
-    expect(wrapper.get('input[name="key-provider"][value="cn"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('input[name="key-provider"][value="deepseek"]').attributes('disabled')).toBeDefined()
     groupSelect.vm.$emit('update:modelValue', 1)
     await nextTick()
     await wrapper.get('input[name="key-provider"][value="openai"]').setValue()
@@ -344,14 +344,14 @@ describe('user KeysView column settings', () => {
     await wrapper.get('#key-form').trigger('submit')
     expect(createKey).not.toHaveBeenCalled()
     expect(showError).toHaveBeenCalledWith('keys.groupRequired')
-    await wrapper.get('input[name="key-provider"][value="other"]').setValue()
-    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([3, 4])
+    await wrapper.get('input[name="key-provider"][value="grok"]').setValue()
+    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([3])
     groupSelect.vm.$emit('update:modelValue', 3)
     await nextTick()
     await wrapper.get('#key-form').trigger('submit')
     await flushPromises()
     expect(createKey).toHaveBeenCalledWith('Provider key', 3, undefined, [], [], 0, undefined,
-      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit', undefined, 'other')
+      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit')
     wrapper.unmount()
   })
 
@@ -367,8 +367,14 @@ describe('user KeysView column settings', () => {
     wrapper.unmount()
   })
 
+
+
+
+
+
+
   it('does not inherit a stale key provider after cancelling deletion', async () => {
-    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), model_scope: 'cn' }], total: 1 })
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 3, group: { id: 3, platform: 'deepseek' } }], total: 1 })
     getAvailableGroups.mockResolvedValue([{ id: 2, name: 'GPT', platform: 'openai' }])
     const wrapper = await mountView()
     await getButtonByText(wrapper, 'common.delete').trigger('click')
@@ -378,107 +384,7 @@ describe('user KeysView column settings', () => {
     wrapper.unmount()
   })
 
-  it.each(['cn', 'all'])('filters quick group changes without changing the %s key scope', async (scope) => {
-    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 1, model_scope: scope }], total: 1 })
-    getAvailableGroups.mockResolvedValue([
-      { id: 1, name: 'CN', platform: 'mixed', supported_key_providers: ['cn'] },
-      { id: 2, name: 'GPT', platform: 'openai' },
-    ])
-    const wrapper = await mountView()
-    await wrapper.get('button[title="Click to change group"]').trigger('click')
-    const names = wrapper.findAllComponents({ name: 'GroupOptionItem' }).map((item) => item.attributes('name'))
-    expect(names).toEqual(scope === 'cn' ? ['CN'] : ['CN', 'GPT'])
-    wrapper.unmount()
-  })
-
-  it.each(['create', 'edit'])('uses confirmed Mixed categories on %s and clears stale selections', async (mode) => {
-    getAvailableGroups.mockResolvedValue([
-      { id: 1, name: 'Domestic', platform: 'mixed', supported_key_providers: ['cn'] },
-      { id: 2, name: 'Gemini', platform: 'gemini' },
-      { id: 3, name: 'Grok', platform: 'grok' },
-    ])
-    if (mode === 'edit') listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 1 }], total: 1 })
-    const wrapper = await mountView()
-    if (mode === 'edit') await getButtonByText(wrapper, 'common.edit').trigger('click')
-    else await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
-    expect((wrapper.get('input[name="key-provider"][value="cn"]').element as HTMLInputElement).checked).toBe(true)
-    const groupSelect = wrapper.getComponent('[data-tour="key-form-group"]')
-    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([1])
-    groupSelect.vm.$emit('update:modelValue', 1)
-    await nextTick()
-    await wrapper.get('input[name="key-provider"][value="other"]').setValue()
-    expect(groupSelect.props('modelValue')).toBeNull()
-    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([2, 3])
-    await wrapper.get('[data-tour="key-form-name"]').setValue('Domestic key')
-    await wrapper.get('#key-form').trigger('submit')
-    expect(createKey).not.toHaveBeenCalled()
-    expect(updateKey).not.toHaveBeenCalled()
-    expect(showError).toHaveBeenCalledWith('keys.groupRequired')
-    await wrapper.get('input[name="key-provider"][value="cn"]').setValue()
-    groupSelect.vm.$emit('update:modelValue', 1)
-    await nextTick()
-    await wrapper.get('#key-form').trigger('submit')
-    await flushPromises()
-    if (mode === 'edit') expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'Domestic key', group_id: 1 }))
-    else expect(createKey).toHaveBeenCalledWith('Domestic key', 1, undefined, [], [], 0, undefined,
-      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit', undefined, 'cn')
-    wrapper.unmount()
-  })
-
-  it.each(['openai', 'anthropic', 'cn', 'other'])('creates a %s scoped key from the same four-family Mixed group', async (scope) => {
-    getAvailableGroups.mockResolvedValue([
-      { id: 1, name: 'Relay', platform: 'mixed', supported_key_providers: ['openai', 'anthropic', 'cn', 'other'] },
-      { id: 2, name: 'CN only', platform: 'mixed', supported_key_providers: ['cn'] },
-      { id: 3, name: 'Empty', platform: 'mixed', supported_key_providers: [] },
-    ])
-    const wrapper = await mountView()
-    await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
-    await wrapper.get(`input[name="key-provider"][value="${scope}"]`).setValue()
-    const groupSelect = wrapper.getComponent('[data-tour="key-form-group"]')
-    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual(scope === 'cn' ? [1, 2] : [1])
-    groupSelect.vm.$emit('update:modelValue', 1)
-    await wrapper.get('[data-tour="key-form-name"]').setValue('Scoped')
-    await wrapper.get('#key-form').trigger('submit')
-    await flushPromises()
-    expect(createKey.mock.calls[0]?.[11]).toBe(scope)
-    wrapper.unmount()
-  })
-
-  it('preserves an existing all key scope when only its name is edited', async () => {
-    getAvailableGroups.mockResolvedValue([{ id: 1, name: 'Relay', platform: 'mixed', supported_key_providers: ['cn'] }])
-    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 1, model_scope: 'all' }], total: 1 })
-    const wrapper = await mountView()
-    await getButtonByText(wrapper, 'common.edit').trigger('click')
-    await wrapper.get('[data-tour="key-form-name"]').setValue('Rename only')
-    await wrapper.get('#key-form').trigger('submit')
-    await flushPromises()
-    expect(updateKey.mock.calls[0]?.[1]).not.toHaveProperty('model_scope')
-    wrapper.unmount()
-  })
-
-  it.each(['cn', 'openai', 'anthropic', 'other'])('keeps Mixed %s rates readable in options and after selection', async (scope) => {
-    getAvailableGroups.mockResolvedValue([{
-      id: 10, name: 'Vendor rates', platform: 'mixed', rate_multiplier: 9,
-      supported_key_providers: ['openai', 'anthropic', 'cn', 'other'],
-      supported_model_vendors: ['deepseek', 'kimi', 'openai', 'anthropic', 'gemini'],
-      mixed_provider_rate_multipliers: { deepseek: 0.2, kimi: 0, openai: 2, anthropic: 3, gemini: 4 },
-    }])
-    const wrapper = await mountView(true)
-    await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
-    await wrapper.get(`input[name="key-provider"][value="${scope}"]`).setValue()
-    const groupSelect = wrapper.getComponent('[data-tour="key-form-group"]')
-    const expected = scope === 'cn' ? [{ vendor: 'deepseek', rate: 0.2 }, { vendor: 'kimi', rate: 0 }]
-      : [{ vendor: scope === 'other' ? 'gemini' : scope, rate: scope === 'openai' ? 2 : scope === 'anthropic' ? 3 : 4 }]
-    const option = wrapper.findAllComponents({ name: 'GroupOptionItem' }).find(item => item.props('name') === 'Vendor rates')!
-    expect(option.props('vendorRates')).toEqual(expected)
-    groupSelect.vm.$emit('update:modelValue', 10)
-    await nextTick()
-    const selected = wrapper.findAllComponents({ name: 'GroupBadge' }).find(item => item.props('name') === 'Vendor rates')!
-    expect(selected.props('vendorRates')).toEqual(expected)
-    wrapper.unmount()
-  })
-
-  it('opens an existing key in its own provider and includes all Chinese platforms', async () => {
+  it('opens an existing key in its own provider and selects its individual native provider', async () => {
     getAvailableGroups.mockResolvedValue([
       { id: 1, name: 'GPT', platform: 'openai' },
       { id: 2, name: 'Kimi', platform: 'kimi' },
@@ -489,10 +395,10 @@ describe('user KeysView column settings', () => {
     listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 3 }], total: 1 })
     const wrapper = await mountView()
     await getButtonByText(wrapper, 'common.edit').trigger('click')
-    expect((wrapper.get('input[name="key-provider"][value="cn"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('input[name="key-provider"][value="deepseek"]').element as HTMLInputElement).checked).toBe(true)
     const groupSelect = wrapper.getComponent('[data-tour="key-form-group"]')
     expect(groupSelect.props('modelValue')).toBe(3)
-    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([2, 3, 4, 5])
+    expect(groupSelect.props('options').map((option: { value: number }) => option.value)).toEqual([3])
     wrapper.unmount()
   })
 
@@ -505,7 +411,7 @@ describe('user KeysView column settings', () => {
     listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 2, group_ids: [2, 1] }], total: 1 })
     const wrapper = await mountView()
     await getButtonByText(wrapper, 'common.edit').trigger('click')
-    await wrapper.get('input[name="key-provider"][value="other"]').setValue()
+    await wrapper.get('input[name="key-provider"][value="grok"]').setValue()
     const addSelect = wrapper.findAllComponents({ name: 'Select' }).find((select) => select.attributes('placeholder') === 'keys.smartRoutingAdd')!
     expect(addSelect.props('options')).toMatchObject([{ value: 3 }])
     addSelect.vm.$emit('update:modelValue', 3)

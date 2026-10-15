@@ -48,8 +48,7 @@ func TestClaude55BridgesBillFinalMaxEffort(t *testing.T) {
 					usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 					userRepo := &openAIRecordUsageUserRepoStub{}
 					if native {
-						account.Platform, group.Platform = PlatformMixed, PlatformMixed
-						group.MixedProviderRateMultipliers = map[string]float64{"anthropic": 0.15}
+						account.Platform, group.Platform = PlatformCommandCode, PlatformCommandCode
 						svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
 						svc.cfg, svc.httpUpstream = rawChatCompletionsTestConfig(), upstream
 						svc.resolver = NewModelPricingResolver(nil, svc.billingService)
@@ -126,7 +125,7 @@ func TestClaude55BridgeInvalidParametersAre400BeforeTransport(t *testing.T) {
 }
 
 func TestHaiku55EnabledRejectedBeforeMessagesAndCountTokensTransport(t *testing.T) {
-	for _, endpoint := range []string{"messages", "count_tokens", "mixed-messages"} {
+	for _, endpoint := range []string{"messages", "count_tokens", "native-messages"} {
 		t.Run(endpoint, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(rec)
@@ -139,8 +138,8 @@ func TestHaiku55EnabledRejectedBeforeMessagesAndCountTokensTransport(t *testing.
 			switch endpoint {
 			case "messages":
 				_, err = (&GatewayService{}).Forward(context.Background(), c, account, parsed)
-			case "mixed-messages":
-				account.Platform = PlatformMixed
+			case "native-messages":
+				account.Platform = PlatformCommandCode
 				_, err = (&OpenAIGatewayService{}).forwardAnthropicViaNativeAnthropicEndpoint(context.Background(), c, account, body, "")
 			default:
 				err = (&GatewayService{}).ForwardCountTokens(context.Background(), c, account, parsed)

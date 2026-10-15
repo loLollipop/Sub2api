@@ -115,15 +115,15 @@ func TestOpenAIFinalAttemptPricesExplicitEffortWithoutChangingScale(t *testing.T
 	}
 }
 
-func TestOpenAIFinalAttemptMixedNativeMaxMustFundBeforeNetwork(t *testing.T) {
-	for _, platform := range []string{PlatformMixed, PlatformCommandCode} {
+func TestOpenAIFinalAttemptProviderNativeMaxMustFundBeforeNetwork(t *testing.T) {
+	for _, platform := range []string{PlatformCommandCode} {
 		t.Run(platform, func(t *testing.T) {
 			fixture := newPreauthorizationFixture()
 			bs := NewBillingService(nil, nil)
 			fixture.service.costCalculator = bs
-			group := &Group{ID: 9, Platform: PlatformMixed, ModelPricing: []ChannelModelPricing{{
+			group := &Group{ID: 9, Platform: platform, RateMultiplier: 1, ModelPricing: []ChannelModelPricing{{
 				Models: []string{"claude-fable-5-1"}, MaxReasoningEffortMultiplier: float64Ptr(3),
-			}}, MixedProviderRateMultipliers: map[string]float64{"anthropic": 1}}
+			}}}
 			key := &APIKey{ID: 7, UserID: 42, GroupID: &group.ID, Group: group}
 			body := []byte(`{"model":"claude-fable-5-1","max_tokens":32,"messages":[{"role":"user","content":"hi"}],"output_config":{"effort":"max"}}`)
 			svc := &OpenAIGatewayService{cfg: &config.Config{}, billingService: bs, resolver: NewModelPricingResolver(nil, bs)}
@@ -157,7 +157,7 @@ func TestOpenAIFinalAttemptMixedNativeMaxMustFundBeforeNetwork(t *testing.T) {
 }
 
 func TestOpenAIFinalAttemptProviderChatMustFundBeforeNetwork(t *testing.T) {
-	for _, platform := range []string{PlatformMixed, PlatformCommandCode, PlatformCline} {
+	for _, platform := range []string{PlatformCommandCode, PlatformCline} {
 		t.Run(platform, func(t *testing.T) {
 			fixture := newPreauthorizationFixture()
 			fixture.service.costCalculator = NewBillingService(nil, nil)

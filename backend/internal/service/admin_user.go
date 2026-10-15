@@ -215,7 +215,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if err := validateUserSchedulingLimits(input.Concurrency, input.RPMLimit); err != nil {
 		return nil, err
 	}
-	// nil clears an override; an explicit zero is allowed only for Mixed groups.
+	// nil clears an override; native user-specific rates must remain positive.
 	if input.GroupRates != nil {
 		for groupID, rate := range input.GroupRates {
 			if rate == nil {
@@ -223,11 +223,6 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 			}
 			if err := validateUserGroupRateMultiplier(*rate); err != nil {
 				return nil, fmt.Errorf("%w (group_id=%d)", err, groupID)
-			}
-			if *rate == 0 {
-				if err := s.validateZeroUserGroupRate(ctx, groupID); err != nil {
-					return nil, err
-				}
 			}
 		}
 	}
@@ -378,23 +373,6 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	}
 
 	return user, nil
-}
-
-func (s *adminServiceImpl) validateZeroUserGroupRate(ctx context.Context, groupID int64) error {
-	if groupID <= 0 {
-		return fmt.Errorf("cannot validate zero rate_multiplier (group_id=%d): %w", groupID, ErrGroupNotFound)
-	}
-	if s.groupRepo == nil {
-		return fmt.Errorf("cannot validate zero rate_multiplier: group repository unavailable (group_id=%d)", groupID)
-	}
-	group, err := s.groupRepo.GetByID(ctx, groupID)
-	if err != nil {
-		return fmt.Errorf("cannot validate zero rate_multiplier (group_id=%d): %w", groupID, err)
-	}
-	if group == nil || group.Platform != PlatformMixed {
-		return fmt.Errorf("rate_multiplier must be > 0 for ordinary groups (group_id=%d)", groupID)
-	}
-	return nil
 }
 
 func sameInt64Set(a, b []int64) bool {

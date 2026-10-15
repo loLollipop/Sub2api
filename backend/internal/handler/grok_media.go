@@ -370,9 +370,6 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			accountReleaseFunc = selection.ReleaseFunc
 		}
 		if err != nil {
-			if h.handleModelScopeError(c, err, streamStarted) {
-				return
-			}
 			if failoverClientGone(c) {
 				reqLog.Info("grok_media.account_select_aborted_client_disconnected", zap.Error(err))
 				return
@@ -594,15 +591,6 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		service.SetOpsLatencyMs(c, service.OpsResponseLatencyMsKey, responseLatencyMs)
 
 		if err != nil {
-			if errors.Is(err, service.ErrModelScopeDenied) {
-				if createJob != nil {
-					if refundErr := h.gatewayService.FailGrokVideoBillingJob(requestCtx, createJob); refundErr != nil {
-						reqLog.Error("grok_media.refund_failed", zap.String("job_id", createJob.ID), zap.Error(refundErr))
-					}
-				}
-				h.handleModelScopeError(c, err, streamStarted)
-				return
-			}
 			if endpoint.IsGenerationRequest() {
 				h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
 			}

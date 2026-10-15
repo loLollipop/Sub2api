@@ -537,9 +537,6 @@ urlFallbackLoop:
 			}
 
 			resp, err = p.httpUpstream.Do(upstreamReq, p.proxyURL, p.account.ID, p.account.Concurrency)
-			if errors.Is(err, ErrModelScopeDenied) {
-				return nil, err
-			}
 			if err == nil && resp == nil {
 				err = errors.New("upstream returned nil response")
 			}

@@ -672,14 +672,15 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 		if account.usesNativeResponsesUpstream() && account.IsAdaptiveAPIProtocol() {
 			baseURL = account.GetCNProtocolBaseURL(APIProtocolResponses)
 		}
+		if strings.TrimSpace(baseURL) == "" && (account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol()) {
+			return nil, fmt.Errorf("account %d has no configured Responses endpoint", account.ID)
+		}
 		if baseURL != "" {
 			validatedURL, err := s.validateUpstreamBaseURL(baseURL)
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesURLForPlatform(account.openAIWirePlatform(), validatedURL)
-		} else if account.IsMixed() || account.IsMultiProtocolAPIKey() || account.IsGeminiOpenAIProtocol() {
-			return nil, fmt.Errorf("account requires an explicit Responses endpoint")
+			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL)
 		}
 	}
 	targetURL = appendOpenAIResponsesRequestPathSuffix(targetURL, openAIResponsesRequestPathSuffix(c))

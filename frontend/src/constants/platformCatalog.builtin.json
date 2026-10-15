@@ -143,12 +143,6 @@
       }
     },
     {
-      "id": "mixed",
-      "display_name": "Mixed",
-      "gateway": "openai",
-      "cn_provider": false
-    },
-    {
       "id": "command_code",
       "display_name": "Command Code",
       "gateway": "openai",
@@ -201,7 +195,12 @@
         ]
       }
     },
-    {"id":"typesafe","display_name":"TypeSafe","gateway":"systemone","cn_provider":false}
+    {
+      "id": "typesafe",
+      "display_name": "TypeSafe",
+      "gateway": "systemone",
+      "cn_provider": false
+    }
   ],
   "composite_precedence": [
     "anthropic",
@@ -213,7 +212,6 @@
     "zhipu",
     "deepseek",
     "minimax",
-    "mixed",
     "command_code",
     "cline",
     "typesafe"

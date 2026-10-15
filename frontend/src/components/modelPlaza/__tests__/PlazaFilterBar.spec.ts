@@ -54,24 +54,6 @@ function mountBar(props: Record<string, unknown> = {}) {
 }
 
 describe('PlazaFilterBar faceted filters', () => {
-  it('supports multiple Mixed rates while retaining the ordinary single-rate metadata', () => {
-    const multiGroups = [...groups, { id: 4, name: 'Mixed', platform: 'mixed', rate: 9, rates: [0, 0.5, 2] }]
-    const selectedRate = mountBar({
-      groups: multiGroups, platforms: ['anthropic', 'openai', 'grok', 'mixed'],
-      rates: [0, 0.07, 0.5, 1, 2, 9], rate: 0.5
-    })
-    expect(selectedRate.get('[aria-label="modelPlaza.filters.groupLabel"] [data-option="4"]').attributes('disabled')).toBeUndefined()
-    expect(selectedRate.findAll('.plaza-seg-item').at(-1)!.attributes('disabled')).toBeUndefined()
-    const selectedMixed = mountBar({ groups: multiGroups, rates: [0, 0.07, 0.5, 1, 2, 9], groupId: 4 })
-    const rateOptions = selectedMixed.get('[aria-label="modelPlaza.filters.rateLabel"]')
-    for (const rate of [0, 0.5, 2]) {
-      expect(rateOptions.get(`[data-option="${rate}"]`).attributes('disabled')).toBeUndefined()
-    }
-    expect(rateOptions.get('[data-option="9"]').attributes('disabled')).toBeDefined()
-    expect(rateOptions.get('[data-option="0.07"]').attributes('disabled')).toBeDefined()
-    const ordinary = mountBar({ groups: multiGroups, rate: 0.07 })
-    expect(ordinary.get('[aria-label="modelPlaza.filters.groupLabel"] [data-option="2"]').attributes('disabled')).toBeUndefined()
-  })
 
   it('keeps unmatched platforms, groups and rates disabled instead of hiding them', () => {
     const byGroup = mountBar({ groupId: 2 })

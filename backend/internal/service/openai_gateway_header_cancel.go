@@ -11,9 +11,6 @@ import (
 // Only bound the header wait after the original client cancels. Once headers
 // arrive, the existing response handlers own draining and body cleanup.
 func (s *OpenAIGatewayService) doOpenAIUpstreamWithHeaderCancel(clientCtx context.Context, request *http.Request, proxyURL string, account *Account) (*http.Response, error) {
-	if account.IsMixed() {
-		return s.doOpenAITextUpstream(clientCtx, nil, request, proxyURL, account)
-	}
 	if clientCtx == nil || clientCtx.Done() == nil {
 		return s.doOpenAIUpstream(request, proxyURL, account)
 	}

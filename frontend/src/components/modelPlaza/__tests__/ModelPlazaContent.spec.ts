@@ -11,8 +11,8 @@ vi.mock('vue-i18n', async () => ({
 }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ isAuthenticated: true }) }))
 
-function model(name: string, rate: number): PlazaModel {
-  return { name, platform: 'openai', rate_multiplier: rate, pricing: null, official_pricing: null }
+function model(name: string): PlazaModel {
+  return { name, platform: 'openai', pricing: null, official_pricing: null }
 }
 
 function group(id: number, platform: string, rate: number, models: PlazaModel[]): ModelPlazaGroup {
@@ -31,39 +31,19 @@ function mountContent(groups: ModelPlazaGroup[]) {
   })
 }
 
-describe('ModelPlazaContent Mixed rate filtering', () => {
-  it('filters Mixed models by their rates and sorts by the visible minimum', async () => {
-    const wrapper = mountContent([
-      group(1, 'mixed', 9, [model('cheap', 0.5), model('expensive-visible', 2)]),
-      group(2, 'openai', 1, [model('ordinary-visible', 1)])
-    ])
+describe('ModelPlazaContent native group rates', () => {
+  it('filters and sorts native groups by their effective rates', async () => {
+    const wrapper = mountContent([group(1, 'kimi', 2, [model('moonshot')]), group(2, 'deepseek', 0.5, [model('deepseek-chat')])])
     const filter = wrapper.findComponent(PlazaFilterBar)
-    expect(filter.props('rates')).toEqual([0.5, 1, 2])
-    expect(filter.props('groups')[0].rates).toEqual([0.5, 2])
-    expect(wrapper.findAllComponents(PlazaGroupSection).map((section) => section.props('group').id)).toEqual([1, 2])
+    expect(filter.props('rates')).toEqual([0.5, 2])
+    expect(wrapper.findAllComponents(PlazaGroupSection).map(section => section.props('group').id)).toEqual([2, 1])
     filter.vm.$emit('update:rate', 2)
     await wrapper.vm.$nextTick()
-    const sections = wrapper.findAllComponents(PlazaGroupSection)
-    expect(sections).toHaveLength(1)
-    expect(sections[0].props('group').models.map((m: PlazaModel) => m.name)).toEqual(['expensive-visible'])
-    filter.vm.$emit('update:rate', 'all')
-    filter.vm.$emit('update:search', 'visible')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.findAllComponents(PlazaGroupSection).map((section) => section.props('group').id)).toEqual([2, 1])
-    expect(wrapper.findAllComponents(PlazaGroupSection)[1].props('group').models).toHaveLength(1)
+    expect(wrapper.findAllComponents(PlazaGroupSection).map(section => section.props('group').id)).toEqual([1])
   })
-
-  it('includes explicit zero overrides and independent image rates without the hidden legacy rate', () => {
-    const mixed = group(1, 'mixed', 9, [model('token', 0.5), {
-      ...model('image', 7), pricing: {
-        billing_mode: 'image', input_price: null, output_price: null, cache_write_price: null,
-        cache_read_price: null, image_input_price: null, image_output_price: null,
-        per_request_price: 0.2, intervals: []
-      }
-    }])
-    mixed.user_rate_multiplier = 0
-    mixed.image_rate_independent = true
-    mixed.image_rate_multiplier = 0.4
-    expect(mountContent([mixed]).findComponent(PlazaFilterBar).props('rates')).toEqual([0, 0.4])
+  it('preserves a zero user override', () => {
+    const native = group(1, 'deepseek', 2, [model('deepseek-chat')])
+    native.user_rate_multiplier = 0
+    expect(mountContent([native]).findComponent(PlazaFilterBar).props('rates')).toEqual([0])
   })
 })

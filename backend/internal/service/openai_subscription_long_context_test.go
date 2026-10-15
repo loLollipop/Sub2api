@@ -206,44 +206,6 @@ func TestAccountStatsSubscriptionPolicyPreservesExplicitPricing(t *testing.T) {
 	}
 }
 
-func TestOpenAIGatewayServiceRecordUsage_GPT61MixedVendorRateAndOverride(t *testing.T) {
-	for _, accountType := range []string{AccountTypeOAuth, AccountTypeAPIKey} {
-		for _, override := range []*float64{nil, testPtrFloat64(0), testPtrFloat64(0.25)} {
-			t.Run(fmt.Sprintf("%s/%v", accountType, override), func(t *testing.T) {
-				logs := &openAIRecordUsageLogRepoStub{inserted: true}
-				users := &openAIRecordUsageUserRepoStub{}
-				svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil)
-				svc.userGroupRateResolver = newUserGroupRateResolver(&userGroupRateRepoHotpathStub{rate: override}, nil, time.Minute, nil, "test")
-				key := openAIRecordUsageAPIKeyWithGroup(svc, 1, true)
-				key.GroupID = i64p(1)
-				key.Group.Platform = PlatformMixed
-				key.Group.RateMultiplier = 9 // aggregate rate must never be used
-				key.Group.MixedProviderRateMultipliers = map[string]float64{"openai": 0.15}
-				err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
-					APIKey: key, User: &User{ID: 2},
-					Account:            &Account{ID: 3, Platform: PlatformOpenAI, Type: accountType},
-					ChannelUsageFields: ChannelUsageFields{OriginalModel: "unknown-public-alias", BillingModelSource: BillingModelSourceRequested},
-					Result: &OpenAIForwardResult{RequestID: "mixed-gpt61", Model: "unknown-public-alias", UpstreamModel: "gpt-6.1-sol",
-						Usage: OpenAIUsage{InputTokens: 300000, OutputTokens: 2000}},
-				})
-				require.NoError(t, err)
-				rate := 0.15
-				if override != nil {
-					rate = *override
-				}
-				want := 0.62
-				if accountType == AccountTypeAPIKey {
-					want = 1.23
-				}
-				require.NotNil(t, logs.lastLog)
-				require.InDelta(t, want, logs.lastLog.TotalCost, 1e-12)
-				require.InDelta(t, want*rate, logs.lastLog.ActualCost, 1e-12)
-				require.Equal(t, rate, logs.lastLog.RateMultiplier)
-			})
-		}
-	}
-}
-
 func TestOpenAIGatewayServiceRecordUsage_GPT61SolLongContextBoundary(t *testing.T) {
 	for _, totalInput := range []int{271999, 272000, 272001} {
 		for _, accountType := range []string{AccountTypeOAuth, AccountTypeAPIKey} {

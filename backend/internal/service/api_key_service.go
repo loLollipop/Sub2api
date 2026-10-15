@@ -222,7 +222,6 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	ModelScope  string   `json:"model_scope"`
 	Name        string   `json:"name"`
 	GroupID     *int64   `json:"group_id"`
 	GroupIDs    []int64  `json:"group_ids"`
@@ -246,7 +245,6 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	ModelScope  *string   `json:"model_scope"`
 	Name        *string   `json:"name"`
 	GroupID     *int64    `json:"group_id"`
 	GroupIDs    *[]int64  `json:"group_ids"`
@@ -279,9 +277,6 @@ func validateAPIKeyLimit(v float64) error {
 }
 
 func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
-	if !ValidModelScope(req.ModelScope) {
-		return ErrInvalidModelScope
-	}
 	for _, v := range []float64{req.Quota, req.RateLimit5h, req.RateLimit1d, req.RateLimit7d} {
 		if err := validateAPIKeyLimit(v); err != nil {
 			return err
@@ -294,9 +289,6 @@ func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
 }
 
 func validateUpdateAPIKeyRequest(req UpdateAPIKeyRequest) error {
-	if req.ModelScope != nil && !ValidModelScope(*req.ModelScope) {
-		return ErrInvalidModelScope
-	}
 	for _, v := range []*float64{req.Quota, req.RateLimit5h, req.RateLimit1d, req.RateLimit7d} {
 		if v != nil {
 			if err := validateAPIKeyLimit(*v); err != nil {
@@ -314,9 +306,6 @@ type RateLimitCacheInvalidator interface {
 }
 
 type APIKeyService struct {
-	groupCatalogue interface {
-		SupportedKeyProviders(context.Context, *Group) []string
-	}
 	apiKeyRepo                APIKeyRepository
 	userRepo                  UserRepository
 	groupRepo                 GroupRepository
@@ -405,12 +394,6 @@ func (s *APIKeyService) SetRateLimitCacheInvalidator(inv RateLimitCacheInvalidat
 
 func (s *APIKeyService) SetConcurrencyService(concurrencyService *ConcurrencyService) {
 	s.concurrencyService = concurrencyService
-}
-
-func (s *APIKeyService) SetGroupCatalogue(catalogue interface {
-	SupportedKeyProviders(context.Context, *Group) []string
-}) {
-	s.groupCatalogue = catalogue
 }
 
 // SetLastUsedScheduler routes authentication activity timestamps to the
@@ -616,7 +599,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	// 创建API Key记录
 	apiKey := &APIKey{
-		ModelScope:  NormalizeModelScope(req.ModelScope),
+		ModelScope:  ModelScopeAll,
 		UserID:      userID,
 		Key:         key,
 		Name:        html.EscapeString(req.Name),
@@ -991,10 +974,6 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.AnthropicCacheTTLMode = NormalizeAnthropicCacheTTLMode(*req.AnthropicCacheTTLMode)
 		fields.AnthropicCacheTTLMode = true
 	}
-	if req.ModelScope != nil {
-		apiKey.ModelScope = NormalizeModelScope(*req.ModelScope)
-		fields.ModelScope = true
-	}
 	resetRateLimit := req.ResetRateLimitUsage != nil && *req.ResetRateLimitUsage
 	if resetRateLimit {
 		apiKey.Usage5h = 0
@@ -1176,9 +1155,6 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 	availableGroups := make([]Group, 0)
 	for _, group := range allGroups {
 		if s.canUserBindGroupInternal(user, &group, subscribedGroupIDs) {
-			if s.groupCatalogue != nil {
-				group.SupportedKeyProviders = s.groupCatalogue.SupportedKeyProviders(ctx, &group)
-			}
 			availableGroups = append(availableGroups, group)
 		}
 	}

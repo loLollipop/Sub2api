@@ -92,13 +92,8 @@ func (r *CompositeRouteResolver) ListExactPublicModels(ctx context.Context, grou
 		return nil, err
 	}
 	models := make([]string, 0, len(targets))
-	for model, candidates := range targets {
-		for _, target := range candidates {
-			if CheckModelScope(ctx, model, target.model) == nil {
-				models = append(models, model)
-				break
-			}
-		}
+	for model := range targets {
+		models = append(models, model)
 	}
 	sort.Strings(models)
 	return models, nil

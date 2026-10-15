@@ -72,26 +72,6 @@ func TestBuildV1ModelsURL(t *testing.T) {
 	require.Equal(t, "https://gateway.example.com/antigravity/v1/models", buildV1ModelsURL("https://gateway.example.com/antigravity/"))
 }
 
-func TestDomesticUpstreamModelSyncUsesConfiguredURLAndPreservesCatalog(t *testing.T) {
-	for _, protocol := range []string{"", APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic} {
-		upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: http.StatusOK, Header: make(http.Header),
-			Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"moonshotai/kimi-k2.6"},{"id":"xiaomi/mimo-v2"},{"id":"Agents-A1"},{"id":"Atria-Dawn-Preview"}]}`))}}
-		svc := &AccountTestService{cfg: upstreamModelSyncTestConfig(), httpUpstream: upstream}
-		account := &Account{Platform: PlatformMixed, Type: AccountTypeAPIKey, Credentials: map[string]any{
-			"base_url": "https://domestic.example/prefix/v1", "api_key": "domestic-key", "api_protocol": protocol,
-			"header_override_enabled": true, "header_overrides": map[string]any{"X-Custom-Tenant": "tenant-value"},
-		}}
-		models, err := svc.FetchUpstreamSupportedModels(context.Background(), account)
-		require.NoError(t, err)
-		require.ElementsMatch(t, []string{"moonshotai/kimi-k2.6", "xiaomi/mimo-v2", "Agents-A1", "Atria-Dawn-Preview"}, models)
-		require.Equal(t, http.MethodGet, upstream.lastReq.Method)
-		require.Equal(t, "https://domestic.example/prefix/v1/models", upstream.lastReq.URL.String())
-		require.Equal(t, "Bearer domestic-key", upstream.lastReq.Header.Get("Authorization"))
-		require.Equal(t, []string{"tenant-value"}, headerValuesEqualFold(upstream.lastReq.Header, "X-Custom-Tenant"))
-		require.True(t, HTTPUpstreamRedirectsDisabled(upstream.lastReq.Context()))
-	}
-}
-
 func TestBuildOpenAIModelsURL(t *testing.T) {
 	t.Parallel()
 

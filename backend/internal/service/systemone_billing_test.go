@@ -61,14 +61,10 @@ func TestSystemOnePreauthorizationAndUsageActualInputOnly(t *testing.T) {
 	require.NotContains(t, f.recorder.snapshot(), "repo_begin_refund")
 }
 
-func TestSystemOneSchedulingAndScopes(t *testing.T) {
-	for _, platform := range []string{PlatformOpenAI, PlatformMixed, PlatformAnthropic, PlatformGemini, PlatformCommandCode, PlatformCline} {
+func TestSystemOneSchedulingIsolation(t *testing.T) {
+	for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformCommandCode, PlatformCline} {
 		require.False(t, groupUsableForRequest(&Group{Platform: platform}, PlatformTypeSafe, "jev-latest", map[string]struct{}{PlatformOpenAI: {}}))
 	}
 	require.True(t, groupUsableForRequest(&Group{Platform: PlatformTypeSafe}, PlatformTypeSafe, "jev-latest"))
 	require.False(t, groupUsableForRequest(&Group{Platform: PlatformTypeSafe}, PlatformOpenAI, "gpt-6"))
-	for _, scope := range []string{ModelScopeOpenAI, ModelScopeAnthropic, ModelScopeCN} {
-		require.Error(t, CheckModelScope(ContextWithModelScope(context.Background(), scope), "jev-latest", "jev-latest"))
-	}
-	require.NoError(t, CheckModelScope(ContextWithModelScope(context.Background(), ModelScopeOther), "jev-latest", "jev-latest"))
 }

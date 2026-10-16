@@ -78,8 +78,10 @@ func TestChatResponsesStreamRefusalLifecycle(t *testing.T) {
 					var content []ResponsesContentPart
 					if event.Item != nil {
 						content = event.Item.Content
-						itemWire := wire["item"].(map[string]any)
-						contentWire := itemWire["content"].([]any)
+						itemWire, ok := wire["item"].(map[string]any)
+						require.True(t, ok)
+						contentWire, ok := itemWire["content"].([]any)
+						require.True(t, ok)
 						for j, part := range content {
 							if part.Type == "refusal" {
 								require.Equal(t, map[string]any{"type": "refusal", "refusal": "I cannot help."}, contentWire[j])

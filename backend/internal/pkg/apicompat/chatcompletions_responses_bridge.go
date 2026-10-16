@@ -1842,7 +1842,7 @@ func ChatCompletionsChunkToResponsesEvents(
 					ItemID: state.MessageItemID, Part: &ResponsesContentPart{Type: "refusal"},
 				}))
 			}
-			state.Refusal.WriteString(*choice.Delta.Refusal)
+			_, _ = state.Refusal.WriteString(*choice.Delta.Refusal)
 			events = append(events, chatToResponsesEvent(state, "response.refusal.delta", &ResponsesStreamEvent{
 				OutputIndex: state.MessageIndex, ContentIndex: state.RefusalPartIndex,
 				ItemID: state.MessageItemID, Delta: *choice.Delta.Refusal,

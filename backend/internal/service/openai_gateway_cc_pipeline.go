@@ -333,8 +333,8 @@ func (s *OpenAIGatewayService) scanCCStream(
 						st.Err = errors.New("upstream Chat Completions JSON error body too large")
 						return st
 					}
-					rawJSON.WriteString(line)
-					rawJSON.WriteByte('\n')
+					_, _ = rawJSON.WriteString(line)
+					_ = rawJSON.WriteByte('\n')
 					if !scanner.Scan() {
 						break
 					}

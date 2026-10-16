@@ -1665,12 +1665,16 @@ type ChatCompletionsToResponsesStreamState struct {
 	ReasoningOpen   bool
 	ReasoningDone   bool
 
-	// Message item + output_text content-part lifecycle.
-	MessageItemID string
-	MessageIndex  int
-	TextPartOpen  bool
+	// Message item + text/refusal content-part lifecycle.
+	MessageItemID    string
+	MessageIndex     int
+	TextPartOpen     bool
+	TextPartIndex    int
+	RefusalPartOpen  bool
+	RefusalPartIndex int
 
 	Text      strings.Builder
+	Refusal   strings.Builder
 	Reasoning strings.Builder
 
 	// Tool-call lifecycle, keyed by the upstream tool_call index.
@@ -1823,6 +1827,27 @@ func ChatCompletionsChunkToResponsesEvents(
 			thinking, text := state.inlineThink.Push(*choice.Delta.Content)
 			events = append(events, emitChatInlineThink(state, thinking, text)...)
 		}
+		if choice.Delta.Refusal != nil && *choice.Delta.Refusal != "" {
+			thinking, text := state.inlineThink.Flush()
+			events = append(events, emitChatInlineThink(state, thinking, text)...)
+			events = append(events, closeChatReasoningItem(state)...)
+			events = append(events, ensureChatToResponsesMessageItem(state, "refusal")...)
+			if !state.RefusalPartOpen {
+				state.RefusalPartOpen = true
+				if state.TextPartOpen {
+					state.RefusalPartIndex = 1
+				}
+				events = append(events, chatToResponsesEvent(state, "response.content_part.added", &ResponsesStreamEvent{
+					OutputIndex: state.MessageIndex, ContentIndex: state.RefusalPartIndex,
+					ItemID: state.MessageItemID, Part: &ResponsesContentPart{Type: "refusal"},
+				}))
+			}
+			_, _ = state.Refusal.WriteString(*choice.Delta.Refusal)
+			events = append(events, chatToResponsesEvent(state, "response.refusal.delta", &ResponsesStreamEvent{
+				OutputIndex: state.MessageIndex, ContentIndex: state.RefusalPartIndex,
+				ItemID: state.MessageItemID, Delta: *choice.Delta.Refusal,
+			}))
+		}
 		if len(choice.Delta.ToolCalls) > 0 || (choice.FinishReason != nil && *choice.FinishReason != "") {
 			thinking, text := state.inlineThink.Flush()
 			events = append(events, emitChatInlineThink(state, thinking, text)...)
@@ -1906,15 +1931,25 @@ func FinalizeChatCompletionsResponsesStream(state *ChatCompletionsToResponsesStr
 		if state.TextPartOpen {
 			events = append(events, chatToResponsesEvent(state, "response.output_text.done", &ResponsesStreamEvent{
 				OutputIndex:  state.MessageIndex,
-				ContentIndex: 0,
+				ContentIndex: state.TextPartIndex,
 				Text:         state.Text.String(),
 				ItemID:       state.MessageItemID,
 			}))
 			events = append(events, chatToResponsesEvent(state, "response.content_part.done", &ResponsesStreamEvent{
 				OutputIndex:  state.MessageIndex,
-				ContentIndex: 0,
+				ContentIndex: state.TextPartIndex,
 				ItemID:       state.MessageItemID,
 				Part:         &ResponsesContentPart{Type: "output_text", Text: state.Text.String()},
+			}))
+		}
+		if state.RefusalPartOpen {
+			events = append(events, chatToResponsesEvent(state, "response.refusal.done", &ResponsesStreamEvent{
+				OutputIndex: state.MessageIndex, ContentIndex: state.RefusalPartIndex,
+				ItemID: state.MessageItemID, Refusal: state.Refusal.String(),
+			}))
+			events = append(events, chatToResponsesEvent(state, "response.content_part.done", &ResponsesStreamEvent{
+				OutputIndex: state.MessageIndex, ContentIndex: state.RefusalPartIndex,
+				ItemID: state.MessageItemID, Part: &ResponsesContentPart{Type: "refusal", Refusal: state.Refusal.String()},
 			}))
 		}
 		events = append(events, chatToResponsesEvent(state, "response.output_item.done", &ResponsesStreamEvent{
@@ -1923,7 +1958,7 @@ func FinalizeChatCompletionsResponsesStream(state *ChatCompletionsToResponsesStr
 				Type:    "message",
 				ID:      state.MessageItemID,
 				Role:    "assistant",
-				Content: []ResponsesContentPart{{Type: "output_text", Text: state.Text.String()}},
+				Content: state.messageContent(),
 				Status:  "completed",
 			},
 		}))
@@ -1985,12 +2020,12 @@ func emitChatInlineThink(state *ChatCompletionsToResponsesStreamState, thinking,
 	}
 	if text != "" {
 		events = append(events, closeChatReasoningItem(state)...)
-		events = append(events, ensureChatToResponsesMessageItem(state)...)
+		events = append(events, ensureChatToResponsesMessageItem(state, "output_text")...)
 		events = append(events, ensureChatToResponsesTextPart(state)...)
 		_, _ = state.Text.WriteString(text)
 		events = append(events, chatToResponsesEvent(state, "response.output_text.delta", &ResponsesStreamEvent{
 			OutputIndex:  state.MessageIndex,
-			ContentIndex: 0,
+			ContentIndex: state.TextPartIndex,
 			Delta:        text,
 			ItemID:       state.MessageItemID,
 		}))
@@ -2089,19 +2124,19 @@ func synthesizeChatReasoningFallbackMessage(state *ChatCompletionsToResponsesStr
 	}
 
 	var events []ResponsesStreamEvent
-	events = append(events, ensureChatToResponsesMessageItem(state)...)
+	events = append(events, ensureChatToResponsesMessageItem(state, "output_text")...)
 	events = append(events, ensureChatToResponsesTextPart(state)...)
 	_, _ = state.Text.WriteString(text)
 	events = append(events, chatToResponsesEvent(state, "response.output_text.delta", &ResponsesStreamEvent{
 		OutputIndex:  state.MessageIndex,
-		ContentIndex: 0,
+		ContentIndex: state.TextPartIndex,
 		Delta:        text,
 		ItemID:       state.MessageItemID,
 	}))
 	return events
 }
 
-func ensureChatToResponsesMessageItem(state *ChatCompletionsToResponsesStreamState) []ResponsesStreamEvent {
+func ensureChatToResponsesMessageItem(state *ChatCompletionsToResponsesStreamState, partType string) []ResponsesStreamEvent {
 	if state.MessageItemID != "" {
 		return nil
 	}
@@ -2114,7 +2149,7 @@ func ensureChatToResponsesMessageItem(state *ChatCompletionsToResponsesStreamSta
 			ID:      state.MessageItemID,
 			Role:    "assistant",
 			Status:  "in_progress",
-			Content: []ResponsesContentPart{{Type: "output_text"}},
+			Content: []ResponsesContentPart{{Type: partType}},
 		},
 	})}
 }
@@ -2124,9 +2159,12 @@ func ensureChatToResponsesTextPart(state *ChatCompletionsToResponsesStreamState)
 		return nil
 	}
 	state.TextPartOpen = true
+	if state.RefusalPartOpen {
+		state.TextPartIndex = 1
+	}
 	return []ResponsesStreamEvent{chatToResponsesEvent(state, "response.content_part.added", &ResponsesStreamEvent{
 		OutputIndex:  state.MessageIndex,
-		ContentIndex: 0,
+		ContentIndex: state.TextPartIndex,
 		ItemID:       state.MessageItemID,
 		Part:         &ResponsesContentPart{Type: "output_text", Text: ""},
 	})}
@@ -2326,6 +2364,21 @@ func closeChatToolItems(state *ChatCompletionsToResponsesStreamState) []Response
 	return events
 }
 
+func (state *ChatCompletionsToResponsesStreamState) messageContent() []ResponsesContentPart {
+	text := ResponsesContentPart{Type: "output_text", Text: state.Text.String()}
+	if !state.RefusalPartOpen {
+		return []ResponsesContentPart{text}
+	}
+	refusal := ResponsesContentPart{Type: "refusal", Refusal: state.Refusal.String()}
+	if !state.TextPartOpen {
+		return []ResponsesContentPart{refusal}
+	}
+	if state.TextPartIndex < state.RefusalPartIndex {
+		return []ResponsesContentPart{text, refusal}
+	}
+	return []ResponsesContentPart{refusal, text}
+}
+
 func (state *ChatCompletionsToResponsesStreamState) chatOutput() []ResponsesOutput {
 	var outputs []ResponsesOutput
 	if state.Reasoning.Len() > 0 {
@@ -2340,14 +2393,11 @@ func (state *ChatCompletionsToResponsesStreamState) chatOutput() []ResponsesOutp
 	}
 	if state.MessageItemID != "" || len(state.ToolCalls) == 0 {
 		outputs = append(outputs, ResponsesOutput{
-			Type: "message",
-			ID:   nonEmpty(state.MessageItemID, generateItemID()),
-			Role: "assistant",
-			Content: []ResponsesContentPart{{
-				Type: "output_text",
-				Text: state.Text.String(),
-			}},
-			Status: "completed",
+			Type:    "message",
+			ID:      nonEmpty(state.MessageItemID, generateItemID()),
+			Role:    "assistant",
+			Content: state.messageContent(),
+			Status:  "completed",
 		})
 	}
 	for i := 0; i < len(state.ToolCalls); i++ {

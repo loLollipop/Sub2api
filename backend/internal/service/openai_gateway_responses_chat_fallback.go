@@ -136,7 +136,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	}
 
 	if clientStream {
-		return s.streamChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, localShellTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+		return s.streamChatCompletionsAsResponses(c, resp, account, originalModel, customTools, functionTools, toolSearch, namespaceTools, localShellTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}
 	return s.bufferChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, localShellTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 }
@@ -190,6 +190,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponses(
 func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	c *gin.Context,
 	resp *http.Response,
+	account *Account,
 	originalModel string,
 	customTools map[string]bool,
 	functionTools map[string]bool,
@@ -212,6 +213,8 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	state.NamespaceTools = namespaceTools
 	state.LocalShellTools = localShellTools
 	clientDisconnected := false
+	clientOutputStarted := false
+	var pendingEvents []apicompat.ResponsesStreamEvent
 
 	writeEvents := func(events []apicompat.ResponsesStreamEvent) {
 		if clientDisconnected || len(events) == 0 {
@@ -235,6 +238,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 				)
 				return
 			}
+			clientOutputStarted = true
 		}
 		c.Writer.Flush()
 	}
@@ -242,10 +246,19 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	scan := s.scanCCStream(c, resp, "openai responses chat fallback", requestID, startTime, func(chunk *apicompat.ChatCompletionsChunk) {
 		events := apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state)
 		s.cacheReasoningItemsFromEvents(events)
+		// Role/usage chunks create only lifecycle events. Hold them until
+		// actual text, reasoning, or a named tool call makes replay unsafe.
+		if !clientOutputStarted {
+			pendingEvents = append(pendingEvents, events...)
+			if !chatResponsesStreamHasOutput(state) {
+				return
+			}
+			events, pendingEvents = pendingEvents, nil
+		}
 		writeEvents(events)
-	})
+	}, true)
 
-	if scan.Err != nil {
+	resultWithUsage := func() *OpenAIForwardResult {
 		return &OpenAIForwardResult{
 			RequestID:                     requestID,
 			UpstreamHeaders:               resp.Header,
@@ -263,31 +276,75 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  scan.FirstTokenMs,
 			NonBillableUpstreamError:      scan.NonBillableUpstreamError,
-		}, fmt.Errorf("stream usage incomplete: %w", scan.Err)
+			ClientDisconnect:              clientDisconnected,
+		}
+	}
+	failStream := func(cause error) (*OpenAIForwardResult, error) {
+		if clientDisconnected || errors.Is(cause, context.Canceled) || errors.Is(cause, context.DeadlineExceeded) || c.Request.Context().Err() != nil {
+			return resultWithUsage(), cause
+		}
+		message := cause.Error()
+		if len(scan.ErrorPayload) > 0 {
+			if upstreamMessage := extractOpenAISSEErrorMessage(scan.ErrorPayload); upstreamMessage != "" {
+				message = upstreamMessage
+			}
+		}
+		retryable := len(scan.ErrorPayload) == 0 || openAIStreamFailedEventShouldFailover(scan.ErrorPayload, message)
+		if len(scan.ErrorPayload) > 0 && scan.ErrorEventType != "response.failed" {
+			retryable = openAIStreamErrorEventShouldFailover(scan.ErrorPayload, message)
+		}
+		if !openAIStreamClientOutputStarted(c, clientOutputStarted) && !IsResponseCommitted(c) && retryable {
+			return nil, s.newOpenAIStreamFailoverErrorWithModel(c, account, false, requestID, scan.ErrorPayload, message, upstreamModel, resp.Header)
+		}
+		if !clientOutputStarted && isOpenAINonBillableRequestError(message, scan.ErrorPayload) {
+			scan.NonBillableUpstreamError = true
+		}
+		s.recordOpenAIStreamUpstreamError(c, account, false, requestID, "stream_failed", scan.ErrorPayload, message)
+		s.markOpenAIStreamFinalFailure(c, account, false, requestID, true)
+		// The shared failure builder preserves sequence_number from its source.
+		// Continue this converted stream's sequence rather than restarting at 0.
+		failureSource := make(map[string]json.RawMessage)
+		if IsUpstreamFinancialError(0, scan.ErrorPayload) || upstreamFinancialMessage(message) {
+			message = UpstreamUnavailableMessage
+		} else {
+			_ = json.Unmarshal(scan.ErrorPayload, &failureSource)
+		}
+		failureSource["sequence_number"], _ = json.Marshal(state.SequenceNumber)
+		failurePayload, _ := json.Marshal(failureSource)
+		failureSSE := buildOpenAIResponseFailedSSE(state.ResponseID, originalModel, failurePayload, message)
+		failureData := []byte(strings.TrimSuffix(strings.TrimPrefix(failureSSE, "event: response.failed\ndata: "), "\n\n"))
+		if sanitized, changed := sanitizeOpenAIResponseFailedEventForClient(failureData, "response.failed", clientOutputStarted); changed {
+			failureSSE = "event: response.failed\ndata: " + string(sanitized) + "\n\n"
+		}
+		writeStreamHeaders()
+		if _, err := fmt.Fprint(c.Writer, failureSSE); err != nil {
+			clientDisconnected = true
+		} else {
+			c.Writer.Flush()
+		}
+		MarkResponseCommitted(c)
+		return resultWithUsage(), cause
+	}
+	if scan.Err != nil {
+		return failStream(fmt.Errorf("stream usage incomplete: %w", scan.Err))
+	}
+	// A clean TCP EOF does not prove that the provider finished generating.
+	// Either a finish_reason or the SSE [DONE] sentinel is sufficient.
+	if !scan.SawDone && state.FinishReason == "" {
+		return failStream(errors.New("stream usage incomplete: missing terminal event"))
 	}
 	if err := state.ValidateToolCallArguments(); err != nil {
-		return &OpenAIForwardResult{
-			RequestID:                     requestID,
-			UpstreamHeaders:               resp.Header,
-			Usage:                         scan.Usage,
-			Model:                         originalModel,
-			BillingModel:                  billingModel,
-			UpstreamModel:                 upstreamModel,
-			UpstreamResponseModel:         observedUpstreamResponseModel(c),
-			UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
-			UpstreamEndpoint:              "/v1/chat/completions",
-			ReasoningEffort:               reasoningEffort,
-			UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
-			ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
-			Stream:                        true,
-			Duration:                      time.Since(startTime),
-			FirstTokenMs:                  scan.FirstTokenMs,
-			NonBillableUpstreamError:      scan.NonBillableUpstreamError,
-		}, fmt.Errorf("invalid tool call arguments from upstream: %w", err)
+		return failStream(fmt.Errorf("invalid tool call arguments from upstream: %w", err))
 	}
 
 	finalEvents := apicompat.FinalizeChatCompletionsResponsesStream(state)
+	// Finalize can flush a buffered inline-think prefix into visible text.
+	// Check afterwards, before publishing its synthetic response.completed.
+	if !chatResponsesStreamHasOutput(state) {
+		return failStream(errors.New("upstream Chat Completions stream completed without output"))
+	}
 	s.cacheReasoningItemsFromEvents(finalEvents)
+	writeEvents(pendingEvents)
 	writeEvents(finalEvents)
 	if !clientDisconnected {
 		writeStreamHeaders()
@@ -302,24 +359,19 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 		logCCStreamMissingDoneSentinel("openai responses chat fallback", requestID)
 	}
 
-	return &OpenAIForwardResult{
-		RequestID:                     requestID,
-		UpstreamHeaders:               resp.Header,
-		Usage:                         scan.Usage,
-		Model:                         originalModel,
-		BillingModel:                  billingModel,
-		UpstreamModel:                 upstreamModel,
-		UpstreamResponseModel:         observedUpstreamResponseModel(c),
-		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
-		UpstreamEndpoint:              "/v1/chat/completions",
-		ReasoningEffort:               reasoningEffort,
-		UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
-		ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
-		Stream:                        true,
-		Duration:                      time.Since(startTime),
-		FirstTokenMs:                  scan.FirstTokenMs,
-		NonBillableUpstreamError:      scan.NonBillableUpstreamError,
-	}, nil
+	return resultWithUsage(), nil
+}
+
+func chatResponsesStreamHasOutput(state *apicompat.ChatCompletionsToResponsesStreamState) bool {
+	if state.Text.Len() > 0 || state.Refusal.Len() > 0 || state.Reasoning.Len() > 0 {
+		return true
+	}
+	for _, call := range state.ToolCalls {
+		if call != nil && strings.TrimSpace(call.Function.Name) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func chatChunkStartsResponsesOutput(chunk *apicompat.ChatCompletionsChunk) bool {
@@ -329,6 +381,26 @@ func chatChunkStartsResponsesOutput(chunk *apicompat.ChatCompletionsChunk) bool 
 	for _, choice := range chunk.Choices {
 		if choice.Delta.Content != nil || choice.Delta.ReasoningContent != nil || len(choice.Delta.ToolCalls) > 0 {
 			return true
+		}
+	}
+	return false
+}
+
+func chatChunkStartsResponsesSemanticOutput(chunk *apicompat.ChatCompletionsChunk) bool {
+	if chunk == nil {
+		return false
+	}
+	for _, choice := range chunk.Choices {
+		if (choice.Delta.Content != nil && *choice.Delta.Content != "") ||
+			(choice.Delta.Refusal != nil && *choice.Delta.Refusal != "") ||
+			(choice.Delta.ReasoningContent != nil && *choice.Delta.ReasoningContent != "") ||
+			(choice.Delta.ReasoningContent == nil && choice.Delta.Reasoning != nil && *choice.Delta.Reasoning != "") {
+			return true
+		}
+		for _, call := range choice.Delta.ToolCalls {
+			if call.Function.Name != "" || call.Function.Arguments != "" {
+				return true
+			}
 		}
 	}
 	return false

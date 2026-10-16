@@ -43,6 +43,18 @@ func (e ResponsesStreamEvent) MarshalJSON() ([]byte, error) {
 		m["part"] = outputTextPartWire(e.Part)
 		return json.Marshal(m)
 
+	case "response.refusal.delta", "response.refusal.done":
+		m := e.wireBase()
+		e.putItemID(m)
+		m["output_index"] = e.OutputIndex
+		m["content_index"] = e.ContentIndex
+		if e.Type == "response.refusal.done" {
+			m["refusal"] = e.Refusal
+		} else {
+			m["delta"] = e.Delta
+		}
+		return json.Marshal(m)
+
 	case "response.reasoning_summary_text.delta", "response.reasoning_summary_text.done":
 		m := e.wireBase()
 		e.putItemID(m)
@@ -128,6 +140,9 @@ func (e ResponsesStreamEvent) putItemID(m map[string]any) {
 // outputTextPartWire renders a content part for a message's output_text, always
 // carrying text/annotations/logprobs (matching cc-switch's push_text_delta).
 func outputTextPartWire(part *ResponsesContentPart) map[string]any {
+	if part != nil && part.Type == "refusal" {
+		return map[string]any{"type": "refusal", "refusal": part.Refusal}
+	}
 	text := ""
 	if part != nil {
 		text = part.Text
@@ -213,6 +228,10 @@ func responsesItemWire(item *ResponsesOutput) map[string]any {
 func messageContentWire(parts []ResponsesContentPart) []map[string]any {
 	out := make([]map[string]any, 0, len(parts))
 	for _, p := range parts {
+		if p.Type == "refusal" {
+			out = append(out, map[string]any{"type": "refusal", "refusal": p.Refusal})
+			continue
+		}
 		typ := p.Type
 		if typ == "" {
 			typ = "output_text"

@@ -5,6 +5,8 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -181,6 +184,301 @@ func TestForwardResponses_ForceChatCompletionsRoutesStreamingToChatCompletions(t
 	require.Equal(t, 3, result.Usage.OutputTokens)
 	require.True(t, result.Stream)
 	require.NotNil(t, result.FirstTokenMs)
+}
+
+func TestForwardResponses_ChatFallbackRejectsEmptyOrInvalidStream(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct {
+		name string
+		wire string
+	}{
+		{name: "empty EOF"},
+		{name: "done only", wire: "data: [DONE]\n\n"},
+		{name: "SSE comments", wire: ": keepalive\n\nevent: message\ndata: \n\n"},
+		{name: "role and empty text", wire: "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"},
+		{name: "usage only", wire: "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":0}}\n\ndata: [DONE]\n\n"},
+		{name: "invalid JSON", wire: "data: {broken\n\ndata: [DONE]\n\n"},
+		{name: "unknown SSE JSON", wire: "data: {}\n\ndata: [DONE]\n\n"},
+		{name: "empty tool placeholder", wire: "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0}]},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n"},
+		{name: "non SSE JSON", wire: `{"choices":[{"message":{"content":"not a stream"},"finish_reason":"stop"}]}`},
+		{name: "non SSE error", wire: `{"error":{"message":"temporarily unavailable, please retry"}}`},
+		{name: "pretty non SSE error", wire: "{\n  \"error\": {\n    \"code\": \"server_error\",\n    \"message\": \"temporarily unavailable, please retry\"\n  }\n}"},
+		{name: "retryable SSE error", wire: "data: {\"error\":{\"code\":\"server_error\",\"message\":\"temporarily unavailable, please retry\"}}\n\ndata: [DONE]\n\n"},
+		{name: "typed SSE error", wire: "event: error\ndata: {\"code\":\"request_timeout\",\"message\":\"temporary failure, please retry\"}\n\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err, rec, c := forwardResponsesChatFallbackStream(t, tt.wire)
+			require.Error(t, err)
+			var failoverErr *UpstreamFailoverError
+			require.ErrorAs(t, err, &failoverErr)
+			require.Nil(t, result, "a retryable attempt must not be recorded as a successful usage row")
+			require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+			require.False(t, c.Writer.Written(), "role/usage/lifecycle frames must not commit an empty attempt")
+			require.Empty(t, rec.Body.String())
+		})
+	}
+}
+
+func TestForwardResponses_ChatFallbackReadErrorRespectsOutputBoundary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, withOutput := range []bool{false, true} {
+		wire := "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n"
+		if withOutput {
+			wire += "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2}}\n\n"
+		}
+		result, err, rec, c := forwardResponsesChatFallbackStream(t, wire, io.ErrUnexpectedEOF)
+		require.Error(t, err)
+		var failoverErr *UpstreamFailoverError
+		require.Equal(t, !withOutput, errors.As(err, &failoverErr))
+		if withOutput {
+			require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+			require.NotNil(t, result)
+			require.Equal(t, 4, result.Usage.InputTokens)
+			require.Equal(t, 2, result.Usage.OutputTokens)
+			require.Contains(t, rec.Body.String(), "event: response.failed")
+		} else {
+			require.Nil(t, result)
+			require.False(t, c.Writer.Written())
+		}
+		require.NotContains(t, rec.Body.String(), "event: response.completed")
+	}
+}
+
+func TestForwardResponses_ChatFallbackDoesNotRetryRequestErrorsOrCancellation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct {
+		name    string
+		wire    string
+		readErr error
+	}{
+		{name: "context length", wire: "data: {\"error\":{\"code\":\"context_length_exceeded\",\"type\":\"invalid_request_error\",\"message\":\"Your input exceeds the context window\"}}\n\n"},
+		{name: "typed context length", wire: "event: error\ndata: {\"code\":\"context_length_exceeded\",\"message\":\"Your input exceeds the context window\"}\n\n"},
+		{name: "JSON context length", wire: `{"error":{"code":"context_length_exceeded","type":"invalid_request_error","message":"Your input exceeds the context window"}}`},
+		{name: "pretty JSON context length", wire: "{\n  \"error\": {\n    \"code\": \"context_length_exceeded\",\n    \"type\": \"invalid_request_error\",\n    \"message\": \"Your input exceeds the context window\"\n  }\n}"},
+		{name: "unclassified error", wire: `{"error":{"message":"upstream failed"}}`},
+		{name: "cancellation", readErr: context.Canceled},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err, rec, _ := forwardResponsesChatFallbackStream(t, tt.wire, tt.readErr)
+			require.Error(t, err)
+			require.NotNil(t, result)
+			var failoverErr *UpstreamFailoverError
+			require.False(t, errors.As(err, &failoverErr))
+			require.NotContains(t, rec.Body.String(), "event: response.completed")
+			if tt.readErr != nil {
+				require.ErrorIs(t, err, tt.readErr)
+				require.Empty(t, rec.Body.String())
+			} else {
+				require.Contains(t, rec.Body.String(), "event: response.failed")
+				if strings.Contains(tt.name, "context length") {
+					require.True(t, result.NonBillableUpstreamError)
+					require.Contains(t, rec.Body.String(), `"code":"context_length_exceeded"`)
+				}
+			}
+		})
+	}
+}
+
+func TestForwardResponses_ChatFallbackRejectsTruncatedStreamAfterOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const content = "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n"
+	for _, suffix := range []string{
+		"",
+		"data: {broken\n\n",
+		"data: {\"error\":{\"message\":\"temporarily unavailable, please retry\"}}\n\ndata: [DONE]\n\n",
+	} {
+		t.Run(suffix, func(t *testing.T) {
+			result, err, rec, _ := forwardResponsesChatFallbackStream(t, content+suffix)
+			require.Error(t, err)
+			require.NotNil(t, result)
+			var failoverErr *UpstreamFailoverError
+			require.False(t, errors.As(err, &failoverErr), "partial semantic output cannot be replayed on another account")
+			require.Contains(t, rec.Body.String(), `"delta":"partial"`)
+			require.Contains(t, rec.Body.String(), "event: response.failed")
+			require.NotContains(t, rec.Body.String(), "event: response.completed")
+			require.NotContains(t, rec.Body.String(), "data: [DONE]")
+			lastSequence := int64(-1)
+			for _, line := range strings.Split(rec.Body.String(), "\n") {
+				if payload, ok := extractOpenAISSEDataLine(line); ok {
+					sequence := gjson.Get(payload, "sequence_number").Int()
+					require.Greater(t, sequence, lastSequence)
+					lastSequence = sequence
+				}
+			}
+		})
+	}
+}
+
+func TestForwardResponses_ChatFallbackAcceptsSemanticOutputAndTerminal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct {
+		name string
+		wire string
+		want string
+	}{
+		{name: "finish without done", wire: "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}]}\n\n", want: "response.output_text.delta"},
+		{name: "done without finish", wire: "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"}}]}\n\ndata: [DONE]\n\n", want: "response.output_text.delta"},
+		{name: "empty choices preamble", wire: "data: {\"choices\":[],\"usage\":null,\"error\":null}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}]}\n\n", want: "response.output_text.delta"},
+		{name: "usage without choices", wire: "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: {\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":1}}\n\ndata: [DONE]\n\n", want: "response.output_text.delta"},
+		{name: "reasoning alias", wire: "data: {\"choices\":[{\"delta\":{\"reasoning\":\"thinking\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n", want: "response.reasoning_summary_text.delta"},
+		{name: "refusal only", wire: "data: {\"choices\":[{\"delta\":{\"refusal\":\"I cannot help.\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n", want: "response.refusal.delta"},
+		{name: "inline buffered text", wire: "data: {\"choices\":[{\"delta\":{\"content\":\"<\"}}]}\n\ndata: [DONE]\n\n", want: "response.output_text.delta"},
+		{name: "tool only", wire: "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"get_value\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n", want: "response.function_call_arguments.done"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err, rec, _ := forwardResponsesChatFallbackStream(t, tt.wire)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.NotNil(t, result.FirstTokenMs)
+			require.Contains(t, rec.Body.String(), tt.want)
+			require.Contains(t, rec.Body.String(), "event: response.completed")
+			require.Contains(t, rec.Body.String(), "data: [DONE]")
+		})
+	}
+}
+
+func forwardResponsesChatFallbackStream(t *testing.T, wire string, readErrors ...error) (*OpenAIForwardResult, error, *httptest.ResponseRecorder, *gin.Context) {
+	t.Helper()
+	body := []byte(`{"model":"glm-5.3","input":"hello","stream":true}`)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "X-Request-Id": []string{"rid_empty_chat_stream"}},
+		Body:       io.NopCloser(strings.NewReader(wire)),
+	}}
+	if len(readErrors) > 0 && readErrors[0] != nil {
+		upstream.resp.Body = &openAIStreamReadThenErrorCloser{reader: strings.NewReader(wire), err: readErrors[0]}
+	}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	result, err := svc.Forward(c.Request.Context(), c, forceChatResponsesFallbackAccount(), body)
+	return result, err, rec, c
+}
+
+func TestForwardResponses_ChatFallbackRefusalCannotReplay(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const refusal = "data: {\"choices\":[{\"delta\":{\"refusal\":\"I cannot help.\"}}]}\n\n"
+	for _, suffix := range []string{"", "data: {\"error\":{\"code\":\"server_error\",\"message\":\"please retry\"}}\n\n"} {
+		result, err, rec, _ := forwardResponsesChatFallbackStream(t, refusal+suffix)
+		require.Error(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.FirstTokenMs)
+		var failoverErr *UpstreamFailoverError
+		require.False(t, errors.As(err, &failoverErr))
+		require.Contains(t, rec.Body.String(), "event: response.refusal.delta")
+		require.Contains(t, rec.Body.String(), "event: response.failed")
+		require.NotContains(t, rec.Body.String(), "event: response.completed")
+	}
+}
+
+func TestScanCCStream_JSONErrorFormattingAndBounds(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, contentType := range []string{"application/json", "text/event-stream", ""} {
+		for _, pretty := range []bool{false, true} {
+			for _, code := range []string{"context_length_exceeded", "server_error"} {
+				t.Run(fmt.Sprintf("%s/pretty=%v/%s", contentType, pretty, code), func(t *testing.T) {
+					message := "temporary failure, please retry"
+					payload := fmt.Sprintf(`{"error":{"code":%q,"message":%q}}`, code, message)
+					if pretty {
+						payload = fmt.Sprintf("{\n  \"error\": {\n    \"code\": %q,\n    \"message\": %q\n  }\n}", code, message)
+					}
+					c, _ := gin.CreateTestContext(httptest.NewRecorder())
+					resp := &http.Response{Header: http.Header{"Content-Type": []string{contentType}}, Body: io.NopCloser(strings.NewReader(payload))}
+					svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+					scan := svc.scanCCStream(c, resp, "test", "", time.Now(), func(*apicompat.ChatCompletionsChunk) {
+						t.Fatal("a JSON error must never be converted into output")
+					}, true)
+					require.Error(t, scan.Err)
+					require.JSONEq(t, payload, string(scan.ErrorPayload))
+					require.Equal(t, code == "server_error", openAIStreamErrorEventShouldFailover(scan.ErrorPayload, message))
+				})
+			}
+		}
+	}
+
+	t.Run("bounded multiline body", func(t *testing.T) {
+		svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+		limit := openAIUpstreamErrorBodyReadLimitForConfig(svc.cfg)
+		reader := strings.NewReader("{\n" + strings.Repeat(" \n", int(limit)) + "}")
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		scan := svc.scanCCStream(c, &http.Response{Body: io.NopCloser(reader)}, "test", "", time.Now(), nil, true)
+		require.ErrorContains(t, scan.Err, "body too large")
+		require.Empty(t, scan.ErrorPayload)
+		require.Positive(t, reader.Len(), "stop reading once the bounded JSON buffer is full")
+	})
+
+	t.Run("SSE line limit retained", func(t *testing.T) {
+		cfg := rawChatCompletionsTestConfig()
+		cfg.Gateway.MaxLineSize = 1024
+		svc := &OpenAIGatewayService{cfg: cfg}
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		resp := &http.Response{Body: io.NopCloser(strings.NewReader("data: " + strings.Repeat("x", 4096)))}
+		scan := svc.scanCCStream(c, resp, "test", "", time.Now(), nil, true)
+		require.ErrorContains(t, scan.Err, "token too long")
+	})
+}
+
+func TestForwardResponses_ChatFallbackSanitizesFailureAfterOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, eventType := range []string{"error", "response.failed"} {
+		for _, tt := range []struct {
+			code    string
+			message string
+			want    string
+		}{
+			{code: "server_is_overloaded", message: "servers overloaded", want: "server_error"},
+			{code: "slow_down", message: "slow down", want: "server_error"},
+			{code: "rate_limit_exceeded", message: "try again in 3s", want: "rate_limit_exceeded"},
+			{code: "insufficient_quota", message: "insufficient quota: billing balance exhausted", want: "upstream_error"},
+		} {
+			t.Run(eventType+"/"+tt.code, func(t *testing.T) {
+				errObject := fmt.Sprintf(`{"code":%q,"message":%q}`, tt.code, tt.message)
+				payload := fmt.Sprintf(`{"type":"error","error":%s}`, errObject)
+				if eventType == "response.failed" {
+					payload = fmt.Sprintf(`{"type":"response.failed","response":{"error":%s}}`, errObject)
+				}
+				wire := "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\ndata: " + payload + "\n\n"
+				rec := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(rec)
+				body := []byte(`{"model":"glm-5.3","input":"hello","stream":true}`)
+				c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+				cfg := rawChatCompletionsTestConfig()
+				cfg.Gateway.LogUpstreamErrorBody = true
+				upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(wire))}}
+				svc := &OpenAIGatewayService{cfg: cfg, httpUpstream: upstream}
+				result, err := svc.Forward(c.Request.Context(), c, forceChatResponsesFallbackAccount(), body)
+				require.Error(t, err)
+				require.NotNil(t, result)
+				var failoverErr *UpstreamFailoverError
+				require.False(t, errors.As(err, &failoverErr))
+				lastSequence := int64(-1)
+				var failure gjson.Result
+				for _, line := range strings.Split(rec.Body.String(), "\n") {
+					if data, ok := extractOpenAISSEDataLine(line); ok {
+						frame := gjson.Parse(data)
+						require.Greater(t, frame.Get("sequence_number").Int(), lastSequence)
+						lastSequence = frame.Get("sequence_number").Int()
+						if frame.Get("type").String() == "response.failed" {
+							failure = frame
+						}
+					}
+				}
+				require.True(t, failure.Exists())
+				require.Equal(t, tt.want, failure.Get("response.error.code").String())
+				require.NotContains(t, rec.Body.String(), "event: response.completed")
+				if tt.code == "insufficient_quota" {
+					require.Equal(t, UpstreamUnavailableMessage, failure.Get("response.error.message").String())
+					require.NotContains(t, rec.Body.String(), "insufficient_quota")
+					require.NotContains(t, rec.Body.String(), "billing")
+				} else {
+					require.Equal(t, tt.message, failure.Get("response.error.message").String())
+				}
+				// Client rewriting must not alter the monitored upstream payload.
+				require.Contains(t, c.GetString(OpsUpstreamErrorDetailKey), tt.code)
+			})
+		}
+	}
 }
 
 func TestForwardResponses_ChatFallbackRejectsInvalidToolArgumentsAtOutputLimit(t *testing.T) {

@@ -103,7 +103,7 @@ func TestCacheUsageChatFallbackMatchesRawBilling(t *testing.T) {
 					var err error
 					switch {
 					case protocol == "responses" && stream:
-						result, err = svc.streamChatCompletionsAsResponses(c, resp, "grok-4.6", nil, nil, false, nil, nil, "grok-4.6", "grok-4.6", nil, nil, time.Now())
+						result, err = svc.streamChatCompletionsAsResponses(c, resp, nil, "grok-4.6", nil, nil, false, nil, nil, "grok-4.6", "grok-4.6", nil, nil, time.Now())
 					case protocol == "responses":
 						result, err = svc.bufferChatCompletionsAsResponses(c, resp, "grok-4.6", nil, nil, false, nil, nil, "grok-4.6", "grok-4.6", nil, nil, time.Now())
 					case stream:

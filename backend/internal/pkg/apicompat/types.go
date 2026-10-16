@@ -780,6 +780,7 @@ type ResponsesStreamEvent struct {
 	ContentIndex int    `json:"content_index,omitempty"`
 	Delta        string `json:"delta,omitempty"`
 	Text         string `json:"text,omitempty"`
+	Refusal      string `json:"refusal,omitempty"` // response.refusal.done
 	ItemID       string `json:"item_id,omitempty"`
 
 	// response.function_call_arguments.delta / done

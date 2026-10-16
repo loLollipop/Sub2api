@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -277,7 +278,11 @@ type ccStreamScanState struct {
 	FirstTokenMs *int
 	// SawDone 表示上游发出了 [DONE] 哨兵。
 	SawDone bool
-	// Err 为 scanner 读错误（客户端 context 取消不属于此类，会原样带出）。
+	// ErrorPayload retains a structured upstream error for the Responses
+	// fallback's existing retry/error classifiers. It is never a request body.
+	ErrorPayload   []byte
+	ErrorEventType string
+	// Err 为 scanner 读错误或 Responses 回退启用的协议校验错误。
 	// 非 nil 时调用方必须跳过 finalize 并返回 usage-incomplete 错误，避免
 	// 把上游截断伪装成正常收尾。
 	Err                      error
@@ -287,7 +292,8 @@ type ccStreamScanState struct {
 // scanCCStream 驱动两条 CC 回退路径共享的 SSE 读循环：提取 data 行、在 [DONE]
 // 哨兵处停止、保留最新 usage、记录首 token 时延，并把每个解析成功的 chunk 交给
 // emit 回调做各自的协议转换与写出。读错误按既有约定过滤 context 取消类噪声后
-// 记入 Warn 日志。
+// 记入 Warn 日志。validateResponsesStream 仅由 Responses 回退启用，使其能在
+// 提交任何客户端事件前拒绝错误载荷；Messages 回退保持原有读取行为。
 func (s *OpenAIGatewayService) scanCCStream(
 	c *gin.Context,
 	resp *http.Response,
@@ -295,15 +301,53 @@ func (s *OpenAIGatewayService) scanCCStream(
 	requestID string,
 	startTime time.Time,
 	emit func(*apicompat.ChatCompletionsChunk),
+	validateResponsesStream ...bool,
 ) ccStreamScanState {
 	var st ccStreamScanState
+	strict := len(validateResponsesStream) > 0 && validateResponsesStream[0]
+	var sseEventType string
 
 	scanner := s.newUpstreamSSEScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
+		if strict {
+			if strings.TrimSpace(line) == "" {
+				sseEventType = ""
+			} else if eventType, ok := extractOpenAISSEEventLine(line); ok {
+				sseEventType = eventType
+				continue
+			}
+		}
 		payload, ok := extractOpenAISSEDataLine(line)
 		if !ok {
-			continue
+			// HTTP 200 JSON errors from compatibility providers must not be
+			// mistaken for an empty successful SSE stream.
+			if strict && strings.HasPrefix(strings.TrimSpace(line), "{") {
+				// Providers sometimes return pretty-printed JSON despite an SSE
+				// Content-Type. Read the complete document before classifying it,
+				// retaining the scanner's line limit and a separate total-body cap.
+				limit := openAIUpstreamErrorBodyReadLimitForConfig(s.cfg)
+				var rawJSON strings.Builder
+				for {
+					if int64(rawJSON.Len())+int64(len(line))+1 > limit {
+						st.Err = errors.New("upstream Chat Completions JSON error body too large")
+						return st
+					}
+					rawJSON.WriteString(line)
+					rawJSON.WriteByte('\n')
+					if !scanner.Scan() {
+						break
+					}
+					line = scanner.Text()
+				}
+				if err := scanner.Err(); err != nil {
+					st.Err = err
+					return st
+				}
+				payload = strings.TrimSpace(rawJSON.String())
+			} else {
+				continue
+			}
 		}
 		payload = strings.TrimSpace(payload)
 		if payload == "" {
@@ -312,6 +356,31 @@ func (s *OpenAIGatewayService) scanCCStream(
 		if payload == "[DONE]" {
 			st.SawDone = true
 			break
+		}
+		if strict {
+			root := gjson.Parse(payload)
+			if !gjson.Valid(payload) || !root.IsObject() {
+				st.Err = errors.New("invalid JSON in upstream Chat Completions stream")
+				return st
+			}
+			if u := extractCCStreamUsage(payload); u != nil {
+				st.Usage = *u
+			}
+			eventType := root.Get("type").String()
+			if eventType == "" {
+				eventType = sseEventType
+			}
+			upstreamError, responseError := root.Get("error"), root.Get("response.error")
+			if (upstreamError.Exists() && upstreamError.Type != gjson.Null) || (responseError.Exists() && responseError.Type != gjson.Null) || eventType == "error" || eventType == "response.failed" {
+				st.ErrorPayload = []byte(payload)
+				st.ErrorEventType = eventType
+				st.Err = errors.New("upstream Chat Completions stream returned an error")
+				return st
+			}
+			if !ok || (!root.Get("choices").IsArray() && !root.Get("usage").IsObject()) {
+				st.Err = errors.New("invalid chunk in upstream Chat Completions stream")
+				return st
+			}
 		}
 		// 观察上游 CC chunk 回显的 model / service_tier（计费以回显为准）。
 		// CC chunk 无 type 字段，按 untyped payload 观察（上游约束：只有终止
@@ -326,13 +395,21 @@ func (s *OpenAIGatewayService) scanCCStream(
 
 		var chunk apicompat.ChatCompletionsChunk
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			if strict {
+				st.Err = errors.New("invalid Chat Completions stream chunk")
+				return st
+			}
 			logger.L().Warn(logPrefix+": failed to parse chat stream chunk",
 				zap.Error(err),
 				zap.String("request_id", requestID),
 			)
 			continue
 		}
-		if st.FirstTokenMs == nil && !isOpenAIChatUsageOnlyStreamChunk(payload) && chatChunkStartsResponsesOutput(&chunk) {
+		startsOutput := chatChunkStartsResponsesOutput(&chunk)
+		if strict {
+			startsOutput = chatChunkStartsResponsesSemanticOutput(&chunk)
+		}
+		if st.FirstTokenMs == nil && !isOpenAIChatUsageOnlyStreamChunk(payload) && startsOutput {
 			ms := int(time.Since(startTime).Milliseconds())
 			st.FirstTokenMs = &ms
 		}

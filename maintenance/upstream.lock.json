@@ -2,32 +2,37 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.1.16",
-  "imported_commit": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
+  "imported_version": "2.1.17",
+  "imported_commit": "ce66c457c779653414b8776126144e9bd8148027",
   "personal_baseline_commit": "edf577657ac8d1b2d245e772a0172b550b9d7c53",
-  "latest_observed_version": "2.1.16",
-  "latest_observed_release_commit": "74f99b2c532007265f38d0515980b985e2de9462",
-  "latest_observed_main_commit": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
+  "latest_observed_version": "2.1.17",
+  "latest_observed_release_commit": "c1118207532f4ce1be022f4b4cac27efc65f4d2f",
+  "latest_observed_main_commit": "ce66c457c779653414b8776126144e9bd8148027",
   "observed_delta_review": {
-    "from_commit": "fec7f7fd3f9ad427499df61f19f5852868910bfb",
-    "to_commit": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
-    "status": "selective_argument_retention_backport_verified",
-    "behavior_commits": ["966016ebc3811ee24e327128fde2a1f0a9abc019", "b6251ba03c0fb64869fed172bc0e0e52c8033fbe"],
-    "scope": "Selectively adapted b6251ba03: duplicate SAME-ID function calls retain later complete real JSON arguments when the first is an empty shell. First call location, item ID, outputs and distinct-call identities are preserved; name/type conflicts never graft. Native Responses, passthrough, Chat fallback and live SSE identity regressions pass. Existing origin/scope and dedupe-before-image-lifting unchanged. Independent review complete with Chat negative coverage added. Full backend unit, vet and production build pass; WS parent repeated100 times each at GOMAXPROCS1 and4 passes after correcting only its cold-cache precondition. No DSML parser or live SSE ID rewrite imported; not a full v2.1.16 merge, billing change or release approval.",
-    "evidence": ".artifacts/full-upstream-implementation-20261015/secondary-v2.1.16-review.md"
+    "from_commit": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
+    "to_commit": "ce66c457c779653414b8776126144e9bd8148027",
+    "status": "selective_custom_error_pause_backport",
+    "behavior_commits": [
+      "24881264e1ee747a7adec14751cefe71e6cafec6",
+      "af97802a9",
+      "c1118207532f4ce1be022f4b4cac27efc65f4d2f"
+    ],
+    "scope": "Adapt custom-error stop from permanent status=error to a 30-day temporary pause with a distinct reason, including selected402 and529. Preserve built-in authentication, rate-limit, model-scoped, provider-specific and financial-error precedence. Native SystemOne and local error-policy fixtures adapted. No upstream history import or release version change; prior exclusions remain.",
+    "evidence": "maintenance/notes/upstream-sync-20261017.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
+    "source_head": "ce66c457c779653414b8776126144e9bd8148027",
     "implemented_with_local_regression": [
       "Cline/Command Code using shared provider registry; preserve Mixed and credential destinations",
       "Gemini authorized model catalog and four exclusive API-key model scopes",
       "Request-ID literal contains, =exact and ^prefix with short-query guards and append-only pg_trgm/index recovery migrations",
       "Effective upstream-model Anthropic validation and strict no-replay compatibility boundaries",
       "Shared glass modal appearance preserving local layers, Mixed/payment layouts and reduced motion",
-      "Mixed real HTTP/SSE native-dispatch parity, Responses-shaped Chat requests and output-token limits"
+      "Mixed real HTTP/SSE native-dispatch parity, Responses-shaped Chat requests and output-token limits",
+      "2026-10-17 custom-error stop30days, selected402/529 and local native/error-policy adaptation; see dated sync note for verification"
     ],
     "implemented_with_selected_regression": [
       "TypeSafe moderation: default off, independent profiles/key health, frozen queue and uncached send-time authorization; optional safe model metadata, both-engine local image-identifier filtering, full skipped-image counts and score-preserving regressions"

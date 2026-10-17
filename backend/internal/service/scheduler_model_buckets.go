@@ -16,7 +16,7 @@ import (
 // Empty-mapping accounts still go through IsModelSupported: CN/OAuth defaults
 // may reject a foreign family even without an explicit mapping. Those accounts
 // must not keep the request on a 503 capacity path.
-func accountsSupportingRequestedModel(accounts []Account, requestedModel string) []Account {
+func accountsSupportingRequestedModel(accounts []Account, requestedModel string, compact ...bool) []Account {
 	requestedModel = strings.TrimSpace(requestedModel)
 	if requestedModel == "" || len(accounts) == 0 {
 		return accounts
@@ -24,13 +24,19 @@ func accountsSupportingRequestedModel(accounts []Account, requestedModel string)
 	matched := make([]Account, 0, len(accounts))
 	unmapped := make([]Account, 0)
 	hasMappedMatch := false
+	requireCompact := len(compact) > 0 && compact[0]
 	for _, account := range accounts {
 		mapping := account.GetModelMapping()
-		supported := account.IsModelSupported(requestedModel)
+		if requireCompact && account.IsOpenAI() {
+			if _, matched := account.ResolveCompactMappedModel(requestedModel); matched {
+				mapping = account.GetCompactModelMapping()
+			}
+		}
+		supported := supportsOpenAIRequestModel(&account, requestedModel, requireCompact)
 		if !supported {
 			normalized := normalizeRequestedModelForAccountLookup(account, requestedModel)
 			if normalized != requestedModel {
-				supported = account.IsModelSupported(normalized)
+				supported = supportsOpenAIRequestModel(&account, normalized, requireCompact)
 			}
 		}
 		if len(mapping) == 0 {
@@ -68,8 +74,8 @@ func normalizeRequestedModelForAccountLookup(account Account, requestedModel str
 // solely because they cannot serve the requested model. Callers use that count
 // to emit model_not_supported=N instead of pool=0, so handlers can return 404
 // instead of a retryable 503.
-func filterAccountsSupportingRequestedModel(accounts []Account, requestedModel string) (filtered []Account, unsupported int) {
-	filtered = accountsSupportingRequestedModel(accounts, requestedModel)
+func filterAccountsSupportingRequestedModel(accounts []Account, requestedModel string, compact ...bool) (filtered []Account, unsupported int) {
+	filtered = accountsSupportingRequestedModel(accounts, requestedModel, compact...)
 	if len(accounts) == 0 || strings.TrimSpace(requestedModel) == "" {
 		return filtered, 0
 	}

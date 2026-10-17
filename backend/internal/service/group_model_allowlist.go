@@ -158,7 +158,7 @@ func (a GroupModelAllowlist) FilterForListing(source []string) []string {
 	if len(a.Models) == 0 {
 		// 开启但为空的配置在管理端已被拒绝；对遗留脏数据保持“看到什么 = 能调什么”，
 		// 列表与准入同时返回空。
-		return nil
+		return []string{}
 	}
 
 	patterns := make([]string, 0, len(source))
@@ -169,6 +169,10 @@ func (a GroupModelAllowlist) FilterForListing(source []string) []string {
 		}
 	}
 	if len(patterns) == 0 {
+		// Preserve an authoritative empty catalog through multi-group listing.
+		if source != nil {
+			return []string{}
+		}
 		return nil
 	}
 

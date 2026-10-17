@@ -405,6 +405,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	}
 
 	needModelReplace := originalModel != mappedModel
+	var createdAtStamper responsesCreatedAtStamper
 	streamOutputAccumulator := apicompat.NewBufferedResponseAccumulator()
 	streamDoneItems := newResponsesStreamOutputItems()
 	streamImageOutputs := make([]json.RawMessage, 0, 1)
@@ -461,7 +462,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				return resultWithUsage(), fmt.Errorf("upstream response failed: %s", failedMessage)
 			}
 			applyAttemptResponseHeaders()
-			if _, err := writePendingString(buildOpenAIResponseFailedSSE(responseID, originalModel, bareErrorPayload, failedMessage)); err != nil {
+			if _, err := writePendingString(buildOpenAIResponseFailedSSE(responseID, originalModel, createdAtStamper.Value(), bareErrorPayload, failedMessage)); err != nil {
 				handlePendingWriteError(err)
 			} else {
 				failureDelivered = true
@@ -788,6 +789,12 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			); sanitized {
 				dataBytes = sanitizedData
 				data = string(sanitizedData)
+				line = "data: " + data
+				frame = parseTrustedOpenAISSEDataFrame(dataBytes, eventType)
+			}
+			if stampedData, stamped := createdAtStamper.Stamp(dataBytes, eventType); stamped {
+				dataBytes = stampedData
+				data = string(stampedData)
 				line = "data: " + data
 				frame = parseTrustedOpenAISSEDataFrame(dataBytes, eventType)
 			}
@@ -1879,6 +1886,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		return nil, fmt.Errorf("restore OpenAI namespace response: %w", err)
 	}
 	body = restoreCodexToolNamesFromContext(c, body)
+	body = ensureOpenAIResponseObjectCreatedAt(body)
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	// Codex 协议要求 /responses/compact JSON 响应携带 x-codex-turn-state
 	// （codex-api/src/endpoint/compact.rs 从响应头捕获），显式回传。
@@ -1981,7 +1989,7 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 			return nil, fmt.Errorf("restore OpenAI namespace response: %w", restoreErr)
 		}
 		restoredBody = restoreCodexToolNamesFromContext(c, restoredBody)
-		body = restoredBody
+		body = ensureOpenAIResponseObjectCreatedAt(restoredBody)
 	} else {
 		if originalModel != mappedModel {
 			bodyText = s.replaceModelInSSEBody(bodyText, mappedModel, originalModel)
@@ -2043,8 +2051,8 @@ func extractOpenAISSEErrorMessage(payload []byte) string {
 	return sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(payload)))
 }
 
-func buildOpenAIResponseFailedSSE(responseID, model string, source []byte, fallbackMessage string) string {
-
+func buildOpenAIResponseFailedSSE(responseID, model string, createdAt int64, source []byte, fallbackMessage string) string {
+	sequenceNumber := openAIResponsesFailedSequenceNumber(source)
 	if IsUpstreamFinancialError(0, source) || upstreamFinancialMessage(fallbackMessage) {
 		source = nil
 		fallbackMessage = UpstreamUnavailableMessage
@@ -2081,10 +2089,13 @@ func buildOpenAIResponseFailedSSE(responseID, model string, source []byte, fallb
 	if errorType != "" {
 		errorBody["type"] = errorType
 	}
+	if createdAt <= 0 {
+		createdAt = time.Now().Unix()
+	}
 	response := gin.H{
 		"id":         responseID,
 		"object":     "response",
-		"created_at": time.Now().Unix(),
+		"created_at": createdAt,
 		"status":     "failed",
 		"output":     []any{},
 		"error":      errorBody,
@@ -2094,12 +2105,14 @@ func buildOpenAIResponseFailedSSE(responseID, model string, source []byte, fallb
 	}
 	payload, err := marshalOpenAIUpstreamJSON(gin.H{
 		"type":            "response.failed",
-		"sequence_number": gjson.GetBytes(source, "sequence_number").Int(),
+		"sequence_number": sequenceNumber,
 		"response":        response,
 	})
 	if err != nil {
 		// All values above are JSON primitives, so this is only a defensive fallback.
-		payload = []byte(`{"type":"response.failed","sequence_number":0,"response":{"status":"failed","output":[],"error":{"code":"upstream_error","message":"Upstream response failed"}}}`)
+		payload = []byte(`{"type":"response.failed","sequence_number":` + strconv.FormatInt(sequenceNumber, 10) +
+			`,"response":{"object":"response","created_at":` + strconv.FormatInt(createdAt, 10) +
+			`,"status":"failed","output":[],"error":{"code":"upstream_error","message":"Upstream response failed"}}}`)
 	}
 	return "event: response.failed\ndata: " + string(payload) + "\n\n"
 }

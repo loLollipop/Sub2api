@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 
-const { updateAccountMock, checkMixedChannelRiskMock, authIsSimpleMode } = vi.hoisted(() => ({
+const { updateAccountMock, checkMixedChannelRiskMock, authIsSimpleMode, webSearchConfigMock } = vi.hoisted(() => ({
   updateAccountMock: vi.fn(),
   checkMixedChannelRiskMock: vi.fn(),
-  authIsSimpleMode: { value: true }
+  authIsSimpleMode: { value: true },
+  webSearchConfigMock: vi.fn().mockResolvedValue({ enabled: false, providers: [] })
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -31,7 +32,7 @@ vi.mock('@/api/admin', () => ({
       checkMixedChannelRisk: checkMixedChannelRiskMock
     },
     settings: {
-      getWebSearchEmulationConfig: vi.fn().mockResolvedValue({ enabled: false, providers: [] }),
+      getWebSearchEmulationConfig: webSearchConfigMock,
       getSettings: vi.fn().mockResolvedValue({})
     },
     tlsFingerprintProfiles: {
@@ -55,6 +56,32 @@ vi.mock('vue-i18n', async () => {
 })
 
 import EditAccountModal from '../EditAccountModal.vue'
+
+describe('OpenAI API key web search emulation', () => {
+  afterEach(() => webSearchConfigMock.mockResolvedValue({ enabled: false, providers: [] }))
+
+  it.each(['enabled', 'disabled', 'default'])('loads legacy mode and saves %s without losing other extra', async mode => {
+    webSearchConfigMock.mockResolvedValue({ enabled: true, providers: [{ type: 'brave', api_key: 'test-key' }] })
+    const account = buildAccount()
+    account.extra = { web_search_emulation: true, openai_passthrough: true, openai_long_context_billing_enabled: true, custom_marker: 'keep' }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await flushPromises()
+    const select = wrapper.findAll('select').find(candidate => candidate.find('option[value="enabled"]').exists() && candidate.find('option[value="disabled"]').exists())!
+    expect(select).toBeTruthy()
+    expect((select.element as HTMLSelectElement).value).toBe('enabled')
+    await select.setValue(mode)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    const extra = updateAccountMock.mock.calls[0]?.[1]?.extra
+    expect(extra.web_search_emulation).toBe(mode === 'default' ? undefined : mode)
+    expect(extra.openai_passthrough).toBe(true)
+    expect(extra.openai_long_context_billing_enabled).toBe(true)
+    expect(extra.custom_marker).toBe('keep')
+    wrapper.unmount()
+  })
+})
 
 describe('EditAccountModal catalog providers', () => {
   it('keeps TypeSafe on its native default endpoint when edited', async () => {

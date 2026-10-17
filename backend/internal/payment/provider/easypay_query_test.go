@@ -23,6 +23,21 @@ func TestEasyPayQueryOrderStatusMapping(t *testing.T) {
 		wantError   bool
 	}{
 		{
+			name:       "string scalars from PHP deployments",
+			body:       `{"code":"1","status":"1","money":12.34,"trade_no":2026101600001}`,
+			wantStatus: payment.ProviderStatusPaid, wantAmount: 12.34, wantTradeNo: "2026101600001",
+		},
+		{
+			name:       "null top level fields use nested data",
+			body:       `{"code":1,"status":null,"money":null,"trade_no":null,"data":{"status":"1","money":5,"trade_no":"data-789"}}`,
+			wantStatus: payment.ProviderStatusPaid, wantAmount: 5, wantTradeNo: "data-789",
+		},
+		{
+			name:      "nested foreign identity cannot hide behind matching top level identity",
+			body:      `{"code":1,"out_trade_no":"order-123","data":{"out_trade_no":"foreign"},"status":1}`,
+			wantError: true,
+		},
+		{
 			name:        "top level trade success is paid",
 			body:        `{"code":1,"trade_status":"TRADE_SUCCESS","status":0,"money":"12.34","trade_no":"gateway-123"}`,
 			wantStatus:  payment.ProviderStatusPaid,
@@ -96,9 +111,14 @@ func TestEasyPayQueryOrderStatusMapping(t *testing.T) {
 				if err := r.ParseForm(); err != nil {
 					t.Errorf("ParseForm: %v", err)
 				}
-				gotForm = make(url.Values, len(r.PostForm))
+				gotForm = r.URL.Query()
 				for key, values := range r.PostForm {
-					gotForm[key] = append([]string(nil), values...)
+					if gotForm.Get(key) != values[0] {
+						t.Errorf("body and query disagree for %s", key)
+					}
+				}
+				if len(r.PostForm) != len(gotForm) {
+					t.Error("query parameters must be mirrored in the POST body")
 				}
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(tt.body))

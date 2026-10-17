@@ -237,6 +237,12 @@ func TestGatewayModels_UnmappedOpenAIAccountsSupplementMappedModels(t *testing.T
 	const sparkModel = "gpt-5.3-codex-spark"
 	const alias = "team-coder"
 	parentID := int64(1)
+	subscriptionDefaults := make([]string, 0)
+	for _, model := range openai.DefaultModelIDs() {
+		if model != "gpt-5.5" {
+			subscriptionDefaults = append(subscriptionDefaults, model)
+		}
+	}
 	accounts := []service.Account{
 		{ID: parentID, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth},
 		{
@@ -258,7 +264,7 @@ func TestGatewayModels_UnmappedOpenAIAccountsSupplementMappedModels(t *testing.T
 		{
 			name:     "unmapped parent and Spark shadow retain defaults and aliases",
 			accounts: accounts,
-			want:     append(openai.DefaultModelIDs(), alias),
+			want:     append(append([]string(nil), subscriptionDefaults...), alias),
 		},
 		{
 			name:     "unmapped API key account also contributes defaults",
@@ -268,7 +274,7 @@ func TestGatewayModels_UnmappedOpenAIAccountsSupplementMappedModels(t *testing.T
 		{
 			name:     "unmapped accounts alone retain default response shape",
 			accounts: accounts[:1],
-			want:     openai.DefaultModelIDs(),
+			want:     subscriptionDefaults,
 		},
 		{
 			name:     "custom list can select defaults and aliases",

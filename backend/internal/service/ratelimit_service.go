@@ -573,6 +573,12 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 			shouldDisable = true
 		}
 	case 402:
+		// Selected custom codes use the explicit 30-day pause, not balance recovery.
+		if customErrorCodesEnabled {
+			s.handleCustomErrorCode(ctx, account, statusCode, upstreamMsg)
+			shouldDisable = true
+			break
+		}
 		// 国产供应商：余额不足是可恢复状态（充值/检测恢复后由周期任务自动解除），
 		// 不能走 handleAuthError 永久置 status=error。改为可恢复的临时停调。
 		if account.IsCNProvider() || account.IsCommandCode() {
@@ -1180,15 +1186,21 @@ func (s *RateLimitService) handleAntigravity403(ctx context.Context, account *Ac
 	}
 }
 
-// handleCustomErrorCode 处理自定义错误码，停止账号调度
+const customErrorCodeStopDuration = 30 * 24 * time.Hour
+
+const customErrorCodeReasonPrefix = "custom_error_code"
+
+// handleCustomErrorCode pauses scheduling without a permanent account error.
+// A distinct reason keeps balance checks from clearing this explicit pause.
 func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *Account, statusCode int, errorMsg string) {
 	msg := "Custom error code " + strconv.Itoa(statusCode) + ": " + errorMsg
-	s.notifyAccountSchedulingBlocked(account, time.Time{}, "custom_error_code")
-	if err := s.accountRepo.SetError(ctx, account.ID, msg); err != nil {
-		slog.Warn("account_set_error_failed", "account_id", account.ID, "status_code", statusCode, "error", err)
+	until := time.Now().Add(customErrorCodeStopDuration)
+	s.notifyAccountSchedulingBlocked(account, until, customErrorCodeReasonPrefix)
+	if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, customErrorCodeReasonPrefix+": "+msg); err != nil {
+		slog.Warn("account_custom_error_unsched_failed", "account_id", account.ID, "status_code", statusCode, "error", err)
 		return
 	}
-	slog.Warn("account_disabled_custom_error", "account_id", account.ID, "status_code", statusCode, "error", errorMsg)
+	slog.Warn("account_custom_error_unschedulable", "account_id", account.ID, "status_code", statusCode, "until", until.UTC(), "error", errorMsg)
 }
 
 // handle429 处理429限流错误

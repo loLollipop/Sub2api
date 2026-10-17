@@ -184,7 +184,7 @@ func writeUpstreamFinancialError(c *gin.Context, w gin.ResponseWriter) error {
 	}
 	jsonHeartbeat := OpenAIImagesJSONKeepalivePresent(c)
 	if committed && responses && !jsonHeartbeat {
-		payload := buildOpenAIResponseFailedSSE("", "", nil, UpstreamUnavailableMessage)
+		payload := buildOpenAIResponseFailedSSE("", "", 0, nil, UpstreamUnavailableMessage)
 		_, err := w.WriteString(payload)
 		w.Flush()
 		return err

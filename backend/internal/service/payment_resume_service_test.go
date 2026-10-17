@@ -98,6 +98,29 @@ func TestCanonicalizeReturnURLRejectsRelativeURL(t *testing.T) {
 	}
 }
 
+func TestCanonicalizeReturnURLRejectsNonPlainHostAndUserinfo(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ raw, host, referer string }{
+		{"https://a&b=c.example.com/payment/result", "a&b=c.example.com", ""},
+		{"https://a&b=c.example.com/payment/result", "app.example.com", "https://a&b=c.example.com/purchase"},
+		{"https://a&b=c@app.example.com/payment/result", "app.example.com", ""},
+	} {
+		if got, err := CanonicalizeReturnURL(tc.raw, tc.host, tc.referer); err == nil {
+			t.Fatalf("accepted invalid return URL %q", got)
+		}
+	}
+}
+
+func TestCanonicalizeReturnURLAllowsIPAndPortHosts(t *testing.T) {
+	t.Parallel()
+	for _, raw := range []string{"http://127.0.0.1:3000/payment/result", "http://[::1]:8080/payment/result", "https://pay_site-1.example.com/payment/result"} {
+		parsed, _ := url.Parse(raw)
+		if _, err := CanonicalizeReturnURL(raw, parsed.Host, ""); err != nil {
+			t.Fatalf("CanonicalizeReturnURL(%q): %v", raw, err)
+		}
+	}
+}
+
 func TestCanonicalizeReturnURLRejectsExternalHost(t *testing.T) {
 	t.Parallel()
 

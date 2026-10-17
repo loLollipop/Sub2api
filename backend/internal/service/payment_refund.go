@@ -450,6 +450,10 @@ func (s *PaymentService) QueryAndFinalizeRefund(ctx context.Context, oid int64) 
 		return nil, infraerrors.BadRequest("INVALID_STATUS", "only refund pending orders can be finalized")
 	}
 
+	pendingDetail, err := s.latestRefundPendingDetail(ctx, oid)
+	if err != nil {
+		return nil, err
+	}
 	prov, err := s.getRefundProvider(ctx, o)
 	if err != nil {
 		return nil, fmt.Errorf("get refund provider: %w", err)
@@ -459,13 +463,13 @@ func (s *PaymentService) QueryAndFinalizeRefund(ctx context.Context, oid int64) 
 		return nil, infraerrors.BadRequest("REFUND_QUERY_UNSUPPORTED", "this payment provider does not support refund status query; please verify manually")
 	}
 
-	pendingDetail := s.latestRefundPendingDetail(ctx, oid)
 	finishProviderCall := servertiming.ObserveDependency(ctx, "payment")
 	resp, err := queryProvider.QueryRefund(ctx, payment.RefundQueryRequest{
-		TradeNo:  o.PaymentTradeNo,
-		OrderID:  o.OutTradeNo,
-		RefundID: pendingDetail.RefundID,
-		Amount:   formatGatewayRefundAmount(o.RefundAmount, o),
+		TradeNo:     o.PaymentTradeNo,
+		OrderID:     o.OutTradeNo,
+		RefundID:    pendingDetail.RefundID,
+		Amount:      formatGatewayRefundAmount(o.RefundAmount, o),
+		RequestedAt: pendingDetail.RequestedAt,
 	})
 	finishProviderCall()
 	if err != nil {
@@ -681,14 +685,15 @@ func (s *PaymentService) finalizeRefundFailed(ctx context.Context, o *dbent.Paym
 }
 
 type refundPendingAuditDetail struct {
-	RefundID            string  `json:"refundID"`
-	DeductionState      string  `json:"deductionState"`
-	BalanceDeducted     float64 `json:"balanceDeducted"`
-	SubDaysDeducted     int     `json:"subDaysDeducted"`
-	SubscriptionID      int64   `json:"subscriptionID"`
-	BalanceRolledBack   float64 `json:"balanceRolledBack"`
-	SubDaysRolledBack   int     `json:"subDaysRolledBack"`
-	DeductionRollbackOK *bool   `json:"deductionRollbackOK"`
+	RequestedAt         time.Time `json:"-"`
+	RefundID            string    `json:"refundID"`
+	DeductionState      string    `json:"deductionState"`
+	BalanceDeducted     float64   `json:"balanceDeducted"`
+	SubDaysDeducted     int       `json:"subDaysDeducted"`
+	SubscriptionID      int64     `json:"subscriptionID"`
+	BalanceRolledBack   float64   `json:"balanceRolledBack"`
+	SubDaysRolledBack   int       `json:"subDaysRolledBack"`
+	DeductionRollbackOK *bool     `json:"deductionRollbackOK"`
 }
 
 const refundDeductionStateRetained = "retained"
@@ -726,18 +731,27 @@ func (d refundPendingAuditDetail) applyRetainedDeduction(p *RefundPlan) bool {
 	return true
 }
 
-func (s *PaymentService) latestRefundPendingDetail(ctx context.Context, oid int64) refundPendingAuditDetail {
+func (s *PaymentService) latestRefundPendingDetail(ctx context.Context, oid int64) (refundPendingAuditDetail, error) {
 	logEntry, err := s.entClient.PaymentAuditLog.Query().
 		Where(paymentauditlog.OrderIDEQ(strconv.FormatInt(oid, 10)), paymentauditlog.ActionEQ("REFUND_PENDING")).
 		Order(paymentauditlog.ByCreatedAt(sql.OrderDesc()), paymentauditlog.ByID(sql.OrderDesc())).
 		First(ctx)
-	if err != nil || logEntry == nil {
-		return refundPendingAuditDetail{}
+	if dbent.IsNotFound(err) {
+		return refundPendingAuditDetail{}, nil
+	}
+	if err != nil {
+		return refundPendingAuditDetail{}, fmt.Errorf("read refund pending audit: %w", err)
+	}
+	if logEntry == nil || strings.TrimSpace(logEntry.Detail) == "null" {
+		return refundPendingAuditDetail{}, fmt.Errorf("read refund pending audit: missing audit detail")
 	}
 	detail := refundPendingAuditDetail{}
-	_ = json.Unmarshal([]byte(logEntry.Detail), &detail)
+	if err := json.Unmarshal([]byte(logEntry.Detail), &detail); err != nil {
+		return refundPendingAuditDetail{}, fmt.Errorf("parse refund pending audit: %w", err)
+	}
 	detail.RefundID = strings.TrimSpace(detail.RefundID)
-	return detail
+	detail.RequestedAt = logEntry.CreatedAt
+	return detail, nil
 }
 
 // getRefundProvider creates a provider using the order's original instance config.

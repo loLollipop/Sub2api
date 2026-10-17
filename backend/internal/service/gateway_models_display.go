@@ -17,7 +17,7 @@ func (c plazaGatewayModelCatalog) GetAvailableModels(ctx context.Context, groupI
 		return nil
 	}
 	models := c.gateway.GetAvailableModels(ctx, groupID, platform)
-	if len(models) > 0 || platform != PlatformOpenAI {
+	if models != nil || platform != PlatformOpenAI {
 		return models
 	}
 	if _, exists := c.gateway.GetSchedulablePlatforms(ctx, groupID)[PlatformOpenAI]; !exists {

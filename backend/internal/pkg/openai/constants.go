@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // Model represents an OpenAI model
@@ -109,7 +110,9 @@ func CanonicalizeOpenAIModelAliasSpelling(model string) string {
 	}
 
 	normalized := strings.ReplaceAll(model, "_", "-")
-	normalized = strings.Join(strings.Fields(normalized), "-")
+	if strings.IndexFunc(normalized, unicode.IsSpace) >= 0 {
+		normalized = strings.Join(strings.Fields(normalized), "-")
+	}
 	for strings.Contains(normalized, "--") {
 		normalized = strings.ReplaceAll(normalized, "--", "-")
 	}

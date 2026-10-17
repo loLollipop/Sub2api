@@ -1294,7 +1294,7 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		return
 	}
 
-	if len(availableModels) > 0 {
+	if len(availableModels) > 0 || ((responsePlatform == service.PlatformOpenAI || responsePlatform == service.PlatformComposite) && availableModels != nil) {
 		writeModelsList(c, responsePlatform, availableModels)
 		return
 	}
@@ -1354,10 +1354,16 @@ func (h *GatewayHandler) availableModelsForAPIKey(ctx context.Context, apiKey *s
 	}
 	injectDefaults := len(groupIDs) > 1
 	var models []string
+	hasCatalog := false
 	for _, id := range groupIDs {
 		gid := id
 		group := h.groupForModelsList(ctx, apiKey, gid)
-		models = mergeModelIDs(models, h.modelsForGroupID(ctx, &gid, group, forcedPlatform, injectDefaults))
+		groupModels := h.modelsForGroupID(ctx, &gid, group, forcedPlatform, injectDefaults)
+		hasCatalog = hasCatalog || groupModels != nil
+		models = mergeModelIDs(models, groupModels)
+	}
+	if !hasCatalog && len(models) == 0 {
+		return nil
 	}
 	return models
 }
@@ -1384,14 +1390,14 @@ func (h *GatewayHandler) modelsForGroupID(ctx context.Context, groupID *int64, g
 		fallbackModels := defaultModelIDsForPlatform(platform)
 		source := models
 		if platform == service.PlatformComposite {
-			if len(source) == 0 {
+			if source == nil {
 				source = fallbackModels
 			}
 			return group.ModelAllowlist.FilterForListing(source)
 		}
 		return group.ModelAllowlist.FilterForListing(modelListingSource(platform, models, fallbackModels))
 	}
-	if len(models) > 0 {
+	if len(models) > 0 || ((platform == service.PlatformOpenAI || platform == service.PlatformComposite) && models != nil) {
 		return models
 	}
 	if platform == service.PlatformComposite {
@@ -1460,12 +1466,12 @@ func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *servi
 		fallbackModels := defaultCodexModelIDsForPlatform(service.PlatformComposite)
 		if group.ModelAllowlistEnabled() {
 			source := availableModels
-			if len(source) == 0 {
+			if source == nil {
 				source = fallbackModels
 			}
 			return group.ModelAllowlist.FilterForListing(source)
 		}
-		if len(availableModels) > 0 {
+		if availableModels != nil {
 			return availableModels
 		}
 		return fallbackModels
@@ -1476,7 +1482,7 @@ func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *servi
 	if group.ModelAllowlistEnabled() {
 		return group.ModelAllowlist.FilterForListing(modelListingSource(platform, availableModels, fallbackModels))
 	}
-	if len(availableModels) > 0 {
+	if len(availableModels) > 0 || (platform == service.PlatformOpenAI && availableModels != nil) {
 		return availableModels
 	}
 	return fallbackModels
@@ -1488,10 +1494,12 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 	}
 	seen := make(map[string]struct{})
 	models := make([]string, 0)
+	hasCatalog := false
 	schedulablePlatforms := h.gatewayService.GetSchedulablePlatforms(ctx, groupID)
 	for _, platform := range service.GroupCatalogPlatforms() {
 		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
-		if len(platformModels) == 0 && injectUnmappedDefaults {
+		hasCatalog = hasCatalog || platformModels != nil
+		if len(platformModels) == 0 && injectUnmappedDefaults && (platform != service.PlatformOpenAI || platformModels == nil) {
 			// Multi-protocol providers have per-account catalogs, not Claude
 			// fallback models. Listing defaults must not invent callable models.
 			if _, ok := schedulablePlatforms[platform]; ok && !service.IsMultiProtocolAPIKeyProvider(platform) {
@@ -1516,6 +1524,9 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 		if aliases, err := h.gatewayService.GetCompositeRouteModels(ctx, groupID, routeEndpoint[0]); err == nil {
 			models = mergeModelIDs(models, aliases)
 		}
+	}
+	if !hasCatalog && len(models) == 0 {
+		return nil
 	}
 	return models
 }
@@ -1637,6 +1648,9 @@ func writeOpenAIModelsList(c *gin.Context, modelIDs []string) {
 // 与平台默认列表（fallbackModels）。账号映射为空时回落默认列表；Anthropic
 // 平台两者取并集，其余平台以账号映射键为准。
 func modelListingSource(platform string, availableModels, fallbackModels []string) []string {
+	if platform == service.PlatformOpenAI && availableModels != nil {
+		return availableModels
+	}
 	if len(availableModels) == 0 {
 		return fallbackModels
 	}

@@ -216,15 +216,6 @@ func anthropicStreamEventIsTerminal(eventName, data string) bool {
 	return gjson.Get(trimmed, "type").String() == "message_stop"
 }
 
-func cloneStringSlice(src []string) []string {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make([]string, len(src))
-	copy(dst, src)
-	return dst
-}
-
 // IsForceCacheBilling 检查是否启用强制缓存计费
 func IsForceCacheBilling(ctx context.Context) bool {
 	v, _ := ctx.Value(ForceCacheBillingContextKey).(bool)
@@ -1416,13 +1407,13 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 		if cached, found := s.modelsListCache.Get(cacheKey); found {
 			if models, ok := cached.([]string); ok {
 				modelsListCacheHitTotal.Add(1)
-				return cloneStringSlice(models)
+				return storedModelList(models)
 			}
 		}
 	}
 	modelsListCacheMissTotal.Add(1)
 	if s.modelsListCache == nil {
-		return cloneStringSlice(s.loadAvailableModels(ctx, groupID, platform))
+		return storedModelList(s.loadAvailableModels(ctx, groupID, platform))
 	}
 	catalog := s.ensureGroupModelsCatalog(ctx, groupID)
 	if ctx.Err() != nil {
@@ -1431,7 +1422,7 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	models := catalog.modelsFor(platform)
 	s.modelsListCache.Set(cacheKey, storedModelList(models), s.modelsListCacheTTL)
 	modelsListCacheStoreTotal.Add(1)
-	return cloneStringSlice(models)
+	return storedModelList(models)
 }
 
 // loadAvailableModels computes a model whitelist from the scheduler snapshot

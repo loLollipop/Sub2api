@@ -169,8 +169,8 @@ func TestOpenAISyntheticFailuresCarryRequiredFields(t *testing.T) {
 		payload []byte
 		seq     int64
 	}{
-		{"http", []byte(strings.TrimSpace(strings.SplitN(buildOpenAIResponseFailedSSE("resp_test", "model", source, ""), "data: ", 2)[1])), 17},
-		{"ws bridge", buildOpenAIWSHTTPBridgeFailedEvent("resp_test", "model", source, ""), 17},
+		{"http", []byte(strings.TrimSpace(strings.SplitN(buildOpenAIResponseFailedSSE("resp_test", "model", 0, source, ""), "data: ", 2)[1])), 17},
+		{"ws bridge", buildOpenAIWSHTTPBridgeFailedEvent("resp_test", "model", 0, source, ""), 17},
 		{"ws disconnect", buildOpenAIWSPassthroughFailureEvent("resp_test", "model"), 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

@@ -58,6 +58,20 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		return s.forwardAnthropicViaNativeAnthropicEndpoint(ctx, c, account, body, defaultMappedModel)
 	}
 
+	// Preserve native Anthropic routing above; only emulate search for OpenAI
+	// API-key requests that would otherwise enter the compatibility converter.
+	if account.Platform == PlatformOpenAI {
+		groupID := getOpenAIGroupIDFromContext(c)
+		if shouldEmulateWebSearchFor(ctx, s.settingService, s.channelService, account, &groupID, body) {
+			stream := gjson.GetBytes(body, "stream").Bool()
+			res, err := writeEmulatedWebSearch(ctx, c, account, body, gjson.GetBytes(body, "model").String(), stream)
+			if err != nil {
+				return nil, err
+			}
+			return &OpenAIForwardResult{Model: res.Model, Stream: stream, Duration: res.Duration}, nil
+		}
+	}
+
 	// 分组级跨协议转换开关：到这里说明上游不是 Anthropic 族，本次请求必然要
 	// 把 Anthropic Messages 转成 OpenAI 族的 Chat Completions 或 Responses。
 	// 默认关闭时直接返回可诊断的 400，不再静默转换。

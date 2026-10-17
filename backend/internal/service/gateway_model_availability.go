@@ -21,6 +21,9 @@ type ModelAvailabilityDiagnosis struct {
 	// HasModelSupport is true if at least one account's model mapping admits
 	// the requested model.
 	HasModelSupport bool
+	// HasRetiredSubscriptionModel records a ChatGPT upstream blocked by model
+	// retirement, so an unsupported request can include migration guidance.
+	HasRetiredSubscriptionModel bool
 }
 
 // ModelAvailabilityDiagnoser is implemented by gateway services that can
@@ -140,6 +143,9 @@ func diagnoseModelAvailabilityFromSchedulerSnapshot(
 			continue
 		}
 		diag.HasAccountsInPool = true
+		if isRetiredOpenAISubscriptionModel(&accounts[i], resolveOpenAIAccountUpstreamModelForRequest(&accounts[i], requestedModel, false)) {
+			diag.HasRetiredSubscriptionModel = true
+		}
 		if accounts[i].IsModelSupported(requestedModel) {
 			diag.HasModelSupport = true
 			return diag

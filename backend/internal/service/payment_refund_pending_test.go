@@ -274,12 +274,13 @@ func TestLegacyPendingRefundUsesRecordedRollbackAmount(t *testing.T) {
 
 func TestLegacyPendingRefundWithoutProofOfRollbackDoesNotDeductAgain(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		detail *string
+		name      string
+		detail    *string
+		wantError bool
 	}{
 		{name: "rollback failed", detail: stringPointer(`{"refundID":"rf_test","deductionRollbackOK":false,"balanceDeducted":100}`)},
 		{name: "missing audit"},
-		{name: "malformed audit", detail: stringPointer(`{"refundID":`)},
+		{name: "malformed audit", detail: stringPointer(`{"refundID":`), wantError: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -313,6 +314,15 @@ func TestLegacyPendingRefundWithoutProofOfRollbackDoesNotDeductAgain(t *testing.
 			defer restore()
 
 			result, err := svc.QueryAndFinalizeRefund(ctx, order.ID)
+			if tc.wantError {
+				require.ErrorContains(t, err, "parse refund pending audit")
+				require.Nil(t, result)
+				require.Zero(t, deductionCalls)
+				current, getErr := client.PaymentOrder.Get(ctx, order.ID)
+				require.NoError(t, getErr)
+				require.Equal(t, OrderStatusRefundPending, current.Status)
+				return
+			}
 			require.NoError(t, err)
 			require.True(t, result.Success)
 			require.Zero(t, deductionCalls)

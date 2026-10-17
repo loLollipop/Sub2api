@@ -1416,13 +1416,13 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 		if cached, found := s.modelsListCache.Get(cacheKey); found {
 			if models, ok := cached.([]string); ok {
 				modelsListCacheHitTotal.Add(1)
-				return cloneStringSlice(models)
+				return storedModelList(models)
 			}
 		}
 	}
 	modelsListCacheMissTotal.Add(1)
 	if s.modelsListCache == nil {
-		return cloneStringSlice(s.loadAvailableModels(ctx, groupID, platform))
+		return storedModelList(s.loadAvailableModels(ctx, groupID, platform))
 	}
 	catalog := s.ensureGroupModelsCatalog(ctx, groupID)
 	if ctx.Err() != nil {
@@ -1431,7 +1431,7 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	models := catalog.modelsFor(platform)
 	s.modelsListCache.Set(cacheKey, storedModelList(models), s.modelsListCacheTTL)
 	modelsListCacheStoreTotal.Add(1)
-	return cloneStringSlice(models)
+	return storedModelList(models)
 }
 
 // loadAvailableModels computes a model whitelist from the scheduler snapshot

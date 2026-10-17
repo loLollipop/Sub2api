@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -16,7 +17,36 @@ func (s *GatewayService) GetCompositeRouteModels(ctx context.Context, groupID *i
 	if s == nil || s.compositeResolver == nil || groupID == nil {
 		return nil, nil
 	}
-	return s.compositeResolver.ListExactPublicModels(ctx, *groupID, endpoint)
+	targets, err := s.compositeResolver.exactPublicModelTargets(ctx, *groupID, endpoint)
+	if err != nil || len(targets) == 0 {
+		return nil, err
+	}
+	var accounts []Account
+	needsOpenAI := false
+	for _, candidates := range targets {
+		for _, target := range candidates {
+			needsOpenAI = needsOpenAI || target.platform == PlatformOpenAI
+		}
+	}
+	if needsOpenAI && s.schedulerSnapshot != nil {
+		accounts, _, err = s.schedulerSnapshot.listSchedulableAccountsForRequest(withSchedulerRequestMode(ctx, s.accountRepo, s.schedulerSnapshot), groupID, PlatformOpenAI, false)
+	} else if needsOpenAI && s.accountRepo != nil {
+		accounts, err = listSchedulableAccountsFromRepo(ctx, s.accountRepo, groupID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	models := make([]string, 0, len(targets))
+	for model, candidates := range targets {
+		for _, target := range candidates {
+			if target.platform != PlatformOpenAI || !openAIModelRetiredForAccounts(accounts, target.model) {
+				models = append(models, model)
+				break
+			}
+		}
+	}
+	sort.Strings(models)
+	return models, nil
 }
 
 type groupModelsCatalog struct {
@@ -64,9 +94,11 @@ func (c groupModelsCatalog) unionModels() []string {
 
 func storedModelList(models []string) []string {
 	if models == nil {
-		return []string{}
+		return nil
 	}
-	return cloneStringSlice(models)
+	// An empty filtered catalog is authoritative. Keep it distinct from an
+	// unknown catalog through cache storage and copies.
+	return append(make([]string, 0, len(models)), models...)
 }
 
 func (s *GatewayService) ensureGroupModelsCatalog(ctx context.Context, groupID *int64) groupModelsCatalog {
@@ -192,6 +224,7 @@ func modelsFromSchedulableAccounts(accounts []Account, platform string) []string
 
 	filterPlatform := strings.TrimSpace(platform)
 	modelSet := make(map[string]struct{})
+	useOpenAIDefaults := false
 	for i := range accounts {
 		acc := &accounts[i]
 		if filterPlatform != "" && acc.Platform != filterPlatform {
@@ -204,10 +237,21 @@ func modelsFromSchedulableAccounts(accounts []Account, platform string) []string
 			continue
 		}
 		if platform == PlatformOpenAI && acc.IsOpenAIPassthroughEnabled() {
-			return nil
+			useOpenAIDefaults = true
+			continue
 		}
 		for model := range acc.GetModelMapping() {
 			modelSet[model] = struct{}{}
+		}
+	}
+	if platform == PlatformOpenAI && (len(modelSet) == 0 || useOpenAIDefaults) {
+		defaults := openai.DefaultModelIDs()
+		filtered := filterRetiredOpenAIModelIDs(accounts, defaults)
+		if len(filtered) != len(defaults) {
+			return filtered
+		}
+		if useOpenAIDefaults {
+			return nil
 		}
 	}
 	if len(modelSet) == 0 {
@@ -220,11 +264,17 @@ func modelsFromSchedulableAccounts(accounts []Account, platform string) []string
 	sort.Strings(models)
 	if platform == PlatformOpenAI {
 		models = supplementUnmappedOpenAIModels(accounts, models)
+		models = filterRetiredOpenAIModelIDs(accounts, models)
 	}
 	return models
 }
 
 func catalogHasRequestedModel(cat groupModelsCatalog, requestedModel string) groupCatalogModelPresence {
+	// Live/Realtime select by endpoint capability with an empty model placeholder.
+	// A concrete text-model catalog must not turn that placeholder into a miss.
+	if strings.TrimSpace(requestedModel) == "" {
+		return groupCatalogModelUnknown
+	}
 	sawCatalog := false
 	for _, platform := range groupCatalogPlatforms() {
 		models := cat.modelsFor(platform)

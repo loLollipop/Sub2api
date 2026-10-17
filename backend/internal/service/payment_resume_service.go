@@ -244,6 +244,9 @@ func CanonicalizeReturnURL(raw string, srcHost string, srcURL string) (string, e
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return "", infraerrors.BadRequest("INVALID_RETURN_URL", "return_url must use http or https")
 	}
+	if !isPlainReturnURLHost(parsed.Hostname()) {
+		return "", infraerrors.BadRequest("INVALID_RETURN_URL", "return_url host is invalid")
+	}
 	// The browser supplies only the destination. All result parameters are
 	// generated server-side after this check; preserving caller-supplied query
 	// fields would let a signed checkout URL be reinterpreted as a callback.
@@ -261,6 +264,24 @@ func CanonicalizeReturnURL(raw string, srcHost string, srcURL string) (string, e
 		return "", infraerrors.BadRequest("INVALID_RETURN_URL", "return_url must use the same host as the current site or browser origin")
 	}
 	return parsed.String(), nil
+}
+
+// isPlainReturnURLHost allows IP literals and plain hostname characters only.
+func isPlainReturnURLHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	if net.ParseIP(host) != nil {
+		return true
+	}
+	for _, c := range host {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == '.', c == '-', c == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func allowedReturnURLHost(returnURLHost string, requestHost string, refererURL string) bool {

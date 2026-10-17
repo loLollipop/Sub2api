@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const timingReviewTerminal = `{"type":"response.completed","response":{"id":"resp_timing","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"hello"}]}],"usage":{"input_tokens":12,"output_tokens":4,"input_tokens_details":{"cached_tokens":3}}}}`
+const timingReviewTerminal = `{"type":"response.completed","response":{"id":"resp_timing","created_at":1700000000,"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"hello"}]}],"usage":{"input_tokens":12,"output_tokens":4,"input_tokens_details":{"cached_tokens":3}}}}`
 
 type timingReviewResult struct {
 	firstTokenMs *int

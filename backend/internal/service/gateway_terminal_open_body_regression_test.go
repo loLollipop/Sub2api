@@ -178,7 +178,7 @@ func TestTerminalOpenBodyFailureAndDisconnectedUsage(t *testing.T) {
 					_, err := io.WriteString(writer, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n")
 					require.NoError(t, err)
 					synctest.Wait()
-					terminal := "event: response.failed\ndata: {\"type\":\"response.failed\",\"response\":{\"id\":\"resp_failed\",\"usage\":{\"input_tokens\":9,\"output_tokens\":2},\"error\":{\"code\":\"cyber_policy\",\"message\":\"blocked by policy\"}}}\n\n"
+					terminal := "event: response.failed\ndata: {\"type\":\"response.failed\",\"response\":{\"id\":\"resp_failed\",\"created_at\":1700000000,\"usage\":{\"input_tokens\":9,\"output_tokens\":2},\"error\":{\"code\":\"cyber_policy\",\"message\":\"blocked by policy\"}}}\n\n"
 					_, err = io.WriteString(writer, terminal)
 					require.NoError(t, err)
 					result := requireTerminalOpenBodyResult(t, results)

@@ -245,6 +245,14 @@ func TestGroupModelAllowlistFilterForListing(t *testing.T) {
 		}
 	})
 
+	t.Run("authoritative empty source stays nonnil", func(t *testing.T) {
+		cfg := GroupModelAllowlist{Enabled: true, Models: []string{"gpt-*"}}
+		got := cfg.FilterForListing([]string{})
+		if got == nil || len(got) != 0 {
+			t.Fatalf("expected authoritative empty output, got %#v", got)
+		}
+	})
+
 	t.Run("enabled empty config yields empty output", func(t *testing.T) {
 		cfg := GroupModelAllowlist{Enabled: true}
 		if got := cfg.FilterForListing(source); len(got) != 0 {

@@ -237,14 +237,35 @@ func (s *PaymentService) executeFulfillment(ctx context.Context, oid int64) erro
 	case payment.OrderTypeBalance:
 		return s.ExecuteBalanceFulfillment(ctx, oid)
 	default:
-		return infraerrors.BadRequest("INVALID_ORDER_TYPE", "order cannot fulfill with unsupported order type")
+		return s.rejectUnsupportedOrderType(ctx, o)
 	}
+}
+
+func isSupportedPaymentOrderType(orderType string) bool {
+	return orderType == payment.OrderTypeBalance || orderType == payment.OrderTypeSubscription
+}
+
+func (s *PaymentService) rejectUnsupportedOrderType(ctx context.Context, o *dbent.PaymentOrder) error {
+	reason := "unsupported order type: " + o.OrderType
+	count, err := s.entClient.PaymentOrder.Update().
+		Where(paymentorder.IDEQ(o.ID), paymentorder.StatusIn(OrderStatusPaid, OrderStatusRecharging)).
+		SetStatus(OrderStatusFailed).SetFailedAt(time.Now()).SetFailedReason(reason).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("mark unsupported order type FAILED: %w", err)
+	}
+	if count > 0 {
+		s.writeAuditLog(ctx, o.ID, "FULFILLMENT_FAILED", "system", map[string]any{"reason": reason})
+	}
+	return nil
 }
 
 func (s *PaymentService) ExecuteBalanceFulfillment(ctx context.Context, oid int64) error {
 	o, err := s.entClient.PaymentOrder.Get(ctx, oid)
 	if err != nil {
 		return infraerrors.NotFound("NOT_FOUND", "order not found")
+	}
+	if o.OrderType != payment.OrderTypeBalance {
+		return infraerrors.BadRequest("INVALID_ORDER_TYPE", "order is not a balance order")
 	}
 	if o.Status == OrderStatusCompleted {
 		return nil
@@ -898,6 +919,9 @@ func (s *PaymentService) RetryFulfillment(ctx context.Context, oid int64) error 
 	}
 	if o.Status != OrderStatusFailed && o.Status != OrderStatusPaid && o.Status != OrderStatusRecharging {
 		return infraerrors.BadRequest("INVALID_STATUS", "only paid, failed, and recoverable recharging orders can retry")
+	}
+	if !isSupportedPaymentOrderType(o.OrderType) {
+		return infraerrors.BadRequest("INVALID_ORDER_TYPE", "unsupported order type")
 	}
 	s.writeAuditLog(ctx, oid, "RECHARGE_RETRY", "admin", map[string]any{"detail": "admin manual retry"})
 	return s.executeFulfillment(ctx, oid)

@@ -2181,6 +2181,8 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 	nonBillableUpstreamError := false
 	var bareErrorPayload []byte
 	bareErrorAccountSideEffectsPending := false
+	// Observe upstream timestamps without rewriting passthrough events.
+	var createdAtTracker responsesCreatedAtStamper
 	upstreamRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
 	// 流式预扣补扣：仅当请求持有活动的预扣 guard 且带输出补扣 tracker 时非空。
 	// 逐帧仅做整数累加，跨输出窗口时才原子补扣一次，补扣失败中止上游流。
@@ -2246,7 +2248,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 		if !writePendingLines() {
 			return
 		}
-		if _, err := fmt.Fprint(w, buildOpenAIResponseFailedSSE(responseID, originalModel, bareErrorPayload, failedMessage)); err != nil {
+		if _, err := fmt.Fprint(w, buildOpenAIResponseFailedSSE(responseID, originalModel, createdAtTracker.Value(), bareErrorPayload, failedMessage)); err != nil {
 			startDisconnectDrain()
 			return
 		}
@@ -2362,6 +2364,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			authoritativeTerminalDataPending = frame.validJSON && frame.payloadEventType != "" &&
 				frame.payloadEventType != "error" && openAIStreamEventTypeIsTerminal(frame.payloadEventType)
 			rawEventType := frame.eventType
+			createdAtTracker.Observe(dataBytes, rawEventType)
 			observer.ObserveOpenAIFrame(frame)
 			if needModelReplace && strings.Contains(data, mappedModel) {
 				line = s.replaceModelInSSELine(line, mappedModel, originalModel)
@@ -2661,7 +2664,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				}
 			}
 			if !clientDisconnected {
-				if _, err := fmt.Fprint(w, buildOpenAIResponseFailedSSE(responseID, originalModel, nil, "Upstream stream ended before completion")); err != nil {
+				if _, err := fmt.Fprint(w, buildOpenAIResponseFailedSSE(responseID, originalModel, createdAtTracker.Value(), nil, "Upstream stream ended before completion")); err != nil {
 					startDisconnectDrain()
 				} else {
 					failureDelivered = true

@@ -2,7 +2,10 @@
 // registry, load balancing, and shared utilities for the payment subsystem.
 package payment
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // PaymentType represents a supported payment method.
 type PaymentType = string
@@ -191,10 +194,11 @@ type RefundRequest struct {
 // RefundQueryRequest contains identifiers needed to query a previously
 // requested refund.
 type RefundQueryRequest struct {
-	TradeNo  string
-	OrderID  string
-	RefundID string
-	Amount   string
+	TradeNo     string
+	OrderID     string
+	RefundID    string
+	Amount      string
+	RequestedAt time.Time // Original pending-refund audit time; zero when unknown.
 }
 
 // RefundResponse is returned after a refund request.

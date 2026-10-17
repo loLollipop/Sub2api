@@ -903,12 +903,12 @@ export default {
       poolModeRetryStatusCodes: '同账号重试状态码',
       poolModeRetryStatusCodesHint: '仅在池模式下生效。以英文逗号分隔的 HTTP 状态码（100-599），命中时触发同账号重试。留空使用默认值（{default}）。',
       customErrorCodes: '自定义错误码',
-      customErrorCodesHint: '仅对选中的错误码停止调度',
-      customErrorCodesWarning: '仅选中的错误码会停止调度，其他错误将返回 500。',
+      customErrorCodesHint: '仅处理选中的错误码；自定义停调持续 30 天，内置认证和限流规则仍优先',
+      customErrorCodesWarning: '选中的错误码按内置策略处理；触发自定义停调时暂停 30 天。其他错误将返回 500。',
       customErrorCodes429Warning:
-        '429 已有内置的限流处理机制。添加到自定义错误码后，将直接停止调度而非临时限流。确定要添加吗？',
+        '429 仍按内置限流规则处理。启用自定义错误码后，仅选中的错误码会被处理。确定要添加吗？',
       customErrorCodes529Warning:
-        '529 已有内置的过载处理机制。添加到自定义错误码后，将直接停止调度而非临时标记过载。确定要添加吗？',
+        '529 已有内置的过载处理机制。添加到自定义错误码后，将停止调度 30 天。确定要添加吗？',
       selectedErrorCodes: '已选择',
       noneSelectedUsesDefault: '未选择（使用默认策略）',
       enterErrorCode: '输入错误码 (100-599)',

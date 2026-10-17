@@ -829,13 +829,13 @@ export default {
       poolModeRetryStatusCodesHint:
         'Comma-separated HTTP status codes (100-599) that trigger same-account retry in pool mode. Leave blank to use defaults ({default}).',
       customErrorCodes: 'Custom Error Codes',
-      customErrorCodesHint: 'Only stop scheduling for selected error codes',
+      customErrorCodesHint: 'Only handle selected codes. Custom pauses last 30 days; built-in authentication and rate-limit rules take precedence',
       customErrorCodesWarning:
-        'Only selected error codes will stop scheduling. Other errors will return 500.',
+        'Selected codes follow built-in policies; custom scheduling pauses last 30 days. Other errors return 500.',
       customErrorCodes429Warning:
-        '429 already has built-in rate limit handling. Adding it to custom error codes will disable the account instead of temporary rate limiting. Are you sure?',
+        '429 keeps built-in rate limit handling. With custom error codes enabled, only selected codes are handled. Continue?',
       customErrorCodes529Warning:
-        '529 already has built-in overload handling. Adding it to custom error codes will disable the account instead of temporary overload marking. Are you sure?',
+        '529 already has built-in overload handling. Adding it to custom error codes pauses scheduling for 30 days. Continue?',
       selectedErrorCodes: 'Selected',
       noneSelectedUsesDefault: 'None selected (uses default policy)',
       enterErrorCode: 'Enter error code (100-599)',

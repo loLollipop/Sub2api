@@ -29,6 +29,8 @@ Docker Compose 的三个模板都已传入此变量。修改 `.env` 后需要在
 
 已审查提交记录在 `backend/internal/service/update_source_baselines.go`，并由回归测试核对 `maintenance/upstream.lock.json` 和 `maintenance/original-backports.json`。维护者完成源码比较后才更新检查点；这表示历史已审查，不代表所有功能都已合并。具体移植与暂缓内容以两个 maintenance 文件为准。
 
+2026-10-17 检查点：原版 `b0a02a330`（v0.2.17），二改 `ce66c457c`（v2.1.17）。适配记录见 [双上游同步说明](../maintenance/notes/upstream-sync-20261017.md)，本项目发行版本不随上游版本号自动变更。
+
 ## 安装安全边界
 
 上游跟踪只是审查提醒，不改变安装包来源，也不解除现有禁用在线自替换的保护。发布、迁移验证和部署仍使用本项目的受控发布流程。任意仓库 URL 不受支持；非法检查模式会退回默认发布检查并提示警告。

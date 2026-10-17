@@ -311,7 +311,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 		}
 		failureSource["sequence_number"], _ = json.Marshal(state.SequenceNumber)
 		failurePayload, _ := json.Marshal(failureSource)
-		failureSSE := buildOpenAIResponseFailedSSE(state.ResponseID, originalModel, failurePayload, message)
+		failureSSE := buildOpenAIResponseFailedSSE(state.ResponseID, originalModel, state.Created, failurePayload, message)
 		failureData := []byte(strings.TrimSuffix(strings.TrimPrefix(failureSSE, "event: response.failed\ndata: "), "\n\n"))
 		if sanitized, changed := sanitizeOpenAIResponseFailedEventForClient(failureData, "response.failed", clientOutputStarted); changed {
 			failureSSE = "event: response.failed\ndata: " + string(sanitized) + "\n\n"

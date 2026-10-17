@@ -624,11 +624,15 @@ type errorPolicyRepoStub struct {
 	tempCalls           int
 	setErrCalls         int
 	lastErrorMsg        string
+	lastTempUntil       time.Time
+	lastTempReason      string
 	modelRateLimitCalls []modelNotFoundRateLimitCall
 }
 
 func (r *errorPolicyRepoStub) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	r.tempCalls++
+	r.lastTempUntil = until
+	r.lastTempReason = reason
 	return nil
 }
 

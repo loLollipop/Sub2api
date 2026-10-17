@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 )
@@ -669,7 +670,10 @@ func codexModelLookupKey(modelID string) string {
 		parts := strings.Split(modelID, "/")
 		modelID = parts[len(parts)-1]
 	}
-	return strings.ToLower(strings.Join(strings.Fields(modelID), "-"))
+	if strings.IndexFunc(modelID, unicode.IsSpace) >= 0 {
+		modelID = strings.Join(strings.Fields(modelID), "-")
+	}
+	return strings.ToLower(modelID)
 }
 
 func isKnownCodexModelSuffix(suffix string) bool {

@@ -4,17 +4,19 @@
   "source_releases": {
     "v0.2.14": "0363b8cdba8cec3e2ba4b2dbd49c4481143fa55d",
     "v0.2.15": "f2669c8cf62555cd92389b3f55920e9e6e7c6ff2",
-    "v0.2.16": "01842576b3d5c1e2545b5a99ad555d36e28ed306"
+    "v0.2.16": "01842576b3d5c1e2545b5a99ad555d36e28ed306",
+    "v0.2.17": "060d0160417782cd962a0c7f460f6cd4565d4916"
   },
-  "latest_reviewed_main_commit": "1b2243a4f50621508e79aef4b498a2937a6238ee",
+  "latest_reviewed_main_commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "1b2243a4f50621508e79aef4b498a2937a6238ee",
+    "source_head": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
     "implemented_with_local_regression": [
       "Toolchain, cooldown scopes and frontend lifecycle fixes",
+      "2026-10-17 Responses created_at, Gemini compatibility thinking, subscription retirement/public catalogs and payment compatibility; dated sync note records local adaptations and verification",
       "Provider registry with Mixed/Cline/Command Code and credential destination protection",
       "Vertex API-key/service-account endpoint/model handling and authorized Gemini catalog",
       "Group localization and exact composite aliases",
@@ -68,7 +70,19 @@
     { "commit": "f022a0457", "scope": "saved-passthrough-rule-state" },
     { "commit": "7b1aa9314", "scope": "integer-rpm-input" },
     { "commit": "8811c125e", "scope": "group-rate-load-isolation", "note": "Also isolate stale save completion/errors from a switched or reopened dialog, and block edits before the initial load succeeds; keep pending writes serialized." },
-    { "commit": "81bd85ec5", "scope": "ops-settings-loaded-save-guard", "note": "Also isolate stale save completion/errors after closing or reopening; keep pending writes serialized." }
+    { "commit": "81bd85ec5", "scope": "ops-settings-loaded-save-guard", "note": "Also isolate stale save completion/errors after closing or reopening; keep pending writes serialized." },
+    { "commit": "bdfe215cb", "scope": "responses-created-at", "note": "Stable missing/null created_at on normal HTTP/WS/JSON Responses; passthrough observation only, preserving local empty-success failover, usage and financial redaction. Source fixture followups71e6b6a97/f2e5b55f3 adapted." },
+    { "commit": "64211de8d", "scope": "gemini-compat-thinking", "note": "Thinking budgets/levels and streamed thought summaries, drop historical reasoning, preserve signature-retry intent. Record final forwarded level and retain local0.15 settlement." },
+    { "commit": "26aab6dc0", "scope": "gpt55-subscription-retirement", "note": "OAuth/setup/shadow retirement only; API-key access and explicit replacement mappings retained. Local scheduler snapshot, catalog/cache, compact and handler adaptation." },
+    { "commit": "86f844304", "scope": "gpt55-public-alias-projection", "note": "Filter final public aliases before final ETag; preserve original upstream metadata/cache bytes." },
+    { "commit": "26e55cf33", "scope": "openai-apikey-messages-websearch", "note": "Shared emulation gate after native Anthropic routing and before cross-protocol gate; retain OpenAI extra fields on save." },
+    { "commit": "7de15113c", "scope": "openai-websearch-oauth-exclusion", "note": "OAuth and setup-token never enter OpenAI websearch emulation." },
+    { "commit": "7c6f70680", "scope": "payment-type-and-pending-hold", "note": "Add missing fulfillment/retry type guards; retain stronger existing transactional hold and single rollback implementation." },
+    { "commit": "f996b0bfa", "scope": "stripe-local-client-secret", "note": "Read validated same-order recovery snapshot instead of URL client_secret; preserve local shop/recharge UI." },
+    { "commit": "44e35fbf8", "scope": "pending-refund-atomic-failure", "note": "Already covered by local transactional retained-deduction rollback/retry and live-balance update; no weaker fallback transaction imported." },
+    { "commit": "83337a0c6", "scope": "alipay-refund-query-and-invalid-types", "note": "Add stable-request-ID refund queries, pending-audit timestamp/error handling and unsupported fulfillment closeout; retain canonical return URL rejection and add plain host validation." },
+    { "commit": "f37b69b77", "scope": "alipay-query-pending-grace", "note": "Query failures remain pending; no-record failure only after10min; legacy trade-number refund IDs require manual verification." },
+    { "commit": "1b92038ea", "scope": "easypay-query-and-settlement", "note": "Mirror query/body, flexible scalar decoding, strict success/order checks and notification validation, URL secret redaction. Preserve fixed-instance service-layer settlement verification; do not add duplicate handler confirmation." }
   ],
   "preserve_during_future_sync": [
     "Existing 0.15 billing and fixed-price shop-link recharge customizations",
@@ -84,5 +98,11 @@
     "Monitoring platform picker/details refresh and compact filters are already present. Ops account-name/output-TPS UI is implemented with selected frontend regressions; final backend validation is tracked separately.",
     "SheetJS CDN dependency replacement (daa791574) is now pinned0.20.3 with verified SHA512/clean-store frozen installation/export regression; obsolete xlsx audit exemptions removed.",
     "Final real PostgreSQL schema upgrade/rollback, race/Redis/Docker and cross-batch integration verification remain outstanding; implemented source features are listed in cumulative_sync rather than the historical deferral list."
-  ]
+  ],
+  "observed_delta_review": {
+    "from_commit": "1b2243a4f50621508e79aef4b498a2937a6238ee",
+    "to_commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
+    "status": "selective_backport_with_local_equivalents",
+    "evidence": "maintenance/notes/upstream-sync-20261017.md"
+  }
 }

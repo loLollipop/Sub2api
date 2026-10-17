@@ -140,26 +140,22 @@ let redirectTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   const orderId = Number(route.query.order_id)
-  const clientSecret = String(route.query.client_secret || '')
   const method = String(route.query.method || '')
   const resumeToken = typeof route.query.resume_token === 'string' ? route.query.resume_token : undefined
 
-  if (!orderId || !clientSecret) {
-    loading.value = false
-    initError.value = t('payment.stripeMissingParams')
-    return
-  }
-
   try {
-    if (typeof window !== 'undefined') {
-      const restored = readPaymentRecoverySnapshot(
+    const restored = typeof window !== 'undefined'
+      ? readPaymentRecoverySnapshot(
         window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY),
         { resumeToken },
       )
-      if (restored?.orderId === orderId) {
-        currency.value = normalizePaymentCurrency(restored.currency)
-      }
+      : null
+    const clientSecret = restored?.orderId === orderId ? restored.clientSecret : ''
+    if (!orderId || !clientSecret) {
+      initError.value = t('payment.stripeMissingParams')
+      return
     }
+    currency.value = normalizePaymentCurrency(restored?.currency)
     const res = await paymentAPI.getOrder(orderId)
     order.value = res.data
     if (res.data.currency) {

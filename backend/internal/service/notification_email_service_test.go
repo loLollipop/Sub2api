@@ -430,6 +430,7 @@ func TestNotificationEmailSendDeduplicatesSubscriptionExpiryReminder(t *testing.
 	require.NoError(t, repo.SetMultiple(ctx, smtpServer.settings()))
 
 	emailSvc := NewEmailService(repo, nil)
+	emailSvc.smtpDialContext = (&net.Dialer{Timeout: smtpDialTimeout}).DialContext
 	svc := NewNotificationEmailService(repo, emailSvc)
 	input := NotificationEmailSendInput{
 		Event:          NotificationEmailEventSubscriptionExpiryReminder,

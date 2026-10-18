@@ -260,7 +260,9 @@ func TestRecordCyberPolicyEvent_RuntimeSnapshotRefreshFailureKeepsStaleScope(t *
 		SettingKeyRiskControlEnabled:      "true",
 		SettingKeyContentModerationConfig: `{"all_groups":true,"model_filter":{"type":"include","models":["gpt-5"]}}`,
 	}}
-	svc := NewContentModerationService(settingRepo, repo, nil, nil, nil, nil, nil, nil)
+	// This test counts refresh queries precisely; unrelated background workers
+	// must not race its initial snapshot load or create extra refresh attempts.
+	svc := &ContentModerationService{settingRepo: settingRepo, repo: repo}
 	svc.runtimeCacheTTL.Store(int64(time.Minute))
 
 	_, err := svc.loadRuntimeSnapshot(context.Background())

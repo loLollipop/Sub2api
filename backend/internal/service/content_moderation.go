@@ -62,12 +62,14 @@ const (
 	defaultContentModerationTimeoutMS = 3000
 	maxContentModerationTimeoutMS     = 30000
 	maxModerationInputRunes           = 12000
+	maxModerationLogExcerptRunes      = 200000
 	maxModerationExcerptRunes         = 240
 
 	defaultContentModerationWorkerCount          = 4
 	maxContentModerationWorkerCount              = 32
 	defaultContentModerationQueueSize            = 32768
 	maxContentModerationQueueSize                = 100000
+	maxContentModerationAsyncPayloadBytes        = 64 << 20
 	defaultContentModerationBanThreshold         = 10
 	defaultContentModerationViolationWindowHours = 720
 	defaultContentModerationBlockHTTPStatus      = http.StatusForbidden
@@ -317,6 +319,8 @@ type ContentModerationModelFilter struct {
 }
 
 type ContentModerationCheckInput struct {
+	// logText replaces the original request body in asynchronous audit tasks.
+	logText    string
 	RequestID  string
 	UserID     int64
 	UserEmail  string
@@ -521,6 +525,8 @@ type ContentModerationService struct {
 	httpClient               *http.Client
 	moderationProxyCache     atomic.Pointer[moderationProxyURLCacheEntry]
 	asyncQueue               chan contentModerationTask
+	asyncPayloadBytes        atomic.Int64
+	asyncQueueClosed         atomic.Bool
 	workerCount              int
 	apiKeyCursor             atomic.Uint64
 	asyncActive              atomic.Int64
@@ -555,6 +561,7 @@ type contentModerationRuntimeSnapshot struct {
 }
 
 type contentModerationTask struct {
+	payloadBytes     int64
 	input            ContentModerationCheckInput
 	content          ContentModerationInput
 	inputHash        string
@@ -1192,21 +1199,19 @@ func (s *ContentModerationService) enqueueAsync(input ContentModerationCheckInpu
 		s.asyncDropped.Add(1)
 		return
 	}
-	input.GroupID = cloneInt64Ptr(input.GroupID)
-	content.Images = append([]string(nil), content.Images...)
+	// Keep only the bounded last user turn needed by buildLog. Retaining Body
+	// would also retain unrelated history and arbitrarily large attachments.
+	input.logText = strings.Clone(trimRunes(redactContentModerationSecrets(moderationLogFullText(input, content.ExcerptText())), maxModerationLogExcerptRunes))
+	input.Body = nil
 	task := contentModerationTask{
 		input:      input,
 		content:    content,
-		config:     cloneContentModerationConfig(cfg),
+		config:     cfg,
 		inputHash:  hashText,
 		enqueuedAt: time.Now(),
 	}
-	select {
-	case s.asyncQueue <- task:
-		s.asyncEnqueued.Add(1)
-	default:
+	if !s.enqueueTask(task) {
 		slog.Warn("content_moderation.async_queue_full", "user_id", input.UserID, "endpoint", input.Endpoint)
-		s.asyncDropped.Add(1)
 	}
 }
 
@@ -1230,21 +1235,124 @@ func (s *ContentModerationService) enqueueRecord(input ContentModerationCheckInp
 	task := contentModerationTask{
 		inputHash:        inputHash,
 		log:              log,
-		config:           cloneContentModerationConfig(cfg),
+		config:           cfg,
 		recordHash:       recordHash,
 		applySideEffects: applySideEffects,
 		enqueuedAt:       time.Now(),
 	}
-	select {
-	case s.asyncQueue <- task:
-		s.asyncEnqueued.Add(1)
-	default:
+	if !s.enqueueTask(task) {
 		slog.Warn("content_moderation.record_queue_full",
 			"user_id", input.UserID,
 			"endpoint", input.Endpoint,
 			"action", log.Action)
-		s.asyncDropped.Add(1)
 	}
+}
+
+// The budget covers both queued and running audit/record tasks, including their
+// frozen configurations. Dequeue does not free the reservation: a slow or
+// panicking worker must not allow producers to refill its still-live payload.
+func (s *ContentModerationService) enqueueTask(task contentModerationTask) (enqueued bool) {
+	task.payloadBytes = task.retainedPayloadBytes()
+	for {
+		used := s.asyncPayloadBytes.Load()
+		if s.asyncQueueClosed.Load() || task.payloadBytes > maxContentModerationAsyncPayloadBytes-used {
+			s.asyncDropped.Add(1)
+			return false
+		}
+		if s.asyncPayloadBytes.CompareAndSwap(used, used+task.payloadBytes) {
+			break
+		}
+	}
+	defer func() {
+		if !enqueued {
+			s.releaseAsyncTask(task)
+			s.asyncDropped.Add(1)
+		}
+	}()
+	task.config = cloneContentModerationConfig(task.config)
+	task.input.GroupID = cloneInt64Ptr(task.input.GroupID)
+	// Scalar metadata may be a zero-copy substring of the original JSON body.
+	// Detach it before retaining a task so len-based charging stays valid.
+	task.input.RequestID = strings.Clone(task.input.RequestID)
+	task.input.UserEmail = strings.Clone(task.input.UserEmail)
+	task.input.APIKeyName = strings.Clone(task.input.APIKeyName)
+	task.input.GroupName = strings.Clone(task.input.GroupName)
+	task.input.Endpoint = strings.Clone(task.input.Endpoint)
+	task.input.Provider = strings.Clone(task.input.Provider)
+	task.input.Model = strings.Clone(task.input.Model)
+	task.input.Protocol = strings.Clone(task.input.Protocol)
+	task.inputHash = strings.Clone(task.inputHash)
+	task.content.Text = strings.Clone(task.content.Text)
+	task.content.Images = append([]string(nil), task.content.Images...)
+	for i := range task.content.Images {
+		task.content.Images[i] = strings.Clone(task.content.Images[i])
+	}
+	// A closed channel can race a producer. Limit recovery to the send itself;
+	// allocation/configuration panics still propagate after refunding the budget.
+	func() {
+		defer func() {
+			if recover() != nil {
+				s.asyncQueueClosed.Store(true)
+			}
+		}()
+		select {
+		case s.asyncQueue <- task:
+			enqueued = true
+			s.asyncEnqueued.Add(1)
+		default:
+		}
+	}()
+	return enqueued
+}
+
+func (s *ContentModerationService) releaseAsyncTask(task contentModerationTask) {
+	if task.payloadBytes > 0 {
+		s.asyncPayloadBytes.Add(-task.payloadBytes)
+	}
+}
+
+func moderationStringBytes(values ...string) int64 {
+	var size int64
+	for _, value := range values {
+		size += int64(len(value)) + 16
+	}
+	return size
+}
+
+func moderationScoreBytes(scores map[string]float64) int64 {
+	var size int64
+	for key := range scores {
+		size += int64(len(key)) + 64
+	}
+	return size
+}
+
+func moderationEnginePayloadBytes(cfg *ContentModerationEngineConfig) int64 {
+	if cfg == nil {
+		return 0
+	}
+	return 256 + moderationStringBytes(cfg.BaseURL, cfg.Model) + moderationStringBytes(cfg.APIKeys...) + moderationScoreBytes(cfg.Thresholds)
+}
+
+func (task contentModerationTask) retainedPayloadBytes() int64 {
+	// Conservative fixed allowance includes task/struct headers and pointers;
+	// slices, map entries and all variable-length payloads are charged below.
+	in := task.input
+	size := int64(2048) + int64(cap(in.Body)) + moderationStringBytes(in.logText, in.RequestID, in.UserEmail, in.APIKeyName, in.GroupName, in.Endpoint, in.Provider, in.Model, in.Protocol, task.inputHash, task.content.Text) + moderationStringBytes(task.content.Images...)
+	if log := task.log; log != nil {
+		size += moderationStringBytes(log.RequestID, log.UserEmail, log.APIKeyName, log.GroupName, log.Endpoint, log.Provider, log.Model, log.Mode, log.Action, log.HighestCategory, log.MatchedKeyword, log.InputExcerpt, log.Error, log.UserStatus)
+		size += moderationScoreBytes(log.CategoryScores) + moderationScoreBytes(log.ThresholdSnapshot)
+		if meta := log.EngineMeta; meta != nil {
+			size += 128 + moderationStringBytes(meta.Engine, meta.Model, meta.RulesVersion)
+		}
+	}
+	if cfg := task.config; cfg != nil {
+		size += moderationStringBytes(cfg.Engine, cfg.Mode, cfg.BaseURL, cfg.Model, cfg.APIKey, cfg.BlockMessage, cfg.KeywordBlockingMode, cfg.ModelFilter.Type)
+		size += moderationStringBytes(cfg.APIKeys...) + moderationStringBytes(cfg.BlockedKeywords...) + moderationStringBytes(cfg.ModelFilter.Models...)
+		size += int64(len(cfg.GroupIDs))*8 + moderationScoreBytes(cfg.Thresholds)
+		size += moderationEnginePayloadBytes(cfg.openAIProfile) + moderationEnginePayloadBytes(cfg.TypeSafe)
+	}
+	return size
 }
 
 func (s *ContentModerationService) worker(id int) {
@@ -1260,10 +1368,14 @@ func (s *ContentModerationService) worker(id int) {
 		task, ok := s.dequeueAsyncTask(ctx, time.Second)
 		if !ok {
 			cancel()
+			if s.asyncQueueClosed.Load() {
+				return
+			}
 			continue
 		}
 		func() {
 			defer cancel()
+			defer s.releaseAsyncTask(task)
 			defer func() {
 				if r := recover(); r != nil {
 					slog.Error("content_moderation.worker_panic", "worker_id", id, "recover", r)
@@ -1284,6 +1396,7 @@ func (s *ContentModerationService) worker(id int) {
 			}
 			s.dispatchAsyncTask(ctx, task)
 		}()
+		task = contentModerationTask{}
 	}
 }
 
@@ -1299,6 +1412,9 @@ func (s *ContentModerationService) dequeueAsyncTask(ctx context.Context, idleWai
 	defer timer.Stop()
 	select {
 	case task, ok := <-s.asyncQueue:
+		if !ok {
+			s.asyncQueueClosed.Store(true)
+		}
 		return task, ok
 	case <-ctx.Done():
 		return zero, false
@@ -1939,28 +2055,32 @@ func (s *ContentModerationService) buildLog(input ContentModerationCheckInput, c
 	if input.APIKeyID > 0 {
 		apiKeyID = cloneInt64Ptr(&input.APIKeyID)
 	}
+	excerpt := input.logText
+	if excerpt == "" {
+		excerpt = strings.Clone(trimRunes(redactContentModerationSecrets(moderationLogFullText(input, text)), maxModerationLogExcerptRunes))
+	}
 	return &ContentModerationLog{
-		RequestID:         input.RequestID,
+		RequestID:         strings.Clone(input.RequestID),
 		UserID:            userID,
-		UserEmail:         input.UserEmail,
+		UserEmail:         strings.Clone(input.UserEmail),
 		APIKeyID:          apiKeyID,
-		APIKeyName:        input.APIKeyName,
+		APIKeyName:        strings.Clone(input.APIKeyName),
 		GroupID:           cloneInt64Ptr(input.GroupID),
-		GroupName:         input.GroupName,
-		Endpoint:          input.Endpoint,
-		Provider:          input.Provider,
-		Model:             input.Model,
-		Mode:              cfg.Mode,
-		Action:            action,
+		GroupName:         strings.Clone(input.GroupName),
+		Endpoint:          strings.Clone(input.Endpoint),
+		Provider:          strings.Clone(input.Provider),
+		Model:             strings.Clone(input.Model),
+		Mode:              strings.Clone(cfg.Mode),
+		Action:            strings.Clone(action),
 		Flagged:           flagged,
-		HighestCategory:   highestCategory,
+		HighestCategory:   strings.Clone(highestCategory),
 		HighestScore:      highestScore,
 		CategoryScores:    cloneFloatMap(scores),
 		ThresholdSnapshot: cloneFloatMap(cfg.Thresholds),
-		InputExcerpt:      trimRunes(redactContentModerationSecrets(moderationLogFullText(input, text)), maxModerationInputRunes),
+		InputExcerpt:      excerpt,
 		UpstreamLatencyMS: latency,
 		QueueDelayMS:      queueDelay,
-		Error:             errText,
+		Error:             strings.Clone(errText),
 	}
 }
 
@@ -3036,7 +3156,10 @@ func cloneInt64Ptr(in *int64) *int64 {
 }
 
 func moderationLogFullText(input ContentModerationCheckInput, fallback string) string {
-	full := ExtractContentModerationFullText(input.Protocol, input.Body)
+	if input.logText != "" {
+		return input.logText
+	}
+	full := ExtractContentModerationLastUserTurn(input.Protocol, input.Body)
 	if strings.TrimSpace(full) == "" {
 		return fallback
 	}

@@ -222,7 +222,7 @@ func newUpstreamBillingProbeTestService(
 		Enabled:           false,
 		AllowInsecureHTTP: true,
 	}}}
-	accountTestService := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: cfg}
+	accountTestService := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: cfg}
 	return NewUpstreamBillingProbeService(repo, accountTestService, NewSettingService(settingRepo, cfg))
 }
 

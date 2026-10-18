@@ -571,6 +571,68 @@ func TestOpenAIWSPassthroughTurnLifecycle_SerializesTerminalCommitAndNextTurn(t 
 	require.False(t, <-admitted, "failed terminal write must keep the current turn in flight")
 }
 
+func TestPassthroughLifecycle_ClientReaderPreservesRelayCancelCause(t *testing.T) {
+	tests := []struct {
+		name       string
+		cause      error
+		wantStatus coderws.StatusCode
+		wantReason string
+	}{
+		{
+			name:       "lease loss",
+			cause:      ErrOpenAIWSIngressLeaseLost,
+			wantStatus: coderws.StatusTryAgainLater,
+			wantReason: "websocket ingress capacity lease lost; please reconnect",
+		},
+		{
+			name:       "internal relay cancellation",
+			cause:      context.Canceled,
+			wantStatus: coderws.StatusGoingAway,
+			wantReason: "websocket request canceled",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			relayCtx, cancelRelay := context.WithCancelCause(context.Background())
+			cancelRelay(tt.cause)
+			serverErr := make(chan error, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				conn, err := coderws.Accept(w, r, nil)
+				if err != nil {
+					serverErr <- err
+					return
+				}
+				defer func() { _ = conn.CloseNow() }()
+				// Keep ingress propagation pending so relay cancellation always
+				// reaches the joined reader first, as it can when ingress cancels
+				// its relay and reader children in that order.
+				clientFrameConn := &openAIWSClientFrameConn{conn: conn, controlCtx: context.Background()}
+				_, _, err = clientFrameConn.ReadFrame(relayCtx)
+				serverErr <- err
+			}))
+			defer server.Close()
+
+			dialCtx, cancelDial := context.WithTimeout(context.Background(), 3*time.Second)
+			clientConn, _, err := coderws.Dial(dialCtx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
+			cancelDial()
+			require.NoError(t, err)
+			defer func() { _ = clientConn.CloseNow() }()
+
+			_, err = readPassthroughLifecycleFrame(t, clientConn, 3*time.Second)
+			var closeErr coderws.CloseError
+			require.ErrorAs(t, err, &closeErr)
+			require.Equal(t, tt.wantStatus, closeErr.Code)
+			require.Equal(t, tt.wantReason, closeErr.Reason)
+			select {
+			case err := <-serverErr:
+				require.ErrorIs(t, err, tt.cause)
+			case <-time.After(3 * time.Second):
+				t.Fatal("passthrough relay-canceled reader did not exit")
+			}
+		})
+	}
+}
+
 func TestPassthroughLifecycle_LeaseLossSendsRetryClose(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	controlCtx, cancelControl := context.WithCancelCause(context.Background())

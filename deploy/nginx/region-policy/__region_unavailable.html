@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="color-scheme" content="light">
+    <title>地区访问说明 · Regional access notice</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #152031;
+        --muted: #52647c;
+        --blue: #245ca4;
+        --line: #dde7f3;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100svh;
+        padding: 64px 32px;
+        display: grid;
+        place-items: center;
+        color: var(--ink);
+        background: #edf4fc;
+        font-family: "Aptos", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .notice {
+        width: min(100%, 1080px);
+        padding: 42px 72px 32px;
+        border: 1px solid #e1eaf5;
+        border-radius: 24px;
+        background: #fff;
+        box-shadow: 0 24px 80px -40px #7d99bd55;
+      }
+
+      .masthead, .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .masthead {
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .label {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: .11em;
+        line-height: 1.7;
+      }
+
+      .label span { color: var(--muted); }
+
+      .status {
+        flex-shrink: 0;
+        padding: 7px 12px;
+        border: 1px solid #d7e5f7;
+        border-radius: 6px;
+        color: var(--blue);
+        background: #f2f7fe;
+        font-family: "Consolas", "SFMono-Regular", monospace;
+        font-size: 12px;
+      }
+
+      .content { padding: 52px 0 38px; }
+
+      .symbol {
+        display: grid;
+        place-items: center;
+        width: 56px;
+        height: 56px;
+        margin-bottom: 28px;
+        border-radius: 16px;
+        color: var(--blue);
+        background: #edf4ff;
+      }
+
+      .symbol svg { width: 28px; height: 28px; }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(30px, 4.8vw, 52px);
+        font-weight: 650;
+        letter-spacing: -.045em;
+        line-height: 1.38;
+      }
+
+      h1 span { display: block; }
+
+      .english-title {
+        max-width: 680px;
+        margin: 17px 0 28px;
+        color: #344962;
+        font-size: clamp(19px, 2.4vw, 24px);
+        font-weight: 400;
+        letter-spacing: -.02em;
+        line-height: 1.5;
+      }
+
+      .description {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.9;
+      }
+
+      .description + .description {
+        margin-top: 5px;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .reference {
+        padding: 25px 28px;
+        border: 1px solid #dbe7f6;
+        border-radius: 14px;
+        background: #f7faff;
+      }
+
+      .reference .label { color: var(--blue); }
+
+      h2 {
+        margin: 15px 0 8px;
+        font-size: 19px;
+        font-weight: 600;
+        line-height: 1.6;
+      }
+
+      a { color: var(--ink); text-decoration-color: #9bb6d6; text-underline-offset: 5px; }
+      a:hover { color: var(--blue); }
+      a:focus-visible { outline: 3px solid var(--blue); outline-offset: 5px; border-radius: 2px; }
+
+      .reference p:not(.label) {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
+      .reference .translation { margin-bottom: 13px !important; }
+
+      .reference .source { margin-top: 13px !important; }
+
+      .footer {
+        margin-top: 36px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.7;
+      }
+
+      .footer p { margin: 0; }
+
+      @media (max-width: 600px) {
+        body { padding: 20px 12px; }
+        .notice { padding: 24px 24px 22px; border-radius: 18px; }
+        .masthead { gap: 10px; padding-bottom: 22px; }
+        .masthead .label { max-width: 170px; font-size: 10px; }
+        .masthead .label span { display: block; }
+        .status { padding: 6px 8px; font-size: 11px; }
+        .content { padding: 32px 0 28px; }
+        .symbol { margin-bottom: 22px; }
+        h1 { font-size: clamp(26px, 7.8vw, 42px); }
+        .english-title { margin-top: 16px; margin-bottom: 22px; font-size: 19px; }
+        .description { font-size: 14px; }
+        .description + .description { font-size: 13px; }
+        .reference { padding: 21px 18px; }
+        .reference .label { font-size: 10px; letter-spacing: .06em; }
+        h2 { font-size: 17px; }
+        .footer { align-items: flex-start; flex-direction: column; gap: 6px; margin-top: 28px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="notice" aria-labelledby="notice-title">
+      <header class="masthead">
+        <p class="label">地区访问说明 <span lang="en">/ ACCESS NOTICE</span></p>
+        <span class="status" lang="en">HTTP 451</span>
+      </header>
+
+      <section class="content" aria-labelledby="notice-title">
+        <div class="symbol" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <path d="M12 3 4.5 6v5.4c0 4.4 3.1 7.6 7.5 9.6 4.4-2 7.5-5.2 7.5-9.6V6L12 3Z"/>
+            <path d="M12 8v4.5M12 16h.01"/>
+          </svg>
+        </div>
+        <h1 id="notice-title"><span>本网站暂不向</span><span>中国大陆地区开放</span></h1>
+        <p class="english-title" lang="en">This website is currently unavailable in mainland China.</p>
+        <p class="description">根据本网站当前的地区服务政策，您所在地区的网页访问暂不可用。感谢您的理解。</p>
+        <p class="description" lang="en">Web access is unavailable in your region under our current regional service policy. Thank you for your understanding.</p>
+      </section>
+
+      <aside class="reference" aria-labelledby="reference-title">
+        <p class="label">法规参考 <span lang="en">/ REGULATORY REFERENCE</span></p>
+        <h2 id="reference-title"><a href="https://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm" target="_blank" rel="noopener noreferrer">《生成式人工智能服务管理暂行办法》<span aria-hidden="true"> ↗</span></a></h2>
+        <p class="translation" lang="en">Interim Measures for the Management of Generative Artificial Intelligence Services</p>
+        <p>施行日期：<time datetime="2023-08-15">2023 年 8 月 15 日</time></p>
+        <p lang="en">Effective from August 15, 2023.</p>
+        <p class="source">来源：中国国家互联网信息办公室 · 点击标题查看官方发布。</p>
+        <p lang="en">Source: Cyberspace Administration of China. Select the title to read the official publication (in Chinese; opens in a new tab).</p>
+      </aside>
+
+      <footer class="footer">
+        <p>地区服务政策 <span lang="en">/ Regional service policy</span></p>
+        <p lang="en">451 · Unavailable For Legal Reasons</p>
+      </footer>
+    </main>
+  </body>
+</html>

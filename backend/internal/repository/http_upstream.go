@@ -158,9 +158,10 @@ type openAIHTTP2FallbackState struct {
 // 7. 代理变更时清空旧连接池，避免复用错误代理
 // 8. 账号并发数与连接池上限对应（账号隔离策略下）
 type httpUpstreamService struct {
-	cfg     *config.Config                  // 全局配置
-	mu      sync.RWMutex                    // 保护 clients map 的读写锁
-	clients map[string]*upstreamClientEntry // 客户端缓存池，key 由隔离策略决定
+	publicNetwork *contentDownloadNetwork         // instance-local fixture injection; nil in production
+	cfg           *config.Config                  // 全局配置
+	mu            sync.RWMutex                    // 保护 clients map 的读写锁
+	clients       map[string]*upstreamClientEntry // 客户端缓存池，key 由隔离策略决定
 	// OpenAI 走 HTTP/HTTPS 代理时的 H2->H1 回退状态（key=标准化 proxyKey）
 	openAIHTTP2Fallbacks sync.Map
 }
@@ -239,9 +240,13 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 
 	// 执行请求
 	var client *http.Client
-	if contentDownload {
+	if contentDownload || service.HTTPUpstreamPublicHostsOnly(req.Context()) {
 		allowPrivateInitial := contentPolicy.InitialRelay && !s.shouldValidateResolvedIP() && !service.HTTPUpstreamPublicHostsOnly(req.Context())
-		client, err = newContentDownloadClient(entry.client, proxyURL, defaultPoolSettings(s.cfg), allowPrivateInitial, contentPolicy.Headers, defaultContentDownloadNetwork())
+		network := defaultContentDownloadNetwork()
+		if s.publicNetwork != nil {
+			network = *s.publicNetwork
+		}
+		client, err = newContentDownloadClient(entry.client, proxyURL, defaultPoolSettings(s.cfg), allowPrivateInitial, contentPolicy.Headers, network)
 		if err != nil {
 			atomic.AddInt64(&entry.inFlight, -1)
 			atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
@@ -252,8 +257,8 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 		}
 	} else {
 		client = s.httpClientForUpstreamRequest(entry.client, req)
-		client = httpClientWithGrokAccessDeniedFallback(client)
 	}
+	client = httpClientWithGrokAccessDeniedFallback(client)
 	resp, err := servertiming.Do(client, req)
 	captureUpstreamHeadersForOps(req, resp)
 	if err != nil {
@@ -286,6 +291,12 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
 	}
 	if req != nil {
+		// Public-only administrative probes bind DNS answers to each socket,
+		// including proxy CONNECT/SOCKS. The pooled fingerprint transport does
+		// not provide that guarantee, so these probes use the isolated adapter.
+		if service.HTTPUpstreamPublicHostsOnly(req.Context()) {
+			return s.Do(req, proxyURL, accountID, accountConcurrency)
+		}
 		if _, contentDownload := service.HTTPUpstreamContentDownloadFromContext(req.Context()); contentDownload {
 			return s.Do(req, proxyURL, accountID, accountConcurrency)
 		}
@@ -661,6 +672,10 @@ func (s *httpUpstreamService) validateRequestHost(req *http.Request) error {
 	host := strings.TrimSpace(req.URL.Hostname())
 	if host == "" {
 		return errors.New("request host is empty")
+	}
+	if publicHostsOnly && s.publicNetwork != nil {
+		_, err := s.publicNetwork.resolve(req.Context(), host, true)
+		return err
 	}
 	if err := urlvalidator.ValidateResolvedIP(host); err != nil {
 		return err
@@ -1576,8 +1591,20 @@ func wrapTrackedBody(body io.ReadCloser, onClose func()) io.ReadCloser {
 	if body == nil {
 		return body
 	}
-	return &trackedBody{ReadCloser: body, onClose: onClose}
+	tracked := &trackedBody{ReadCloser: body, onClose: onClose}
+	if duplex, ok := body.(io.ReadWriteCloser); ok {
+		return &trackedDuplexBody{trackedBody: tracked, writer: duplex}
+	}
+	return tracked
 }
+
+// HTTP 101 bodies must retain Write for coder/websocket handshakes.
+type trackedDuplexBody struct {
+	*trackedBody
+	writer io.Writer
+}
+
+func (b *trackedDuplexBody) Write(p []byte) (int, error) { return b.writer.Write(p) }
 
 // decompressResponseBody 根据 Content-Encoding 解压响应体。
 // 当请求显式设置了 accept-encoding 时，Go 的 Transport 不会自动解压，需要手动处理。

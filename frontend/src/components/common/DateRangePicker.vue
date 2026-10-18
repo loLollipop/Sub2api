@@ -124,15 +124,6 @@ const validRange = computed(() => {
   return Number.isFinite(start) && Number.isFinite(end) && start <= end
 })
 
-const today = computed(() => {
-  // Use local timezone to avoid UTC timezone issues
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-})
-
 // Tomorrow's date - used for max date to handle timezone differences
 // When user is in a timezone behind the server, "today" on server might be "tomorrow" locally
 const tomorrow = computed(() => {
@@ -160,7 +151,7 @@ const presets: DatePreset[] = [
     labelKey: 'dates.today',
     value: 'today',
     getRange: () => {
-      const t = today.value
+      const t = formatDateToString(new Date())
       return { start: t, end: t }
     }
   },
@@ -190,7 +181,7 @@ const presets: DatePreset[] = [
     labelKey: 'dates.last7Days',
     value: '7days',
     getRange: () => {
-      const end = today.value
+      const end = formatDateToString(new Date())
       const d = new Date()
       d.setDate(d.getDate() - 6)
       const start = formatDateToString(d)
@@ -201,7 +192,7 @@ const presets: DatePreset[] = [
     labelKey: 'dates.last14Days',
     value: '14days',
     getRange: () => {
-      const end = today.value
+      const end = formatDateToString(new Date())
       const d = new Date()
       d.setDate(d.getDate() - 13)
       const start = formatDateToString(d)
@@ -212,7 +203,7 @@ const presets: DatePreset[] = [
     labelKey: 'dates.last30Days',
     value: '30days',
     getRange: () => {
-      const end = today.value
+      const end = formatDateToString(new Date())
       const d = new Date()
       d.setDate(d.getDate() - 29)
       const start = formatDateToString(d)
@@ -225,7 +216,7 @@ const presets: DatePreset[] = [
     getRange: () => {
       const now = new Date()
       const start = formatDateToString(new Date(now.getFullYear(), now.getMonth(), 1))
-      return { start, end: today.value }
+      return { start, end: formatDateToString(new Date()) }
     }
   },
   {
@@ -309,6 +300,22 @@ const apply = () => {
   isOpen.value = false
 }
 
+// refreshActivePreset re-applies the currently active quick preset so an
+// external refresh button can slide a relative window (e.g. 近24小时) to
+// "now". Returns the recomputed range, or null when the user set a custom
+// range — a custom range must stay exactly where the user put it.
+const refreshActivePreset = (): { startDate: string; endDate: string } | null => {
+  if (!activePreset.value) return null
+  const preset = presets.find((p) => p.value === activePreset.value)
+  if (!preset) return null
+  const range = preset.getRange()
+  localStartDate.value = normalizeInput(range.start)
+  localEndDate.value = normalizeInput(range.end, true)
+  return { startDate: localStartDate.value, endDate: localEndDate.value }
+}
+
+defineExpose({ refreshActivePreset })
+
 const handleClickOutside = (event: MouseEvent) => {
   if (containerRef.value && !containerRef.value.contains(event.target as Node)) {
     isOpen.value = false
@@ -321,20 +328,18 @@ const handleEscape = (event: KeyboardEvent) => {
   }
 }
 
-// Sync local state with props
+// Preserve a selected preset when the parent echoes our applied range. A
+// relative preset's clock may have advanced since selection. External changes
+// still reset/re-detect the preset, and manual input calls onDateChange above.
 watch(
-  () => props.startDate,
-  (val) => {
-    localStartDate.value = normalizeInput(val)
-    onDateChange()
-  }
-)
-
-watch(
-  () => props.endDate,
-  (val) => {
-    localEndDate.value = normalizeInput(val, true)
-    onDateChange()
+  () => [props.startDate, props.endDate] as const,
+  ([start, end]) => {
+    const normalizedStart = normalizeInput(start)
+    const normalizedEnd = normalizeInput(end, true)
+    const unchanged = normalizedStart === localStartDate.value && normalizedEnd === localEndDate.value
+    localStartDate.value = normalizedStart
+    localEndDate.value = normalizedEnd
+    if (!unchanged) onDateChange()
   }
 )
 

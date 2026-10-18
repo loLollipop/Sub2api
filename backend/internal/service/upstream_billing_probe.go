@@ -669,7 +669,7 @@ func (s *UpstreamBillingProbeService) probeLoadedAccount(ctx context.Context, ac
 		profile = HTTPUpstreamProfileOpenAI
 	}
 	reqCtx := WithHTTPUpstreamProfile(req.Context(), profile)
-	req = req.WithContext(WithHTTPUpstreamRedirectsDisabled(reqCtx))
+	req = req.WithContext(WithHTTPUpstreamRedirectsDisabled(WithHTTPUpstreamPublicHostsOnly(reqCtx)))
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	account.ApplyHeaderOverrides(req.Header)

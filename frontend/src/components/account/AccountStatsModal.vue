@@ -436,7 +436,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Chart as ChartJS,
@@ -631,16 +631,15 @@ const lineChartOptions = computed(() => ({
 }))
 
 // Load stats when modal opens
-watch(
-  () => props.show,
-  async (newVal) => {
+const onVisibilityChange = async (newVal: boolean) => {
     if (newVal && props.account) {
       await loadStats()
     } else {
       stats.value = null
     }
   }
-)
+watch(() => props.show, onVisibilityChange)
+onMounted(() => { void onVisibilityChange(props.show) })
 
 const loadStats = async () => {
   if (!props.account) return

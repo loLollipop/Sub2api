@@ -28,7 +28,7 @@ func antigravityModelSyncAccount(plan string) *Account {
 }
 
 func antigravityModelSyncService() *AccountTestService {
-	return &AccountTestService{
+	return &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		antigravityGatewayService: &AntigravityGatewayService{tokenProvider: &AntigravityTokenProvider{}},
 		cfg:                       upstreamModelSyncTestConfig(),
 	}

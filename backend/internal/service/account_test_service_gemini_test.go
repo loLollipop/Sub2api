@@ -43,7 +43,7 @@ func TestProcessGeminiStream_EmitsImageEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	ctx, recorder := newTestContext()
-	svc := &AccountTestService{}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget}
 
 	stream := strings.NewReader("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"},{\"inlineData\":{\"mimeType\":\"image/png\",\"data\":\"QUJD\"}}]}}]}\n\ndata: [DONE]\n\n")
 

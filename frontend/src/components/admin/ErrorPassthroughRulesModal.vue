@@ -430,7 +430,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
@@ -489,11 +489,13 @@ const matchModeOptions = computed(() => [
 const platformOptions = CONCRETE_PLATFORM_OPTIONS
 
 // Load rules when dialog opens
-watch(() => props.show, (newVal) => {
+const onVisibilityChange = (newVal: boolean) => {
   if (newVal) {
     loadRules()
   }
-})
+}
+watch(() => props.show, onVisibilityChange)
+onMounted(() => { void onVisibilityChange(props.show) })
 
 const loadRules = async () => {
   loading.value = true

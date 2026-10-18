@@ -374,6 +374,11 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	durationMs := int(result.Duration.Milliseconds())
 	accountRateMultiplier := account.BillingRateMultiplier()
 	requestID := resolveUsageBillingRequestID(ctx, result.RequestID)
+	if result.SearchOnly {
+		// Standalone tool invocations are separate money events even when a client
+		// or upstream reuses its request ID. The forwarder supplies a unique ID.
+		requestID = result.RequestID
+	}
 	if result.OpenAIWSMode {
 		if upstreamRequestID := strings.TrimSpace(result.RequestID); upstreamRequestID != "" {
 			requestID = upstreamRequestID
@@ -458,7 +463,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		usageLog.ActualCost = canonicalUsageActualCost(cost)
 		usageLog.LongContextBillingApplied = cost.LongContextBillingApplied
 	}
-	if isVideoUsage && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
+	if result.SearchOnly {
+		usageLog.RateMultiplier = baseMultiplier
+	} else if isVideoUsage && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = videoMultiplier
 	} else if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier
@@ -626,6 +633,9 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 ) (*CostBreakdown, error) {
 	modelLongContextExempt := len(modelLongContextExemptions) > 0 && modelLongContextExemptions[0]
 	billingModel := firstUsageBillingModel(billingModels)
+	if result != nil && result.SearchOnly {
+		return s.billingService.CalculateSearchCost(result.SearchCount, groupSearchPricePer1kFromAPIKey(apiKey), webSearchMultiplier), nil
+	}
 	if result != nil && result.WebSearchCalls > 0 {
 		// Codex alpha/search 网页搜索按次计费：上游不返回 usage/token 字段，单价只取
 		// 分组覆盖价（nil 时默认 0.01 = 官方 $10/1000 次），不参与渠道级模型定价。

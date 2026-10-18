@@ -47,7 +47,7 @@ func TestAccountTestService_TestAccountConnection_OpenAICompactOAuthSuccessPersi
 		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid-probe"}},
 		Body:       io.NopCloser(strings.NewReader(compactProbeSSESuccessBody)),
 	}}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		accountRepo:  repo,
 		httpUpstream: upstream,
 	}
@@ -108,7 +108,7 @@ func TestAccountTestService_TestAccountConnection_OpenAICompactOAuth404MarksUnsu
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
 		Body:       io.NopCloser(strings.NewReader(`404 page not found`)),
 	}}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		accountRepo:  repo,
 		httpUpstream: upstream,
 	}
@@ -155,7 +155,7 @@ func TestAccountTestService_TestAccountConnection_OpenAICompactAPIKeyUsesNativeR
 		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
 		Body:       io.NopCloser(strings.NewReader(compactProbeSSESuccessBody)),
 	}}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		accountRepo:  repo,
 		httpUpstream: upstream,
 		cfg:          &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
@@ -202,7 +202,7 @@ func TestAccountTestService_TestAccountConnection_OpenAICompactAPIKeyDefaultBase
 		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
 		Body:       io.NopCloser(strings.NewReader(compactProbeSSESuccessBody)),
 	}}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		accountRepo:  repo,
 		httpUpstream: upstream,
 		cfg:          &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
@@ -248,7 +248,7 @@ func TestAccountTestService_TestAccountConnection_OpenAICompact2xxWithoutItemMar
 		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
 		Body:       io.NopCloser(strings.NewReader(noItemBody)),
 	}}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		accountRepo:  repo,
 		httpUpstream: upstream,
 	}

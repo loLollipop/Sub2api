@@ -278,3 +278,7 @@ gitleaks*.json
 /routes-runtime.json
 /inventory-overlay.json
 /inventory_test.go
+
+# Python test caches
+__pycache__/
+*.py[cod]

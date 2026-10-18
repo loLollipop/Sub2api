@@ -553,7 +553,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onUnmounted, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
@@ -702,13 +702,13 @@ const refreshOpenPanel = async () => {
 }
 
 // Load plans when dialog opens
-watch(
-  () => props.show,
-  async (visible) => {
+let panelUnmounted = false
+onUnmounted(() => { panelUnmounted = true })
+const onVisibilityChange = async (visible: boolean) => {
     if (visible && props.accountId) {
       await loadPlans()
       stopRefresh()
-      if (props.show) refreshTimer = setInterval(() => { void refreshOpenPanel() }, 15000)
+      if (props.show && !panelUnmounted) refreshTimer = setInterval(() => { void refreshOpenPanel() }, 15000)
     } else {
       stopRefresh()
       plans.value = []
@@ -720,7 +720,8 @@ watch(
       showDeleteConfirm.value = false
     }
   }
-)
+watch(() => props.show, onVisibilityChange)
+onMounted(() => { void onVisibilityChange(props.show) })
 
 const loadPlans = async () => {
   if (!props.accountId) return

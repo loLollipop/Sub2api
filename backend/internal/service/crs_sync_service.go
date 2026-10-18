@@ -8,18 +8,21 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
 type CRSSyncService struct {
+	// Optional instance transport for deterministic DNS/socket regression tests.
+	crsNetwork         *customUsageNetwork
 	accountRepo        AccountRepository
 	proxyRepo          ProxyRepository
 	oauthService       *OAuthService
@@ -227,7 +230,7 @@ func (s *CRSSyncService) fetchCRSExport(ctx context.Context, baseURL, username, 
 	}
 	normalizedURL := strings.TrimSpace(baseURL)
 	if s.cfg.Security.URLAllowlist.Enabled {
-		normalized, err := normalizeBaseURL(normalizedURL, s.cfg.Security.URLAllowlist.CRSHosts, s.cfg.Security.URLAllowlist.AllowPrivateHosts)
+		normalized, err := normalizeBaseURL(normalizedURL, s.cfg.Security.URLAllowlist.CRSHosts, crsHostExplicitlyAllowed(normalizedURL, s.cfg.Security.URLAllowlist.CRSHosts))
 		if err != nil {
 			return nil, err
 		}
@@ -243,24 +246,22 @@ func (s *CRSSyncService) fetchCRSExport(ctx context.Context, baseURL, username, 
 		return nil, errors.New("username and password are required")
 	}
 
-	client, err := httpclient.GetClient(httpclient.Options{
-		Timeout: 20 * time.Second,
-		// 解析后 IP 校验（防 DNS Rebinding）只由 AllowPrivateHosts 决定，
-		// **不再绑在 allowlist 开关上**。
-		//
-		// 原先写的是 `URLAllowlist.Enabled`，等于把「关掉 allowlist」静默解释成
-		// 「连 rebinding 防护也一起关掉」——两件独立的事被耦合在一起。后果是
-		// ALLOWLIST_ENABLED=false + ALLOW_PRIVATE_HOSTS=false 这种配置**完全没有
-		// 解析 IP 校验**（线上正是 allowlist=false，只是私有地址也被显式允许，
-		// 所以暂时没暴露出来）。
-		//
-		// AllowPrivateHosts 的语义就是「是否放行私网/环回地址」，它才是唯一
-		// 相关的开关。
-		ValidateResolvedIP: !s.cfg.Security.URLAllowlist.AllowPrivateHosts,
-		AllowPrivateHosts:  s.cfg.Security.URLAllowlist.AllowPrivateHosts,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create http client failed: %w", err)
+	// Private CRS hosts require an exact, explicit operator entry. Pin public
+	// DNS answers to the connection; the global private-host switch is irrelevant.
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	dial := dialer.DialContext
+	if !crsHostExplicitlyAllowed(normalizedURL, s.cfg.Security.URLAllowlist.CRSHosts) {
+		network := customUsageNetwork{lookup: net.DefaultResolver.LookupIPAddr, dial: dial}
+		if s.crsNetwork != nil {
+			network = *s.crsNetwork
+		}
+		dial = network.dialContext
+	}
+	transport := &http.Transport{Proxy: nil, DialContext: dial, TLSHandshakeTimeout: 10 * time.Second}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Timeout: 20 * time.Second, Transport: transport,
+		// Authentication and export credentials never follow redirects.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 
 	adminToken, err := crsLogin(ctx, client, normalizedURL, username, password)
@@ -1332,6 +1333,30 @@ func normalizeBaseURL(raw string, allowlist []string, allowPrivate bool) (string
 	return normalized, nil
 }
 
+// crsHostExplicitlyAllowed deliberately excludes wildcard entries: access to a
+// private CRS service must be granted to that individual hostname.
+func crsHostExplicitlyAllowed(raw string, allowlist []string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" {
+		return false
+	}
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	for _, entry := range allowlist {
+		candidate := strings.TrimSpace(entry)
+		if strings.Contains(candidate, "*") {
+			continue
+		}
+		if !strings.Contains(candidate, "://") {
+			candidate = "//" + candidate
+		}
+		parsed, err := url.Parse(candidate)
+		if err == nil && parsed.User == nil && strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".") == host {
+			return true
+		}
+	}
+	return false
+}
+
 // cleanBaseURL removes trailing suffix from base_url in credentials
 // Used for both Claude and OpenAI accounts to remove /v1
 func cleanBaseURL(credentials map[string]any, suffixToRemove string) {
@@ -1364,7 +1389,8 @@ func crsLogin(ctx context.Context, client *http.Client, baseURL, username, passw
 
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("crs login failed: status=%d body=%s", resp.StatusCode, string(raw))
+		slog.Warn("crs_login_upstream_error", "status", resp.StatusCode, "body_len", len(raw))
+		return "", fmt.Errorf("crs login failed: upstream returned %d", resp.StatusCode)
 	}
 
 	var parsed crsLoginResponse
@@ -1399,7 +1425,8 @@ func crsExportAccounts(ctx context.Context, client *http.Client, baseURL, adminT
 
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 5<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("crs export failed: status=%d body=%s", resp.StatusCode, string(raw))
+		slog.Warn("crs_export_upstream_error", "status", resp.StatusCode, "body_len", len(raw))
+		return nil, fmt.Errorf("crs export failed: upstream returned %d", resp.StatusCode)
 	}
 
 	var parsed crsExportResponse

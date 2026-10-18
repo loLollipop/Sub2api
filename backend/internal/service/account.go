@@ -127,6 +127,7 @@ const (
 	OpenAIEndpointCapabilityChatCompletions OpenAIEndpointCapability = "chat_completions"
 	OpenAIEndpointCapabilityEmbeddings      OpenAIEndpointCapability = "embeddings"
 	OpenAIEndpointCapabilityAlphaSearch     OpenAIEndpointCapability = "alpha_search"
+	OpenAIEndpointCapabilityDeepSeekTools   OpenAIEndpointCapability = "deepseek_tools"
 	OpenAIEndpointCapabilityLive            OpenAIEndpointCapability = "live"
 	// OpenAIEndpointCapabilityGrokMediaGeneration keeps image/video generation
 	// away from Grok accounts that are explicitly disabled or whose billing
@@ -2036,6 +2037,10 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		// 支持 Responses 的上游同样需具备 chat 能力：复用下方 chat_completions
 		// 配置集校验。
 		capability = OpenAIEndpointCapabilityChatCompletions
+	case OpenAIEndpointCapabilityDeepSeekTools:
+		if a.Platform != PlatformDeepseek || a.Type != AccountTypeAPIKey {
+			return false
+		}
 	case OpenAIEndpointCapabilityAlphaSearch:
 		// alpha/search 的转发按账号类型分流：OAuth/PAT 走
 		// chatgpt.com/backend-api/codex/alpha/search，API key 走

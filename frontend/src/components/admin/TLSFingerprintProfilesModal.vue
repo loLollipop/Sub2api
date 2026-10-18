@@ -327,7 +327,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -380,11 +380,13 @@ const form = reactive({
 })
 
 // Load profiles when dialog opens
-watch(() => props.show, (newVal) => {
+const onVisibilityChange = (newVal: boolean) => {
   if (newVal) {
     loadProfiles()
   }
-})
+}
+watch(() => props.show, onVisibilityChange)
+onMounted(() => { void onVisibilityChange(props.show) })
 
 const loadProfiles = async () => {
   loading.value = true

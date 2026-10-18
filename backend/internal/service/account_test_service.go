@@ -139,6 +139,8 @@ func normalizeGrokAccountTestMode(mode string) string {
 
 // AccountTestService handles account testing operations
 type AccountTestService struct {
+	// Instance-scoped validator injection keeps fake upstream tests deterministic.
+	validateTestTarget        func(string) error
 	accountRepo               AccountRepository
 	geminiTokenProvider       *GeminiTokenProvider
 	claudeTokenProvider       *ClaudeTokenProvider
@@ -255,20 +257,38 @@ func NewAccountTestService(
 	}
 }
 
+var errTestTargetNotAllowed = errors.New("account test target is not allowed")
+
 func (s *AccountTestService) validateUpstreamBaseURL(raw string) (string, error) {
 	if s.cfg == nil {
 		return "", errors.New("config is not available")
 	}
+	var normalized string
+	var err error
 	if !s.cfg.Security.URLAllowlist.Enabled {
-		return urlvalidator.ValidateURLFormat(raw, s.cfg.Security.URLAllowlist.AllowInsecureHTTP)
+		normalized, err = urlvalidator.ValidateURLFormat(raw, s.cfg.Security.URLAllowlist.AllowInsecureHTTP)
+	} else {
+		normalized, err = urlvalidator.ValidateHTTPSURL(raw, urlvalidator.ValidationOptions{
+			AllowedHosts:     s.cfg.Security.URLAllowlist.UpstreamHosts,
+			RequireAllowlist: true,
+			AllowPrivate:     s.validateTestTarget != nil,
+		})
 	}
-	normalized, err := urlvalidator.ValidateHTTPSURL(raw, urlvalidator.ValidationOptions{
-		AllowedHosts:     s.cfg.Security.URLAllowlist.UpstreamHosts,
-		RequireAllowlist: true,
-		AllowPrivate:     s.cfg.Security.URLAllowlist.AllowPrivateHosts,
-	})
 	if err != nil {
 		return "", err
+	}
+	u, err := url.Parse(normalized)
+	if err != nil || u.User != nil {
+		return "", errTestTargetNotAllowed
+	}
+	validate := s.validateTestTarget
+	if validate == nil {
+		validate = urlvalidator.ValidateResolvedIP
+	}
+	// Resolution errors fail closed. The request also carries a public-only
+	// transport policy so a later DNS change cannot loosen the admission check.
+	if err := validate(u.Hostname()); err != nil {
+		return "", fmt.Errorf("%w: %v", errTestTargetNotAllowed, err)
 	}
 	return normalized, nil
 }
@@ -539,7 +559,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		proxyURL = account.Proxy.URL()
 	}
 
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	resp, err := s.doTestRequest(req, proxyURL, account)
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
@@ -611,7 +631,7 @@ func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Con
 		proxyURL = account.Proxy.URL()
 	}
 
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	resp, err := s.doTestRequest(req, proxyURL, account)
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
@@ -1099,6 +1119,7 @@ func (s *AccountTestService) resolveTestTLSProfile(account *Account) *tlsfingerp
 }
 
 func (s *AccountTestService) doTestRequest(req *http.Request, proxyURL string, account *Account) (*http.Response, error) {
+	req = req.WithContext(WithHTTPUpstreamRedirectsDisabled(WithHTTPUpstreamPublicHostsOnly(req.Context())))
 	return s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.resolveTestTLSProfile(account))
 }
 
@@ -1870,7 +1891,7 @@ func (s *AccountTestService) testGrokRealtime(c *gin.Context, ctx context.Contex
 
 	dialer := s.grokWSDialer
 	if dialer == nil {
-		dialer = newDefaultOpenAIWSClientDialer()
+		dialer = s.newPublicTestWSDialer(account)
 	}
 
 	dialCtx, cancel := context.WithTimeout(ctx, grokRealtimeProbeTimeout)
@@ -2161,7 +2182,7 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 		proxyURL = account.Proxy.URL()
 	}
 
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	resp, err := s.doTestRequest(req, proxyURL, account)
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Chat Completions API (/v1/chat/completions) request failed: %s", err.Error()))
 	}
@@ -2451,7 +2472,7 @@ func (s *AccountTestService) testGeminiAccountConnection(c *gin.Context, account
 		proxyURL = account.Proxy.URL()
 	}
 
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	resp, err := s.doTestRequest(req, proxyURL, account)
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
@@ -3093,7 +3114,7 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 		proxyURL = account.Proxy.URL()
 	}
 
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	resp, err := s.doTestRequest(req, proxyURL, account)
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}

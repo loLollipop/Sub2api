@@ -4,6 +4,8 @@ package service
 
 import (
 	"context"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,19 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// 回归：解析后 IP 校验（防 DNS Rebinding）曾经写成
-//
-//	ValidateResolvedIP: cfg.Security.URLAllowlist.Enabled
-//
-// 这把两件独立的事耦合在一起——「关掉 allowlist」被静默解释成
-// 「连 rebinding 防护也一起关掉」。于是
-//
-//	ALLOWLIST_ENABLED=false + ALLOW_PRIVATE_HOSTS=false
-//
-// 这种配置**完全没有解析 IP 校验**，可以直连私网/环回地址。
-//
-// 现在只由 AllowPrivateHosts 决定：它才是「是否放行私网地址」的那个开关。
-// 本测试锁住这个行为——如果有人把它改回绑定 Enabled，这里会失败。
+// Private CRS targets require explicit CRSHosts even when global private access is enabled.
 func TestCRSSyncResolvedIPValidationIsNotTiedToAllowlist(t *testing.T) {
 	t.Parallel()
 
@@ -50,11 +40,11 @@ func TestCRSSyncResolvedIPValidationIsNotTiedToAllowlist(t *testing.T) {
 		})
 
 		require.Error(t, err, "closing the allowlist must not silently disable DNS-rebinding protection")
-		require.Contains(t, err.Error(), "is not allowed",
+		require.Contains(t, err.Error(), "blocked_destination",
 			"the loopback destination must be rejected by the resolved-IP check")
 	})
 
-	t.Run("private hosts allowed reaches the server", func(t *testing.T) {
+	t.Run("global private hosts allowed still blocks loopback", func(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
@@ -69,10 +59,67 @@ func TestCRSSyncResolvedIPValidationIsNotTiedToAllowlist(t *testing.T) {
 			Password: "password",
 		})
 
-		// 这里仍会失败（测试服务器返回的不是合法登录响应），但**不能**是 IP 被拦。
-		if err != nil {
-			require.NotContains(t, err.Error(), "is not allowed",
-				"AllowPrivateHosts=true must let the resolved-IP check pass")
-		}
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "blocked_destination")
 	})
+}
+
+func TestCRSSyncExplicitPrivateHostAndRedirectPolicy(t *testing.T) {
+	var targetHits int
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { targetHits++; w.Write([]byte("internal secret")) }))
+	defer target.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
+	defer source.Close()
+	cfg := &config.Config{}
+	cfg.Security.URLAllowlist.AllowInsecureHTTP = true
+	cfg.Security.URLAllowlist.CRSHosts = []string{"127.0.0.1"}
+	svc := NewCRSSyncService(nil, nil, nil, nil, nil, cfg)
+	_, err := svc.fetchCRSExport(context.Background(), source.URL, "admin", "password")
+	require.ErrorContains(t, err, "upstream returned 307")
+	require.NotContains(t, err.Error(), "internal secret")
+	require.Zero(t, targetHits)
+}
+
+func TestCRSExplicitHostPolicy(t *testing.T) {
+	require.True(t, crsHostExplicitlyAllowed("https://relay.internal:8443", []string{"relay.internal"}))
+	require.True(t, crsHostExplicitlyAllowed("https://[::1]:8443", []string{"[::1]:8443"}))
+	require.False(t, crsHostExplicitlyAllowed("https://relay.internal", []string{"*.internal"}))
+	require.False(t, crsHostExplicitlyAllowed("https://relay.internal.evil", []string{"relay.internal"}))
+}
+
+func TestCRSSyncPinsDNSAndRejectsRebinding(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/web/auth/login", r.URL.Path)
+		w.Header().Set("Connection", "close")
+		w.Write([]byte(`{"success":true,"token":"secret"}`))
+	}))
+	defer server.Close()
+	calls, dials := 0, 0
+	cfg := &config.Config{}
+	cfg.Security.URLAllowlist.AllowInsecureHTTP = true
+	svc := NewCRSSyncService(nil, nil, nil, nil, nil, cfg)
+	svc.crsNetwork = &customUsageNetwork{
+		lookup: func(context.Context, string) ([]net.IPAddr, error) {
+			calls++
+			if calls == 1 {
+				return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
+			}
+			return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+		},
+		dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			dials++
+			require.Equal(t, "8.8.8.8:80", address, "the actual dial must receive the validated IP")
+			return (&net.Dialer{}).DialContext(ctx, network, server.Listener.Addr().String())
+		},
+	}
+	_, err := svc.fetchCRSExport(context.Background(), "http://relay.example", "admin", "password")
+	require.ErrorContains(t, err, "blocked_destination")
+	require.Equal(t, 2, calls)
+	require.Equal(t, 1, dials, "rebinding must be rejected before the second socket connects")
+	svc.crsNetwork.lookup = func(context.Context, string) ([]net.IPAddr, error) { return nil, errors.New("DNS unavailable") }
+	_, err = svc.fetchCRSExport(context.Background(), "http://relay.example", "admin", "password")
+	require.ErrorContains(t, err, "dns_failed")
+	require.Equal(t, 1, dials)
 }

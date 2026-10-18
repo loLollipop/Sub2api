@@ -34,7 +34,7 @@ func TestProbeOpenAIAPIKeyResponsesSupportUsesCodexProbeHeaders(t *testing.T) {
 		Header:     make(http.Header),
 		Body:       io.NopCloser(strings.NewReader(`{"output":[{"type":"function_call","name":"probe_ping"}]}`)),
 	}}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		accountRepo:  repo,
 		httpUpstream: upstream,
 		cfg:          &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
@@ -43,6 +43,8 @@ func TestProbeOpenAIAPIKeyResponsesSupportUsesCodexProbeHeaders(t *testing.T) {
 	svc.ProbeOpenAIAPIKeyResponsesSupport(context.Background(), account.ID)
 
 	require.NotNil(t, upstream.lastReq)
+	require.True(t, HTTPUpstreamPublicHostsOnly(upstream.lastReq.Context()))
+	require.True(t, HTTPUpstreamRedirectsDisabled(upstream.lastReq.Context()))
 	require.Equal(t, "https://compat-upstream.example/v1/responses", upstream.lastReq.URL.String())
 	requireOpenAICodexProbeHeaders(t, upstream.lastReq.Header)
 	updates := <-updateCalls
@@ -79,7 +81,7 @@ func TestProbeOpenAIAPIKeyResponsesSupportCNProviders(t *testing.T) {
 				stubOpenAIAccountRepo: stubOpenAIAccountRepo{accounts: []Account{account}},
 				updateExtraCalls:      updateCalls,
 			}
-			svc := &AccountTestService{accountRepo: repo}
+			svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo}
 
 			svc.ProbeOpenAIAPIKeyResponsesSupport(context.Background(), account.ID)
 

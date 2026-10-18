@@ -62,7 +62,7 @@ func vertexModelSyncTestAccount(credentials map[string]any) *Account {
 }
 
 func vertexModelSyncTestService(upstream *httpUpstreamRecorder) *AccountTestService {
-	return &AccountTestService{
+	return &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		httpUpstream:        upstream,
 		cfg:                 upstreamModelSyncTestConfig(),
 		geminiTokenProvider: NewGeminiTokenProvider(nil, &vertexModelsTokenCacheStub{token: "ya29.vertex-token"}, nil),
@@ -202,7 +202,7 @@ func TestFetchUpstreamSupportedModelsVertexInvalidCredentialsIsConfigError(t *te
 
 	cache := &vertexModelsTokenCacheStub{token: "ya29.vertex-token"}
 	upstream := &httpUpstreamRecorder{}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		httpUpstream:        upstream,
 		cfg:                 upstreamModelSyncTestConfig(),
 		geminiTokenProvider: NewGeminiTokenProvider(nil, cache, nil),
@@ -228,7 +228,7 @@ func TestFetchUpstreamSupportedModelsVertexInvalidLocationSkipsTokenExchange(t *
 
 	cache := &vertexModelsTokenCacheStub{token: "ya29.vertex-token"}
 	upstream := &httpUpstreamRecorder{}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		httpUpstream:        upstream,
 		cfg:                 upstreamModelSyncTestConfig(),
 		geminiTokenProvider: NewGeminiTokenProvider(nil, cache, nil),

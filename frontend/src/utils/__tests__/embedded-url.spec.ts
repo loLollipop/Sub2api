@@ -23,11 +23,13 @@ describe('embedded-url', () => {
     })
     document.documentElement.classList.remove('dark')
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
   })
 
   it('adds embedded query parameters including locale and source context', () => {
     const result = buildEmbeddedUrl(
-      'https://pay.example.com/checkout?plan=pro',
+      // 同源目标才允许携带凭据
+      'https://app.example.com/checkout?plan=pro',
       42,
       'token-123',
       'dark',
@@ -45,6 +47,25 @@ describe('embedded-url', () => {
     expect(url.searchParams.get('src_url')).toBe('https://app.example.com/user/purchase')
   })
 
+  // 回归：第三方域不得收到 access token。
+  // 之前充值中心把 catfk.com 配成菜单 URL，前端就把当前用户的 JWT 拼进
+  // iframe src / 新窗口 href，凭据随 URL 进了对方日志与浏览器历史。
+  it('never sends the auth token to a third-party origin', () => {
+    const result = buildEmbeddedUrl(
+      'https://catfk.com/shop/kedaya',
+      10405,
+      'admin-session-jwt',
+      'light',
+      'zh-CN',
+    )
+
+    const url = new URL(result)
+    expect(url.searchParams.has('token')).toBe(false)
+    // 非凭据标识仍然保留，嵌入方仍能识别用户
+    expect(url.searchParams.get('user_id')).toBe('10405')
+    expect(url.searchParams.get('ui_mode')).toBe('embedded')
+  })
+
   it('omits optional params when they are empty', () => {
     const result = buildEmbeddedUrl('https://pay.example.com/checkout', undefined, '', 'light')
 
@@ -54,6 +75,21 @@ describe('embedded-url', () => {
     expect(url.searchParams.has('user_id')).toBe(false)
     expect(url.searchParams.has('token')).toBe(false)
     expect(url.searchParams.has('lang')).toBe(false)
+  })
+
+  it('removes existing third-party tokens and source query credentials', () => {
+    window.location.href = 'https://app.example.com/user/purchase?token=session-secret#access_token=secret'
+    const url = new URL(buildEmbeddedUrl('https://pay.example.com/?token=old&token=older', 42, 'new'))
+    expect(url.searchParams.has('token')).toBe(false)
+    expect(url.searchParams.get('src_url')).toBe('https://app.example.com/user/purchase')
+    expect(url.toString()).not.toContain('secret')
+  })
+
+  it('matches explicit trusted origins exactly', () => {
+    vi.stubEnv('VITE_EMBEDDED_TRUSTED_ORIGINS', ' https://trusted.example.com ')
+    expect(new URL(buildEmbeddedUrl('https://trusted.example.com/page', 1, 'token')).searchParams.get('token')).toBe('token')
+    expect(new URL(buildEmbeddedUrl('https://trusted.example.com.evil.test/page', 1, 'token')).searchParams.has('token')).toBe(false)
+    expect(new URL(buildEmbeddedUrl('http://trusted.example.com/page', 1, 'token')).searchParams.has('token')).toBe(false)
   })
 
   it('returns original string for invalid url input', () => {

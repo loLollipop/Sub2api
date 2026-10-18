@@ -318,7 +318,9 @@ func normalizeContentModerationText(text string) string {
 	return strings.Join(strings.Fields(strings.TrimSpace(text)), " ")
 }
 
-func ExtractContentModerationFullText(protocol string, body []byte) string {
+// ExtractContentModerationLastUserTurn preserves the last turn's text for the
+// audit display, without the classifier's normalization and input size ceiling.
+func ExtractContentModerationLastUserTurn(protocol string, body []byte) string {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return ""
 	}
@@ -326,76 +328,23 @@ func ExtractContentModerationFullText(protocol string, body []byte) string {
 	var images []string
 	switch protocol {
 	case ContentModerationProtocolAnthropicMessages:
-		collectAllRoleMessages(gjson.GetBytes(body, "messages"), "user", &parts, &images)
+		collectLastAnthropicUserMessage(gjson.GetBytes(body, "messages"), &parts, &images)
 	case ContentModerationProtocolOpenAIChat:
-		collectAllRoleMessages(gjson.GetBytes(body, "messages"), "user", &parts, &images)
+		collectLastRoleMessage(gjson.GetBytes(body, "messages"), "user", &parts, &images)
 	case ContentModerationProtocolOpenAIResponses:
-		collectAllResponsesUserInput(gjson.GetBytes(body, "input"), &parts, &images)
+		collectLastResponsesInput(gjson.GetBytes(body, "input"), &parts, &images)
 	case ContentModerationProtocolGemini:
-		collectAllGeminiUserContent(gjson.GetBytes(body, "contents"), &parts, &images)
+		collectLastGeminiContent(gjson.GetBytes(body, "contents"), &parts, &images)
 	case ContentModerationProtocolOpenAIImages:
 		addModerationText(&parts, gjson.GetBytes(body, "prompt").String())
 	default:
-		collectAllResponsesUserInput(gjson.GetBytes(body, "input"), &parts, &images)
-		collectAllRoleMessages(gjson.GetBytes(body, "messages"), "user", &parts, &images)
-		collectAllGeminiUserContent(gjson.GetBytes(body, "contents"), &parts, &images)
+		collectLastResponsesInput(gjson.GetBytes(body, "input"), &parts, &images)
+		collectLastRoleMessage(gjson.GetBytes(body, "messages"), "user", &parts, &images)
+		collectLastGeminiContent(gjson.GetBytes(body, "contents"), &parts, &images)
 	}
-	return strings.TrimSpace(strings.Join(parts, "\n\n"))
-}
-
-func collectAllRoleMessages(messages gjson.Result, role string, parts *[]string, images *[]string) {
-	if !messages.IsArray() {
-		return
+	text := strings.TrimSpace(strings.Join(parts, "\n\n"))
+	if text == "" && len(images) > 0 {
+		return fmt.Sprintf("[images: %d]", len(images))
 	}
-	want := strings.ToLower(strings.TrimSpace(role))
-	for _, item := range messages.Array() {
-		if strings.ToLower(strings.TrimSpace(item.Get("role").String())) != want {
-			continue
-		}
-		collectContentValue(item.Get("content"), parts, images)
-	}
-}
-
-func collectAllResponsesUserInput(input gjson.Result, parts *[]string, images *[]string) {
-	switch {
-	case !input.Exists():
-		return
-	case input.Type == gjson.String:
-		addModerationText(parts, input.String())
-	case input.IsArray():
-		for _, item := range input.Array() {
-			if !isResponsesUserTextItem(item) {
-				continue
-			}
-			collectContentValue(item.Get("content"), parts, images)
-			if item.Get("type").String() == "input_text" || item.Get("text").Exists() {
-				collectContentValue(item, parts, images)
-			}
-		}
-	case input.IsObject():
-		if isResponsesUserTextItem(input) {
-			collectContentValue(input.Get("content"), parts, images)
-			if input.Get("type").String() == "input_text" || input.Get("text").Exists() {
-				collectContentValue(input, parts, images)
-			}
-		}
-	}
-}
-
-func collectAllGeminiUserContent(contents gjson.Result, parts *[]string, images *[]string) {
-	if !contents.IsArray() {
-		return
-	}
-	for _, item := range contents.Array() {
-		role := strings.ToLower(strings.TrimSpace(item.Get("role").String()))
-		if role != "" && role != "user" {
-			continue
-		}
-		if arr := item.Get("parts"); arr.IsArray() {
-			arr.ForEach(func(_, part gjson.Result) bool {
-				addModerationText(parts, part.Get("text").String())
-				return true
-			})
-		}
-	}
+	return text
 }

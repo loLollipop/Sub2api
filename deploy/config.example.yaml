@@ -1205,6 +1205,9 @@ billing:
     # 估算输出 / 输入 token 上限
     max_output_tokens: 128000
     max_input_tokens: 200000
+    # Estimated input floor; 0 uses 4096, a negative value disables the floor.
+    # 仅影响预留估算，不改变最终计费；不能保证覆盖所有上游注入上下文。
+    min_input_tokens: 4096
     # Cap for a single reservation in USD (0 = no cap)
     # 单请求预留金额上限（USD，0 为不设上限）
     max_reservation_usd: 0
@@ -1212,6 +1215,8 @@ billing:
     # billing model), reject it instead of admitting it without reservation.
     # 无法为请求定价（计费模型无基础/分组/渠道定价）时拒绝请求；默认 false 为放行不预留（节流告警日志）
     fail_closed_on_unpriced: false
+    # Reject admission on balance/cache/reservation errors when enabled.
+    fail_closed_on_reserve_error: false
 
 # =============================================================================
 # Turnstile Configuration

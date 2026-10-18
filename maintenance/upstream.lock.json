@@ -2,29 +2,24 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.1.17",
-  "imported_commit": "ce66c457c779653414b8776126144e9bd8148027",
-  "personal_baseline_commit": "edf577657ac8d1b2d245e772a0172b550b9d7c53",
-  "latest_observed_version": "2.1.17",
-  "latest_observed_release_commit": "c1118207532f4ce1be022f4b4cac27efc65f4d2f",
-  "latest_observed_main_commit": "ce66c457c779653414b8776126144e9bd8148027",
+  "imported_version": "2.1.27",
+  "imported_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
+  "personal_baseline_commit": "792225b48fceb53931c4d888095fbe4860c80efd",
+  "latest_observed_version": "2.1.27",
+  "latest_observed_release_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
+  "latest_observed_main_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
   "observed_delta_review": {
-    "from_commit": "f7bde184592d6855d4b27d1f705a8aad13f49e3f",
-    "to_commit": "ce66c457c779653414b8776126144e9bd8148027",
-    "status": "selective_custom_error_pause_backport",
-    "behavior_commits": [
-      "24881264e1ee747a7adec14751cefe71e6cafec6",
-      "af97802a9",
-      "c1118207532f4ce1be022f4b4cac27efc65f4d2f"
-    ],
-    "scope": "Adapt custom-error stop from permanent status=error to a 30-day temporary pause with a distinct reason, including selected402 and529. Preserve built-in authentication, rate-limit, model-scoped, provider-specific and financial-error precedence. Native SystemOne and local error-policy fixtures adapted. No upstream history import or release version change; prior exclusions remain.",
-    "evidence": "maintenance/notes/upstream-sync-20261017.md"
+    "from_commit": "ce66c457c779653414b8776126144e9bd8148027",
+    "to_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
+    "status": "selective_security_tools_and_ui_backport",
+    "scope": "Adapt outbound SMTP/CRS/admin-probe protection, inflight reservation floor and opt-in error policy, trusted embed credentials, usage refresh/mobile sorting/lazy modals/xlsx chunk, semantic-preserving request scan, scoped DeepSeek reasoning cleanup, standalone Search/Fetch with native search billing, and last-user-turn moderation logs. Preserve native platforms, local routing and settlement; no migrations or dependency changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261018.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "ce66c457c779653414b8776126144e9bd8148027",
+    "source_head": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
     "implemented_with_local_regression": [
       "Cline/Command Code using shared provider registry; preserve Mixed and credential destinations",
       "Gemini authorized model catalog and four exclusive API-key model scopes",
@@ -32,89 +27,180 @@
       "Effective upstream-model Anthropic validation and strict no-replay compatibility boundaries",
       "Shared glass modal appearance preserving local layers, Mixed/payment layouts and reduced motion",
       "Mixed real HTTP/SSE native-dispatch parity, Responses-shaped Chat requests and output-token limits",
-      "2026-10-17 custom-error stop30days, selected402/529 and local native/error-policy adaptation; see dated sync note for verification"
+      "2026-10-17 custom-error stop30days, selected402/529 and local native/error-policy adaptation; see dated sync note for verification",
+      "2026-10-18 selective security, reservation, standalone DeepSeek tools, moderation logs and frontend/request performance adaptations; see dated sync note for exact validation"
     ],
     "implemented_with_selected_regression": [
       "TypeSafe moderation: default off, independent profiles/key health, frozen queue and uncached send-time authorization; optional safe model metadata, both-engine local image-identifier filtering, full skipped-image counts and score-preserving regressions"
     ],
-    "source_implementation_with_local_adaptations": ["Native System One forwarding/response decoding restored to the source implementation; local Mixed/scope/target-route adaptations remain. No bespoke native reconciliation or financial recovery subsystem; post-rollback selected backend regression, full TypeSafe package tests and server build passed"],
-    "reverted_local_mechanisms_by_user_request": ["Custom System One journal, manual resolution APIs, worker, migration267 and native-only hold markers", "Custom Gemini cache operation journal/migration262 and v2 frozen-price layer", "Experimental durable-image store and this continuation's Redis CAS/billing-recovery extensions"],
-    "excluded_by_user": ["LinuxDo OAuth referral propagation", "Multi-code affiliate expansion and per-code rebate statistics"],
-    "verification_limits": ["Full frontend387 files/3095 tests, typecheck/lint/build and Mixed1004 HTTP/SSE tests/subtests passed", "PostgreSQL16 production-schema-only rehearsal applied ten migrations twice; final backend/CI and live acceptance remain separate gates"],
+    "source_implementation_with_local_adaptations": [
+      "Native System One forwarding/response decoding restored to the source implementation; local Mixed/scope/target-route adaptations remain. No bespoke native reconciliation or financial recovery subsystem; post-rollback selected backend regression, full TypeSafe package tests and server build passed"
+    ],
+    "reverted_local_mechanisms_by_user_request": [
+      "Custom System One journal, manual resolution APIs, worker, migration267 and native-only hold markers",
+      "Custom Gemini cache operation journal/migration262 and v2 frozen-price layer",
+      "Experimental durable-image store and this continuation's Redis CAS/billing-recovery extensions"
+    ],
+    "excluded_by_user": [
+      "LinuxDo OAuth referral propagation",
+      "Multi-code affiliate expansion and per-code rebate statistics"
+    ],
+    "verification_limits": [
+      "Full frontend387 files/3095 tests, typecheck/lint/build and Mixed1004 HTTP/SSE tests/subtests passed",
+      "PostgreSQL16 production-schema-only rehearsal applied ten migrations twice; final backend/CI and live acceptance remain separate gates"
+    ],
     "evidence": ".artifacts/source-sync-resume-20261015/notes.md"
   },
-  "selected_fix_commits_since_2_1_9": ["850047604", "8d7b4b763", "d295fd925", "a20741493", "7435eebdd", "91db72e40", "b6251ba03"],
+  "selected_fix_commits_since_2_1_9": [
+    "850047604",
+    "8d7b4b763",
+    "d295fd925",
+    "a20741493",
+    "7435eebdd",
+    "91db72e40",
+    "b6251ba03"
+  ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
     {
       "feature": "deepseek-dsml-body-dedup-and-scope-expansion",
-      "upstream_commits": ["91db72e40", "8643e7ca9", "fec7f7fd3"],
+      "upstream_commits": [
+        "91db72e40",
+        "8643e7ca9",
+        "fec7f7fd3"
+      ],
       "reason": "Shared normalizer wiring is imported; same-ID empty-shell argument retention from later b6251ba03 is now selectively adapted and regression-verified. Defer parser-dependent code, name-plus-arguments deduplication that can erase valid independent calls, and nested/item-ID rewrites with unresolved canonical-order/collision risks. No model-name or host substring scope expansion. The two older test-only followups apply to deferred code."
     },
     {
       "feature": "affiliate-per-code-invite-and-rebate-statistics",
-      "upstream_commits": ["c696d2cbd"],
+      "upstream_commits": [
+        "c696d2cbd"
+      ],
       "reason": "Cancelled by user on 2026-10-15. Do not implement multi-code storage, APIs, UI, attribution or per-code statistics. Preserve the existing single-code and rebate behavior. LinuxDo OAuth referral propagation was also cancelled and its development changes removed."
     },
     {
       "feature": "typesafe-systemone-affiliate-multicode-and-moderation-engines",
-      "upstream_commits": ["7435eebdd"],
+      "upstream_commits": [
+        "7435eebdd"
+      ],
       "reason": "Moderation remains default off with selected privacy/metadata regressions. Native System One forwarding/decoder now use the source implementation with only fork routing/scope adaptations; the bespoke journal/manual-resolution/worker/hold-marker redesign was withdrawn by user request. Affiliate multi-code and LinuxDo referral additions remain cancelled. No production mutation or complete-feature claim."
     },
     {
       "feature": "global-glass-modal-restyling",
-      "upstream_commits": ["77696f2ea"],
+      "upstream_commits": [
+        "77696f2ea"
+      ],
       "reason": "Source modal appearance adapted and included in passing full frontend regression; customized Mixed/payment layouts, dialog layers and reduced-motion behavior preserved."
     },
     {
       "feature": "gemini-group-openai-account-catalog-expansion",
-      "upstream_commits": ["7435eebdd"],
+      "upstream_commits": [
+        "7435eebdd"
+      ],
       "reason": "Implemented through the local authorized dynamic catalog rather than the source static platform list; local catalog/scope regressions pass. Live native-provider verification remains outstanding. See cumulative_sync rather than treating the old deferral as unimplemented."
     },
     {
       "feature": "grok-moderation-refusal-billing",
-      "upstream_commits": ["8d487b465", "f0d3865f3", "8262ca158"],
+      "upstream_commits": [
+        "8d487b465",
+        "f0d3865f3",
+        "8262ca158"
+      ],
       "reason": "Refusal billing is attached to GatewayHandler, but normal Grok traffic uses OpenAIGatewayHandler. Preserve prior billing until the actual path and settlement are covered by endpoint tests."
     },
     {
       "feature": "plaintext-reasoning-request-history",
-      "upstream_commits": ["009874ac5"],
+      "upstream_commits": [
+        "009874ac5"
+      ],
       "reason": "The shared Chat-to-Responses converter sets store:false; summary-only reasoning items are not portable and the existing OpenAI normalizer removes them. Preserve assistant-message history and exact whitespace until destination support is verified. Output thinking separation and local_shell conversion are imported."
     },
     {
       "feature": "deepseek-inline-dsml-and-global-analysis-summary-tags",
-      "upstream_commits": ["1d373770d", "c35492853", "1557adff3", "f075051a0"],
+      "upstream_commits": [
+        "1d373770d",
+        "c35492853",
+        "1557adff3",
+        "f075051a0"
+      ],
       "reason": "Defer the new parser, bridge and passthrough wiring together: truncated invocations and literal code examples synthesize executable tool calls; generated events violate sequence/index/identity, while partial tags bypass the buffer cap. The passthrough hook is unreachable for normal DeepSeek platform accounts and additionally breaks SSE frame boundaries, final output identities, and preauthorization observation. Preserve existing think/thinking conversion and native structured tools until provider-scoped parsing and real Forward-level streaming/billing regressions are available. The native-account session scheduling change is imported separately."
     },
     {
       "feature": "stdlib-server-h2c-config",
-      "upstream_commits": ["a6e6dfb9e"],
+      "upstream_commits": [
+        "a6e6dfb9e"
+      ],
       "reason": "The standard library HTTP2Config has no independent idle timeout; upstream assigns the h2c timeout to Server.IdleTimeout and changes HTTP/1 connection lifetime. Preserve the existing x/net server setup until separate HTTP/1 and h2c timeout behavior can be retained. The outbound standard library HTTP/2 transport update is imported."
     },
     {
       "feature": "async-images-multi-group-entry-gate-relaxation",
-      "upstream_commits": ["f075051a0"],
+      "upstream_commits": [
+        "f075051a0"
+      ],
       "reason": "Submit still uses the primary group platform instead of ResolvedTargetPlatform, and a primary-group moderation completion marker can skip target-group policy. Preserve the existing entry platform and image-generation permission rejection until resolved-target authorization and auditing are covered; duplicate-model rejection is imported independently."
     },
     {
       "feature": "cline-command-code-platforms",
-      "upstream_commits": ["14dc46aee"],
+      "upstream_commits": [
+        "14dc46aee"
+      ],
       "reason": "Implemented with provider profiles, mapped-model endpoint and credential-destination regressions; local append-only migration258 preserves Mixed. Source migration255 was not imported. Real PostgreSQL upgrade verification remains outstanding."
     },
     {
       "feature": "honeypot-scanner-path-bans",
-      "upstream_commits": ["5705748d8"],
+      "upstream_commits": [
+        "5705748d8"
+      ],
       "reason": "Defer all honeypot detection, routes and ban wiring: the keyword heuristic rejects legitimate business queries. The 2.1.3 SigV4 correction does not fix other legitimate query-value false positives. In-flight usage tracking is imported independently with request-thread metadata publication, race-free snapshots, atomic Redis cleanup and stale-response protection. Authentication keeps its existing c.Next flow."
     },
     {
       "feature": "usage-request-id-trigram-index-migrations",
-      "upstream_commits": ["5c031ae04", "980c14531", "756f7efd3"],
+      "upstream_commits": [
+        "5c031ae04",
+        "980c14531",
+        "756f7efd3"
+      ],
       "reason": "Implemented via local append-only263/264, fail-closed extension/index validation, schema-aware invalid-index recovery and guarded literal search modes. SQL mock/unit/handler/UI regressions and static independent audit pass; opt-in local PostgreSQL fixtures exist but have not executed. Production retains validate mode, no schema migration performed."
     },
     {
       "feature": "opus55-public-model-only-strict-validation",
-      "upstream_commits": ["66790d7ee"],
+      "upstream_commits": [
+        "66790d7ee"
+      ],
       "reason": "Adapted to validate the actual channel/account-resolved Anthropic model with original-body facts, not the source public-only gate. Local mapped/native/bridge regressions pass; no production verification performed."
+    },
+    {
+      "feature": "deepseek-automatic-web-search-execution",
+      "upstream_commits": [
+        "879d623b3",
+        "e57fc306e",
+        "eb5d4c189"
+      ],
+      "reason": "Source automatic tool execution discards chargeable Search results and has incomplete SSE/final-answer propagation; also depends on deferred DSML behavior. Standalone explicit tool endpoints are adapted separately with mandatory usage settlement."
+    },
+    {
+      "feature": "group-dedicated-search-credentials-and-settings-ui",
+      "upstream_commits": [
+        "879d623b3",
+        "56e0379fe",
+        "dbc035f24"
+      ],
+      "reason": "Source migration260 conflicts with an applied immutable local migration. Requires a future append-only migration267+ and complete cache/DTO/projection/secret-redaction support. Keep existing per-group search pricing and account credentials for standalone tools."
+    },
+    {
+      "feature": "global-call-id-scope-and-dsml-followup",
+      "upstream_commits": [
+        "783a4773b",
+        "acb60bfa5"
+      ],
+      "reason": "Parser-dependent DSML and global body-shape call-ID normalization remain outside the verified provider scope. Preserve previous explicit deferrals."
+    },
+    {
+      "feature": "no-op-json-validation-removal",
+      "upstream_commits": [
+        "6eda39041"
+      ],
+      "reason": "Import scanner and safe prefilters, but retain compaction/tool-schema no-op JSON validation and escaping semantics. Single-pass scanner retains hard JSON validation, first-match nested duplicate-key semantics, local thinking support, and range refresh after model rewrite."
     }
   ],
   "deployment_repository": "loLollipop/Sub2api",

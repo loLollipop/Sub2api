@@ -190,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -324,9 +324,7 @@ const canExchangeCode = computed(() => {
 })
 
 // Watchers
-watch(
-  () => props.show,
-  (newVal) => {
+const onVisibilityChange = (newVal: boolean) => {
     if (newVal && props.account) {
       // Initialize addMethod based on current account type (Claude only)
       if (
@@ -348,7 +346,8 @@ watch(
       resetState()
     }
   }
-)
+watch(() => props.show, onVisibilityChange)
+onMounted(() => { void onVisibilityChange(props.show) })
 
 // Methods
 const resetState = () => {

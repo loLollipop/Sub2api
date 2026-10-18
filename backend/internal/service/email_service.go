@@ -17,9 +17,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
 var (
@@ -97,6 +99,8 @@ type SMTPConfig struct {
 
 // EmailService 邮件服务
 type EmailService struct {
+	// Optional instance-scoped transport injection for local SMTP tests.
+	smtpDialContext          func(context.Context, string, string) (net.Conn, error)
 	settingRepo              SettingRepository
 	cache                    EmailCache
 	notificationEmailService *NotificationEmailService
@@ -186,6 +190,8 @@ func (s *EmailService) SendEmail(ctx context.Context, to, subject, body string) 
 const smtpDialTimeout = 10 * time.Second
 const smtpIOTimeout = 20 * time.Second
 
+var ErrSMTPTargetBlocked = errors.New("smtp target is not allowed")
+
 // SendEmailWithConfig 使用指定配置发送邮件
 func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body string) error {
 	message, err := buildSMTPMessage(config, to, subject, body)
@@ -245,12 +251,11 @@ func smtpTLSConfig(host string) *tls.Config {
 //   - UseTLS=false：明文连接后若服务器支持 STARTTLS 则机会式升级，
 //     与 smtp.SendMail 的默认行为一致。
 func (s *EmailService) connectSMTP(config *SMTPConfig) (*smtp.Client, error) {
-	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
-	dialer := &net.Dialer{Timeout: smtpDialTimeout}
+	addr := net.JoinHostPort(config.Host, strconv.Itoa(config.Port))
 	tlsConfig := smtpTLSConfig(config.Host)
 
 	if config.UseTLS {
-		conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+		conn, err := s.dialSMTPTLS(addr, tlsConfig)
 		if err == nil {
 			return newSMTPClient(conn, config.Host)
 		}
@@ -260,16 +265,61 @@ func (s *EmailService) connectSMTP(config *SMTPConfig) (*smtp.Client, error) {
 		}
 		// SMTP 服务器先发问候语：明文问候会让 TLS 握手立刻返回
 		// RecordHeaderError，据此可靠判定对端期望 STARTTLS。
-		return s.connectSMTPStartTLS(dialer, addr, config.Host, tlsConfig, true)
+		return s.connectSMTPStartTLS(addr, config.Host, tlsConfig, true)
 	}
 
-	return s.connectSMTPStartTLS(dialer, addr, config.Host, tlsConfig, false)
+	return s.connectSMTPStartTLS(addr, config.Host, tlsConfig, false)
+}
+
+// dialSMTP checks the address selected by net.Dialer immediately before connect.
+// No second DNS lookup is used between policy validation and the socket connect.
+func (s *EmailService) dialSMTP(ctx context.Context, network, address string) (net.Conn, error) {
+	if s.smtpDialContext != nil {
+		return s.smtpDialContext(ctx, network, address)
+	}
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	if isBlockedHostname(strings.TrimSuffix(strings.ToLower(host), ".")) {
+		return nil, ErrSMTPTargetBlocked
+	}
+	dialer := &net.Dialer{Timeout: smtpDialTimeout, Control: func(_, target string, _ syscall.RawConn) error {
+		host, _, err := net.SplitHostPort(target)
+		if err != nil {
+			return err
+		}
+		if !urlvalidator.IsPublicNetIP(net.ParseIP(host)) {
+			return ErrSMTPTargetBlocked
+		}
+		return nil
+	}}
+	return dialer.DialContext(ctx, network, address)
+}
+
+func (s *EmailService) dialSMTPTLS(address string, cfg *tls.Config) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), smtpDialTimeout)
+	defer cancel()
+	conn, err := s.dialSMTP(ctx, "tcp", address)
+	if err != nil {
+		return nil, err
+	}
+	return smtpTLSHandshake(ctx, conn, cfg)
+}
+
+func smtpTLSHandshake(ctx context.Context, conn net.Conn, cfg *tls.Config) (net.Conn, error) {
+	tlsConn := tls.Client(conn, cfg)
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return tlsConn, nil
 }
 
 // connectSMTPStartTLS 建立明文连接并按需升级 STARTTLS。
 // mandatory 为 true 时服务器必须支持 STARTTLS，否则报错。
-func (s *EmailService) connectSMTPStartTLS(dialer *net.Dialer, addr, host string, tlsConfig *tls.Config, mandatory bool) (*smtp.Client, error) {
-	conn, err := dialer.Dial("tcp", addr)
+func (s *EmailService) connectSMTPStartTLS(addr, host string, tlsConfig *tls.Config, mandatory bool) (*smtp.Client, error) {
+	conn, err := s.dialSMTP(context.Background(), "tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("smtp dial: %w", err)
 	}

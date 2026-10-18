@@ -36,7 +36,7 @@ func runResponsesProbe(t *testing.T, status int, body string) map[string]any {
 		stubOpenAIAccountRepo: stubOpenAIAccountRepo{accounts: []Account{account}},
 		updateExtraCalls:      updateCalls,
 	}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		accountRepo: repo,
 		httpUpstream: &httpUpstreamRecorder{resp: &http.Response{
 			StatusCode: status,

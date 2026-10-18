@@ -71,7 +71,7 @@ func TestAccountTestService_OpenAIImageAPIKeyUsesConfiguredV1BaseURL(t *testing.
 			Body: io.NopCloser(strings.NewReader(`{"data":[{"b64_json":"aGVsbG8=","revised_prompt":"draw a cat"}]}`)),
 		},
 	}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		httpUpstream: upstream,
 		cfg:          &config.Config{},
 	}

@@ -3803,7 +3803,7 @@
 import ProviderProtocolRulesEditor from './ProviderProtocolRulesEditor.vue'
 import { listPlatforms } from '@/constants/platformCatalog'
 import { isMultiProtocolApiKeyPlatform, providerNativeProtocols, providerRoutesByModel, providerProtocolRules, serializeProviderProtocolRules, resolveProviderAccountMode, type ProviderProtocolRuleRow } from './credentialsBuilder'
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 
@@ -4698,9 +4698,7 @@ const canExchangeCode = computed(() => {
 })
 
 // Watchers
-watch(
-  () => props.show,
-  (newVal) => {
+const onVisibilityChange = (newVal: boolean) => {
     if (newVal) {
       // Load TLS fingerprint profiles
       adminAPI.tlsFingerprintProfiles.list()
@@ -4724,7 +4722,8 @@ watch(
       resetForm()
     }
   }
-)
+watch(() => props.show, onVisibilityChange)
+onMounted(() => { void onVisibilityChange(props.show) })
 
 // Sync form.type based on accountCategory, addMethod, and platform-specific type
 watch(

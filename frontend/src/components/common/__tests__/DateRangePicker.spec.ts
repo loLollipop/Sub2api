@@ -150,3 +150,68 @@ describe('DateRangePicker second precision', () => {
     wrapper.unmount()
   })
 })
+
+describe('DateRangePicker refreshActivePreset', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('refreshes a calendar preset across midnight', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 18, 23, 59, 59))
+    const wrapper = mount(DateRangePicker, {
+      props: { startDate: '2026-10-18', endDate: '2026-10-18' },
+      global: { stubs: { Icon: true } },
+    })
+    await wrapper.vm.$nextTick()
+    vi.setSystemTime(new Date(2026, 9, 19, 0, 0, 1))
+    expect(wrapper.vm.refreshActivePreset()).toEqual({ startDate: '2026-10-19', endDate: '2026-10-19' })
+    wrapper.unmount()
+  })
+
+  it('keeps the selected preset after a delayed apply and parent echo', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 18, 10, 44, 0))
+    const wrapper = mount(DateRangePicker, {
+      props: { startDate: '2026-10-01T00:00:00', endDate: '2026-10-02T00:00:00', includeTime: true },
+      global: { stubs: { Icon: true } },
+    })
+    await wrapper.find('.date-picker-trigger').trigger('click')
+    await wrapper.findAll('.date-picker-preset').find(node => node.text() === 'Last 24 Hours')!.trigger('click')
+    vi.setSystemTime(new Date(2026, 9, 18, 10, 44, 2))
+    await wrapper.find('.date-picker-apply').trigger('click')
+    await wrapper.setProps({ startDate: '2026-10-17T10:44:00', endDate: '2026-10-18T10:44:00' })
+    vi.setSystemTime(new Date(2026, 9, 18, 10, 50, 0))
+    expect(wrapper.vm.refreshActivePreset()).toEqual({ startDate: '2026-10-17T10:50:00', endDate: '2026-10-18T10:50:00' })
+    await wrapper.setProps({ startDate: '2026-10-01T00:00:00', endDate: '2026-10-02T00:00:00' })
+    expect(wrapper.vm.refreshActivePreset()).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('slides a relative preset window to the current time', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 17, 10, 38, 14))
+    const wrapper = mount(DateRangePicker, {
+      props: { startDate: '2026-10-16T10:38:14', endDate: '2026-10-17T10:38:14', includeTime: true },
+      global: { stubs: { Icon: true } },
+    })
+    await wrapper.vm.$nextTick()
+
+    vi.setSystemTime(new Date(2026, 9, 17, 10, 44, 0))
+    const range = (wrapper.vm as any).refreshActivePreset()
+    expect(range).toEqual({ startDate: '2026-10-16T10:44:00', endDate: '2026-10-17T10:44:00' })
+    // 组件只回传新范围；重新加载由调用方负责，不能额外触发一次 change 事件。
+    expect(wrapper.emitted('change')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('returns null for a custom range without touching it', async () => {
+    const wrapper = mount(DateRangePicker, {
+      props: { startDate: '2026-10-01T00:00:00', endDate: '2026-10-02T00:00:00', includeTime: true },
+      global: { stubs: { Icon: true } },
+    })
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.vm as any).refreshActivePreset()).toBeNull()
+    expect(wrapper.emitted('change')).toBeUndefined()
+    wrapper.unmount()
+  })
+})

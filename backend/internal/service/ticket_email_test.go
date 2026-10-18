@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"net"
 	"net/mail"
 	"os"
 	"path/filepath"
@@ -95,7 +96,9 @@ func TestTicketReplyEmailDeliversFullEscapedConversation(t *testing.T) {
 	require.NoError(t, settings.SetMultiple(ctx, smtp.settings()))
 	require.NoError(t, settings.Set(ctx, SettingKeyFrontendURL, "https://support.example.com/"))
 	require.NoError(t, settings.Set(ctx, SettingKeySiteName, "可达鸭"))
-	notifications := NewNotificationEmailService(settings, NewEmailService(settings, nil))
+	emailService := NewEmailService(settings, nil)
+	emailService.smtpDialContext = (&net.Dialer{Timeout: smtpDialTimeout}).DialContext
+	notifications := NewNotificationEmailService(settings, emailService)
 	notifications.RememberRecipientLocale(ctx, 7, "owner@example.com", "zh-CN")
 	ticket := &Ticket{ID: 10, UserID: 7, Subject: "API 请求排查 <script>bad()</script>", Contact: "attacker@example.com", UserEmail: "stale@example.com"}
 	detail := &TicketDetail{Ticket: ticket}

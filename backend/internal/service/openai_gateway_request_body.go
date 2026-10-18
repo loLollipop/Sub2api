@@ -151,6 +151,22 @@ func normalizeDeepSeekResponsesRequestBody(account *Account, body []byte) []byte
 			normalized = stripped
 		}
 	}
+	// DeepSeek Responses implementations reject these OpenAI-only switches.
+	// Preserve effort and all reasoning history; keep the existing provider scope.
+	if dedupe {
+		for _, path := range []string{"reasoning.summary", "reasoning.generate_summary"} {
+			if gjson.GetBytes(normalized, path).Exists() {
+				if next, err := sjson.DeleteBytes(normalized, path); err == nil {
+					normalized = next
+				}
+			}
+		}
+		if reasoning := gjson.GetBytes(normalized, "reasoning"); reasoning.IsObject() && len(reasoning.Map()) == 0 {
+			if next, err := sjson.DeleteBytes(normalized, "reasoning"); err == nil {
+				normalized = next
+			}
+		}
+	}
 
 	var requestBody map[string]any
 	if err := decodeOpenAIJSONUseNumber(normalized, &requestBody); err != nil {
@@ -1644,14 +1660,25 @@ func extractOpenAIReasoningEffortFromBody(body []byte, modelCandidates ...string
 }
 
 func explicitRequestedReasoningEffortFromBody(body []byte) string {
-	raw := strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String())
-	if raw == "" {
-		raw = strings.TrimSpace(gjson.GetBytes(body, "reasoning_effort").String())
+	hasEscape := bytes.IndexByte(body, '\\') >= 0
+	for _, probe := range reasoningEffortProbes {
+		if !hasEscape && !bytes.Contains(body, probe.key) {
+			continue
+		}
+		if raw := strings.TrimSpace(gjson.GetBytes(body, probe.path).String()); raw != "" {
+			return raw
+		}
 	}
-	if raw == "" {
-		raw = strings.TrimSpace(gjson.GetBytes(body, "output_config.effort").String())
-	}
-	return raw
+	return ""
+}
+
+var reasoningEffortProbes = []struct {
+	path string
+	key  []byte
+}{
+	{"reasoning.effort", []byte(`"reasoning"`)},
+	{"reasoning_effort", []byte(`"reasoning_effort"`)},
+	{"output_config.effort", []byte(`"output_config"`)},
 }
 
 // CanonicalRequestedReasoningEffort extracts the client-requested effort before

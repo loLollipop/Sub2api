@@ -4,12 +4,14 @@ package service
 
 import (
 	"bufio"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"math/big"
 	"net"
 	"strings"
@@ -280,7 +282,7 @@ func smtpTestConfig(port int, useTLS bool) *SMTPConfig {
 // 465 语义：UseTLS=true + 隐式 TLS 服务器，原有路径保持可用。
 func TestSMTPConnectionImplicitTLS(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, true, false)
-	svc := &EmailService{}
+	svc := &EmailService{smtpDialContext: (&net.Dialer{Timeout: smtpDialTimeout}).DialContext}
 
 	if err := svc.TestSMTPConnectionWithConfig(smtpTestConfig(port, true)); err != nil {
 		t.Fatalf("expected implicit TLS connection to succeed, got: %v", err)
@@ -294,7 +296,7 @@ func TestSMTPConnectionImplicitTLS(t *testing.T) {
 // 隐式 TLS 失败后必须自动降级为强制 STARTTLS 并成功。
 func TestSMTPConnectionStartTLSFallbackWhenTLSEnabled(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, true)
-	svc := &EmailService{}
+	svc := &EmailService{smtpDialContext: (&net.Dialer{Timeout: smtpDialTimeout}).DialContext}
 
 	if err := svc.TestSMTPConnectionWithConfig(smtpTestConfig(port, true)); err != nil {
 		t.Fatalf("expected STARTTLS fallback to succeed, got: %v", err)
@@ -310,7 +312,7 @@ func TestSMTPConnectionStartTLSFallbackWhenTLSEnabled(t *testing.T) {
 // UseTLS=true 但服务器不支持 STARTTLS：必须报错，且绝不能把凭据发到明文连接上。
 func TestSMTPConnectionMandatoryStartTLSRefusesPlaintext(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, false)
-	svc := &EmailService{}
+	svc := &EmailService{smtpDialContext: (&net.Dialer{Timeout: smtpDialTimeout}).DialContext}
 
 	err := svc.TestSMTPConnectionWithConfig(smtpTestConfig(port, true))
 	if err == nil {
@@ -328,7 +330,7 @@ func TestSMTPConnectionMandatoryStartTLSRefusesPlaintext(t *testing.T) {
 // 这是 #1488 评论"测试连接不成功，发送测试邮件实际上能发"的回归用例。
 func TestSMTPConnectionOpportunisticStartTLSWhenTLSDisabled(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, true)
-	svc := &EmailService{}
+	svc := &EmailService{smtpDialContext: (&net.Dialer{Timeout: smtpDialTimeout}).DialContext}
 
 	if err := svc.TestSMTPConnectionWithConfig(smtpTestConfig(port, false)); err != nil {
 		t.Fatalf("expected opportunistic STARTTLS test connection to succeed, got: %v", err)
@@ -341,7 +343,7 @@ func TestSMTPConnectionOpportunisticStartTLSWhenTLSDisabled(t *testing.T) {
 // UseTLS=false + 服务器不支持 STARTTLS：保持明文直连（既有行为不回归）。
 func TestSMTPConnectionPlainWhenNoStartTLS(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, false)
-	svc := &EmailService{}
+	svc := &EmailService{smtpDialContext: (&net.Dialer{Timeout: smtpDialTimeout}).DialContext}
 
 	if err := svc.TestSMTPConnectionWithConfig(smtpTestConfig(port, false)); err != nil {
 		t.Fatalf("expected plain connection to succeed, got: %v", err)
@@ -354,7 +356,7 @@ func TestSMTPConnectionPlainWhenNoStartTLS(t *testing.T) {
 // 发送路径全流程：UseTLS=true + STARTTLS 服务器（587 语义）完整走完 MAIL/RCPT/DATA。
 func TestSendEmailWithConfigStartTLSFallback(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, true)
-	svc := &EmailService{}
+	svc := &EmailService{smtpDialContext: (&net.Dialer{Timeout: smtpDialTimeout}).DialContext}
 
 	err := svc.SendEmailWithConfig(smtpTestConfig(port, true), "rcpt@example.com", "subject", "<p>body</p>")
 	if err != nil {
@@ -371,7 +373,7 @@ func TestSendEmailWithConfigStartTLSFallback(t *testing.T) {
 // 发送路径全流程：UseTLS=true + 隐式 TLS 服务器（465 语义）保持既有行为。
 func TestSendEmailWithConfigImplicitTLS(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, true, false)
-	svc := &EmailService{}
+	svc := &EmailService{smtpDialContext: (&net.Dialer{Timeout: smtpDialTimeout}).DialContext}
 
 	err := svc.SendEmailWithConfig(smtpTestConfig(port, true), "rcpt@example.com", "subject", "<p>body</p>")
 	if err != nil {
@@ -379,5 +381,28 @@ func TestSendEmailWithConfigImplicitTLS(t *testing.T) {
 	}
 	if !srv.sawCommand("DATA") {
 		t.Fatal("expected send path to reach DATA")
+	}
+}
+
+func TestSMTPRejectsPrivateTargetsBeforeConnect(t *testing.T) {
+	svc := &EmailService{}
+	for _, host := range []string{"127.0.0.1", "localhost", "10.0.0.1", "169.254.169.254", "100.100.100.200", "::1", "198.18.0.1"} {
+		for _, useTLS := range []bool{false, true} {
+			_, err := svc.connectSMTP(&SMTPConfig{Host: host, Port: 25, UseTLS: useTLS})
+			if !errors.Is(err, ErrSMTPTargetBlocked) {
+				t.Fatalf("host=%s TLS=%v: got %v", host, useTLS, err)
+			}
+		}
+	}
+}
+
+func TestSMTPImplicitTLSHonorsHandshakeTimeout(t *testing.T) {
+	client, server := net.Pipe()
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	_, err := smtpTLSHandshake(ctx, client, smtpTLSConfig("mail.example"))
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected TLS timeout, got %v", err)
 	}
 }

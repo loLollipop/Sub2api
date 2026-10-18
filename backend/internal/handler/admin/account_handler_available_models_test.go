@@ -385,7 +385,7 @@ func TestAccountHandlerSyncUpstreamModels_ConfigErrorReturnsBadRequest(t *testin
 			Type:     service.AccountTypeAPIKey,
 			Status:   service.StatusActive,
 			Credentials: map[string]any{
-				"base_url": "https://openai.example.com/v1",
+				"base_url": "https://1.1.1.1/v1",
 			},
 		},
 	}
@@ -405,7 +405,7 @@ func TestAccountHandlerSyncUpstreamModelsReturnsCapabilityMetadata(t *testing.T)
 		account: service.Account{
 			ID: 48, Name: "custom-openai", Platform: service.PlatformOpenAI,
 			Type: service.AccountTypeAPIKey, Status: service.StatusActive,
-			Credentials: map[string]any{"api_key": "key", "base_url": "https://provider.example/v1"},
+			Credentials: map[string]any{"api_key": "key", "base_url": "https://8.8.8.8/v1"},
 		},
 	}
 	upstream := &syncUpstreamHTTPUpstream{resp: &http.Response{
@@ -452,7 +452,7 @@ func TestAccountHandlerSyncUpstreamModelsPreviewUsesProvidedModelMapping(t *test
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
 			Body: io.NopCloser(strings.NewReader(`{
 				"configured-provider": {
-					"api": "https://provider.example/v1",
+					"api": "https://8.8.8.8/v1",
 					"models": {
 						"glm-5.3": {
 							"id": "glm-5.3",
@@ -475,7 +475,7 @@ func TestAccountHandlerSyncUpstreamModelsPreviewUsesProvidedModelMapping(t *test
 		strings.NewReader(`{
 			"platform":"openai",
 			"type":"apikey",
-			"base_url":"https://provider.example/v1",
+			"base_url":"https://8.8.8.8/v1",
 			"api_key":"key",
 			"model_mapping":{"public-glm":"glm-5.3"}
 		}`),
@@ -508,7 +508,7 @@ func TestAccountHandlerSyncUpstreamModelsPreviewGeminiCustomUsesOpenAIModels(t *
 		strings.NewReader(`{
 			"platform":"gemini",
 			"type":"apikey",
-			"base_url":"https://custom-relay.example.com/v1",
+			"base_url":"https://8.8.4.4/v1",
 			"api_key":"sk-gemini",
 			"api_protocol":"chat_completions"
 		}`),
@@ -517,7 +517,7 @@ func TestAccountHandlerSyncUpstreamModelsPreviewGeminiCustomUsesOpenAIModels(t *
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, "https://custom-relay.example.com/v1/models", captured)
+	require.Equal(t, "https://8.8.4.4/v1/models", captured)
 	require.NotContains(t, captured, "/v1beta/models")
 	var resp struct {
 		Data service.UpstreamModelCatalog `json:"data"`
@@ -592,7 +592,7 @@ func TestAccountHandlerSyncUpstreamModelsPreviewGeminiCustomInfersOpenAIModelsWi
 		strings.NewReader(`{
 			"platform":"gemini",
 			"type":"apikey",
-			"base_url":"https://custom-relay.example.com",
+			"base_url":"https://8.8.4.4",
 			"api_key":"sk-gemini"
 		}`),
 	)
@@ -600,7 +600,7 @@ func TestAccountHandlerSyncUpstreamModelsPreviewGeminiCustomInfersOpenAIModelsWi
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, "https://custom-relay.example.com/v1/models", captured)
+	require.Equal(t, "https://8.8.4.4/v1/models", captured)
 	require.NotContains(t, captured, "/v1beta/models")
 }
 
@@ -631,7 +631,7 @@ func TestAccountHandlerSyncUpstreamModels_UpstreamErrorDoesNotExposeBody(t *test
 			Status:   service.StatusActive,
 			Credentials: map[string]any{
 				"api_key":  "openai-key",
-				"base_url": "https://openai.example.com/v1",
+				"base_url": "https://1.1.1.1/v1",
 			},
 		},
 	}

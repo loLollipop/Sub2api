@@ -40,7 +40,7 @@ func TestCodexContextWindowSyncRoundTrip(t *testing.T) {
 				}]}`, tc.fields))),
 			}}
 			repo := &upstreamModelMetadataRepoStub{}
-			syncer := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+			syncer := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 			catalog, err := syncer.SyncUpstreamModelCatalog(context.Background(), &account)
 			require.NoError(t, err)
 			require.Empty(t, catalog.Warnings)
@@ -138,7 +138,7 @@ func TestCodexContextWindowRegistryEnrichment(t *testing.T) {
 					}}`)),
 				},
 			}}
-			syncer := &AccountTestService{
+			syncer := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 				accountRepo: &upstreamModelMetadataRepoStub{}, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig(),
 			}
 			catalog, err := syncer.SyncUpstreamModelCatalog(context.Background(), &account)

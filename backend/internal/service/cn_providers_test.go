@@ -597,7 +597,7 @@ func TestGetOpenAIProtocolAPIKey_CNProviders(t *testing.T) {
 func TestBuildUpstreamModelsRequest_CNProviders(t *testing.T) {
 	t.Parallel()
 
-	svc := &AccountTestService{cfg: &config.Config{}}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, cfg: &config.Config{}}
 	cases := []struct {
 		name     string
 		platform string
@@ -831,7 +831,7 @@ func TestGetOpenAIFormatBaseURL_ProtocolAware(t *testing.T) {
 // TestBuildUpstreamModelsRequest_AnthropicProtocol 模型同步使用协议感知 base。
 func TestBuildUpstreamModelsRequest_AnthropicProtocol(t *testing.T) {
 	t.Parallel()
-	svc := &AccountTestService{cfg: &config.Config{}}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, cfg: &config.Config{}}
 	account := &Account{
 		ID: 1, Platform: PlatformZhipu, Type: AccountTypeAPIKey,
 		Credentials: map[string]any{

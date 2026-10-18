@@ -235,7 +235,7 @@ func scheduledQualityRunner(account *Account, results *scheduledQualityResultRep
 	return &ScheduledTestRunnerService{
 		planRepo:       plans,
 		scheduledSvc:   NewScheduledTestService(plans, results),
-		accountTestSvc: &AccountTestService{accountRepo: accounts},
+		accountTestSvc: &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: accounts},
 		// Populating this ensures success cannot accidentally invoke the broad
 		// recovery path (its unrelated methods on the stub deliberately panic).
 		rateLimitSvc: &RateLimitService{accountRepo: accounts},

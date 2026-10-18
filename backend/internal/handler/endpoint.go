@@ -20,6 +20,8 @@ const (
 	EndpointChatCompletions      = "/v1/chat/completions"
 	EndpointEmbeddings           = "/v1/embeddings"
 	EndpointAlphaSearch          = "/v1/alpha/search"
+	EndpointDeepSeekToolsSearch  = service.DeepSeekToolsPathSearch
+	EndpointDeepSeekToolsFetch   = service.DeepSeekToolsPathFetch
 	EndpointResponses            = "/v1/responses"
 	EndpointResponsesCompact     = "/v1/responses/compact"
 	EndpointResponsesInputTokens = "/v1/responses/input_tokens"
@@ -84,6 +86,10 @@ func NormalizeInboundEndpoint(path string) string {
 	switch {
 	case strings.Contains(path, EndpointResponsesInputTokens) || isResponsesInputTokensAliasPath(path):
 		return EndpointResponsesInputTokens
+	case strings.Contains(path, EndpointDeepSeekToolsSearch):
+		return EndpointDeepSeekToolsSearch
+	case strings.Contains(path, EndpointDeepSeekToolsFetch):
+		return EndpointDeepSeekToolsFetch
 	case strings.Contains(path, EndpointEmbeddings):
 		return EndpointEmbeddings
 	case strings.Contains(path, EndpointAlphaSearch) || isBareOrSubpathOf(strings.TrimRight(path, "/"), "/alpha/search") || isBareOrSubpathOf(strings.TrimRight(path, "/"), "/backend-api/codex/alpha/search"):

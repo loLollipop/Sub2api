@@ -37,6 +37,8 @@ jobs:
       - name: Offline VPS release updater tests
         run: |
           sudo /bin/bash deploy/tests/vps-release-update-test.sh
+      - name: Regional access notice checks
+        run: python3 -m unittest discover -s deploy/tests -p test_region_policy.py
       - name: Unit tests
         working-directory: backend
         run: make test-unit
@@ -70,6 +72,9 @@ jobs:
       - name: Billing and media concurrency regression
         working-directory: backend
         run: go test -race -p 1 -tags=unit ./internal/handler ./internal/service ./internal/repository -run 'Test(ContentDownload|ForwardGrokMediaContent|GrokVideoDurable|MediaBilling|AsyncImage|ImageTask|OpenAIResponsesWebSocket.*(Balance|Subscription|Settlement)|SmartBilling|.*Refund.*Pending)' -count=1
+      - name: Public probes, DeepSeek tools and moderation queue concurrency regression
+        working-directory: backend
+        run: go test -race -p 1 -tags=unit ./internal/handler ./internal/service ./internal/repository -run 'Test(ParseDeepSeekTools|DeepSeekTools|ForwardDeepSeekTools|ContentModeration|AccountTest.*(Target|Security)|PublicProbe|SMTP)' -count=1
 
   frontend:
     runs-on: ubuntu-latest

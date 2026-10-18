@@ -99,6 +99,7 @@ func newDefaultOpenAIWSClientDialer() openAIWSClientDialer {
 }
 
 type coderOpenAIWSClientDialer struct {
+	httpClient   *http.Client // optional dedicated transport for administrative probes
 	proxyMu      sync.Mutex
 	proxyClients map[string]*openAIWSProxyClientEntry
 	proxyHits    atomic.Int64
@@ -152,7 +153,9 @@ func (d *coderOpenAIWSClientDialer) Dial(
 			return true
 		},
 	}
-	if proxy := strings.TrimSpace(proxyURL); proxy != "" {
+	if d.httpClient != nil {
+		opts.HTTPClient = d.httpClient
+	} else if proxy := strings.TrimSpace(proxyURL); proxy != "" {
 		proxyClient, err := d.proxyHTTPClient(proxy)
 		if err != nil {
 			return nil, 0, nil, err

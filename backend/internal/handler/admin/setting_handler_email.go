@@ -2,6 +2,7 @@ package admin
 
 import (
 	"html"
+	"log/slog"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
@@ -76,7 +77,8 @@ func (h *SettingHandler) TestSMTPConnection(c *gin.Context) {
 
 	err := h.emailService.TestSMTPConnectionWithConfig(config)
 	if err != nil {
-		response.BadRequest(c, "SMTP connection test failed: "+err.Error())
+		slog.Warn("admin_smtp_test_failed", "error", err)
+		response.BadRequest(c, "SMTP connection test failed: unable to connect or authenticate")
 		return
 	}
 
@@ -187,7 +189,8 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 `
 
 	if err := h.emailService.SendEmailWithConfig(config, req.Email, subject, body); err != nil {
-		response.BadRequest(c, "Failed to send test email: "+err.Error())
+		slog.Warn("admin_smtp_send_failed", "error", err)
+		response.BadRequest(c, "Failed to send test email")
 		return
 	}
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -106,6 +107,7 @@ func TestOpsScheduledReportLegacyTemplateReceivesSummaryHTML(t *testing.T) {
 	require.NoError(t, repo.SetMultiple(ctx, smtpServer.settings()))
 
 	emailService := NewEmailService(repo, nil)
+	emailService.smtpDialContext = (&net.Dialer{Timeout: smtpDialTimeout}).DialContext
 	notificationService := NewNotificationEmailService(repo, emailService)
 	_, err := notificationService.UpdateTemplate(
 		ctx,

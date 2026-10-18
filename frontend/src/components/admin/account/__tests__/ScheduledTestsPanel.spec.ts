@@ -23,6 +23,24 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 describe('ScheduledTestsPanel quality results', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('loads when lazily mounted open and does not restart polling after a late unmount', async () => {
+    vi.useFakeTimers()
+    let finish!: (plans: never[]) => void
+    listByAccount.mockImplementationOnce(() => new Promise<never[]>(resolve => { finish = resolve }))
+    const wrapper = mount(ScheduledTestsPanel, {
+      props: { show: true, accountId: 2, modelOptions: [] },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' }, ConfirmDialog: true } },
+    })
+    try {
+      expect(listByAccount).toHaveBeenCalledTimes(1)
+      wrapper.unmount()
+      finish([])
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(30000)
+      expect(listByAccount).toHaveBeenCalledTimes(1)
+    } finally { vi.useRealTimers() }
+  })
+
   it('creates ordinary plans with quality checking off and resets after explicit opt-in', async () => {
     listByAccount.mockResolvedValue([])
     create.mockResolvedValue({ id: 1 })

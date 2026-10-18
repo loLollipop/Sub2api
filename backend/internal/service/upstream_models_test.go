@@ -183,7 +183,7 @@ func TestExtractUpstreamModelIDs(t *testing.T) {
 }
 
 func TestBuildUpstreamModelsRequestSupportsOpenAIOAuth(t *testing.T) {
-	svc := &AccountTestService{cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, cfg: upstreamModelSyncTestConfig()}
 	account := &Account{
 		ID:       11,
 		Platform: PlatformOpenAI,
@@ -211,7 +211,7 @@ func TestFetchUpstreamSupportedModelsParsesOpenAIOAuthManifest(t *testing.T) {
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
 		Body:       io.NopCloser(strings.NewReader(`{"models":[{"slug":"gpt-5.6-sol"},{"slug":"gpt-5.5-codex"}]}`)),
 	}}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		httpUpstream: upstream,
 		cfg:          upstreamModelSyncTestConfig(),
 	}
@@ -240,7 +240,7 @@ func TestExtractGrokUpstreamModelIDs(t *testing.T) {
 func TestBuildUpstreamModelsRequestsForAPIKeyAccounts(t *testing.T) {
 	t.Parallel()
 
-	svc := &AccountTestService{cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, cfg: upstreamModelSyncTestConfig()}
 	ctx := context.Background()
 
 	anthropicReq, err := svc.buildAnthropicUpstreamModelsRequest(ctx, &Account{
@@ -352,7 +352,7 @@ func TestBuildUpstreamModelsRequestsForAPIKeyAccounts(t *testing.T) {
 func TestBuildUpstreamModelsRequestSupportsGrokOAuth(t *testing.T) {
 	t.Parallel()
 
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		cfg:               upstreamModelSyncTestConfig(),
 		grokTokenProvider: NewGrokTokenProvider(nil, nil),
 	}
@@ -371,7 +371,7 @@ func TestBuildUpstreamModelsRequestSupportsGrokOAuth(t *testing.T) {
 func TestBuildUpstreamModelsRequestGrokOAuthRequiresTokenProvider(t *testing.T) {
 	t.Parallel()
 
-	svc := &AccountTestService{cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, cfg: upstreamModelSyncTestConfig()}
 	_, err := svc.buildUpstreamModelsRequest(context.Background(), grokOAuthModelSyncTestAccount(""))
 	require.Error(t, err)
 
@@ -384,7 +384,7 @@ func TestBuildUpstreamModelsRequestGrokOAuthRequiresTokenProvider(t *testing.T) 
 func TestBuildAntigravityAPIKeyModelsRequestRejectsOfficialCloudCodeBase(t *testing.T) {
 	t.Parallel()
 
-	svc := &AccountTestService{cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, cfg: upstreamModelSyncTestConfig()}
 	_, err := svc.buildAntigravityAPIKeyModelsRequest(context.Background(), &Account{
 		Platform: PlatformAntigravity,
 		Type:     AccountTypeAPIKey,
@@ -404,7 +404,7 @@ func TestBuildAntigravityAPIKeyModelsRequestRejectsOfficialCloudCodeBase(t *test
 func TestBuildAnthropicUpstreamModelsRequestRejectsBedrock(t *testing.T) {
 	t.Parallel()
 
-	svc := &AccountTestService{cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, cfg: upstreamModelSyncTestConfig()}
 	_, err := svc.buildAnthropicUpstreamModelsRequest(context.Background(), &Account{
 		Platform: PlatformAnthropic,
 		Type:     AccountTypeBedrock,
@@ -424,7 +424,7 @@ func TestFetchUpstreamSupportedModelsParsesOpenAIResponse(t *testing.T) {
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
 		Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"gpt-5"},{"id":"gpt-5"},{"name":"o3"}]}`)),
 	}}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		httpUpstream: upstream,
 		cfg:          upstreamModelSyncTestConfig(),
 	}
@@ -476,7 +476,7 @@ func TestSyncUpstreamModelCatalogEnrichesOpenCodeIDOnlyListAndPersistsSnapshot(t
 		},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget,
 		accountRepo:  repo,
 		httpUpstream: upstream,
 		cfg:          upstreamModelSyncTestConfig(),
@@ -557,7 +557,7 @@ func TestSyncUpstreamModelCatalogUsesConfiguredModelsWhenListEndpointUnsupported
 		},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 	account := &Account{
 		ID: 97, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
 		Credentials: map[string]any{
@@ -605,7 +605,7 @@ func TestSyncUpstreamModelCatalogDoesNotUseConfiguredModelsForRealUpstreamFailur
 				StatusCode: tt.statusCode,
 				Body:       io.NopCloser(strings.NewReader(`{"error":"failed"}`)),
 			}}
-			svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+			svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 			_, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 				ID: 98, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -627,7 +627,7 @@ func TestSyncUpstreamModelCatalogRequiresConfiguredModelsForUnsupportedListEndpo
 		StatusCode: http.StatusMethodNotAllowed,
 		Body:       io.NopCloser(strings.NewReader(`{"error":"method not allowed"}`)),
 	}}
-	svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	_, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 99, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -654,7 +654,7 @@ func TestSyncUpstreamModelCatalogPrefersDirectUpstreamMetadata(t *testing.T) {
 		}]}`)),
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 92, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -691,7 +691,7 @@ func TestSyncUpstreamModelCatalogReplacesSnapshotWhenUpstreamModelsChange(t *tes
 		},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 	account := &Account{
 		ID: 101, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
 		Credentials: map[string]any{
@@ -732,7 +732,7 @@ func TestSyncUpstreamModelCatalogPersistsExplicitNonReasoningCapability(t *testi
 		}]}`)),
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 94, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -761,7 +761,7 @@ func TestSyncUpstreamModelCatalogClassifiesSnapshotPersistenceFailureAsInternal(
 		}]}`)),
 	}}
 	repo := &upstreamModelMetadataRepoStub{err: errors.New("database unavailable")}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	_, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 95, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -780,7 +780,7 @@ func TestSyncUpstreamModelCatalogDoesNotOverwriteSnapshotWhenRegistryFails(t *te
 		{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader(`{"error":"unavailable"}`))},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 93, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -808,7 +808,7 @@ func TestSyncUpstreamModelCatalogDoesNotPersistPartialMetadataWhenRegistryFails(
 		{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader(`{"error":"unavailable"}`))},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 96, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -865,7 +865,7 @@ func TestSyncUpstreamModelCatalogIgnoresDedicatedMediaModelsForCompleteness(t *t
 		},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 113, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -904,7 +904,7 @@ func TestFetchUpstreamSupportedModelsUsesConfiguredBodyLimit(t *testing.T) {
 	}}
 	cfg := upstreamModelSyncTestConfig()
 	cfg.Gateway.ModelsListReadMaxBytes = 8
-	svc := &AccountTestService{httpUpstream: upstream, cfg: cfg}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, httpUpstream: upstream, cfg: cfg}
 
 	_, err := svc.FetchUpstreamSupportedModels(context.Background(), &Account{
 		ID:       7,
@@ -1001,7 +1001,7 @@ func TestSyncUpstreamModelCatalogEnrichesOfficialOpenAIHostWithoutRegistryAPIFie
 		},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 110, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -1065,7 +1065,7 @@ func TestSyncUpstreamModelCatalogPersistsCompleteModelsWhenSomeRemainIncomplete(
 		},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 111, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -1122,7 +1122,7 @@ func TestSyncUpstreamModelCatalogEnrichesConfiguredMappingModelsMissingFromUpstr
 		},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 112, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
@@ -1161,7 +1161,7 @@ func TestSyncUpstreamModelCatalogAstraPartialRefreshPreservesKnownCapabilities(t
 		}}}`))},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 	account := &Account{ID: 114, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
 		Credentials: map[string]any{"api_key": "test", "base_url": "https://api.openai.com/v1",
 			"model_mapping": map[string]any{"public-model": "mapped-only"}},
@@ -1354,7 +1354,7 @@ func TestSyncUpstreamModelCatalogFillsDeepSeekV4WhenRegistryMisses(t *testing.T)
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"deepseek":{"id":"deepseek","api":"https://api.deepseek.com","models":{}}}`))},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 501, Platform: PlatformDeepseek, Type: AccountTypeAPIKey,
@@ -1398,7 +1398,7 @@ func TestSyncUpstreamModelCatalogFillsMissingOfficialMetadata(t *testing.T) {
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"openai":{"id":"openai","models":{}}}`))},
 	}}
 	repo := &upstreamModelMetadataRepoStub{}
-	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	svc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
 
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
 		ID: 777, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,

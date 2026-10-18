@@ -239,6 +239,8 @@ func RegisterGatewayRoutes(
 			h.Gateway.Responses(c)
 		}))
 		gateway.POST("/alpha/search", textBodyLimit, h.OpenAIGateway.AlphaSearch)
+		gateway.POST("/tools/search", h.OpenAIGateway.DeepSeekToolsSearch)
+		gateway.POST("/tools/fetch", h.OpenAIGateway.DeepSeekToolsFetch)
 		gateway.GET("/responses", func(c *gin.Context) {
 			h.OpenAIGateway.ResponsesWebSocket(c)
 		})

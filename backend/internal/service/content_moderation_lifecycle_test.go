@@ -12,12 +12,17 @@ import (
 )
 
 func moderationLifecycleInput() (ContentModerationCheckInput, weak.Pointer[byte]) {
-	body := []byte(`{"messages":[{"role":"user","content":"first user turn"},{"role":"assistant","content":"` + strings.Repeat("x", 4<<20) + `"},{"role":"user","content":"blocked prompt"}]}`)
+	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"first user turn"},{"role":"assistant","content":"` + strings.Repeat("x", 4<<20) + `"},{"role":"user","content":"blocked prompt"}]}`)
+	parsed, err := ParseGatewayRequest(NewRequestBodyRef(body), "")
+	if err != nil {
+		panic(err) // The fixture must exercise the real zero-copy model parser.
+	}
 	return ContentModerationCheckInput{
 		RequestID: "lifecycle-test",
 		UserID:    41,
 		APIKeyID:  73,
 		Protocol:  ContentModerationProtocolOpenAIChat,
+		Model:     parsed.Model,
 		Body:      body,
 	}, weak.Make(&body[0])
 }
@@ -40,7 +45,7 @@ func TestContentModerationBuildLogReleasesRequestBody(t *testing.T) {
 	defer runtime.KeepAlive(log)
 	require.Equal(t, int64(41), *log.UserID)
 	require.Equal(t, int64(73), *log.APIKeyID)
-	require.Equal(t, "first user turn\n\nblocked prompt", log.InputExcerpt)
+	require.Equal(t, "blocked prompt", log.InputExcerpt)
 	requireModerationBodyCollected(t, body)
 }
 
@@ -66,8 +71,9 @@ func TestContentModerationRecordQueueReleasesRequestBody(t *testing.T) {
 
 	task, ok := svc.dequeueAsyncTask(context.Background(), time.Second)
 	require.True(t, ok)
+	defer svc.releaseAsyncTask(task)
 	require.Equal(t, 0, len(task.input.Body))
-	require.Equal(t, "first user turn\n\nblocked prompt", task.log.InputExcerpt)
+	require.Equal(t, "blocked prompt", task.log.InputExcerpt)
 	require.Equal(t, int64(41), *task.log.UserID)
 	require.Equal(t, int64(73), *task.log.APIKeyID)
 	require.Equal(t, "blocked", task.log.MatchedKeyword)
@@ -99,8 +105,10 @@ func BenchmarkContentModerationQueueRoundTrip(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		svc.enqueueAsync(input, cfg, content, "hash")
-		if _, ok := svc.dequeueAsyncTask(ctx, time.Second); !ok {
+		task, ok := svc.dequeueAsyncTask(ctx, time.Second)
+		if !ok {
 			b.Fatal("enqueued task missing")
 		}
+		svc.releaseAsyncTask(task)
 	}
 }

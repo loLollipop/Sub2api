@@ -33,6 +33,17 @@ async function openRules(enabled = true) {
 }
 
 describe('error passthrough enabled state', () => {
+  it('loads rules when lazily mounted already open', async () => {
+    mocks.list.mockResolvedValue([rule(true)])
+    const wrapper = mount(ErrorPassthroughRulesModal, {
+      props: { show: true },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' }, ConfirmDialog: true, Icon: true } }
+    })
+    await flushPromises()
+    expect(mocks.list).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('tbody').text()).toContain('Rule')
+  })
+
   it.each([true, false])('keeps the server state after two pending clicks (enabled=%s)', async (enabled) => {
     const finishes: Array<(value: unknown) => void> = []
     mocks.toggleEnabled.mockImplementation(() => new Promise(resolve => { finishes.push(resolve) }))

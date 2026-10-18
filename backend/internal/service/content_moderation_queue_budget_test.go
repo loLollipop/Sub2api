@@ -125,10 +125,10 @@ func TestContentModerationAuditQueueReleasesBodyAndPreservesFullLog(t *testing.T
 	svc := moderationBudgetService(1)
 	text := strings.Repeat("界", maxModerationLogExcerptRunes)
 	body := func() weak.Pointer[byte] {
-		input, body := moderationLifecycleInput()
+		input, _ := moderationLifecycleInput()
 		input.Body = append(input.Body[:len(input.Body)-len(`blocked prompt"}]}`)], []byte(text+`"}]}`)...)
 		// append can reallocate: track the backing array actually enqueued.
-		body = weak.Make(&input.Body[0])
+		body := weak.Make(&input.Body[0])
 		svc.enqueueAsync(input, defaultContentModerationConfig(), ContentModerationInput{Text: "bounded audit input"}, "hash")
 		return body
 	}()

@@ -27,7 +27,9 @@ func TestPublicProbePreservesGrokAccessDeniedFallback(t *testing.T) {
 	}))
 	defer server.Close()
 	network := defaultContentDownloadNetwork()
-	network.tlsConfig = server.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
+	transport, ok := server.Client().Transport.(*http.Transport)
+	require.True(t, ok)
+	network.tlsConfig = transport.TLSClientConfig.Clone()
 	network.tlsConfig.ServerName = server.Certificate().IPAddresses[0].String()
 	network.lookup = func(context.Context, string) ([]net.IPAddr, error) {
 		return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
@@ -36,7 +38,8 @@ func TestPublicProbePreservesGrokAccessDeniedFallback(t *testing.T) {
 		destinations = append(destinations, address)
 		return (&net.Dialer{}).DialContext(ctx, proto, server.Listener.Addr().String())
 	}
-	upstream := NewHTTPUpstream(nil).(*httpUpstreamService)
+	upstream, ok := NewHTTPUpstream(nil).(*httpUpstreamService)
+	require.True(t, ok)
 	upstream.publicNetwork = &network
 	req, err := http.NewRequest(http.MethodPost, "https://"+grokCLIProxyHost+"/v1/responses", bytes.NewBufferString(`{"input":"ping"}`))
 	require.NoError(t, err)
@@ -69,7 +72,8 @@ func TestPublicProbeTransportPinsSocketAndPreservesDuplex(t *testing.T) {
 		destinations = append(destinations, address)
 		return (&net.Dialer{}).DialContext(ctx, network, server.Listener.Addr().String())
 	}
-	upstream := NewHTTPUpstream(nil).(*httpUpstreamService)
+	upstream, ok := NewHTTPUpstream(nil).(*httpUpstreamService)
+	require.True(t, ok)
 	upstream.publicNetwork = &network
 	client := &http.Client{Transport: probeTestRoundTripper{upstream}}
 	conn, _, err := websocket.Dial(t.Context(), "ws://8.8.8.8/probe", &websocket.DialOptions{HTTPClient: client})

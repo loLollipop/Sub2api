@@ -1,0 +1,22 @@
+name: Sensitive data check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  sensitive-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Test scanner
+        run: python3 -m unittest discover -s tools/tests -p 'test_check_sensitive.py'
+      - name: Scan tracked files
+        run: python3 tools/check_sensitive.py --all

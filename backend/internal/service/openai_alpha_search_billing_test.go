@@ -59,6 +59,7 @@ func TestCalculateOpenAIRecordUsageCostWebSearchPerCall(t *testing.T) {
 
 	// 分组配置单价 0.005
 	apiKey.Group.WebSearchPricePerCall = float64Ptr(0.005)
+	apiKey.Group.SearchPricePer1k = float64Ptr(999) // DeepSeek 的千次价不得覆盖 alpha/search 的单次价。
 	cost, err = svc.calculateOpenAIRecordUsageCost(context.Background(), result, apiKey, []string{"gpt-5.6-sol"}, 1.0, 1.0, 1.0, 1.0, UsageTokens{}, "", boolPtr(false), time.Time{})
 	require.NoError(t, err)
 	require.InDelta(t, 0.005, cost.TotalCost, 1e-12)

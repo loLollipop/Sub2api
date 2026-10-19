@@ -112,3 +112,7 @@ test-frontend:
 
 test-frontend-critical:
 	@pnpm --dir frontend exec vitest run $(FRONTEND_CRITICAL_VITEST)
+
+.PHONY: sensitive
+sensitive:
+	@python3 tools/check_sensitive.py --all

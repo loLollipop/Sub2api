@@ -378,6 +378,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 			}
 		}
 		line = applyOllamaCloudRawChatCompletionsSSELine(account, line)
+		line, _ = repairChatCompletionChunkSSELine(line)
 		line = stripEmptyChatToolCallIdentityFromSSELine(line)
 
 		writeLine(line)
@@ -550,6 +551,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		return nil, newGrokMissingUsageFailoverError(c, account, upstreamRequestID)
 	}
 	respBody = applyOllamaCloudRawChatCompletionsResponse(account, respBody)
+	respBody = repairChatCompletionMessageRole(respBody)
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)

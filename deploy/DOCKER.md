@@ -17,6 +17,9 @@ docker run -d \
 
 ## Docker Compose
 
+Set `DB_PASSWORD` to a strong URL-safe password in your environment or `.env`
+file before starting this example. Both services use the same value.
+
 ```yaml
 version: '3.8'
 
@@ -26,7 +29,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/sub2api?sslmode=disable
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD}@db:5432/sub2api?sslmode=disable
       - REDIS_URL=redis://redis:6379
     depends_on:
       - db
@@ -36,7 +39,7 @@ services:
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?Set DB_PASSWORD}
       - POSTGRES_DB=sub2api
     volumes:
       - postgres_data:/var/lib/postgresql/data

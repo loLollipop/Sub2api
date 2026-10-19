@@ -2,24 +2,24 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.1.27",
-  "imported_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
-  "personal_baseline_commit": "792225b48fceb53931c4d888095fbe4860c80efd",
-  "latest_observed_version": "2.1.27",
-  "latest_observed_release_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
-  "latest_observed_main_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
+  "imported_version": "2.2.0",
+  "imported_commit": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
+  "personal_baseline_commit": "1747626147ace28e09aeea83d29c08b4e0e36c03",
+  "latest_observed_version": "2.2.0",
+  "latest_observed_release_commit": "d01e1c5f77932b7256dc7d619ef312171bc5ddd5",
+  "latest_observed_main_commit": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
   "observed_delta_review": {
-    "from_commit": "ce66c457c779653414b8776126144e9bd8148027",
-    "to_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
-    "status": "selective_security_tools_and_ui_backport",
-    "scope": "Adapt outbound SMTP/CRS/admin-probe protection, inflight reservation floor and opt-in error policy, trusted embed credentials, usage refresh/mobile sorting/lazy modals/xlsx chunk, semantic-preserving request scan, scoped DeepSeek reasoning cleanup, standalone Search/Fetch with native search billing, and last-user-turn moderation logs. Preserve native platforms, local routing and settlement; no migrations or dependency changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261018.md"
+    "from_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
+    "to_commit": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
+    "status": "selective_chat_roles_admin_groups_and_sensitive_guard_backport",
+    "scope": "Repair exact Chat Completion empty roles in real raw and passthrough paths, preserve simple-mode group selector fields, add sensitive-content checks and search price regressions. Preserve native routing, local settlement and previous deferrals; no migrations or dependency changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261019.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
+    "source_head": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
     "implemented_with_local_regression": [
       "Cline/Command Code using shared provider registry; preserve Mixed and credential destinations",
       "Gemini authorized model catalog and four exclusive API-key model scopes",
@@ -28,7 +28,8 @@
       "Shared glass modal appearance preserving local layers, Mixed/payment layouts and reduced motion",
       "Mixed real HTTP/SSE native-dispatch parity, Responses-shaped Chat requests and output-token limits",
       "2026-10-17 custom-error stop30days, selected402/529 and local native/error-policy adaptation; see dated sync note for verification",
-      "2026-10-18 selective security, reservation, standalone DeepSeek tools, moderation logs and frontend/request performance adaptations; see dated sync note for exact validation"
+      "2026-10-18 selective security, reservation, standalone DeepSeek tools, moderation logs and frontend/request performance adaptations; see dated sync note for exact validation",
+      "2026-10-19 selective v2.2.0 Chat role repair, simple-mode account group shape and sensitive-content checks; retain SearchOnly/alpha-search pricing with selected regressions; see dated sync note"
     ],
     "implemented_with_selected_regression": [
       "TypeSafe moderation: default off, independent profiles/key health, frozen queue and uncached send-time authorization; optional safe model metadata, both-engine local image-identifier filtering, full skipped-image counts and score-preserving regressions"
@@ -104,9 +105,10 @@
       "upstream_commits": [
         "8d487b465",
         "f0d3865f3",
-        "8262ca158"
+        "8262ca158",
+        "c928b8670"
       ],
-      "reason": "Refusal billing is attached to GatewayHandler, but normal Grok traffic uses OpenAIGatewayHandler. Preserve prior billing until the actual path and settlement are covered by endpoint tests."
+      "reason": "New session blocking still targets the old GatewayHandler instead of the real OpenAIGatewayHandler; keys lack API-key isolation and the fixed-price change has no local settlement contract. Preserve prior pricing and defer until real endpoint, isolation and exactly-once billing regressions exist."
     },
     {
       "feature": "plaintext-reasoning-request-history",
@@ -121,9 +123,10 @@
         "1d373770d",
         "c35492853",
         "1557adff3",
-        "f075051a0"
+        "f075051a0",
+        "cad9380dc"
       ],
-      "reason": "Defer the new parser, bridge and passthrough wiring together: truncated invocations and literal code examples synthesize executable tool calls; generated events violate sequence/index/identity, while partial tags bypass the buffer cap. The passthrough hook is unreachable for normal DeepSeek platform accounts and additionally breaks SSE frame boundaries, final output identities, and preauthorization observation. Preserve existing think/thinking conversion and native structured tools until provider-scoped parsing and real Forward-level streaming/billing regressions are available. The native-account session scheduling change is imported separately."
+      "reason": "Keep the parser and global rewrite chain deferred for previously recorded execution/identity/buffering risks. Local code has no DSML rewrite chain for the new compatibility gate; upstream gate also misses ordinary Responses handling. Chat role repair is independently adapted in actual raw and passthrough forwarding paths."
     },
     {
       "feature": "stdlib-server-h2c-config",
@@ -149,9 +152,11 @@
     {
       "feature": "honeypot-scanner-path-bans",
       "upstream_commits": [
-        "5705748d8"
+        "5705748d8",
+        "c928b8670",
+        "e8cc1b5ff"
       ],
-      "reason": "Defer all honeypot detection, routes and ban wiring: the keyword heuristic rejects legitimate business queries. The 2.1.3 SigV4 correction does not fix other legitimate query-value false positives. In-flight usage tracking is imported independently with request-thread metadata publication, race-free snapshots, atomic Redis cleanup and stale-response protection. Authentication keeps its existing c.Next flow."
+      "reason": "Local honeypot chain remains deferred for legitimate-query false positives; the upstream allow-network configuration cannot be imported independently. Preserve existing authentication flow."
     },
     {
       "feature": "usage-request-id-trigram-index-migrations",
@@ -183,9 +188,11 @@
       "upstream_commits": [
         "879d623b3",
         "56e0379fe",
-        "dbc035f24"
+        "dbc035f24",
+        "cd9f0c33b",
+        "ef5308361"
       ],
-      "reason": "Source migration260 conflicts with an applied immutable local migration. Requires a future append-only migration267+ and complete cache/DTO/projection/secret-redaction support. Keep existing per-group search pricing and account credentials for standalone tools."
+      "reason": "Source migration260 conflicts with an applied immutable local migration. Requires a future append-only migration267+ and complete cache/DTO/auth projection/secret-redaction support. Followup credential projection and UI echo remain deferred together; standalone tools keep existing group pricing and account credentials."
     },
     {
       "feature": "global-call-id-scope-and-dsml-followup",

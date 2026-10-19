@@ -133,13 +133,18 @@ func TestForwardDeepSeekToolsFailureIsUnbilledAndRedacted(t *testing.T) {
 }
 
 func TestDeepSeekToolsReservationEqualsSettlement(t *testing.T) {
-	for _, price := range []*float64{nil, floatPtr(5), floatPtr(13), floatPtr(0)} {
+	for _, tc := range []struct {
+		price      *float64
+		multiplier float64
+	}{
+		{nil, 1.7}, {floatPtr(5), 1.7}, {floatPtr(13), 1.7}, {floatPtr(0), 1.7}, {floatPtr(5), 0.15},
+	} {
 		for _, label := range []string{DeepSeekToolsLabelSearch, DeepSeekToolsLabelFetch} {
 			logs := &openAIRecordUsageLogRepoStub{inserted: true}
 			users := &openAIRecordUsageUserRepoStub{}
 			svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil)
 			gid := int64(8)
-			key := &APIKey{ID: 2, UserID: 1, User: &User{ID: 1}, GroupID: &gid, Group: &Group{ID: gid, Platform: PlatformDeepseek, RateMultiplier: 1.7, SearchPricePer1k: price}}
+			key := &APIKey{ID: 2, UserID: 1, User: &User{ID: 1}, GroupID: &gid, Group: &Group{ID: gid, Platform: PlatformDeepseek, RateMultiplier: tc.multiplier, SearchPricePer1k: tc.price}}
 			estimate, priced := (DeepSeekToolsReservationEstimator{Gateway: svc}).EstimateInflightReservation(context.Background(), key, InflightEstimateRequest{Model: label, SearchCalls: 1})
 			require.True(t, priced)
 			ctx := context.WithValue(context.Background(), ctxkey.ClientRequestID, "reused-client-id")
@@ -150,7 +155,7 @@ func TestDeepSeekToolsReservationEqualsSettlement(t *testing.T) {
 			require.InDelta(t, estimate, logs.lastLog.ActualCost, 1e-12)
 			require.Equal(t, result.RequestID, logs.lastLog.RequestID)
 			require.Equal(t, label, logs.lastLog.Model)
-			expected := svc.billingService.CalculateSearchCost(1, price, 1.7)
+			expected := svc.billingService.CalculateSearchCost(1, tc.price, tc.multiplier)
 			require.InDelta(t, expected.ActualCost, logs.lastLog.ActualCost, 1e-12)
 		}
 	}
@@ -165,4 +170,16 @@ func TestDeepSeekToolsSearchOnlyDoesNotMaskOrdinaryTokenPricingFailure(t *testin
 	cost, err := svc.calculateOpenAIRecordUsageCost(context.Background(), result, &APIKey{}, []string{result.Model}, 1, 1, 1, 1, UsageTokens{}, "", nil, time.Time{})
 	require.NoError(t, err)
 	require.InDelta(t, 0.005, cost.ActualCost, 1e-12)
+}
+
+func TestDeepSeekToolsSearchOnlyUsesPerThousandPriceAndBaseMultiplier(t *testing.T) {
+	svc := &OpenAIGatewayService{billingService: NewBillingService(&config.Config{}, nil)}
+	apiKey := &APIKey{Group: &Group{Platform: PlatformDeepseek, SearchPricePer1k: floatPtr(5), WebSearchPricePerCall: floatPtr(99)}}
+	// Standalone tools must price before token lookup, even with nonzero tokens
+	// and an unpriced model. The base multiplier, including values below 1, wins.
+	result := &OpenAIForwardResult{Model: "unpriced-model-for-tools-regression", SearchOnly: true, SearchCount: 2}
+	cost, err := svc.calculateOpenAIRecordUsageCost(context.Background(), result, apiKey, []string{result.Model}, 3, 1, 1, 0.15, UsageTokens{InputTokens: 100, OutputTokens: 10}, "", nil, time.Time{})
+	require.NoError(t, err)
+	require.InDelta(t, 0.01, cost.TotalCost, 1e-12)
+	require.InDelta(t, 0.0015, cost.ActualCost, 1e-12)
 }

@@ -78,6 +78,9 @@ jobs:
       - name: Chat role and simple-mode group regression
         working-directory: backend
         run: go test -race -p 1 -tags=unit ./internal/service ./internal/handler/admin -run 'Test(RepairChatCompletion|ForwardAsRawChatCompletionsDeepSeekRepairsRole|HandleResponsePassthroughRepairsChatRole|AccountHandlerSimpleMode|AccountHandlerAdvancedMode|CalculateOpenAIRecordUsageCostWebSearchPerCall)' -count=1
+      - name: Anthropic thinking outbound regression
+        working-directory: backend
+        run: go test -race -p 1 -tags=unit ./internal/service -run 'Test(Anthropic.*Thinking|SanitizeAnthropicThinking|Claude55|Haiku55|MappedOpus|SelectedOpus|ForwardAnthropicAPIKey)' -count=1
 
   frontend:
     runs-on: ubuntu-latest

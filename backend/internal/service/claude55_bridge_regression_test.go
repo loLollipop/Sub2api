@@ -33,6 +33,7 @@ func TestClaude55BridgesBillFinalMaxEffort(t *testing.T) {
 					rec := httptest.NewRecorder()
 					c, _ := gin.CreateTestContext(rec)
 					c.Request = httptest.NewRequest(http.MethodPost, path, nil)
+					c.Set("api_key", &APIKey{Group: &Group{CrossProtocolConversionEnabled: true}})
 					upstream := &anthropicHTTPUpstreamRecorder{resp: &http.Response{
 						StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"text/event-stream"}},
 						Body: io.NopCloser(strings.NewReader(strings.ReplaceAll(miniAnthropicSSEStream(), "glm-4.7", model))),
@@ -49,8 +50,9 @@ func TestClaude55BridgesBillFinalMaxEffort(t *testing.T) {
 					userRepo := &openAIRecordUsageUserRepoStub{}
 					if native {
 						account.Platform, group.Platform = PlatformCommandCode, PlatformCommandCode
-						svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
-						svc.cfg, svc.httpUpstream = rawChatCompletionsTestConfig(), upstream
+						svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil, rawChatCompletionsTestConfig())
+						t.Cleanup(svc.StopOpenAICodexTicketHarvester)
+						svc.httpUpstream = upstream
 						svc.resolver = NewModelPricingResolver(nil, svc.billingService)
 						var result *OpenAIForwardResult
 						var err error
@@ -105,6 +107,7 @@ func TestClaude55BridgeInvalidParametersAre400BeforeTransport(t *testing.T) {
 				rec := httptest.NewRecorder()
 				c, _ := gin.CreateTestContext(rec)
 				c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+				c.Set("api_key", &APIKey{Group: &Group{CrossProtocolConversionEnabled: true}})
 				account := &Account{Platform: PlatformAnthropic, Type: AccountTypeAPIKey,
 					Credentials: map[string]any{"model_mapping": map[string]any{"alias": tc.model}}}
 				body := []byte(`{"model":"alias","input":"hi",` + tc.responses + `}`)

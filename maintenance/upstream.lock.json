@@ -2,25 +2,26 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.0",
-  "imported_commit": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
-  "personal_baseline_commit": "1747626147ace28e09aeea83d29c08b4e0e36c03",
-  "latest_observed_version": "2.2.0",
-  "latest_observed_release_commit": "d01e1c5f77932b7256dc7d619ef312171bc5ddd5",
-  "latest_observed_main_commit": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
+  "imported_version": "2.2.1",
+  "imported_commit": "f645453e36c1514563055e64704e493e412c3263",
+  "personal_baseline_commit": "1ced8742fa192526db9f7fde8da9feee689e5ae7",
+  "latest_observed_version": "2.2.1",
+  "latest_observed_release_commit": "c6f961bfde98267935bdcb0bae49382469d6f8d9",
+  "latest_observed_main_commit": "f645453e36c1514563055e64704e493e412c3263",
   "observed_delta_review": {
-    "from_commit": "bef03f934486ad715bb64dc31c8cb7c4e2e138cd",
-    "to_commit": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
-    "status": "selective_chat_roles_admin_groups_and_sensitive_guard_backport",
-    "scope": "Repair exact Chat Completion empty roles in real raw and passthrough paths, preserve simple-mode group selector fields, add sensitive-content checks and search price regressions. Preserve native routing, local settlement and previous deferrals; no migrations or dependency changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261019.md"
+    "from_commit": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
+    "to_commit": "f645453e36c1514563055e64704e493e412c3263",
+    "status": "selective_anthropic_thinking_outbound_backport",
+    "scope": "Normalize supported Claude thinking modes at final mapped Anthropic outbound boundaries. Preserve original request validation, Haiku and legacy model behavior, native routing, local settlement and previous deferrals; no migrations or dependency changes. See the dated note for semantic limits.",
+    "evidence": "maintenance/notes/upstream-sync-20261019-v221.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "4f868ed05a8255d5b54be514d71ba759805f0ae2",
+    "source_head": "f645453e36c1514563055e64704e493e412c3263",
     "implemented_with_local_regression": [
+      "Final mapped-model Anthropic thinking normalization across message, conversion and token-count request builders; preserve explicit disabled handling and original validation (v2.2.1 source review)",
       "Cline/Command Code using shared provider registry; preserve Mixed and credential destinations",
       "Gemini authorized model catalog and four exclusive API-key model scopes",
       "Request-ID literal contains, =exact and ^prefix with short-query guards and append-only pg_trgm/index recovery migrations",
@@ -63,6 +64,13 @@
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "anthropic-disabled-thinking-omission",
+      "upstream_commits": [
+        "d7fa42325"
+      ],
+      "reason": "Omitting thinking can select implicit adaptive behavior for Opus 5.5. Preserve the explicit disabled request and existing validation rather than claiming omission disables reasoning. Other selected thinking compatibility and final outbound boundaries are adapted separately."
+    },
     {
       "feature": "deepseek-dsml-body-dedup-and-scope-expansion",
       "upstream_commits": [

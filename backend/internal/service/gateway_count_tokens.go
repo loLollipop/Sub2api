@@ -393,6 +393,7 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 	token string,
 ) (*http.Request, error) {
 	body = stripDeferredToolCacheControl(body)
+	body = sanitizeAnthropicThinkingForModel(body, gjson.GetBytes(body, "model").String())
 	targetURL := claudeAPICountTokensURL
 	baseURL := getAnthropicGatewayBaseURL(account)
 	if baseURL != "" {
@@ -465,6 +466,7 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 // buildCountTokensRequest 构建 count_tokens 上游请求
 func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token, tokenType, modelID string, mimicClaudeCode bool) (*http.Request, []byte, error) {
 	body = stripDeferredToolCacheControl(body)
+	body = sanitizeAnthropicThinkingForModel(body, modelID)
 	// 确定目标 URL
 	targetURL := claudeAPICountTokensURL
 	baseURL := ""

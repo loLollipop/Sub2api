@@ -37,8 +37,9 @@ func validateSelectedAnthropicMessagesRequest(c *gin.Context, body []byte, model
 			return fmt.Errorf("%s", message)
 		}
 	}
-	// Preserve the existing enabled->adaptive compatibility gate for Opus and
-	// Sonnet. No other original parameters are repaired to bypass validation.
+	// Preserve enabled->adaptive compatibility and normalize between_tools only
+	// for eligible non-Sonnet models. Disabled and original semantic validation
+	// facts stay intact; omitting thinking can imply adaptive thinking.
 	return validateClaude55Request(sanitizeAnthropicThinkingForModel(body, model), model)
 }
 

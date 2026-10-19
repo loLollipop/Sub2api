@@ -84,6 +84,18 @@ func TestSanitizeAnthropicThinkingForModel(t *testing.T) {
 		require.False(t, gjson.GetBytes(out, "thinking.budget_tokens").Exists())
 	})
 
+	t.Run("between_tools uses adaptive only within eligible non-Sonnet families", func(t *testing.T) {
+		body := []byte(`{"thinking":{"type":"between_tools","budget_tokens":1024},"messages":[]}`)
+		for _, model := range []string{"claude-opus-5-5", "anthropic/claude-opus-5.6", "claude-fable-5", "claude-fable-5-1"} {
+			out := sanitizeAnthropicThinkingForModel(body, model)
+			require.Equal(t, "adaptive", gjson.GetBytes(out, "thinking.type").String(), model)
+			require.False(t, gjson.GetBytes(out, "thinking.budget_tokens").Exists(), model)
+		}
+		for _, model := range []string{"anthropic/claude-sonnet-5.5", "claude-haiku-5-5", "claude-opus-5", "claude-opus-4-8", "deepseek-v4", "gpt-5"} {
+			require.Equal(t, body, sanitizeAnthropicThinkingForModel(body, model), model)
+		}
+	})
+
 	t.Run("已经是 adaptive 时字节级 no-op", func(t *testing.T) {
 		body := []byte(`{"thinking":{"type":"adaptive","budget_tokens":5000},"messages":[]}`)
 		require.Equal(t, string(body), string(sanitizeAnthropicThinkingForModel(body, "claude-opus-5-5")))
@@ -140,7 +152,7 @@ func TestForwardAnthropicAPIKeyConvertsEnabledThinkingForOpus55(t *testing.T) {
 		deferredService:      &DeferredService{},
 	}
 	account := &Account{
-		ID: 29168, Name: "custom-relay.example.com", Platform: PlatformAnthropic, Type: AccountTypeAPIKey,
+		ID: 201, Name: "thinking-compat-test", Platform: PlatformAnthropic, Type: AccountTypeAPIKey,
 		Concurrency: 1,
 		Credentials: map[string]any{"api_key": "k", "base_url": "https://api.anthropic.com"},
 		Status:      StatusActive, Schedulable: true,

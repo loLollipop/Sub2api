@@ -125,6 +125,7 @@ func (s *GatewayService) ForwardAsResponses(
 
 	// 7b. Normalize cache_control ttl ordering (an 1h block must not follow a 5m one).
 	anthropicBody = normalizeCacheControlTTLOrder(anthropicBody)
+	anthropicBody = sanitizeAnthropicThinkingForModel(anthropicBody, mappedModel)
 
 	// 8. Get access token
 	token, tokenType, err := s.GetAccessToken(ctx, account)

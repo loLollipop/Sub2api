@@ -58,7 +58,9 @@ func anthropicModelRequiresAdaptiveThinking(modelID string) bool {
 }
 
 // sanitizeAnthropicThinkingForModel 修正直连 Anthropic 路径上的 thinking 协议漂移：
-// 对已不接受 "enabled" 的模型把 thinking.type 换成 "adaptive"。
+// 对已不接受 "enabled" 的模型把 thinking.type 换成 "adaptive"；
+// 同一范围内的非 Sonnet 模型也将 "between_tools" 转为 "adaptive"。
+// disabled 保持原样，由请求校验决定是否拒绝；省略 thinking 可能启用隐式 adaptive。
 //
 // 为什么连 budget_tokens 一起删：
 //   - adaptive 的语义是「由模型自决思考预算」，budget_tokens 对它没有作用，删掉不丢语义；
@@ -72,7 +74,11 @@ func sanitizeAnthropicThinkingForModel(body []byte, modelID string) []byte {
 	}
 
 	thinking := gjson.GetBytes(body, "thinking")
-	if !thinking.IsObject() || thinking.Get("type").String() != "enabled" {
+	if !thinking.IsObject() {
+		return body
+	}
+	mode := thinking.Get("type").String()
+	if mode != "enabled" && (mode != "between_tools" || strings.Contains(strings.ToLower(modelID), "claude-sonnet-")) {
 		return body
 	}
 

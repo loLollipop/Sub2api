@@ -50,8 +50,9 @@ func TestClaude55BridgesBillFinalMaxEffort(t *testing.T) {
 					userRepo := &openAIRecordUsageUserRepoStub{}
 					if native {
 						account.Platform, group.Platform = PlatformCommandCode, PlatformCommandCode
-						svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
-						svc.cfg, svc.httpUpstream = rawChatCompletionsTestConfig(), upstream
+						svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil, rawChatCompletionsTestConfig())
+						t.Cleanup(svc.StopOpenAICodexTicketHarvester)
+						svc.httpUpstream = upstream
 						svc.resolver = NewModelPricingResolver(nil, svc.billingService)
 						var result *OpenAIForwardResult
 						var err error

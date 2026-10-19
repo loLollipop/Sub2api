@@ -2357,6 +2357,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 		}
 		lineStartsClientOutput := false
 		forceFlushFailedEvent := false
+		line, _ = repairChatCompletionChunkSSELine(line)
 		if data, ok := extractOpenAISSEDataLine(line); ok {
 			dataBytes := []byte(data)
 			trimmedData := strings.TrimSpace(data)
@@ -2826,6 +2827,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	if normalized, changed := normalizeFractionalCreatedAtForClient(body); changed {
 		body = normalized
 	}
+	body = repairChatCompletionMessageRole(body)
 	if !writeOpenAICompactSSEBridge(c, resp.StatusCode, body) {
 		c.Data(resp.StatusCode, contentType, body)
 	}

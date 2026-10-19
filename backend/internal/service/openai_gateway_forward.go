@@ -104,6 +104,13 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	} else if toolSchemaSanitized {
 		body = sanitizedToolBody
 	}
+	if account.IsOpenAI() {
+		if aliasBody, aliasChanged, aliasErr := normalizeOpenAIResponsesLegacyWebSearchToolType(body); aliasErr != nil {
+			return nil, aliasErr
+		} else if aliasChanged {
+			body = aliasBody
+		}
+	}
 	if account.IsOpenAIOAuthLike() {
 		reasoningBody, reasoningChanged, reasoningErr := normalizeOpenAIResponsesReasoningMode(body, account.GetMappedModel(gjson.GetBytes(body, "model").String()))
 		if reasoningErr != nil {

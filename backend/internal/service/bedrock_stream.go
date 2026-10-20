@@ -30,6 +30,7 @@ func (s *GatewayService) handleBedrockStreamingResponse(
 	startTime time.Time,
 	model string,
 ) (*streamingResult, error) {
+	ArmOpenAIStreamSSEKeepalive(c)
 	w := c.Writer
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -104,6 +105,20 @@ func (s *GatewayService) handleBedrockStreamingResponse(
 		intervalCh = intervalTicker.C
 	}
 
+	// Header setup stops the request's pre-header heartbeat manager. Keep
+	// subsequent pings in this loop so they cannot race with EventStream writes.
+	keepaliveInterval := time.Duration(0)
+	if s.cfg != nil && s.cfg.Gateway.StreamKeepaliveInterval > 0 {
+		keepaliveInterval = time.Duration(s.cfg.Gateway.StreamKeepaliveInterval) * time.Second
+	}
+	var keepaliveCh <-chan time.Time
+	lastDataAt := time.Now()
+	if keepaliveInterval > 0 {
+		keepaliveTicker := time.NewTicker(keepaliveInterval)
+		defer keepaliveTicker.Stop()
+		keepaliveCh = keepaliveTicker.C
+	}
+
 	for {
 		select {
 		case ev, ok := <-events:
@@ -128,6 +143,7 @@ func (s *GatewayService) handleBedrockStreamingResponse(
 			if sseData == nil {
 				continue
 			}
+			lastDataAt = time.Now()
 
 			if firstTokenMs == nil {
 				ms := int(time.Since(startTime).Milliseconds())
@@ -159,6 +175,18 @@ func (s *GatewayService) handleBedrockStreamingResponse(
 					flusher.Flush()
 				}
 			}
+
+		case <-keepaliveCh:
+			if clientDisconnected || time.Since(lastDataAt) < keepaliveInterval {
+				continue
+			}
+			if _, err := fmt.Fprint(w, "event: ping\ndata: {\"type\": \"ping\"}\n\n"); err != nil {
+				clientDisconnected = true
+				logger.LegacyPrintf("service.gateway", "[Bedrock] Client disconnected during keepalive ping, continue draining for usage: account=%d", account.ID)
+				continue
+			}
+			flusher.Flush()
+			lastDataAt = time.Now()
 
 		case <-intervalCh:
 			lastRead := time.Unix(0, lastReadAt.Load())

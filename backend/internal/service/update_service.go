@@ -192,7 +192,7 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 		}
 	}
 
-	// Release and branch failures are independent: every enabled source is checked.
+	// Project and upstream release failures are independent: every enabled source is checked.
 	var sourceResults <-chan []UpstreamUpdateInfo
 	checkTimeout := s.checkTimeout
 	if checkTimeout <= 0 {

@@ -392,10 +392,14 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 
 		if err != nil {
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
+			if result != nil && result.ClientDisconnect || failoverClientGone(c) {
+				submitForwardUsage(result)
+				return
+			}
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
 				// Can't failover if streaming content already sent
-				if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
+				if !service.ResetOpenAIStreamSSEKeepaliveForRetry(c) || service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
 					submitForwardUsage(result)
 					h.handleResponsesFailoverExhausted(c, failoverErr, true)
 					return

@@ -908,7 +908,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		if service.GetOpsCyberPolicy(c) != nil {
 			cyberBlockBodyHTTP = sessionHashBody
 		}
-		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, shouldRecordStandaloneCyberUsage(err, result != nil), cyberBlockBodyHTTP, clientRequestedUsageFields(c, channelMapping, reqModel, ""), service.HashUsageRequestPayload(body))
+		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, shouldRecordStandaloneCyberUsage(err, result != nil), cyberBlockBodyHTTP, service.ContentModerationProtocolOpenAIResponses, clientRequestedUsageFields(c, channelMapping, reqModel, ""), service.HashUsageRequestPayload(body))
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
 		responseLatencyMs := forwardDurationMs
@@ -1370,6 +1370,13 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
 	routingStart := time.Now()
 
+	// Install before acquiring the user slot, so queued pings cannot commit 200.
+	stopStreamHeaderKeepalive := func() {}
+	if reqStream {
+		stopStreamHeaderKeepalive = service.StartOpenAIStreamSSEKeepaliveUntilUpstream(c, h.openAICompactKeepaliveInterval())
+	}
+	defer stopStreamHeaderKeepalive()
+
 	userReleaseFunc, acquired := h.acquireResponsesUserSlot(c, subject.UserID, subject.Concurrency, reqStream, &streamStarted, reqLog)
 	if !acquired {
 		return
@@ -1441,15 +1448,6 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	if balanceGuard != nil {
 		c.Request = c.Request.WithContext(service.ContextWithBalancePreauthorizationGuard(c.Request.Context(), balanceGuard))
 	}
-	// Anthropic-compatible streaming responses can also spend time waiting for
-	// an upstream header while the fill scheduler retries accounts.  SSE
-	// comments are protocol-safe here and keep a proxied edge connection alive;
-	// non-streaming Messages requests remain untouched.
-	stopStreamHeaderKeepalive := func() {}
-	if reqStream {
-		stopStreamHeaderKeepalive = service.StartOpenAIStreamSSEKeepalive(c, h.openAICompactKeepaliveInterval())
-	}
-	defer stopStreamHeaderKeepalive()
 
 	for {
 		if failoverClientGone(c) {
@@ -1583,7 +1581,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		if service.GetOpsCyberPolicy(c) != nil {
 			cyberBlockBodyMsg = body
 		}
-		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, shouldRecordStandaloneCyberUsage(err, result != nil), cyberBlockBodyMsg, clientRequestedUsageFields(c, channelMappingMsg, reqModel, ""), service.HashUsageRequestPayload(body))
+		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, shouldRecordStandaloneCyberUsage(err, result != nil), cyberBlockBodyMsg, service.ContentModerationProtocolAnthropicMessages, clientRequestedUsageFields(c, channelMappingMsg, reqModel, ""), service.HashUsageRequestPayload(body))
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
 		responseLatencyMs := forwardDurationMs
@@ -1642,6 +1640,10 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		}
 		if err != nil {
 			h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionHash, account, err)
+			if result != nil && result.ClientDisconnect {
+				submitMessagesUsage(result)
+				return
+			}
 			if result != nil && result.ImageCount > 0 {
 				reqLog.Warn("openai_messages.forward_partial_error_with_image_result",
 					zap.Int64("account_id", account.ID),
@@ -1659,7 +1661,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 						)
 						return
 					}
-					if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
+					if !service.ResetOpenAIStreamSSEKeepaliveForRetry(c) || service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
 						h.gatewayService.ObserveOpenAIAccountHealthFailure(c.Request.Context(), account, err)
 						submitMessagesUsage(result)
 						h.handleAnthropicFailoverExhausted(c, failoverErr, true)
@@ -3045,7 +3047,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				turnRecordPricingAt := turnPricing.currentOr(turnStart)
 				turnBillingAPIKey := turnBillingAPIKeys.forTurn(turn, apiKey)
 				cyberMarked := service.GetOpsCyberPolicy(c) != nil
-				h.recordCyberPolicyIfMarkedAt(c, turnBillingAPIKey, account, subscription, turnRequestedModel, shouldRecordStandaloneCyberUsage(turnErr, result != nil), cyberBlockBody, turnUsageFields, requestPayloadHash, turnRecordPricingAt)
+				h.recordCyberPolicyIfMarkedAt(c, turnBillingAPIKey, account, subscription, turnRequestedModel, shouldRecordStandaloneCyberUsage(turnErr, result != nil), cyberBlockBody, service.ContentModerationProtocolOpenAIResponses, turnUsageFields, requestPayloadHash, turnRecordPricingAt)
 				cyberBlockedThisConn, cyberBlockPendingAfterFailover = advanceOpenAIWSCyberBlockState(
 					cyberBlockedThisConn,
 					cyberBlockPendingAfterFailover,
@@ -3779,7 +3781,7 @@ func openAIForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForwa
 }
 
 func openAIForwardMayFailover(c *gin.Context, writerSizeBeforeForward int, failoverErr *service.UpstreamFailoverError) bool {
-	if c == nil || c.Writer == nil {
+	if c == nil || c.Writer == nil || !service.ResetOpenAIStreamSSEKeepaliveForRetry(c) {
 		return false
 	}
 	if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) == writerSizeBeforeForward {
@@ -4292,17 +4294,17 @@ func (h *OpenAIGatewayHandler) enqueueCyberSessionBlockedOpsEntry(c *gin.Context
 // 当前请求已发给用户，本方法只做事后记录，不影响响应。只有 forward 失败且没有可供
 // 正常 RecordUsage 消费的 result 时，recordStandaloneUsage 才为 true 并补一条用量行；
 // partial result 始终由正常任务统一记录和结算，避免同一请求出现两个 money task。
-func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey *service.APIKey, account *service.Account, subscription *service.UserSubscription, model string, recordStandaloneUsage bool, cyberBlockBody []byte, channelFields service.ChannelUsageFields, requestPayloadHash string) {
+func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey *service.APIKey, account *service.Account, subscription *service.UserSubscription, model string, recordStandaloneUsage bool, cyberBlockBody []byte, protocol string, channelFields service.ChannelUsageFields, requestPayloadHash string) {
 	var pricingAt time.Time
 	if c.Request != nil {
 		pricingAt = service.OpenAIPricingAtFromContext(c.Request.Context())
 	}
-	h.recordCyberPolicyIfMarkedAt(c, apiKey, account, subscription, model, recordStandaloneUsage, cyberBlockBody, channelFields, requestPayloadHash, pricingAt)
+	h.recordCyberPolicyIfMarkedAt(c, apiKey, account, subscription, model, recordStandaloneUsage, cyberBlockBody, protocol, channelFields, requestPayloadHash, pricingAt)
 }
 
 // WS callers pass the same per-turn time and key snapshot as normal usage. The
 // connection context still contains the handshake's older pricing time.
-func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarkedAt(c *gin.Context, apiKey *service.APIKey, account *service.Account, subscription *service.UserSubscription, model string, recordStandaloneUsage bool, cyberBlockBody []byte, channelFields service.ChannelUsageFields, requestPayloadHash string, pricingAt time.Time) {
+func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarkedAt(c *gin.Context, apiKey *service.APIKey, account *service.Account, subscription *service.UserSubscription, model string, recordStandaloneUsage bool, cyberBlockBody []byte, protocol string, channelFields service.ChannelUsageFields, requestPayloadHash string, pricingAt time.Time) {
 	mark := service.GetOpsCyberPolicy(c)
 	if mark == nil {
 		return
@@ -4310,6 +4312,10 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarkedAt(c *gin.Context, apiKe
 	if c.GetBool(cyberPolicyRecordedKey) {
 		return
 	}
+	// Snapshot synchronously after the mark, before WS buffers/context are reused.
+	inputExcerpt := service.CyberPolicyInputExcerpt(protocol, cyberBlockBody)
+	markSnapshot := *mark
+	mark = &markSnapshot
 	c.Set(cyberPolicyRecordedKey, true)
 	model = clientRequestedModel(c, model)
 
@@ -4431,6 +4437,7 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarkedAt(c *gin.Context, apiKe
 				GroupName:       groupName,
 				Endpoint:        inboundEndpoint,
 				Model:           model,
+				InputExcerpt:    inputExcerpt,
 				UpstreamMessage: mark.Message,
 				UpstreamBody:    mark.Body,
 				UpstreamStatus:  mark.UpstreamStatus,

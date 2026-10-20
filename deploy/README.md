@@ -30,7 +30,7 @@ These deployment examples reference this repository's own published artifacts; t
 | `DATAMANAGEMENTD_CN.md` | datamanagementd 部署与联动说明（中文） |
 | `config.example.yaml` | Example configuration file |
 | `EDGE_SECURITY.md` | Reverse proxy, CDN/WAF, trusted proxy, and ingress hardening guide |
-| `UPDATE_TRACKING.md` | Project release checks and optional upstream source tracking |
+| `UPDATE_TRACKING.md` | Project release checks and optional upstream official release tracking |
 
 ---
 
@@ -264,7 +264,7 @@ docker compose down -v
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password; 8-72 bytes if provided |
 | `TZ` | No | `Asia/Shanghai` | Timezone |
 | `UPDATE_GITHUB_TOKEN` | No | *(empty)* | Token for `api.github.com` release checks only; asset downloads remain anonymous. |
-| `UPDATE_CHECK_MODE` | No | `release` | Check this project's official releases; `upstream` additionally tracks the two reviewed upstream branches without installing their artifacts. |
+| `UPDATE_CHECK_MODE` | No | `release` | Check this project's official releases; `upstream` additionally checks official GitHub Releases from both upstream repositories (ignoring branch commits, drafts and prereleases) without installing their artifacts. |
 | `GEMINI_OAUTH_CLIENT_ID` | No | *(builtin)* | Google OAuth client ID (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
 | `GEMINI_OAUTH_CLIENT_SECRET` | No | *(builtin)* | Google OAuth client secret (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
 | `GEMINI_OAUTH_SCOPES` | No | *(default)* | OAuth scopes (Gemini OAuth) |

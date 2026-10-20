@@ -27,6 +27,10 @@ export interface VersionInfo {
 }
 
 export interface UpstreamUpdateInfo {
+  baseline_release_tag?: string
+  release_tag?: string
+  published_at?: string
+  release_url?: string
   repository: string
   branch: string
   baseline_commit: string

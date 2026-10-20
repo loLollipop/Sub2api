@@ -273,6 +273,13 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	// 获取订阅信息（可能为nil）- 提前获取用于后续检查
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 
+	// Gate all queue/timer heartbeats until the upstream confirms SSE.
+	stopStreamHeaderKeepalive := func() {}
+	if reqStream {
+		stopStreamHeaderKeepalive = service.StartOpenAIStreamSSEKeepaliveUntilUpstream(c, h.streamKeepaliveInterval())
+	}
+	defer stopStreamHeaderKeepalive()
+
 	// 1. 首先获取用户并发槽位
 	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, subject.UserID, subject.Concurrency, reqStream, &streamStarted)
 	if err != nil {
@@ -318,15 +325,6 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	if balanceGuard != nil {
 		c.Request = c.Request.WithContext(service.ContextWithBalancePreauthorizationGuard(c.Request.Context(), balanceGuard))
 	}
-
-	// Keep the edge connection alive while compatibility routing selects an
-	// account and waits for the upstream response headers. Start only after
-	// validation/billing so pre-stream errors retain their normal HTTP status.
-	stopStreamHeaderKeepalive := func() {}
-	if reqStream {
-		stopStreamHeaderKeepalive = service.StartOpenAIStreamSSEKeepalive(c, h.streamKeepaliveInterval())
-	}
-	defer stopStreamHeaderKeepalive()
 
 	// 余额模式在途预留：防止并发请求在预检时看到同一份余额而集体透支。
 	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
@@ -649,10 +647,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			if err != nil {
 				h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), apiKey.GroupID, sessionKey, account, err)
+				if result != nil && result.ClientDisconnect || failoverClientGone(c) {
+					submitGeminiUsage(result)
+					return
+				}
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
 					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
-					if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
+					if !service.ResetOpenAIStreamSSEKeepaliveForRetry(c) || service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
 						submitGeminiUsage(result)
 						h.handleFailoverExhausted(c, failoverErr, service.PlatformGemini, true)
 						return
@@ -1093,6 +1095,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 			if err != nil {
 				h.gatewayService.InvalidateUpstreamAffinity(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account, err)
+				if result != nil && result.ClientDisconnect || failoverClientGone(c) {
+					submitForwardUsage(result)
+					return
+				}
 				// Beta policy block: return 400 immediately, no failover
 				var betaBlockedErr *service.BetaBlockedError
 				if errors.As(err, &betaBlockedErr) {
@@ -1109,6 +1115,11 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.Bool("fallback_used", fallbackUsed),
 					)
 					if !fallbackUsed && fallbackGroupID != nil && *fallbackGroupID > 0 {
+						if !service.ResetOpenAIStreamSSEKeepaliveForRetry(c) {
+							submitForwardUsage(result)
+							_ = h.antigravityGatewayService.WriteMappedClaudeError(c, account, promptTooLongErr.StatusCode, promptTooLongErr.RequestID, promptTooLongErr.Body)
+							return
+						}
 						// This is an explicit, operator-configured failover branch. It is
 						// allowed to resolve the fallback group's control-plane policy from
 						// PostgreSQL; ordinary model scheduling remains snapshot-only.
@@ -1167,7 +1178,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
 					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
-					if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
+					if !service.ResetOpenAIStreamSSEKeepaliveForRetry(c) || service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
 						submitForwardUsage(result)
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return

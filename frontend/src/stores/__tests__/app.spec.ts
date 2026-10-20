@@ -101,6 +101,8 @@ describe('useAppStore', () => {
       release_info: { name: '2.1.16', body: '', published_at: '', html_url: 'https://github.com/loLollipop/Sub2api/releases/tag/v2.1.16' },
       upstream_updates: [{
         repository: 'kiss-kedaya/sub2api', branch: 'main', baseline_commit: 'a'.repeat(40),
+        baseline_release_tag: 'v2.2.6', release_tag: 'v2.2.7', published_at: '2026-10-20T00:00:00Z',
+        release_url: 'https://github.com/kiss-kedaya/sub2api/releases/tag/v2.2.7',
         latest_commit: 'b'.repeat(40), has_update: true, compare_url: 'https://github.com/kiss-kedaya/sub2api/compare/a...b',
       }, {
         repository: 'Wei-Shaw/sub2api', branch: 'main', baseline_commit: 'c'.repeat(40),
@@ -149,6 +151,8 @@ describe('useAppStore', () => {
       await expect(Promise.all([first, second])).resolves.toEqual([null, null])
       expect(store.hasAnyUpdate).toBe(true)
       expect(store.versionWarning).toBe('network unavailable')
+      expect(store.upstreamUpdates[0]?.warning).toBe('network unavailable')
+      expect(store.upstreamUpdates[1]?.warning).toBe('source unavailable')
       expect(store.versionLoading).toBe(false)
       expect((await store.fetchVersion())?.warning).toBe('network unavailable')
     })

@@ -46,13 +46,13 @@ func TestCyberHandlerAsyncUsageRetainsRequestOrTurnPricing(t *testing.T) {
 			pricingAt := connectionAt
 			var turnPricing openAIWSTurnPricing
 			if transport == "http" {
-				h.recordCyberPolicyIfMarked(c, key, account, nil, "deepseek-v4-pro", true, nil, service.ChannelUsageFields{}, "")
+				h.recordCyberPolicyIfMarked(c, key, account, nil, "deepseek-v4-pro", true, nil, service.ContentModerationProtocolOpenAIResponses, service.ChannelUsageFields{}, "")
 			} else {
 				// Deliberately different from the handshake clock and worker time.
 				turnPricing.freeze(time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC))
 				pricingAt = turnPricing.currentOr(connectionAt)
 				require.False(t, pricingAt.Equal(connectionAt))
-				h.recordCyberPolicyIfMarkedAt(c, key, account, nil, "deepseek-v4-pro", true, nil, service.ChannelUsageFields{}, "", pricingAt)
+				h.recordCyberPolicyIfMarkedAt(c, key, account, nil, "deepseek-v4-pro", true, nil, service.ContentModerationProtocolOpenAIResponses, service.ChannelUsageFields{}, "", pricingAt)
 			}
 			// Later context/turn changes must not alter the queued money task.
 			c.Request = c.Request.WithContext(context.Background())

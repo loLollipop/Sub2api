@@ -16,10 +16,12 @@ import (
 
 type updateTrackingClientStub struct {
 	updateServiceGitHubClientStub
-	heads    map[string]string
-	errs     map[string]error
-	branches []string
-	mu       sync.Mutex
+	releases    map[string]*GitHubRelease
+	releaseErrs map[string]error
+	heads       map[string]string
+	errs        map[string]error
+	branches    []string
+	mu          sync.Mutex
 }
 
 type contextAwareUpdateCache struct{ updateServiceCacheStub }
@@ -45,19 +47,19 @@ type slowUpdateTrackingClient struct {
 }
 
 func (c *slowUpdateTrackingClient) FetchLatestRelease(ctx context.Context, repo string) (*GitHubRelease, error) {
-	if c.waitRelease {
+	if c.waitRelease && repo == personalReleaseRepo {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}
 	return c.updateTrackingClientStub.FetchLatestRelease(ctx, repo)
 }
 
-func (c *slowUpdateTrackingClient) FetchBranchHead(ctx context.Context, repo, branch string) (string, error) {
+func (c *slowUpdateTrackingClient) FetchReleaseCommit(ctx context.Context, repo, tag string) (string, error) {
 	if repo == c.waitRepo {
 		<-ctx.Done()
 		return "", ctx.Err()
 	}
-	return c.updateTrackingClientStub.FetchBranchHead(ctx, repo, branch)
+	return c.updateTrackingClientStub.FetchReleaseCommit(ctx, repo, tag)
 }
 
 func TestUpdateTrackingTimeoutPreservesReleaseFallbackAndPartialCache(t *testing.T) {
@@ -119,11 +121,35 @@ func (s *updateTrackingClientStub) FetchBranchHead(_ context.Context, repo, bran
 	return s.heads[repo], s.errs[repo]
 }
 
+func (s *updateTrackingClientStub) FetchReleaseCommit(_ context.Context, repo, tag string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if release := s.releases[repo]; release == nil || release.TagName != tag {
+		return "", errors.New("unexpected tag")
+	}
+	return s.heads[repo], s.errs[repo]
+}
+
+func (s *updateTrackingClientStub) FetchLatestRelease(ctx context.Context, repo string) (*GitHubRelease, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if repo == personalReleaseRepo {
+		return s.updateServiceGitHubClientStub.FetchLatestRelease(ctx, repo)
+	}
+	s.latestRepos = append(s.latestRepos, repo)
+	return s.releases[repo], s.releaseErrs[repo]
+}
+
 func newUpdateTrackingClient() *updateTrackingClientStub {
 	return &updateTrackingClientStub{
 		updateServiceGitHubClientStub: updateServiceGitHubClientStub{release: &GitHubRelease{TagName: "v2.1.12"}},
-		heads:                         map[string]string{"kiss-kedaya/sub2api": strings.Repeat("a", 40), "Wei-Shaw/sub2api": originalReviewedCommit},
-		errs:                          map[string]error{},
+		releases: map[string]*GitHubRelease{
+			"kiss-kedaya/sub2api": {TagName: "v2.2.7", PublishedAt: "2026-10-20T00:00:00Z"},
+			"Wei-Shaw/sub2api":    {TagName: "v0.2.17", PublishedAt: "2026-08-01T00:00:00Z"},
+		},
+		releaseErrs: map[string]error{},
+		heads:       map[string]string{"kiss-kedaya/sub2api": strings.Repeat("a", 40), "Wei-Shaw/sub2api": defaultUpdateSourceBaselines()[1].releaseCommit},
+		errs:        map[string]error{},
 	}
 }
 
@@ -135,8 +161,8 @@ func TestUpdateTrackingComparesCheckpointsIndependentlyOfLocalVersion(t *testing
 	require.NoError(t, err)
 	require.False(t, info.HasUpdate, "local release is newer than this project's latest release")
 	require.True(t, info.ReviewRequired)
-	require.Equal(t, []string{personalReleaseRepo}, client.latestRepos)
-	require.ElementsMatch(t, []string{"kiss-kedaya/sub2api/main", "Wei-Shaw/sub2api/main"}, client.branches)
+	require.ElementsMatch(t, []string{personalReleaseRepo, "kiss-kedaya/sub2api", "Wei-Shaw/sub2api"}, client.latestRepos)
+	require.Empty(t, client.branches, "monitoring must never request moving branch heads")
 	require.Len(t, info.UpstreamUpdates, 2)
 	require.True(t, info.UpstreamUpdates[0].HasUpdate)
 	require.Equal(t, "https://github.com/kiss-kedaya/sub2api/compare/"+forkImportedCommit+"..."+strings.Repeat("a", 40), info.UpstreamUpdates[0].CompareURL)
@@ -178,7 +204,7 @@ func TestUpdateTrackingReleaseFailureStillChecksSources(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, info.Warning, "release unavailable")
 	require.True(t, info.UpstreamUpdates[0].HasUpdate)
-	require.Len(t, client.branches, 2)
+	require.Empty(t, client.branches)
 	svc.currentVersion = "2.1.17"
 	cached, err := svc.getFromCache(context.Background())
 	require.NoError(t, err)
@@ -200,7 +226,7 @@ func TestUpdateTrackingUnknownCheckpointsAndInvalidHeads(t *testing.T) {
 			client := newUpdateTrackingClient()
 			client.heads["kiss-kedaya/sub2api"] = tt.head
 			svc := NewUpdateService(&updateServiceCacheStub{}, client, "2.1.16", "release")
-			svc.upstreamSources[0].commit = tt.baseline
+			svc.upstreamSources[0].releaseCommit = tt.baseline
 			info, err := svc.CheckUpdate(context.Background(), true)
 			require.NoError(t, err)
 			require.NotEmpty(t, info.UpstreamUpdates[0].Warning)
@@ -244,6 +270,7 @@ func TestUpdateTrackingFailureReplacesPreviouslyMatchedCheckpoint(t *testing.T) 
 	t.Setenv("UPDATE_CHECK_MODE", "upstream")
 	client := newUpdateTrackingClient()
 	client.heads["kiss-kedaya/sub2api"] = forkImportedCommit
+	client.releases["kiss-kedaya/sub2api"].TagName = "v2.2.6"
 	svc := NewUpdateService(&updateServiceCacheStub{}, client, "2.1.16", "release")
 	first, err := svc.CheckUpdate(context.Background(), true)
 	require.NoError(t, err)
@@ -275,7 +302,7 @@ func TestUpdateTrackingCacheIdentityAndLocalRuntimeRecomputed(t *testing.T) {
 	require.Error(t, err, "release cache must not hide source tracking")
 	_, err = trackingService.CheckUpdate(context.Background(), false)
 	require.NoError(t, err)
-	require.Len(t, client.branches, 2)
+	require.Empty(t, client.branches)
 	t.Setenv("UPDATE_STRATEGY", "disabled")
 	newRuntime := NewUpdateService(cache, client, "2.1.17-personal.1", "source")
 	info, err := newRuntime.CheckUpdate(context.Background(), false)
@@ -289,7 +316,7 @@ func TestUpdateTrackingCacheIdentityAndLocalRuntimeRecomputed(t *testing.T) {
 	info, err = newRuntime.getFromCache(context.Background())
 	require.NoError(t, err)
 	require.False(t, info.HasUpdate)
-	newRuntime.upstreamSources[0].commit = strings.Repeat("c", 40)
+	newRuntime.upstreamSources[0].releaseCommit = strings.Repeat("c", 40)
 	_, err = newRuntime.getFromCache(context.Background())
 	require.Error(t, err, "checkpoint changes invalidate source cache")
 	newRuntime.upstreamSources = defaultUpdateSourceBaselines()
@@ -327,7 +354,115 @@ func TestUpdateTrackingNeverDownloadsOrInstallsSourceArtifacts(t *testing.T) {
 	client.release.TagName = "v2.1.17"
 	require.ErrorIs(t, svc.PerformUpdate(context.Background()), ErrUpstreamReviewRequired)
 	require.Zero(t, client.downloadCalls)
-	for _, repo := range client.latestRepos {
-		require.Equal(t, personalReleaseRepo, repo)
+	require.Empty(t, client.branches)
+}
+
+func TestUpdateTrackingOnlyOfficialReleasesCreateNotifications(t *testing.T) {
+	t.Setenv("UPDATE_CHECK_MODE", "upstream")
+	for _, scenario := range []string{"reviewed release", "main ahead", "new release", "draft", "prerelease", "missing release", "missing publication", "bad tag", "resolution failed"} {
+		t.Run(scenario, func(t *testing.T) {
+			client := newUpdateTrackingClient()
+			svc := NewUpdateService(&updateServiceCacheStub{}, client, "99.0.0", "release")
+			baseline := svc.upstreamSources[0]
+			client.releases[baseline.repository].TagName = baseline.releaseTag
+			client.heads[baseline.repository] = baseline.releaseCommit
+			switch scenario {
+			case "main ahead":
+				svc.upstreamSources[0].commit = strings.Repeat("f", 40)
+			case "new release":
+				client.releases[baseline.repository].TagName = "v2.2.7"
+			case "draft":
+				client.releases[baseline.repository].Draft = true
+			case "prerelease":
+				client.releases[baseline.repository].Prerelease = true
+			case "missing release":
+				client.releases[baseline.repository] = nil
+			case "missing publication":
+				client.releases[baseline.repository].PublishedAt = ""
+			case "bad tag":
+				client.releases[baseline.repository].TagName = "../main"
+			case "resolution failed":
+				client.errs[baseline.repository] = errors.New("tag missing")
+			}
+			info, err := svc.CheckUpdate(context.Background(), true)
+			require.NoError(t, err)
+			require.Empty(t, client.branches)
+			require.Equal(t, scenario == "new release", info.UpstreamUpdates[0].HasUpdate)
+			if scenario != "reviewed release" && scenario != "main ahead" && scenario != "new release" {
+				require.NotEmpty(t, info.UpstreamUpdates[0].Warning)
+				require.Empty(t, info.UpstreamUpdates[0].CompareURL)
+			}
+		})
 	}
+}
+
+func TestUpdateTrackingCacheValidatesReleaseEvidenceAndRecomputesState(t *testing.T) {
+	t.Setenv("UPDATE_CHECK_MODE", "upstream")
+	cache := &updateServiceCacheStub{}
+	client := newUpdateTrackingClient()
+	svc := NewUpdateService(cache, client, "2.1.16", "release")
+	_, err := svc.CheckUpdate(context.Background(), true)
+	require.NoError(t, err)
+	original := cache.data
+	for _, scenario := range []string{"old identity", "missing metadata", "wrong release URL", "wrong baseline tag", "warning suppresses update", "forged has update"} {
+		t.Run(scenario, func(t *testing.T) {
+			var payload updateCachePayload
+			require.NoError(t, json.Unmarshal([]byte(original), &payload))
+			source := &payload.UpstreamUpdates[0]
+			switch scenario {
+			case "old identity":
+				payload.Identity = strings.Replace(payload.Identity, "v3-official-releases", "v2", 1)
+			case "missing metadata":
+				source.ReleaseTag, source.PublishedAt, source.ReleaseURL = "", "", ""
+			case "wrong release URL":
+				source.ReleaseURL = "https://attacker.example/"
+			case "wrong baseline tag":
+				source.BaselineReleaseTag = "v0"
+			case "warning suppresses update":
+				source.Warning = "failed to resolve"
+			case "forged has update":
+				source.ReleaseTag = source.BaselineReleaseTag
+				source.LatestCommit = source.BaselineCommit
+				source.ReleaseURL = upstreamReleaseURL(source.Repository, source.ReleaseTag)
+				source.HasUpdate = true
+			}
+			encoded, err := json.Marshal(payload)
+			require.NoError(t, err)
+			cache.data = string(encoded)
+			cached, err := svc.getFromCache(context.Background())
+			if scenario == "warning suppresses update" || scenario == "forged has update" {
+				require.NoError(t, err)
+				require.False(t, cached.UpstreamUpdates[0].HasUpdate)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestUpdateTrackingUpstreamReleaseFailureDoesNotSuppressOtherReleases(t *testing.T) {
+	t.Setenv("UPDATE_CHECK_MODE", "upstream")
+	client := newUpdateTrackingClient()
+	client.release.TagName = "v2.1.17"
+	client.releaseErrs["Wei-Shaw/sub2api"] = errors.New("release API unavailable")
+	svc := NewUpdateService(&updateServiceCacheStub{}, client, "2.1.16", "release")
+	info, err := svc.CheckUpdate(context.Background(), true)
+	require.NoError(t, err)
+	require.True(t, info.HasUpdate)
+	require.True(t, info.UpstreamUpdates[0].HasUpdate)
+	require.Contains(t, info.UpstreamUpdates[1].Warning, "release API unavailable")
+	require.False(t, info.UpstreamUpdates[1].HasUpdate)
+	require.Empty(t, client.branches)
+}
+
+func TestUpdateTrackingRejectsUnsupportedSourcesBeforeRequests(t *testing.T) {
+	t.Setenv("UPDATE_CHECK_MODE", "upstream")
+	client := newUpdateTrackingClient()
+	svc := NewUpdateService(&updateServiceCacheStub{}, client, "2.1.16", "release")
+	svc.upstreamSources = []updateSourceBaseline{{repository: "attacker/repo", branch: "main"}}
+	info, err := svc.CheckUpdate(context.Background(), true)
+	require.NoError(t, err)
+	require.Equal(t, []string{personalReleaseRepo}, client.latestRepos)
+	require.Contains(t, info.UpstreamUpdates[0].Warning, "Unsupported")
+	require.False(t, info.ReviewRequired)
 }

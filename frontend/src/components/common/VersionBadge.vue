@@ -262,12 +262,14 @@
               <div v-if="upstreamUpdates.length" class="mt-3 space-y-2 border-t border-gray-100 pt-3 dark:border-dark-700" data-testid="upstream-updates">
                 <p class="text-xs font-medium text-gray-600 dark:text-dark-300">{{ t('version.upstreamSources') }}</p>
                 <div v-for="source in upstreamUpdates" :key="source.repository" class="rounded-lg border border-gray-200 p-2 text-xs dark:border-dark-700">
-                  <a :href="upstreamSourceURL(source)" target="_blank" rel="noopener noreferrer" class="break-words font-medium text-primary-600 dark:text-primary-400">{{ source.repository }} / {{ source.branch }}</a>
+                  <a :href="upstreamSourceURL(source)" target="_blank" rel="noopener noreferrer" class="break-words font-medium text-primary-600 dark:text-primary-400">{{ source.repository }}</a>
                   <p class="mt-1" :class="source.has_update || source.warning ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-dark-400'">
-                    {{ source.warning || versionWarning ? t('version.checkUnknown') : source.has_update ? t('version.upstreamUpdateAvailable') : t('version.checkpointMatched') }}
+                    {{ source.warning || !source.release_tag || !source.latest_commit ? t('version.checkUnknown') : source.has_update ? t('version.upstreamUpdateAvailable') : t('version.checkpointMatched') }}
                   </p>
-                  <p v-if="source.baseline_commit" class="mt-1 text-gray-500 dark:text-dark-400">{{ t('version.reviewedCheckpoint') }}: {{ source.baseline_commit.slice(0, 12) }}</p>
-                  <p v-if="source.latest_commit" class="text-gray-500 dark:text-dark-400">{{ t('version.branchHead') }}: {{ source.latest_commit.slice(0, 12) }}</p>
+                  <p v-if="source.baseline_commit" class="mt-1 text-gray-500 dark:text-dark-400">{{ t('version.reviewedCheckpoint') }}: {{ source.baseline_release_tag }} / {{ source.baseline_commit.slice(0, 12) }}</p>
+                  <p v-if="source.release_tag" class="mt-1 text-gray-500 dark:text-dark-400">{{ t('version.officialRelease') }}: {{ source.release_tag }}</p>
+                  <p v-if="source.published_at" class="text-gray-500 dark:text-dark-400">{{ t('version.releaseDate') }}: {{ source.published_at }}</p>
+                  <p v-if="source.latest_commit" class="text-gray-500 dark:text-dark-400">{{ t('version.releaseCommit') }}: {{ source.latest_commit.slice(0, 12) }}</p>
                   <p v-if="source.warning" class="mt-1 break-words text-amber-600 dark:text-amber-400">{{ source.warning }}</p>
                   <a v-if="source.compare_url" :href="source.compare_url" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block text-primary-600 dark:text-primary-400">{{ t('version.reviewChanges') }}</a>
                 </div>
@@ -591,7 +593,7 @@ const checkComplete = computed(() => appStore.versionLoaded && !hasWarning.value
 const releaseCheckComplete = computed(() => appStore.versionLoaded && !versionWarning.value)
 
 function upstreamSourceURL(source: UpstreamUpdateInfo): string {
-  return `https://github.com/${source.repository}/tree/${source.branch}`
+  return source.release_url || `https://github.com/${source.repository}/releases`
 }
 // 生产多实例部署（UPDATE_STRATEGY=disabled）禁止在线更新/回退：原地换二进制与
 // 按版本命名的 systemd 单元不匹配，会把当前版本跑死。

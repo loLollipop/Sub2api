@@ -3,6 +3,7 @@ package repository
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -523,4 +524,87 @@ func (s *GitHubReleaseServiceSuite) TestFetchChecksumFile_ContextCancel() {
 
 func TestGitHubReleaseServiceSuite(t *testing.T) {
 	suite.Run(t, new(GitHubReleaseServiceSuite))
+}
+
+func TestGitHubReleaseClientResolvesExactReleaseTag(t *testing.T) {
+	for _, annotated := range []bool{false, true} {
+		t.Run(fmt.Sprint(annotated), func(t *testing.T) {
+			client := newTestGitHubReleaseClient()
+			client.updateGitHubToken = "update-secret"
+			var paths []string
+			client.httpClient.Transport = githubReleaseRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				require.Equal(t, "https", req.URL.Scheme)
+				require.Equal(t, "api.github.com", req.URL.Host)
+				require.Equal(t, "Bearer update-secret", req.Header.Get("Authorization"))
+				paths = append(paths, req.URL.EscapedPath())
+				body := `{"object":{"type":"commit","sha":"` + strings.Repeat("b", 40) + `"}}`
+				if annotated && len(paths) == 1 {
+					body = `{"object":{"type":"tag","sha":"` + strings.Repeat("a", 40) + `","url":"https://attacker.example/tag"}}`
+				}
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+			})
+			sha, err := client.FetchReleaseCommit(context.Background(), "Wei-Shaw/sub2api", "release/v0.2.17")
+			require.NoError(t, err)
+			require.Equal(t, strings.Repeat("b", 40), sha)
+			require.Equal(t, "/repos/Wei-Shaw/sub2api/git/ref/tags/release%2Fv0.2.17", paths[0])
+			if annotated {
+				require.Equal(t, []string{paths[0], "/repos/Wei-Shaw/sub2api/git/tags/" + strings.Repeat("a", 40)}, paths)
+			} else {
+				require.Len(t, paths, 1)
+			}
+		})
+	}
+}
+
+func TestGitHubReleaseClientReleaseTagErrors(t *testing.T) {
+	for _, scenario := range []string{"status", "invalid JSON", "invalid SHA", "tree", "cycle", "depth", "network", "cancelled"} {
+		t.Run(scenario, func(t *testing.T) {
+			client := newTestGitHubReleaseClient()
+			calls := 0
+			client.httpClient.Transport = githubReleaseRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				calls++
+				if scenario == "network" {
+					return nil, fmt.Errorf("offline")
+				}
+				if scenario == "cancelled" {
+					return nil, req.Context().Err()
+				}
+				status := http.StatusOK
+				body := `{"object":{"type":"tag","sha":"` + strings.Repeat("a", 40) + `"}}`
+				switch scenario {
+				case "status":
+					status = http.StatusNotFound
+				case "invalid JSON":
+					body = "invalid"
+				case "invalid SHA":
+					body = `{"object":{"type":"commit","sha":"bad"}}`
+				case "tree":
+					body = `{"object":{"type":"tree","sha":"` + strings.Repeat("a", 40) + `"}}`
+				case "depth":
+					body = fmt.Sprintf(`{"object":{"type":"tag","sha":"%040x"}}`, calls)
+				}
+				return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+			})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if scenario == "cancelled" {
+				cancel()
+			}
+			_, err := client.FetchReleaseCommit(ctx, "kiss-kedaya/sub2api", "v2.2.6")
+			require.Error(t, err)
+			require.LessOrEqual(t, calls, 9)
+		})
+	}
+}
+
+func TestGitHubReleaseClientRejectsUntrustedReleaseSources(t *testing.T) {
+	client := newTestGitHubReleaseClient()
+	client.httpClient.Transport = githubReleaseRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		t.Fatal("invalid source must not make an API request")
+		return nil, fmt.Errorf("unexpected request")
+	})
+	for _, source := range [][2]string{{"attacker/repo", "v1"}, {"Wei-Shaw/sub2api", ""}, {"Wei-Shaw/sub2api", "../main"}, {"Wei-Shaw/sub2api", "v1?ref=main"}, {"Wei-Shaw/sub2api", "v1\n"}} {
+		_, err := client.FetchReleaseCommit(context.Background(), source[0], source[1])
+		require.Error(t, err)
+	}
 }

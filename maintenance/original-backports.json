@@ -8,6 +8,9 @@
     "v0.2.17": "060d0160417782cd962a0c7f460f6cd4565d4916"
   },
   "latest_reviewed_main_commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
+  "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
+  "reviewed_release_tag": "v0.2.17",
+  "reviewed_release_commit": "060d0160417782cd962a0c7f460f6cd4565d4916",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",

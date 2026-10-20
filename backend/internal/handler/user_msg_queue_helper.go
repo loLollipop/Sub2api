@@ -127,7 +127,7 @@ func (h *UserMsgQueueHelper) waitForLockWithPing(
 					*streamStarted = true
 				}
 				written, err = fmt.Fprint(c.Writer, string(h.pingFormat))
-			} else if !*streamStarted {
+			} else if written > 0 && !*streamStarted {
 				*streamStarted = true
 			}
 			if err != nil {
@@ -241,7 +241,7 @@ func (h *UserMsgQueueHelper) ThrottleWithPing(
 					*streamStarted = true
 				}
 				written, err = fmt.Fprint(c.Writer, string(h.pingFormat))
-			} else if !*streamStarted {
+			} else if written > 0 && !*streamStarted {
 				*streamStarted = true
 			}
 			if err != nil {

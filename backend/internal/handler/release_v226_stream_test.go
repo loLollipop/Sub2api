@@ -23,18 +23,19 @@ func TestV226QueuedMessagesGate(t *testing.T) {
 			stop := service.StartOpenAIStreamSSEKeepaliveUntilUpstream(c, time.Millisecond)
 			defer stop()
 			started := false
-			if slotType == "rpm" {
+			switch slotType {
+			case "rpm":
 				queue := service.NewUserMessageQueueService(nil, nil, &config.UserMessageQueueConfig{MinDelayMs: 50, MaxDelayMs: 50})
 				h := NewUserMsgQueueHelper(queue, SSEPingFormatClaude, time.Millisecond)
 				err := h.ThrottleWithPing(c, 1, 1, true, &started, 15*time.Millisecond, zap.NewNop())
 				require.Error(t, err)
-			} else if slotType == "message_queue" {
+			case "message_queue":
 				ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Millisecond)
 				defer cancel()
 				h := &UserMsgQueueHelper{pingFormat: SSEPingFormatClaude, pingInterval: time.Millisecond}
 				_, err := h.waitForLockWithPing(c, ctx, 1, 1, true, &started, zap.NewNop())
 				require.Error(t, err)
-			} else {
+			default:
 				h := NewConcurrencyHelper(nil, SSEPingFormatClaude, time.Millisecond)
 				_, err := h.waitForSlotWithPingTimeout(c, slotType, 1, 1, 15*time.Millisecond, true, &started, false)
 				require.Error(t, err)

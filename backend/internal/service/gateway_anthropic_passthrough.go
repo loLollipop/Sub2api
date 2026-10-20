@@ -540,7 +540,6 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 					if _, err := io.WriteString(w, pendingErrorHeader+"\n\n"); err != nil {
 						clientDisconnected = true
 					}
-					pendingErrorHeader = ""
 				}
 				if !clientDisconnected {
 					// 兜底补刷，确保最后一个未以空行结尾的事件也能及时送达客户端。

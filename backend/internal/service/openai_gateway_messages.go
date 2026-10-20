@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -163,10 +164,9 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		return nil, fmt.Errorf("convert anthropic to responses: %w", err)
 	}
 
-	// Upstream always uses streaming (upstream may not support sync mode).
-	// The client's original preference determines the response format.
-	responsesReq.Stream = true
-	isStream := true
+	// Respect the client preference; Codex OAuth below explicitly forces SSE.
+	responsesReq.Stream = clientStream
+	isStream := clientStream
 
 	// 3b. Handle BetaFastMode → service_tier: "priority"
 	if containsBetaToken(c.GetHeader("anthropic-beta"), claude.BetaFastMode) {
@@ -272,8 +272,8 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		if shouldAutoInjectPromptCacheKeyForCompat(upstreamModel) {
 			compatTurnState = s.getOpenAICompatSessionTurnState(ctx, c, account, promptCacheKey)
 		}
-		// OAuth codex transform forces stream=true upstream, so always use
-		// the streaming response handler regardless of what the client asked.
+		// OAuth Codex transform forces stream=true upstream; sync clients still
+		// receive a buffered JSON response.
 		isStream = true
 		responsesBody, err = json.Marshal(reqBody)
 		if err != nil {
@@ -525,13 +525,16 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 
 	// 9. Handle normal response
-	// Upstream is always streaming; choose response format based on client preference.
+	// A sync upstream may return JSON or ignore stream=false and send SSE.
 	var result *OpenAIForwardResult
 	var handleErr error
 	if clientStream {
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 && strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+			ArmOpenAIStreamSSEKeepalive(c)
+		}
 		result, handleErr = s.handleAnthropicStreamingResponse(resp, c, account, originalModel, billingModel, upstreamModel, startTime)
 	} else {
-		// Client wants JSON: buffer the streaming response and assemble a JSON reply.
+		// Client wants JSON: accept a sync response or buffer the SSE fallback.
 		result, handleErr = s.handleAnthropicBufferedStreamingResponse(resp, c, account, originalModel, billingModel, upstreamModel, startTime)
 	}
 
@@ -597,12 +600,132 @@ func (s *OpenAIGatewayService) handleAnthropicErrorResponse(
 	return s.handleCompatErrorResponse(resp, c, account, writeAnthropicError, requestedModel...)
 }
 
+// readAnthropicCompatBufferedResponse accepts bounded Responses JSON and the
+// SSE fallback still used by Codex and providers that ignore stream=false.
+func (s *OpenAIGatewayService) readAnthropicCompatBufferedResponse(resp *http.Response, c *gin.Context, requestID string) (*apicompat.ResponsesResponse, OpenAIUsage, *apicompat.BufferedResponseAccumulator, error) {
+	var usage OpenAIUsage
+	if resp == nil || resp.Body == nil {
+		return nil, usage, nil, errors.New("upstream response body is nil")
+	}
+	// Detached upstream requests have no total HTTP timeout. Bound the entire
+	// buffered read (including content sniffing), and retain the existing finite
+	// drain window for clients that disconnect while waiting for usage.
+	clientCtx := context.Background()
+	if c != nil && c.Request != nil {
+		clientCtx = c.Request.Context()
+	}
+	budget := openAIStreamClientDisconnectDrainTimeoutDefault
+	if s.cfg != nil && s.cfg.Gateway.StreamDataIntervalTimeout > 0 {
+		budget = time.Duration(s.cfg.Gateway.StreamDataIntervalTimeout) * time.Second
+	}
+	source := &openAIRequestContextReadCloser{ReadCloser: resp.Body, cleanup: func() {}}
+	resp.Body = s.openAIBufferedBodyWithCancel(clientCtx, source)
+	readCtx, cancelRead := context.WithTimeout(context.Background(), budget)
+	deadlineDone := make(chan struct{})
+	stopDeadline := context.AfterFunc(readCtx, func() {
+		defer close(deadlineDone)
+		_ = source.Close()
+	})
+	deadlineStopped := false
+	stopReadDeadline := func() {
+		if deadlineStopped {
+			return
+		}
+		deadlineStopped = true
+		if !stopDeadline() {
+			<-deadlineDone
+		}
+	}
+	defer func() {
+		stopReadDeadline()
+		cancelRead()
+		_ = resp.Body.Close()
+	}()
+	readError := func(err error) error {
+		if clientErr := clientCtx.Err(); clientErr != nil {
+			return clientErr
+		}
+		if deadlineErr := readCtx.Err(); !deadlineStopped && deadlineErr != nil {
+			return deadlineErr
+		}
+		return err
+	}
+	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
+	isJSON := strings.Contains(contentType, "application/json") || strings.Contains(contentType, "+json")
+	if contentType == "" {
+		reader := bufio.NewReader(resp.Body)
+		// Preserve Close on the real body; the caller owns its lifecycle.
+		resp.Body = &bufferedCompatResponseBody{Reader: reader, Closer: resp.Body}
+		// Skip bounded whitespace without consuming bytes from the JSON size
+		// limit. Whitespace alone cannot distinguish JSON from an SSE fallback.
+		sniffLimit := min(int64(reader.Size()), resolveUpstreamResponseReadLimit(s.cfg))
+		for i := 0; ; i++ {
+			if int64(i) >= sniffLimit {
+				writeAnthropicError(c, http.StatusBadGateway, "api_error", "Upstream response has excessive leading whitespace")
+				return nil, usage, nil, errors.New("upstream content type sniff limit exceeded")
+			}
+			prefix, err := reader.Peek(i + 1)
+			if err != nil {
+				return nil, usage, nil, readError(err)
+			}
+			switch prefix[i] {
+			case ' ', '\n', '\r', '\t':
+				continue
+			}
+			isJSON = prefix[i] == '{' || prefix[i] == '['
+			if !isJSON && i > 0 {
+				_, _ = reader.Discard(i)
+			}
+			break
+		}
+	}
+	if !isJSON {
+		// SSE already has an idle watchdog. Release the sniff/JSON deadline
+		// while keeping the cancellation drain wrapper for that existing path.
+		stopReadDeadline()
+		if err := readCtx.Err(); err != nil {
+			return nil, usage, nil, readError(err)
+		}
+		cancelRead()
+		response, usage, acc, err := s.readOpenAICompatBufferedTerminal(resp, c, "openai messages buffered", requestID)
+		if err != nil {
+			err = readError(err)
+		}
+		return response, usage, acc, err
+	}
+	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
+	if err != nil {
+		return nil, usage, nil, readError(err)
+	}
+	body = restoreCodexToolNamesFromContext(c, body)
+	var response apicompat.ResponsesResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		writeAnthropicError(c, http.StatusBadGateway, "api_error", "Invalid upstream Responses JSON")
+		return nil, usage, nil, fmt.Errorf("decode upstream Responses JSON: %w", err)
+	}
+	switch strings.TrimSpace(response.Status) {
+	case "completed", "failed", "incomplete":
+	default:
+		writeAnthropicError(c, http.StatusBadGateway, "api_error", "Upstream response is not terminal")
+		return nil, usage, nil, errors.New("upstream Responses JSON has no terminal status")
+	}
+	if response.Usage != nil {
+		usage = copyOpenAIUsageFromResponsesUsage(response.Usage)
+	}
+	return &response, usage, nil, nil
+}
+
+type bufferedCompatResponseBody struct {
+	io.Reader
+	io.Closer
+}
+
 // handleAnthropicBufferedStreamingResponse reads all Responses SSE events from
 // the upstream streaming response, finds the terminal event (response.completed
 // / response.incomplete / response.failed), converts the complete response to
 // Anthropic Messages JSON format, and writes it to the client.
-// This is used when the client requested stream=false but the upstream is always
-// streaming.
+// Sync upstream JSON and providers that still return SSE share conversion and
+// usage/continuation handling here.
 func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 	resp *http.Response,
 	c *gin.Context,
@@ -614,7 +737,7 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
 
-	finalResponse, usage, acc, err := s.readOpenAICompatBufferedTerminal(resp, c, "openai messages buffered", requestID)
+	finalResponse, usage, acc, err := s.readAnthropicCompatBufferedResponse(resp, c, requestID)
 	if err != nil {
 		var readErr *openAICompatBufferedReadError
 		if errors.As(err, &readErr) && readErr != nil {
@@ -634,6 +757,20 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 	observer.Observe(finalResponse.Model, true)
 	observer.ObserveServiceTier(finalResponse.ServiceTier, true)
 
+	result := &OpenAIForwardResult{
+		RequestID:                     requestID,
+		UpstreamHeaders:               resp.Header,
+		ResponseID:                    finalResponse.ID,
+		Usage:                         usage,
+		Model:                         originalModel,
+		BillingModel:                  billingModel,
+		UpstreamModel:                 upstreamModel,
+		UpstreamResponseModel:         observedUpstreamResponseModel(c),
+		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
+		UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
+		Stream:                        false,
+		Duration:                      time.Since(startTime),
+	}
 	if strings.TrimSpace(finalResponse.Status) == "failed" {
 		payload, _ := json.Marshal(gin.H{"type": "response.failed", "response": finalResponse})
 		if hit, code, msg := detectOpenAICyberPolicy(payload); hit {
@@ -650,11 +787,15 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 				clientMsg = "Request blocked by upstream cyber-security policy"
 			}
 			writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", clientMsg)
-			return nil, fmt.Errorf("openai cyber_policy: %s", msg)
+			return result, fmt.Errorf("openai cyber_policy: %s", msg)
 		}
 		message := openAICompatFailedResponseMessage(finalResponse)
+		// Buffered failures previously returned no billable result. Retain
+		// diagnostic usage while preserving that zero-charge contract for every
+		// failed response, including ordinary content-policy refusals.
+		result.NonBillableUpstreamError = true
 		if openAIStreamFailedEventShouldFailover(payload, message) {
-			return nil, s.newOpenAIStreamFailoverErrorWithModel(c, account, false, requestID, payload, message, upstreamModel, resp.Header)
+			return result, s.newOpenAIStreamFailoverErrorWithModel(c, account, false, requestID, payload, message, upstreamModel, resp.Header)
 		}
 		message = s.recordOpenAIStreamUpstreamError(c, account, false, requestID, "http_error", payload, message)
 		// 统一走语义状态推断 + body 归一化（与 /v1/responses 路径一致），
@@ -667,10 +808,10 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 			}
 			MarkResponseCommitted(c)
 			writeAnthropicError(c, status, errType, errMsg)
-			return nil, fmt.Errorf("upstream response failed (passthrough): %s", errMsg)
+			return result, fmt.Errorf("upstream response failed (passthrough): %s", errMsg)
 		}
 		writeAnthropicError(c, http.StatusBadGateway, "api_error", message)
-		return nil, fmt.Errorf("upstream response failed: %s", message)
+		return result, fmt.Errorf("upstream response failed: %s", message)
 	}
 	if strings.TrimSpace(finalResponse.Status) == "completed" {
 		logOpenAISuccessMissingUsage(c.Request.Context(), c, account, resp, &usage, "response.completed", false)
@@ -678,7 +819,9 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 
 	// When the terminal event has an empty output array, reconstruct from
 	// accumulated delta events so the client receives the full content.
-	acc.SupplementResponseOutput(finalResponse)
+	if acc != nil {
+		acc.SupplementResponseOutput(finalResponse)
+	}
 
 	anthropicResp := apicompat.ResponsesToAnthropic(finalResponse, originalModel)
 
@@ -688,20 +831,6 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 	c.Header("Content-Type", "application/json; charset=utf-8")
 	c.JSON(http.StatusOK, anthropicResp)
 
-	result := &OpenAIForwardResult{
-		RequestID:                     requestID,
-		UpstreamHeaders:               resp.Header,
-		ResponseID:                    finalResponse.ID,
-		Usage:                         usage,
-		Model:                         originalModel,
-		BillingModel:                  billingModel,
-		UpstreamModel:                 upstreamModel,
-		UpstreamResponseModel:         observedUpstreamResponseModel(c),
-		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
-		UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
-		Stream:                        false,
-		Duration:                      time.Since(startTime),
-	}
 	// Grok /v1/messages uses Responses upstream; count native search for surcharge.
 	if account != nil && account.IsGrok() && finalResponse != nil {
 		if body, err := json.Marshal(finalResponse); err == nil {

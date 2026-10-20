@@ -264,6 +264,9 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	var firstTokenMs *int
 	var clientDisconnect bool
 	if input.RequestStream {
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 && strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+			ArmOpenAIStreamSSEKeepalive(c)
+		}
 		streamResult, err := s.handleStreamingResponseAnthropicAPIKeyPassthrough(ctx, resp, c, account, input.StartTime, input.RequestModel)
 		if err != nil {
 			// 流中断时保留已观测到的 usage 与错误一起返回，避免上游已计量的请求
@@ -533,6 +536,11 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 		select {
 		case ev, ok := <-events:
 			if !ok {
+				if pendingErrorHeader != "" && !clientDisconnected {
+					if _, err := io.WriteString(w, pendingErrorHeader+"\n\n"); err != nil {
+						clientDisconnected = true
+					}
+				}
 				if !clientDisconnected {
 					// 兜底补刷，确保最后一个未以空行结尾的事件也能及时送达客户端。
 					flusher.Flush()
@@ -718,6 +726,14 @@ func anthropicStreamErrorSemantics(payload string) (status int, errType, message
 		status = 529
 	case "rate_limit_error":
 		status = http.StatusTooManyRequests
+	case "invalid_request_error":
+		status = http.StatusBadRequest
+	case "not_found_error":
+		status = http.StatusNotFound
+	case "authentication_error":
+		status = http.StatusUnauthorized
+	case "permission_error":
+		status = http.StatusForbidden
 	default:
 		status = http.StatusBadGateway
 	}

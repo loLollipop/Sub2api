@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -138,6 +139,82 @@ func (c *githubReleaseClient) FetchBranchHead(ctx context.Context, repo, branch 
 		return "", err
 	}
 	return result.Commit.SHA, nil
+}
+
+func (c *githubReleaseClientError) FetchReleaseCommit(ctx context.Context, repo, tag string) (string, error) {
+	return "", c.err
+}
+
+// FetchReleaseCommit resolves only the exact tag attached to a published release.
+// GitHub-returned object URLs are intentionally ignored: each request is rebuilt
+// on the trusted API authority, preserving the existing token trust boundary.
+func (c *githubReleaseClient) FetchReleaseCommit(ctx context.Context, repo, tag string) (string, error) {
+	if repo != "kiss-kedaya/sub2api" && repo != "Wei-Shaw/sub2api" {
+		return "", fmt.Errorf("unsupported upstream source")
+	}
+	if tag == "" || strings.TrimSpace(tag) != tag || strings.ContainsAny(tag, " ~^:?*[\\\t\r\n\x00") {
+		return "", fmt.Errorf("invalid release tag")
+	}
+	for _, part := range strings.Split(tag, "/") {
+		if part == "" || part == "." || part == ".." {
+			return "", fmt.Errorf("invalid release tag")
+		}
+	}
+	for _, char := range tag {
+		if char < 32 || char == 127 {
+			return "", fmt.Errorf("invalid release tag")
+		}
+	}
+	type gitObject struct {
+		SHA  string `json:"sha"`
+		Type string `json:"type"`
+	}
+	endpoint := fmt.Sprintf("https://api.github.com/repos/%s/git/ref/tags/%s", repo, url.PathEscape(tag))
+	seen := make(map[string]bool)
+	// At most eight annotated tag objects may be dereferenced.
+	for depth := 0; depth <= 8; depth++ {
+		req, err := c.newAPIRequest(ctx, endpoint)
+		if err != nil {
+			return "", err
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return "", err
+		}
+		var result struct {
+			Object gitObject `json:"object"`
+		}
+		decodeErr := func() error {
+			defer func() { _ = resp.Body.Close() }()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("GitHub API returned %d", resp.StatusCode)
+			}
+			return json.NewDecoder(io.LimitReader(resp.Body, 1024*1024)).Decode(&result)
+		}()
+		if decodeErr != nil {
+			return "", decodeErr
+		}
+		object := result.Object
+		if len(object.SHA) != 40 {
+			return "", fmt.Errorf("invalid release object SHA")
+		}
+		if _, err := hex.DecodeString(object.SHA); err != nil {
+			return "", fmt.Errorf("invalid release object SHA")
+		}
+		object.SHA = strings.ToLower(object.SHA)
+		if object.Type == "commit" {
+			return object.SHA, nil
+		}
+		if object.Type != "tag" {
+			return "", fmt.Errorf("release tag does not point to a commit")
+		}
+		if seen[object.SHA] {
+			return "", fmt.Errorf("cyclic release tag")
+		}
+		seen[object.SHA] = true
+		endpoint = fmt.Sprintf("https://api.github.com/repos/%s/git/tags/%s", repo, object.SHA)
+	}
+	return "", fmt.Errorf("release tag dereference limit exceeded")
 }
 
 func (c *githubReleaseClientError) FetchRecentReleases(ctx context.Context, repo string, perPage int) ([]*service.GitHubRelease, error) {

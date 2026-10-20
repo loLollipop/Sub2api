@@ -2,25 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.2",
-  "imported_commit": "648c17cc14846c901726f866fa76059d61aacc75",
-  "personal_baseline_commit": "c26d1187f2af791bde1056a0929e942a5816b1a9",
-  "latest_observed_version": "2.2.2",
-  "latest_observed_release_commit": "da633759c0d65ecd3ca928c214ac79a77fecb9c9",
+  "imported_version": "2.2.6",
+  "imported_commit": "152b7758da66076e36c732c4b933aa5899193049",
+  "personal_baseline_commit": "1bcd4ada71bc6e67258805a39df62b85faa16548",
+  "latest_observed_version": "2.2.6",
+  "latest_observed_release_commit": "152b7758da66076e36c732c4b933aa5899193049",
   "latest_observed_main_commit": "648c17cc14846c901726f866fa76059d61aacc75",
+  "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
+  "reviewed_release_tag": "v2.2.6",
+  "reviewed_release_commit": "152b7758da66076e36c732c4b933aa5899193049",
   "observed_delta_review": {
-    "from_commit": "f645453e36c1514563055e64704e493e412c3263",
-    "to_commit": "648c17cc14846c901726f866fa76059d61aacc75",
-    "status": "selective_responses_legacy_web_search_alias_backport",
-    "scope": "Normalize legacy web_search_preview tool declarations and object tool_choice for OpenAI Responses HTTP and WebSocket requests. Preserve unrelated bytes, native providers, local settlement and previous deferrals; no migrations, dependency or account configuration changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261019-v222.md"
+    "from_commit": "648c17cc14846c901726f866fa76059d61aacc75",
+    "to_commit": "152b7758da66076e36c732c4b933aa5899193049",
+    "status": "selective_formal_v226_backport",
+    "scope": "Review only formal v2.2.6: adapt streaming error/heartbeat semantics, default-off thinking budget correction and privacy-preserving cyber input excerpts; retain prior Grok refusal billing/session deferrals and immutable migrations. Monitor both upstreams using official releases and exact tag commits.",
+    "evidence": "maintenance/notes/upstream-sync-20261020-v226.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "648c17cc14846c901726f866fa76059d61aacc75",
+    "source_head": "152b7758da66076e36c732c4b933aa5899193049",
     "implemented_with_local_regression": [
+      "Formal v2.2.6 streaming/config and privacy-preserving cyber excerpt adaptations; release-only upstream reminders with exact tag checkpoints (see dated sync note)",
       "OpenAI Responses legacy web_search_preview alias normalization on HTTP and WebSocket outbound paths, with dated-type boundaries and native-provider preservation (v2.2.2 source review)",
       "Final mapped-model Anthropic thinking normalization across message, conversion and token-count request builders; preserve explicit disabled handling and original validation (v2.2.1 source review)",
       "Cline/Command Code using shared provider registry; preserve Mixed and credential destinations",
@@ -115,9 +119,12 @@
         "8d487b465",
         "f0d3865f3",
         "8262ca158",
-        "c928b8670"
+        "c928b8670",
+        "80bffc964",
+        "323793755",
+        "c0f193e70"
       ],
-      "reason": "New session blocking still targets the old GatewayHandler instead of the real OpenAIGatewayHandler; keys lack API-key isolation and the fixed-price change has no local settlement contract. Preserve prior pricing and defer until real endpoint, isolation and exactly-once billing regressions exist."
+      "reason": "Re-reviewed through formal v2.2.6. Raw Chat refusal remains a plain error but the added charging/blocking branch is nested under failover-only handling; real entry lacks the matching block read and group-only keys lack API-key isolation. Fixed group pricing also collides with immutable local migration261 and has no proven exactly-once local settlement contract. Preserve existing pricing/session behavior; defer all dependent billing/schema/test changes until these issues are covered."
     },
     {
       "feature": "plaintext-reasoning-request-history",

@@ -161,6 +161,49 @@ func isResponsesUserTextItem(item gjson.Result) bool {
 	return responseItemHasModerationText(item)
 }
 
+// Audit display may look past tool/reasoning output. Classification continues
+// to use collectLastResponsesInput, which examines only the final item.
+func collectLastResponsesUserTurnForDisplay(input gjson.Result, parts *[]string, images *[]string) {
+	if input.Type == gjson.String {
+		addModerationText(parts, input.String())
+		return
+	}
+	items := []gjson.Result{input}
+	if input.IsArray() {
+		items = input.Array()
+	}
+	for i := len(items) - 1; i >= 0; i-- {
+		item := items[i]
+		if !item.IsObject() {
+			continue
+		}
+		role := strings.ToLower(strings.TrimSpace(item.Get("role").String()))
+		typ := strings.ToLower(strings.TrimSpace(item.Get("type").String()))
+		switch typ {
+		case "", "message":
+			if role != "user" {
+				continue
+			}
+		case "input_text":
+			if role != "" && role != "user" {
+				continue
+			}
+		default:
+			continue
+		}
+		var candidate, candidateImages []string
+		collectContentValue(item.Get("content"), &candidate, &candidateImages)
+		if typ == "input_text" {
+			collectContentValue(item, &candidate, &candidateImages)
+		}
+		if len(candidate) > 0 || len(candidateImages) > 0 {
+			*parts = append(*parts, candidate...)
+			*images = append(*images, candidateImages...)
+			return
+		}
+	}
+}
+
 func responseItemHasModerationText(item gjson.Result) bool {
 	var parts []string
 	var images []string
@@ -332,7 +375,7 @@ func ExtractContentModerationLastUserTurn(protocol string, body []byte) string {
 	case ContentModerationProtocolOpenAIChat:
 		collectLastRoleMessage(gjson.GetBytes(body, "messages"), "user", &parts, &images)
 	case ContentModerationProtocolOpenAIResponses:
-		collectLastResponsesInput(gjson.GetBytes(body, "input"), &parts, &images)
+		collectLastResponsesUserTurnForDisplay(gjson.GetBytes(body, "input"), &parts, &images)
 	case ContentModerationProtocolGemini:
 		collectLastGeminiContent(gjson.GetBytes(body, "contents"), &parts, &images)
 	case ContentModerationProtocolOpenAIImages:

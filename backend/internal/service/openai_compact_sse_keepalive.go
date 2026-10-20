@@ -30,6 +30,10 @@ type openAICompactSSEKeepalive struct {
 	started     bool
 	stopped     bool
 	writeFailed bool
+	// Ordinary streams must not replay after committing even a heartbeat.
+	ordinaryStream    bool
+	gateUntilUpstream bool
+	upstreamReady     bool
 	// bytes 是心跳已写出的注释字节数。心跳不构成语义响应，handler 的
 	// "Forward 期间是否已写响应"判定（failover 放弃换号的依据）必须扣除
 	// 这部分字节，见 OpenAICompactKeepaliveAdjustedWrittenSize。
@@ -45,7 +49,7 @@ type openAICompactSSEKeepalive struct {
 // 内部的本地拒绝）也不会与心跳 goroutine 产生数据竞争或字节交错。
 func StartOpenAICompactSSEKeepalive(c *gin.Context, interval time.Duration) func() {
 	enabled := c != nil && openAICompactClientWantsStream(c)
-	return startOpenAISSEKeepalive(c, interval, enabled)
+	return startOpenAISSEKeepaliveWithGate(c, interval, enabled, false, false)
 }
 
 // StartOpenAIStreamSSEKeepalive starts the same guarded SSE heartbeat for a
@@ -54,11 +58,74 @@ func StartOpenAICompactSSEKeepalive(c *gin.Context, interval time.Duration) func
 // installed.  Keeping the state in the existing manager makes the adjusted
 // writer-size and failover accounting apply consistently to both paths.
 func StartOpenAIStreamSSEKeepalive(c *gin.Context, interval time.Duration) func() {
-	return startOpenAISSEKeepalive(c, interval, true)
+	return startOpenAISSEKeepaliveWithGate(c, interval, true, true, false)
+}
+
+// StartOpenAIStreamSSEKeepaliveUntilUpstream installs the gate before the timer
+// starts, including heartbeats emitted while waiting for a concurrency slot.
+func StartOpenAIStreamSSEKeepaliveUntilUpstream(c *gin.Context, interval time.Duration) func() {
+	return startOpenAISSEKeepaliveWithGate(c, interval, true, true, true)
+}
+
+// ArmOpenAIStreamSSEKeepalive is called only after a successful SSE response.
+// Readiness permits heartbeats; it does not itself commit any downstream bytes.
+func ArmOpenAIStreamSSEKeepalive(c *gin.Context) {
+	if c == nil {
+		return
+	}
+	if value, ok := c.Get(openAICompactSSEKeepaliveKey); ok {
+		if k, ok := value.(*openAICompactSSEKeepalive); ok && k != nil {
+			k.mu.Lock()
+			k.upstreamReady = true
+			k.mu.Unlock()
+		}
+	}
+}
+
+// IsOpenAIStreamSSEKeepaliveCommitted excludes compact's deliberately early
+// HTTP 200, for which the existing heartbeat-only failover contract still holds.
+func IsOpenAIStreamSSEKeepaliveCommitted(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	if value, ok := c.Get(openAICompactSSEKeepaliveKey); ok {
+		if k, ok := value.(*openAICompactSSEKeepalive); ok && k != nil {
+			k.mu.Lock()
+			defer k.mu.Unlock()
+			return k.ordinaryStream && k.writer.Written()
+		}
+	}
+	return false
+}
+
+// ResetOpenAIStreamSSEKeepaliveForRetry checks commitment and closes the
+// upstream gate in one critical section, before retry backoff or scheduling.
+// Compact keeps its existing heartbeat-only replay exception.
+func ResetOpenAIStreamSSEKeepaliveForRetry(c *gin.Context) bool {
+	if c == nil {
+		return true
+	}
+	if value, ok := c.Get(openAICompactSSEKeepaliveKey); ok {
+		if k, ok := value.(*openAICompactSSEKeepalive); ok && k != nil {
+			k.mu.Lock()
+			defer k.mu.Unlock()
+			if k.ordinaryStream && k.writer.Written() {
+				return false
+			}
+			if k.gateUntilUpstream {
+				k.upstreamReady = false
+			}
+		}
+	}
+	return true
 }
 
 func startOpenAISSEKeepalive(c *gin.Context, interval time.Duration, enabled bool) func() {
-	if c == nil || c.Writer == nil || interval <= 0 || !enabled {
+	return startOpenAISSEKeepaliveWithGate(c, interval, enabled, false, false)
+}
+
+func startOpenAISSEKeepaliveWithGate(c *gin.Context, interval time.Duration, enabled, ordinaryStream, gateUntilUpstream bool) func() {
+	if c == nil || c.Writer == nil || !enabled || interval <= 0 && !gateUntilUpstream {
 		return func() {}
 	}
 	if _, exists := c.Get(openAICompactSSEKeepaliveKey); exists {
@@ -66,8 +133,10 @@ func startOpenAISSEKeepalive(c *gin.Context, interval time.Duration, enabled boo
 	}
 	originalWriter := c.Writer
 	k := &openAICompactSSEKeepalive{
-		writer: originalWriter,
-		stop:   make(chan struct{}),
+		writer:            originalWriter,
+		stop:              make(chan struct{}),
+		ordinaryStream:    ordinaryStream,
+		gateUntilUpstream: gateUntilUpstream,
 	}
 	c.Set(openAICompactSSEKeepaliveKey, k)
 	wrappedWriter := &openAICompactKeepaliveWriter{ResponseWriter: originalWriter, k: k}
@@ -77,23 +146,25 @@ func startOpenAISSEKeepalive(c *gin.Context, interval time.Duration, enabled boo
 	if c.Request != nil {
 		reqDone = c.Request.Context().Done()
 	}
-	go func() {
-		timer := time.NewTimer(interval)
-		defer timer.Stop()
-		for {
-			select {
-			case <-k.stop:
-				return
-			case <-reqDone:
-				return
-			case <-timer.C:
+	if interval > 0 {
+		go func() {
+			timer := time.NewTimer(interval)
+			defer timer.Stop()
+			for {
+				select {
+				case <-k.stop:
+					return
+				case <-reqDone:
+					return
+				case <-timer.C:
+				}
+				if !k.beat() {
+					return
+				}
+				timer.Reset(interval)
 			}
-			if !k.beat() {
-				return
-			}
-			timer.Reset(interval)
-		}
-	}()
+		}()
+	}
 	return func() {
 		k.Stop()
 		// Do not leave a pooled middleware writer reachable through the compact
@@ -111,6 +182,9 @@ func (k *openAICompactSSEKeepalive) beat() bool {
 	defer k.mu.Unlock()
 	if k.stopped {
 		return false
+	}
+	if k.gateUntilUpstream && !k.upstreamReady {
+		return true
 	}
 	if !k.started {
 		header := k.writer.Header()
@@ -156,6 +230,10 @@ func WriteOpenAIStreamSSEHeartbeat(c *gin.Context, payload []byte) (written int,
 
 	k.mu.Lock()
 	defer k.mu.Unlock()
+	if k.gateUntilUpstream && !k.upstreamReady {
+		// This is handled: falling back to the writer would bypass the gate.
+		return 0, nil, true
+	}
 	if k.stopped {
 		return 0, nil, false
 	}

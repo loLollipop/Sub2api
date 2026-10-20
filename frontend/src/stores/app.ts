@@ -294,6 +294,7 @@ export const useAppStore = defineStore('app', () => {
       .catch((error: unknown) => {
         const err = error as { response?: { data?: { message?: string } }; message?: string }
         versionWarning.value = err.response?.data?.message || err.message || i18n.global.t('version.checkFailed')
+        upstreamUpdates.value = upstreamUpdates.value.map((source) => ({ ...source, warning: source.warning || versionWarning.value }))
         return null
       })
       .finally(() => {

@@ -25,6 +25,8 @@ const info: VersionInfo = {
   upstream_updates: [{
     repository: 'kiss-kedaya/sub2api', branch: 'main', baseline_commit: 'a'.repeat(40),
     latest_commit: 'b'.repeat(40), has_update: true,
+    baseline_release_tag: 'v2.2.6', release_tag: 'v2.2.7', published_at: '2026-10-20T00:00:00Z',
+    release_url: 'https://github.com/kiss-kedaya/sub2api/releases/tag/v2.2.7',
     compare_url: `https://github.com/kiss-kedaya/sub2api/compare/${'a'.repeat(40)}...${'b'.repeat(40)}`,
   }, {
     repository: 'Wei-Shaw/sub2api', branch: 'main', baseline_commit: 'c'.repeat(40),
@@ -62,10 +64,22 @@ describe('VersionBadge source checks', () => {
     expect(view.text()).toContain('kiss-kedaya/sub2api')
     expect(view.text()).toContain('Wei-Shaw/sub2api')
     expect(view.text()).toContain('version.upstreamUpdateAvailable')
+    expect(view.text()).toContain('version.officialRelease')
+    expect(view.text()).toContain('version.releaseCommit')
+    expect(view.text()).not.toContain('version.branchHead')
+    expect(view.find('[href="https://github.com/kiss-kedaya/sub2api/releases/tag/v2.2.7"]').exists()).toBe(true)
+    expect(view.find('[href*="/tree/main"]').exists()).toBe(false)
     expect(view.text()).toContain('rate limited')
     expect(view.find('[data-testid="upstream-updates"] a[href*="/compare/"]').exists()).toBe(true)
     expect(view.find('[data-testid="upstream-updates"] button').exists()).toBe(false)
     expect(view.find('button').attributes('title')).toBe('version.updateAvailable')
+  })
+
+  it('keeps successful upstream release checks visible when the project release check fails', async () => {
+    vi.mocked(checkUpdates).mockResolvedValueOnce({ ...info, warning: 'project release unavailable' })
+    const view = await openBadge()
+    expect(view.text()).toContain('version.upstreamUpdateAvailable')
+    expect(view.find('[data-testid="version-warning"]').text()).toContain('project release unavailable')
   })
 
   it('keeps API failure visible and never claims an unknown check is up to date', async () => {

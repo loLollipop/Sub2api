@@ -3187,7 +3187,7 @@ func TestForwardAsAnthropicForGrokUsesXAIResponses(t *testing.T) {
 	require.Equal(t, "x_search", gjson.GetBytes(upstream.lastBody, "tools.1.type").String())
 	require.Equal(t, "none", gjson.GetBytes(upstream.lastBody, "tool_choice").String())
 	require.Empty(t, upstream.lastReq.Header.Get("session_id"))
-	require.True(t, gjson.GetBytes(upstream.lastBody, "stream").Bool())
+	require.False(t, gjson.GetBytes(upstream.lastBody, "stream").Bool(), "sync Messages requests preserve the upstream stream preference")
 	require.NotContains(t, string(upstream.lastBody), "chatgpt.com")
 	require.Equal(t, "grok", result.Model)
 	require.Equal(t, "grok-4.6", result.UpstreamModel)

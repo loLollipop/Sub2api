@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -15,20 +17,30 @@ const (
 	updateCheckUpstream = "upstream"
 )
 
-// GitHubBranchHeadClient is optional so existing release-only clients remain
-// compatible. Branch tracking cannot supply installable release assets.
+// GitHubBranchHeadClient is retained for compatibility; release monitoring never calls it.
 type GitHubBranchHeadClient interface {
 	FetchBranchHead(ctx context.Context, repo, branch string) (string, error)
 }
 
+// GitHubReleaseCommitClient resolves a release tag to its exact commit, without
+// falling back to target_commitish or a moving branch. It is optional so existing
+// release-only clients remain compatible.
+type GitHubReleaseCommitClient interface {
+	FetchReleaseCommit(ctx context.Context, repo, tag string) (string, error)
+}
+
 type UpstreamUpdateInfo struct {
-	Repository     string `json:"repository"`
-	Branch         string `json:"branch"`
-	BaselineCommit string `json:"baseline_commit"`
-	LatestCommit   string `json:"latest_commit"`
-	HasUpdate      bool   `json:"has_update"`
-	CompareURL     string `json:"compare_url"`
-	Warning        string `json:"warning,omitempty"`
+	BaselineReleaseTag string `json:"baseline_release_tag"`
+	ReleaseTag         string `json:"release_tag"`
+	PublishedAt        string `json:"published_at"`
+	ReleaseURL         string `json:"release_url"`
+	Repository         string `json:"repository"`
+	Branch             string `json:"branch"`
+	BaselineCommit     string `json:"baseline_commit"`
+	LatestCommit       string `json:"latest_commit"`
+	HasUpdate          bool   `json:"has_update"`
+	CompareURL         string `json:"compare_url"`
+	Warning            string `json:"warning,omitempty"`
 }
 
 type updateCachePayload struct {
@@ -75,44 +87,90 @@ func joinUpdateWarnings(first, second string) string {
 	return first + "; " + second
 }
 
+func validUpdateReleaseTag(tag string) bool {
+	if tag == "" || strings.TrimSpace(tag) != tag || strings.ContainsAny(tag, " ~^:?*[\\\t\r\n\x00") {
+		return false
+	}
+	for _, part := range strings.Split(tag, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	for _, char := range tag {
+		if char < 32 || char == 127 {
+			return false
+		}
+	}
+	return true
+}
+
+func upstreamReleaseURL(repo, tag string) string {
+	return fmt.Sprintf("https://github.com/%s/releases/tag/%s", repo, url.PathEscape(tag))
+}
+
+func validUpstreamRelease(info UpstreamUpdateInfo) bool {
+	_, err := time.Parse(time.RFC3339, info.PublishedAt)
+	return validUpdateReleaseTag(info.ReleaseTag) && err == nil &&
+		info.ReleaseURL == upstreamReleaseURL(info.Repository, info.ReleaseTag)
+}
+
 func (s *UpdateService) checkUpstreamSources(ctx context.Context) []UpstreamUpdateInfo {
 	if s.checkMode != updateCheckUpstream {
 		return nil
 	}
-	client, supported := s.githubClient.(GitHubBranchHeadClient)
+	client, _ := s.githubClient.(GitHubReleaseCommitClient)
 	updates := make([]UpstreamUpdateInfo, len(s.upstreamSources))
 	var checks sync.WaitGroup
 	for i, source := range s.upstreamSources {
 		checks.Add(1)
 		go func() {
 			defer checks.Done()
-			updates[i] = checkUpstreamSource(ctx, client, supported, source)
+			updates[i] = checkUpstreamSource(ctx, s.githubClient, client, source)
 		}()
 	}
 	checks.Wait()
 	return updates
 }
 
-func checkUpstreamSource(ctx context.Context, client GitHubBranchHeadClient, supported bool, source updateSourceBaseline) UpstreamUpdateInfo {
-	info := UpstreamUpdateInfo{Repository: source.repository, Branch: source.branch, BaselineCommit: source.commit}
+func checkUpstreamSource(ctx context.Context, releases GitHubReleaseClient, commits GitHubReleaseCommitClient, source updateSourceBaseline) UpstreamUpdateInfo {
+	info := UpstreamUpdateInfo{Repository: source.repository, Branch: source.branch, BaselineCommit: source.releaseCommit, BaselineReleaseTag: source.releaseTag}
 	if !allowedUpdateSource(source.repository, source.branch) {
 		info.Warning = "Unsupported upstream source"
 		return info
 	}
-	if !validUpdateCommit(source.commit) {
-		info.Warning = "Source checkpoint missing or invalid; review status is unknown"
+	if !validUpdateCommit(source.releaseCommit) || !validUpdateReleaseTag(source.releaseTag) {
+		info.Warning = "Reviewed release checkpoint missing or invalid; review status is unknown"
 	}
-	if !supported {
-		info.Warning = joinUpdateWarnings(info.Warning, "GitHub client does not support source tracking")
-	} else if head, err := client.FetchBranchHead(ctx, source.repository, source.branch); err != nil {
-		info.Warning = joinUpdateWarnings(info.Warning, "Source check failed: "+err.Error())
-	} else if !validUpdateCommit(head) {
-		info.Warning = joinUpdateWarnings(info.Warning, "GitHub returned an invalid branch commit; review status is unknown")
+	if commits == nil {
+		info.Warning = joinUpdateWarnings(info.Warning, "GitHub client does not support release commit tracking")
+		return info
+	}
+	release, err := releases.FetchLatestRelease(ctx, source.repository)
+	if err != nil {
+		info.Warning = joinUpdateWarnings(info.Warning, "Release check failed: "+err.Error())
+		return info
+	}
+	if release == nil || release.Draft || release.Prerelease || !validUpdateReleaseTag(release.TagName) {
+		info.Warning = joinUpdateWarnings(info.Warning, "No valid official release; review status is unknown")
+		return info
+	}
+	info.ReleaseTag, info.PublishedAt = release.TagName, release.PublishedAt
+	info.ReleaseURL = upstreamReleaseURL(source.repository, release.TagName)
+	if !validUpstreamRelease(info) {
+		info.Warning = joinUpdateWarnings(info.Warning, "Invalid release publication metadata; review status is unknown")
+		info.ReleaseTag, info.PublishedAt, info.ReleaseURL = "", "", ""
+		return info
+	}
+	commit, err := commits.FetchReleaseCommit(ctx, source.repository, release.TagName)
+	if err != nil {
+		info.Warning = joinUpdateWarnings(info.Warning, "Release commit check failed: "+err.Error())
+	} else if !validUpdateCommit(commit) {
+		info.Warning = joinUpdateWarnings(info.Warning, "GitHub returned an invalid release commit; review status is unknown")
 	} else {
-		info.LatestCommit = strings.ToLower(head)
-		if validUpdateCommit(source.commit) {
-			info.BaselineCommit = strings.ToLower(source.commit)
-			info.HasUpdate = info.LatestCommit != info.BaselineCommit
+		info.LatestCommit = strings.ToLower(commit)
+		if info.Warning == "" {
+			info.BaselineCommit = strings.ToLower(info.BaselineCommit)
+			info.HasUpdate = info.ReleaseTag != source.releaseTag || info.LatestCommit != info.BaselineCommit
 			info.CompareURL = fmt.Sprintf("https://github.com/%s/compare/%s...%s", source.repository, info.BaselineCommit, info.LatestCommit)
 		}
 	}
@@ -129,10 +187,10 @@ func hasUpstreamUpdate(updates []UpstreamUpdateInfo) bool {
 }
 
 func (s *UpdateService) updateCacheIdentity() string {
-	identity := []string{"v2", personalReleaseRepo, s.checkMode}
+	identity := []string{"v3-official-releases", personalReleaseRepo, s.checkMode}
 	if s.checkMode == updateCheckUpstream {
 		for _, source := range s.upstreamSources {
-			identity = append(identity, source.repository, source.branch, source.commit)
+			identity = append(identity, source.repository, source.branch, source.releaseTag, source.releaseCommit)
 		}
 	}
 	data, _ := json.Marshal(identity)
@@ -153,16 +211,19 @@ func (s *UpdateService) validateCachedUpstream(updates []UpstreamUpdateInfo) err
 	}
 	for i, source := range s.upstreamSources {
 		info := &updates[i]
-		if !allowedUpdateSource(info.Repository, info.Branch) || info.Repository != source.repository || info.Branch != source.branch || !strings.EqualFold(info.BaselineCommit, source.commit) {
+		if !allowedUpdateSource(info.Repository, info.Branch) || info.Repository != source.repository || info.Branch != source.branch || !strings.EqualFold(info.BaselineCommit, source.releaseCommit) || info.BaselineReleaseTag != source.releaseTag {
 			return fmt.Errorf("cached upstream source mismatch")
 		}
-		valid := validUpdateCommit(info.BaselineCommit) && validUpdateCommit(info.LatestCommit)
+		valid := validUpdateReleaseTag(info.BaselineReleaseTag) && validUpdateCommit(info.BaselineCommit) && validUpdateCommit(info.LatestCommit) && validUpstreamRelease(*info)
+		if (info.ReleaseTag != "" || info.PublishedAt != "" || info.ReleaseURL != "") && !validUpstreamRelease(*info) {
+			return fmt.Errorf("cached release metadata invalid")
+		}
 		if !valid && info.Warning == "" {
 			return fmt.Errorf("cached source status incomplete")
 		}
-		info.HasUpdate = valid && !strings.EqualFold(info.BaselineCommit, info.LatestCommit)
+		info.HasUpdate = valid && info.Warning == "" && (info.ReleaseTag != source.releaseTag || !strings.EqualFold(info.BaselineCommit, info.LatestCommit))
 		info.CompareURL = ""
-		if valid {
+		if valid && info.Warning == "" {
 			info.CompareURL = fmt.Sprintf("https://github.com/%s/compare/%s...%s", source.repository, strings.ToLower(info.BaselineCommit), strings.ToLower(info.LatestCommit))
 		}
 	}

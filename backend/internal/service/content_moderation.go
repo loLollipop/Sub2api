@@ -3190,20 +3190,28 @@ func maskSecretTail(secret string) string {
 
 // CyberPolicyRecordInput 是一次 cyber_policy 硬阻断的风控记录入参。
 type CyberPolicyRecordInput struct {
-	RequestID       string
-	UserID          int64
-	UserEmail       string
-	APIKeyID        int64
-	APIKeyName      string
-	GroupID         *int64
-	GroupName       string
-	Endpoint        string
-	Model           string
+	RequestID  string
+	UserID     int64
+	UserEmail  string
+	APIKeyID   int64
+	APIKeyName string
+	GroupID    *int64
+	GroupName  string
+	Endpoint   string
+	Model      string
+	// InputExcerpt is a detached, redacted audit snapshot; never a raw request.
+	InputExcerpt    string
 	UpstreamMessage string
 	UpstreamBody    string
 	UpstreamStatus  int
 	UpstreamInTok   int
 	UpstreamOutTok  int
+}
+
+// CyberPolicyInputExcerpt snapshots only the display text after a cyber mark.
+// The returned string cannot retain the caller's mutable request byte slice.
+func CyberPolicyInputExcerpt(protocol string, body []byte) string {
+	return strings.Clone(trimRunes(redactContentModerationSecrets(ExtractContentModerationLastUserTurn(protocol, body)), maxModerationLogExcerptRunes))
 }
 
 // RecordCyberPolicyEvent 把一次 cyber_policy 硬阻断写入风控中心日志、计入违规计数、
@@ -3258,6 +3266,7 @@ func (s *ContentModerationService) RecordCyberPolicyEvent(ctx context.Context, i
 		Flagged:         true,
 		HighestCategory: "cyber_policy",
 		HighestScore:    1.0,
+		InputExcerpt:    trimRunes(redactContentModerationSecrets(in.InputExcerpt), maxModerationLogExcerptRunes),
 		Error:           trimRunes(redactContentModerationSecrets(errBody), maxModerationExcerptRunes*4),
 		CreatedAt:       time.Now(),
 	}

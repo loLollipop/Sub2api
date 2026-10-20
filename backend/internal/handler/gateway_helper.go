@@ -446,7 +446,7 @@ func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType 
 					*streamStarted = true
 				}
 				written, err = fmt.Fprint(c.Writer, string(h.pingFormat))
-			} else if !*streamStarted {
+			} else if written > 0 && !*streamStarted {
 				*streamStarted = true
 			}
 			if err != nil {

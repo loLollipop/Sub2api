@@ -583,7 +583,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				}
 				// 不是签名错误（或整流器已关闭），继续检查 budget 约束
 				errMsg := extractUpstreamErrorMessage(respBody)
-				if isThinkingBudgetConstraintError(errMsg) && s.settingService.IsBudgetRectifierEnabled(ctx) {
+				if s.cfg != nil && s.cfg.Gateway.ThinkingBudgetRectifyEnabled && isThinkingBudgetConstraintError(errMsg) && s.settingService.IsBudgetRectifierEnabled(ctx) {
 					appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 						ProxyID:            opsUpstreamProxyID(account),
 						ProxyName:          opsUpstreamProxyName(account),
@@ -798,6 +798,9 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	var clientDisconnect bool
 	if reqStream {
 		writerSizeBeforeStream := c.Writer.Size()
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 && strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+			ArmOpenAIStreamSSEKeepalive(c)
+		}
 		streamResult, err := s.handleStreamingResponse(ctx, resp, c, account, startTime, originalModel, reqModel, shouldMimicClaudeCode)
 		if err != nil {
 			var sseErr *sseStreamErrorEventError

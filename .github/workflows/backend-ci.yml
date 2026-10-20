@@ -86,7 +86,9 @@ jobs:
         run: go test -race -p 1 -tags=unit ./internal/service -run 'Test(OpenAIResponsesWebSearchAlias|CalculateWebSearchCost|CalculateOpenAIRecordUsageCostWebSearchPerCall)' -count=1
       - name: Streaming semantics and cyber audit regression
         working-directory: backend
-        run: go test -race -p 1 -tags=unit ./internal/service ./internal/handler ./internal/config -run 'Test(V226|.*Cyber|ExtractContentModerationLastUserTurn|OpenAIForwardMayFailover|ForwardAsAnthropic|OpenAIStream|OpenAICompactSSEKeepalive|ContentModeration)' -count=1
+        # Legacy compatibility cases mutate Gin's global mode. Serialize test
+        # cases while retaining race detection for each case's goroutines.
+        run: go test -race -p 1 -parallel 1 -tags=unit ./internal/service ./internal/handler ./internal/config -run 'Test(V226|.*Cyber|ExtractContentModerationLastUserTurn|OpenAIForwardMayFailover|ForwardAsAnthropic|OpenAIStream|OpenAICompactSSEKeepalive|ContentModeration)' -count=1
 
   frontend:
     runs-on: ubuntu-latest

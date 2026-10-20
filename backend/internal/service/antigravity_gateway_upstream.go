@@ -114,6 +114,7 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 	var clientDisconnect bool
 
 	if claudeReq.Stream {
+		ArmOpenAIStreamSSEKeepalive(c)
 		// 流式响应：透传
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")

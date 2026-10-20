@@ -270,7 +270,7 @@ func TestUpdateTrackingFailureReplacesPreviouslyMatchedCheckpoint(t *testing.T) 
 	t.Setenv("UPDATE_CHECK_MODE", "upstream")
 	client := newUpdateTrackingClient()
 	client.heads["kiss-kedaya/sub2api"] = forkImportedCommit
-	client.releases["kiss-kedaya/sub2api"].TagName = "v2.2.6"
+	client.releases["kiss-kedaya/sub2api"].TagName = defaultUpdateSourceBaselines()[0].releaseTag
 	svc := NewUpdateService(&updateServiceCacheStub{}, client, "2.1.16", "release")
 	first, err := svc.CheckUpdate(context.Background(), true)
 	require.NoError(t, err)
@@ -363,6 +363,7 @@ func TestUpdateTrackingOnlyOfficialReleasesCreateNotifications(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			client := newUpdateTrackingClient()
 			svc := NewUpdateService(&updateServiceCacheStub{}, client, "99.0.0", "release")
+			svc.upstreamSources[0].releaseTag = "v1.0.0"
 			baseline := svc.upstreamSources[0]
 			client.releases[baseline.repository].TagName = baseline.releaseTag
 			client.heads[baseline.repository] = baseline.releaseCommit
@@ -370,7 +371,7 @@ func TestUpdateTrackingOnlyOfficialReleasesCreateNotifications(t *testing.T) {
 			case "main ahead":
 				svc.upstreamSources[0].commit = strings.Repeat("f", 40)
 			case "new release":
-				client.releases[baseline.repository].TagName = "v2.2.7"
+				client.releases[baseline.repository].TagName = "v1.0.1"
 			case "draft":
 				client.releases[baseline.repository].Draft = true
 			case "prerelease":

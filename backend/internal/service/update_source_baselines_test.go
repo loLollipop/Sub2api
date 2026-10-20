@@ -52,7 +52,7 @@ func TestUpdateSourceCheckpointsMatchMaintenanceRecords(t *testing.T) {
 func TestUpdateSourceOfficialReleaseCheckpointsAreSeparateFromReviewedMain(t *testing.T) {
 	sources := defaultUpdateSourceBaselines()
 	require.Len(t, sources, 2)
-	require.Equal(t, "v2.2.6", sources[0].releaseTag)
+	require.Equal(t, "v"+forkImportedVersion, sources[0].releaseTag)
 	require.Equal(t, forkImportedCommit, sources[0].releaseCommit)
 	require.Equal(t, "v0.2.17", sources[1].releaseTag)
 	require.Equal(t, "060d0160417782cd962a0c7f460f6cd4565d4916", sources[1].releaseCommit)

@@ -100,8 +100,8 @@ func TestOpenAIStreamV227BedrockKeepaliveBeforeFirstFrame(t *testing.T) {
 			defer stop()
 			svc := &GatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{StreamKeepaliveInterval: 1}}}
 			reader, writer := io.Pipe()
-			defer reader.Close()
-			defer writer.Close()
+			defer func() { _ = reader.Close() }()
+			defer func() { _ = writer.Close() }()
 			type outcome struct {
 				result *streamingResult
 				err    error
@@ -148,8 +148,8 @@ func TestOpenAIStreamV227BedrockKeepaliveDoesNotMaskIdleTimeout(t *testing.T) {
 	stop := StartOpenAIStreamSSEKeepaliveUntilUpstream(c, 5*time.Millisecond)
 	defer stop()
 	reader, writer := io.Pipe()
-	defer reader.Close()
-	defer writer.Close()
+	defer func() { _ = reader.Close() }()
+	defer func() { _ = writer.Close() }()
 	svc := &GatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{
 		StreamKeepaliveInterval: 1, StreamDataIntervalTimeout: 2,
 	}}}
@@ -200,8 +200,8 @@ func TestOpenAIStreamV227ProviderSuccessOwnsStream(t *testing.T) {
 			stop := StartOpenAIStreamSSEKeepaliveUntilUpstream(c, 5*time.Millisecond)
 			defer stop()
 			reader, writer := io.Pipe()
-			defer reader.Close()
-			defer writer.Close()
+			defer func() { _ = reader.Close() }()
+			defer func() { _ = writer.Close() }()
 			done := make(chan error, 1)
 			go func() {
 				done <- tt.run(c, &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: reader})
@@ -231,8 +231,8 @@ func TestOpenAIStreamV227ForwardUpstreamGatesUntilSuccessfulHeaders(t *testing.T
 			stop := StartOpenAIStreamSSEKeepaliveUntilUpstream(c, 5*time.Millisecond)
 			defer stop()
 			reader, writer := io.Pipe()
-			defer reader.Close()
-			defer writer.Close()
+			defer func() { _ = reader.Close() }()
+			defer func() { _ = writer.Close() }()
 			resp := &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: reader}
 			if status >= 400 {
 				resp.Header.Set("Content-Type", "application/json")

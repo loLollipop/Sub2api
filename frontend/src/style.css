@@ -18,18 +18,11 @@
 
   body {
     @apply min-h-screen text-gray-900 dark:text-gray-100;
-    background:
-      radial-gradient(circle at 8% -10%, rgba(147, 197, 253, 0.32), transparent 34rem),
-      radial-gradient(circle at 92% 0%, rgba(186, 230, 253, 0.28), transparent 30rem),
-      linear-gradient(180deg, #f8fbff 0%, #f1f7ff 52%, #f8fbff 100%);
-    background-attachment: fixed;
+    background: #f8f9fb;
   }
 
   .dark body {
-    background:
-      radial-gradient(circle at 8% -10%, rgba(30, 64, 175, 0.26), transparent 34rem),
-      radial-gradient(circle at 92% 0%, rgba(14, 116, 144, 0.18), transparent 30rem),
-      linear-gradient(180deg, #0f172a 0%, #111c35 52%, #0f172a 100%);
+    background: #111318;
   }
 
   /* 自定义滚动条 - 仅针对 Firefox，避免 Chrome 取消 webkit 的全局定制 */

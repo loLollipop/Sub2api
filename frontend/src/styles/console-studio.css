@@ -1,31 +1,25 @@
-/* Paper, ink and a restrained sky-blue accent across the working console. */
+/* Neutral surfaces and an orange accent, shared by every console page. */
 :is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover) {
-  --signal-bg: #f8f9f9;
+  --signal-bg: #f8f9fb;
   --signal-surface: #ffffff;
-  --signal-raised: #f2f5f6;
+  --signal-raised: #f3f4f6;
   --signal-sidebar: #ffffff;
-  --signal-line: #dde2e4;
-  --signal-text: #202426;
-  --signal-muted: #657078;
-  --signal-accent: #007db5;
+  --signal-line: #e5e7eb;
+  --signal-text: #1f2937;
+  --signal-muted: #6b7280;
+  --signal-accent: #c2410c;
   --signal-amber: #a66a19;
-  --signal-hover: #edf2f4;
-  --signal-accent-soft: #e6f4fc;
+  --signal-hover: #f3f4f6;
+  --signal-accent-soft: #fff7ed;
   --signal-on-accent: #ffffff;
-  --signal-control-line: #b4c0c7;
+  --signal-control-line: #d1d5db;
   --signal-highlight: #ffffff;
-  --signal-inset: #f4f6f7;
-  --signal-divider: #e9edef;
-  --signal-shadow: 0 2px 4px #20242603;
-  --signal-popover-shadow: 0 3px 10px #2024260a, 0 20px 56px #2024261f;
-  --signal-command: #202426;
+  --signal-inset: #f9fafb;
+  --signal-divider: #f0f1f3;
+  --signal-shadow: 0 2px 4px #1f293703;
+  --signal-popover-shadow: 0 3px 10px #1f29370a, 0 20px 56px #1f29371f;
+  --signal-command: #c2410c;
   --signal-command-text: #ffffff;
-  --signal-paper-image: url('../assets/console-paper.webp');
-  --signal-paper-blend: multiply;
-  --signal-paper-opacity: 0.46;
-  --signal-draft-opacity: 1;
-  --signal-draft-ink: #67879838;
-  --signal-draft-line: #348fbc52;
   /* motion tokens: 独角兽级动效体系（统一 easing 与时长） */
   --motion-out: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -33,38 +27,32 @@
   --motion-dur-fast: 140ms;
   --motion-dur-base: 220ms;
   --motion-dur-slow: 420ms;
-  --signal-display-font: Georgia, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif;
+  --signal-display-font: 'Segoe UI Variable', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 .dark :is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover) {
-  --signal-bg: #141718;
-  --signal-surface: #1e2224;
-  --signal-raised: #272d30;
-  --signal-sidebar: #181c1e;
-  --signal-line: #353e43;
-  --signal-text: #f1f5f6;
-  --signal-muted: #aab7be;
-  --signal-accent: #6dc7f2;
+  --signal-bg: #111318;
+  --signal-surface: #1b1e24;
+  --signal-raised: #242830;
+  --signal-sidebar: #171a20;
+  --signal-line: #343943;
+  --signal-text: #f3f4f6;
+  --signal-muted: #a7aeb9;
+  --signal-accent: #fb923c;
   --signal-amber: #e3b770;
-  --signal-hover: #2c3438;
-  --signal-accent-soft: #203741;
-  --signal-on-accent: #10232c;
-  --signal-control-line: #586a74;
+  --signal-hover: #282d35;
+  --signal-accent-soft: #3b291c;
+  --signal-on-accent: #25160c;
+  --signal-control-line: #525b68;
   --signal-highlight: #ffffff0c;
-  --signal-inset: #191e20;
-  --signal-divider: #30383c;
+  --signal-inset: #15181d;
+  --signal-divider: #2c313a;
   --signal-shadow: 0 2px 4px #00000014, 0 8px 20px #0000000f;
   --signal-popover-shadow: 0 4px 12px #00000029, 0 24px 64px #00000066;
-  --signal-command: #eef5f8;
-  --signal-command-text: #192125;
-  --signal-paper-image: url('../assets/console-paper-dark.webp');
-  --signal-paper-blend: screen;
-  --signal-paper-opacity: 0.32;
-  --signal-draft-opacity: 1;
-  --signal-draft-ink: #a0c7db30;
-  --signal-draft-line: #77bfdf48;
+  --signal-command: #f97316;
+  --signal-command-text: #25160c;
   --motion-out: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
@@ -271,7 +259,7 @@ body:has(.console-signal) > .select-dropdown-portal {
 .console-signal .signal-dashboard .signal-token-split { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--signal-line); font-size: 11px; font-variant-numeric: tabular-nums; }
 .console-signal .signal-dashboard .signal-token-split dt { color: var(--signal-muted); }
 .console-signal .signal-dashboard .signal-token-split dd { margin-top: 5px; color: var(--signal-text); overflow-wrap: anywhere; }
-.console-signal .signal-dashboard .signal-actions { display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding: 12px 4px 0 12px; }
+.console-signal .signal-dashboard .signal-actions { display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding: 18px; border: 1px solid var(--signal-line); border-radius: 8px; background: var(--signal-surface); }
 .console-signal .signal-dashboard .signal-actions-label { display: block; padding: 0; color: var(--signal-text); font-size: 14px; font-weight: 600; }
 .console-signal .signal-dashboard .signal-actions-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px 16px; }
 .console-signal .signal-dashboard .signal-actions button { display: flex; align-items: center; justify-content: flex-start; min-width: 0; min-height: 48px; gap: 10px; padding: 8px 0; border-radius: 0; border-bottom: 1px solid var(--signal-line); background: transparent; color: var(--signal-text); text-align: left; font-size: 12px; }
@@ -287,7 +275,7 @@ body:has(.console-signal) > .select-dropdown-portal {
 
 @media (max-width: 1279px) {
   .console-signal .signal-dashboard .signal-lead-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .console-signal .signal-dashboard .signal-actions { grid-column: 1 / -1; padding: 4px 0 0; }
+  .console-signal .signal-dashboard .signal-actions { grid-column: 1 / -1; padding: 16px; }
   .console-signal .signal-dashboard .signal-actions-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .console-signal .signal-dashboard .signal-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .console-signal .signal-dashboard .signal-model-card { grid-column: 1 / -1; }
@@ -491,9 +479,9 @@ body:has(.console-signal) > .select-dropdown-portal {
 
 .console-signal .admin-dashboard-charts > .grid > .card,
 .console-signal .admin-dashboard-charts > .card {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--signal-line);
+  border-radius: 8px;
+  background: var(--signal-surface);
   box-shadow: none;
 }
 
@@ -558,8 +546,8 @@ body:has(.console-signal) > .select-dropdown-portal {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 116px;
-  padding: 20px 0 26px;
+  min-height: 76px;
+  padding: 4px 0 20px;
   overflow: hidden;
   border-bottom: 1px solid var(--signal-line);
   margin-bottom: 24px;
@@ -573,9 +561,9 @@ body:has(.console-signal) > .select-dropdown-portal {
 
 .console-signal .signal-dashboard .signal-editorial-heading h1,
 .console-signal .model-plaza-content .signal-editorial-heading h1 {
-  margin-top: 12px;
+  margin-top: 0;
   font-family: var(--signal-display-font);
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: 0;
@@ -591,7 +579,7 @@ body:has(.console-signal) > .select-dropdown-portal {
 }
 
 .console-signal .signal-editorial-index {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 9px;
   font-family: 'SFMono-Regular', Consolas, monospace;
@@ -604,7 +592,7 @@ body:has(.console-signal) > .select-dropdown-portal {
   width: 5px;
   height: 5px;
   flex-shrink: 0;
-  background: #00a8ed;
+  background: var(--signal-accent);
 }
 
 .console-signal .signal-editorial-heading > button {
@@ -619,22 +607,22 @@ body:has(.console-signal) > .select-dropdown-portal {
 }
 
 .console-signal .signal-dashboard .signal-metric--balance {
-  background: #202a30;
-  border-color: #202a30;
-  color: #ffffff;
+  background: var(--signal-surface);
+  border-color: var(--signal-line);
+  color: var(--signal-text);
 }
 
 .console-signal .signal-dashboard .signal-metric--balance :is(.signal-value, .signal-metric-foot strong) {
-  color: #ffffff;
+  color: var(--signal-text);
 }
 
 .console-signal .signal-dashboard .signal-metric--balance :is(.signal-label, .signal-metric-foot) {
-  color: #c1d5e0;
-  border-color: #ffffff24;
+  color: var(--signal-muted);
+  border-color: var(--signal-line);
 }
 
 .console-signal .signal-dashboard .signal-metric--balance .signal-label > span {
-  color: #84d9ff;
+  color: var(--signal-accent);
 }
 
 .console-signal .admin-overview-identity p {
@@ -727,7 +715,7 @@ body:has(.console-signal) > .select-dropdown-portal {
     .console-signal .admin-metric-grid > .card:hover {
       transform: translateY(-2px);
       border-color: var(--signal-control-line);
-      box-shadow: 0 6px 16px #2024260d, 0 2px 4px #20242608;
+      box-shadow: 0 6px 16px #1f29370d, 0 2px 4px #1f293708;
     }
     .dark :is(.signal-lead-grid, .signal-stat-strip) > .signal-metric:hover,
     .dark .admin-metric-grid > .card:hover {

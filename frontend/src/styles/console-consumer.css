@@ -1,0 +1,40 @@
+/* Desktop consumers use the same destinations as the drawer, arranged above the page. */
+.console-signal .consumer-navigation { display: none; }
+.console-signal .consumer-header { height: auto; }
+.console-signal .consumer-header .header-inner { min-height: 64px; height: auto; }
+.console-signal .header-actions { min-width: 0; }
+.console-signal .consumer-custom-icon svg { display: block; width: 100%; height: 100%; }
+
+@media (min-width: 1024px) {
+  .console-signal.consumer-layout .signal-frame { margin-left: 0; }
+  .console-signal .consumer-mobile-sidebar { display: none; }
+  .console-signal.consumer-layout .signal-main { max-width: 1488px; padding: 28px 32px; }
+  .console-signal .consumer-header .header-inner { max-width: 1488px; margin-inline: auto; padding-inline: 32px; }
+  .console-signal .consumer-navigation { display: flex; justify-content: center; padding: 0 24px 14px; }
+  .console-signal .consumer-nav { display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--signal-line); border-radius: 999px; background: var(--signal-surface); }
+  .console-signal .consumer-nav-link { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 7px 16px; border-radius: 999px; color: var(--signal-muted); font-size: 13px; font-weight: 500; line-height: 20px; white-space: nowrap; transition: color 140ms ease, background-color 140ms ease; }
+  .console-signal .consumer-nav-link:hover { background: var(--signal-hover); color: var(--signal-text); }
+  .console-signal .consumer-nav-link-active { color: var(--signal-accent); background: var(--signal-accent-soft); }
+  .console-signal .consumer-more { position: relative; }
+  .console-signal .consumer-more-menu { position: absolute; top: calc(100% + 10px); right: 0; z-index: 50; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; width: 424px; max-width: calc(100vw - 48px); max-height: min(560px, calc(100dvh - 150px)); overflow-y: auto; padding: 8px; border: 1px solid var(--signal-line); border-radius: 8px; background: var(--signal-surface); box-shadow: var(--signal-popover-shadow); }
+  .console-signal .consumer-more-link { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 42px; padding: 10px; border-radius: 6px; color: var(--signal-muted); font-size: 13px; text-align: left; }
+  .console-signal .consumer-more-link > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+  .console-signal .consumer-more-link:hover { background: var(--signal-hover); color: var(--signal-text); }
+  .console-signal .consumer-more-link-active { background: var(--signal-accent-soft); color: var(--signal-accent); }
+  .console-signal .consumer-theme-toggle { grid-column: 1 / -1; margin-top: 4px; border-top: 1px solid var(--signal-line); border-radius: 0 0 6px 6px; }
+}
+
+/* Keep all utility actions reachable when the viewport cannot hold one row. */
+@media (max-width: 639px) {
+  .console-signal .signal-header { height: auto; }
+  .console-signal .header-inner { height: auto; min-height: 64px; flex-wrap: wrap; gap: 6px; padding-block: 8px; }
+  .console-signal .header-location { flex: 1 1 100%; }
+  .console-signal .header-actions { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; }
+  .console-signal .header-shortcut { width: 32px; min-height: 32px; padding-inline: 6px; }
+  .console-signal .header-subscriptions > button { padding-inline: 6px; }
+  .console-signal .header-subscriptions > div { position: fixed; right: 12px; left: auto; width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 120px); overflow-y: auto; }
+  .console-signal .header-balance { display: flex; padding-inline: 8px; }
+  .console-signal .header-balance-frozen { display: none; }
+  .console-signal .header-balance-detail { position: fixed; top: auto; right: 12px; }
+  .console-signal .account-menu > .dropdown { max-width: calc(100vw - 24px); }
+}

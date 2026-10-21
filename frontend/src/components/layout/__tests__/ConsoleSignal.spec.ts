@@ -119,16 +119,18 @@ describe('SIGNAL shell route isolation', () => {
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/admin/dashboard'))
   })
 
-  it('keeps collapse, mobile navigation, theme and balance semantics', async () => {
+  it('keeps the user drawer, theme and balance semantics without desktop sidebar space', async () => {
     const { app } = await renderShell('/keys')
     expect(wrapper!.get('.header-balance-value').text()).toBe('$20.00')
     expect(wrapper!.get('.header-balance-frozen').text()).toContain('$3.00')
     expect(wrapper!.get('.header-balance-detail').text()).toContain('$23.00')
     expect(wrapper!.get('.header-balance').attributes('tabindex')).toBe('0')
 
-    await wrapper!.get('.sidebar-footer button:last-child').trigger('click')
-    expect(app.sidebarCollapsed).toBe(true)
-    expect(wrapper!.get('.signal-frame').classes()).toContain('lg:ml-[72px]')
+    expect(wrapper!.classes()).toContain('consumer-layout')
+    expect(wrapper!.get('.signal-frame').classes()).not.toContain('lg:ml-64')
+    expect(wrapper!.get('.signal-frame').classes()).not.toContain('lg:ml-[72px]')
+    expect(wrapper!.find('.console-atmosphere').exists()).toBe(false)
+    expect(wrapper!.find('.consumer-nav').exists()).toBe(true)
     await wrapper!.get('.header-location > button').trigger('click')
     expect(app.mobileOpen).toBe(true)
     const wasDark = document.documentElement.classList.contains('dark')
@@ -136,5 +138,14 @@ describe('SIGNAL shell route isolation', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(!wasDark)
     expect(wrapper!.find('.sidebar a[href="/keys"]').exists()).toBe(true)
     expect(wrapper!.find('.sidebar a[href="/usage"]').exists()).toBe(true)
+  })
+
+  it('preserves the admin sidebar collapse and personal destinations', async () => {
+    const { app } = await renderShell('/admin/dashboard', 'admin')
+    await wrapper!.get('.sidebar-footer button:last-child').trigger('click')
+    expect(app.sidebarCollapsed).toBe(true)
+    expect(wrapper!.get('.signal-frame').classes()).toContain('lg:ml-[72px]')
+    expect(wrapper!.find('.consumer-nav').exists()).toBe(false)
+    expect(wrapper!.find('.sidebar a[href="/keys"]').exists()).toBe(true)
   })
 })

@@ -8,6 +8,7 @@ const componentPath = resolve(dirname(fileURLToPath(import.meta.url)), '../AppSi
 const componentSource = readFileSync(componentPath, 'utf8')
 const stylePath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../style.css')
 const styleSource = readFileSync(stylePath, 'utf8')
+const navigationSource = readFileSync(resolve(dirname(componentPath), '../../composables/useConsoleNavigation.ts'), 'utf8')
 
 describe('AppSidebar custom SVG styles', () => {
   it('does not override uploaded SVG fill or stroke colors', () => {
@@ -65,11 +66,11 @@ describe('AppSidebar header styles', () => {
 
 describe('AppSidebar user navigation', () => {
   it('hides the legacy subscriptions entry while keeping the route available', () => {
-    expect(componentSource).not.toContain("{ path: '/subscriptions'")
+    expect(navigationSource).not.toContain("{ path: '/subscriptions'")
   })
 
   it('includes Infinite Canvas next to API keys', () => {
-    expect(componentSource).toContain("{ path: '/infinite-canvas'")
-    expect(componentSource).toContain("t('nav.infiniteCanvas')")
+    expect(navigationSource).toContain("{ path: '/infinite-canvas'")
+    expect(navigationSource).toContain("t('nav.infiniteCanvas')")
   })
 })

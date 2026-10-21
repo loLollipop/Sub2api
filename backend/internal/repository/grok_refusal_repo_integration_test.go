@@ -20,14 +20,9 @@ import (
 func newGrokRefusalIntegrationFixture(t *testing.T) (mediaBillingIntegrationFixture, *userPlatformQuotaServiceAdapter) {
 	t.Helper()
 	f := newMediaBillingIntegrationFixture(t, 10)
-	quota := &userPlatformQuotaServiceAdapter{inner: &userPlatformQuotaRepository{client: testEntClient(t)}}
-	limit := 100.0
-	require.NoError(t, quota.BulkInsertInitial(context.Background(), []service.UserPlatformQuotaRecord{{
-		UserID: f.user.ID, Platform: service.PlatformGrok,
-		DailyLimitUSD: &limit, WeeklyLimitUSD: &limit, MonthlyLimitUSD: &limit,
-	}}))
 	// Commits use the shared database rather than a wrapping test transaction.
-	// Remove pending jobs so unrelated worker-lease tests cannot claim them.
+	// Remove jobs and fixture entities so later worker and repository suites
+	// observe the same database state as before these tests.
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -37,7 +32,25 @@ func newGrokRefusalIntegrationFixture(t *testing.T) (mediaBillingIntegrationFixt
 		require.NoError(t, err)
 		_, err = integrationDB.ExecContext(ctx, `DELETE FROM usage_billing_dedup WHERE api_key_id = $1`, f.apiKey.ID)
 		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, `DELETE FROM api_keys WHERE id = $1`, f.apiKey.ID)
+		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, `DELETE FROM accounts WHERE id = $1`, f.account.ID)
+		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, `DELETE FROM groups WHERE id = $1`, f.group.ID)
+		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, `DELETE FROM live_balance_adjustment_outbox WHERE user_id = $1`, f.user.ID)
+		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, `DELETE FROM live_balance_adjustment_heads WHERE user_id = $1`, f.user.ID)
+		require.NoError(t, err)
+		_, err = integrationDB.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, f.user.ID)
+		require.NoError(t, err)
 	})
+	quota := &userPlatformQuotaServiceAdapter{inner: &userPlatformQuotaRepository{client: testEntClient(t)}}
+	limit := 100.0
+	require.NoError(t, quota.BulkInsertInitial(context.Background(), []service.UserPlatformQuotaRecord{{
+		UserID: f.user.ID, Platform: service.PlatformGrok,
+		DailyLimitUSD: &limit, WeeklyLimitUSD: &limit, MonthlyLimitUSD: &limit,
+	}}))
 	return f, quota
 }
 

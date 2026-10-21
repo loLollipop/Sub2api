@@ -1541,7 +1541,7 @@ func openAIStreamFailedEventSemanticStatus(payload []byte, message string) int {
 	combined := strings.TrimSpace(errType + " " + code + " " + strings.ToLower(strings.TrimSpace(message)))
 	for _, path := range []string{"response.error.status_code", "error.status_code", "status_code"} {
 		if status := int(gjson.GetBytes(payload, path).Int()); status == http.StatusUnauthorized ||
-			status == http.StatusForbidden || status == http.StatusTooManyRequests || status == 529 {
+			status == http.StatusForbidden || status == http.StatusTooManyRequests || (status >= 500 && status <= 599) {
 			return status
 		}
 	}
@@ -1564,6 +1564,8 @@ func openAIStreamFailedEventSemanticStatus(payload []byte, message string) int {
 		return http.StatusForbidden
 	case isOpenAIUpstreamCapacityShedEvent(payload):
 		return http.StatusServiceUnavailable
+	case errType == "server_error" || errType == "api_error":
+		return http.StatusInternalServerError
 	default:
 		return http.StatusBadGateway
 	}
@@ -1593,13 +1595,12 @@ func openAIStreamFailureStatus(payload []byte, message string) int {
 		return http.StatusBadGateway
 	}
 	semanticStatus := openAIStreamFailedEventSemanticStatus(payload, message)
-	switch semanticStatus {
-	case http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests, 529:
+	if semanticStatus >= http.StatusInternalServerError {
 		return semanticStatus
-	case http.StatusServiceUnavailable:
-		if isOpenAIUpstreamCapacityShedEvent(payload) {
-			return semanticStatus
-		}
+	}
+	switch semanticStatus {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests:
+		return semanticStatus
 	}
 	return http.StatusBadGateway
 }

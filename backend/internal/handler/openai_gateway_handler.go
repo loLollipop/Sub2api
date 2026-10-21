@@ -50,6 +50,7 @@ type OpenAIGatewayHandler struct {
 
 type openAIWSTurnChannelMappingSnapshot struct {
 	turn    int
+	model   string
 	mapping service.ChannelMappingResult
 }
 
@@ -2382,11 +2383,18 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		return
 	}
 	reqModel := strings.TrimSpace(gjson.GetBytes(firstMessage, "model").String())
-	firstMessage = rewriteInboundDeepSeekCallIDs(apiKey, reqModel, firstMessage)
 	if reqModel == "" {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model is required in first response.create payload")
 		return
 	}
+	if refusalErr := checkGrokRefusedWebSocketRequest(c, h.gatewayService, apiKey, firstMessage, reqModel, h.apiKeyService); refusalErr != nil {
+		var closeErr *service.OpenAIWSClientCloseError
+		if errors.As(refusalErr, &closeErr) {
+			closeOpenAIClientWS(wsConn, closeErr.StatusCode(), closeErr.Reason())
+		}
+		return
+	}
+	firstMessage = rewriteInboundDeepSeekCallIDs(apiKey, reqModel, firstMessage)
 	// 分组级模型白名单：首帧校验客户端模型，不通过则关闭连接并标记运维原因。
 	// 必须在 ensureCompositeTargetPlatform（合成路由改写）之前执行。
 	// 与 HTTP 准入一致：帧内重复 model 键/大小写变体可能被上游按末值绑定，
@@ -2851,7 +2859,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		// Passthrough rejects overlapping response.create frames, so one immutable
 		// turn-tagged slot preserves the exact mapping used for the in-flight request.
 		var turnChannelMapping atomic.Pointer[openAIWSTurnChannelMappingSnapshot]
-		turnChannelMapping.Store(&openAIWSTurnChannelMappingSnapshot{turn: 1, mapping: channelMappingWS})
+		turnChannelMapping.Store(&openAIWSTurnChannelMappingSnapshot{turn: 1, model: reqModel, mapping: channelMappingWS})
 		// turn 级定价：首轮回退到 TurnStarted 的所属 turn 时刻；后续 turn 由
 		// BeforeTurn 重新冻结 pricingAt 并按最新门复核当前账号。
 		var turnPricing openAIWSTurnPricing
@@ -2865,6 +2873,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			MaxReasoningEffortOverLimit: maxReasoningEffortOverLimit,
 			ReasoningEffortMappings:     reasoningEffortMappings,
 			TurnStarted:                 recordTurnStart,
+			CheckRequest: func(turn int, payload []byte, originalModel string) error {
+				return checkGrokRefusedWebSocketRequest(c, h.gatewayService, apiKey, payload, originalModel, h.apiKeyService)
+			},
 			BeforeRequest: func(turn int, payload []byte, originalModel string) ([]byte, error) {
 				c.Set(securityAuditWSTurnContextKey, turn)
 				service.BeginOpsStreamTurn(c, turn)
@@ -2935,7 +2946,8 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				if turn > 1 && !mappedModelUnchanged && !account.IsModelSupported(model) && !account.IsModelSupported(mapping.MappedModel) {
 					return "", newOpenAIWSUnsupportedModelSwitchError(mapping.MappedModel)
 				}
-				turnChannelMapping.Store(&openAIWSTurnChannelMappingSnapshot{turn: turn, mapping: mapping})
+				turnChannelMapping.Store(&openAIWSTurnChannelMappingSnapshot{turn: turn, model: model, mapping: mapping})
+				service.UpdateGrokRefusalRoute(c, turnBillingAPIKeys.forTurn(turn, apiKey), clientRequestedUsageFields(c, mapping, model, mapping.MappedModel))
 				return mapping.MappedModel, nil
 			},
 			BeforeTurn: func(turn int) error {
@@ -2975,6 +2987,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 					// 当前账号，越线即要求客户端重连重选（连接绑定单一上游账号，
 					// 无法中途换号）。本 turn 的准入与计费共用同一 pricingAt。
 					turnBillingCtx := turnBillingAPIKeys.begin(ctx, h.apiKeyService, turn, apiKey)
+					if snapshot := turnChannelMapping.Load(); snapshot != nil && snapshot.turn == turn {
+						service.UpdateGrokRefusalRoute(c, turnBillingAPIKeys.forTurn(turn, apiKey), clientRequestedUsageFields(c, snapshot.mapping, snapshot.model, snapshot.mapping.MappedModel))
+					}
 					turnCtx, turnAt := h.gatewayService.WithOpenAITurnPricingContext(turnBillingCtx, apiKey.GroupID)
 					if _, vetoed, reason := h.gatewayService.ProfitControlVetoLatest(turnCtx, account); vetoed {
 						reqLog.Info("openai.websocket_turn_profit_vetoed",
@@ -3034,6 +3049,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 					clearCyberPolicyAttemptState(c, !cyberBlockPendingAfterFailover)
 				}()
 				releaseTurnSlots()
+				if service.IsGrokRefusalWSFailure(turnErr) {
+					return
+				}
 				turnRequestedModel := reqModel
 				turnUpstreamModel := ""
 				if result != nil && turn > 1 {

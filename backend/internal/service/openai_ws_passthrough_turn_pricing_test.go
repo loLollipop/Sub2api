@@ -141,6 +141,55 @@ func TestPassthroughIngressFreezesSubsequentTurnBeforeRequestPolicy(t *testing.T
 	testPassthroughIngressFreezesSubsequentTurnBeforeRequestPolicy(t, coderws.MessageText)
 }
 
+func TestPassthroughIngressChecksOriginalFrameBeforeAnyTurnAdmission(t *testing.T) {
+	for _, closeStatus := range []coderws.StatusCode{coderws.StatusPolicyViolation, coderws.StatusInternalError} {
+		t.Run(closeStatus.String(), func(t *testing.T) {
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(context.Canceled)
+			upstream := newStagedPassthroughConn()
+			upstream.Send(`{"type":"response.completed","response":{"id":"resp_first","model":"gpt-5.1"}}`)
+			admissions := 0
+			policyCalls := 0
+			var checked []byte
+			hooks := &OpenAIWSIngressHooks{
+				CheckRequest: func(turn int, payload []byte, model string) error {
+					require.Equal(t, 2, turn)
+					require.Equal(t, "gpt-5.1", model)
+					checked = append([]byte(nil), payload...)
+					return NewOpenAIWSClientCloseError(closeStatus, "refused conversation precheck", nil)
+				},
+				BeforeTurn:    func(int) error { admissions++; return nil },
+				BeforeRequest: func(_ int, payload []byte, _ string) ([]byte, error) { policyCalls++; return payload, nil },
+			}
+			server, serverErr := startPassthroughHookRecordingServer(t, ctx, newPassthroughLifecycleService(passthroughLifecycleConfig(), upstream), passthroughLifecycleAccount(), hooks)
+			defer server.Close()
+			client := dialPassthroughLifecycleClient(t, server)
+			defer func() { _ = client.CloseNow() }()
+			_ = requirePassthroughUpstreamWrite(t, upstream, time.Second)
+			_, err := readPassthroughLifecycleFrame(t, client, time.Second)
+			require.NoError(t, err)
+			original := `{"type":"response.create","input":"blocked","client_metadata":{"test":"original"}}`
+			writeCtx, cancelWrite := context.WithTimeout(context.Background(), time.Second)
+			require.NoError(t, client.Write(writeCtx, coderws.MessageBinary, []byte(original)))
+			cancelWrite()
+			// Read the close handshake so the relay can finish and publish errors.
+			_, _ = readPassthroughLifecycleFrame(t, client, time.Second)
+			select {
+			case err := <-serverErr:
+				var closeErr *OpenAIWSClientCloseError
+				require.ErrorAs(t, err, &closeErr)
+				require.Equal(t, closeStatus, closeErr.StatusCode())
+			case <-time.After(3 * time.Second):
+				t.Fatal("precheck rejection did not end relay")
+			}
+			require.Equal(t, original, string(checked))
+			require.Zero(t, admissions, "precheck must precede the first BeforeTurn call")
+			require.Zero(t, policyCalls)
+			require.Empty(t, upstream.writes, "refused frame must never reach upstream")
+		})
+	}
+}
+
 func TestPassthroughIngressFreezesBinarySubsequentTurnBeforeRequestPolicy(t *testing.T) {
 	testPassthroughIngressFreezesSubsequentTurnBeforeRequestPolicy(t, coderws.MessageBinary)
 }

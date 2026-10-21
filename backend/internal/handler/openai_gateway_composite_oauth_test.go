@@ -20,6 +20,8 @@ import (
 func TestOpenAIResponsesWebSocket_RejectsCompositeOAuthAmbiguity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := newOpenAIHandlerForPreviousResponseIDValidation(t, &concurrencyCacheMock{})
+	refusalHandler, _, _, _ := newRefusalHandler(t, nil)
+	h.gatewayService = refusalHandler.gatewayService
 	h.compositeResolver = service.NewCompositeRouteResolver(nil)
 	h.compositeResolver.SetModelOwnershipResolver(func(context.Context, int64, string) (service.CompositeModelOwnership, error) {
 		return service.CompositeModelOwnership{Ambiguous: true, OpenAIGatewayOAuthClaimed: true}, nil

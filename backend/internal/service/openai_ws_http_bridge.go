@@ -27,6 +27,18 @@ const (
 
 const openAIWSHTTPBridgeToolStateContextKey = "openai_ws_http_bridge_tool_state"
 
+// Constructed only from a real HTTP response, never from SSE/WS status fields or
+// an error string. Preserve the body for durable request-refusal classification.
+type openAIWSHTTPBridgeUpstreamError struct {
+	StatusCode   int
+	ResponseBody []byte
+	Message      string
+}
+
+func (e *openAIWSHTTPBridgeUpstreamError) Error() string {
+	return fmt.Sprintf("upstream http bridge error: status=%d message=%s", e.StatusCode, e.Message)
+}
+
 type openAIWSHTTPBridgeToolState struct {
 	ClientMapping apicompat.ResponsesClientToolMapping
 	LoweredTools  json.RawMessage
@@ -613,11 +625,17 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		if account.Platform != PlatformGrok && (shouldFailover || shouldCooldownOpenAITransientUpstreamError(resp.StatusCode, respBody)) {
 			s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody, actualModel)
 		}
+		upstreamErr := &openAIWSHTTPBridgeUpstreamError{StatusCode: resp.StatusCode, ResponseBody: append([]byte(nil), respBody...), Message: upstreamMsg}
+		if account.Platform == PlatformGrok && isGrokBillableRefusal(resp.StatusCode, respBody) {
+			// The ingress loop commits the block and charge before any refusal
+			// becomes client-visible, then runs AfterTurn to release its slots.
+			return nil, upstreamErr
+		}
 		clientError := buildOpenAIWSHTTPBridgeErrorEvent(resp.StatusCode, upstreamMsg)
 		if writeErr := writeClientMessage(clientError); writeErr == nil {
 			markOpenAIWSClientVisibleFailure(c, "error", clientError)
 		}
-		return nil, fmt.Errorf("upstream http bridge error: status=%d message=%s", resp.StatusCode, upstreamMsg)
+		return nil, upstreamErr
 	}
 	defer func() { _ = resp.Body.Close() }()
 	stopCancelBody := context.AfterFunc(ctx, func() { _ = resp.Body.Close() })

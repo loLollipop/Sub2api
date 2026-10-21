@@ -1097,7 +1097,7 @@ func TestOpenAIGatewayServiceForwardImages_OAuthNonStreamServerErrorReturnsFailo
 	require.Nil(t, result)
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
-	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.Equal(t, http.StatusInternalServerError, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "temporarily unavailable")
 	require.False(t, c.Writer.Written())
 	require.Empty(t, rec.Body.String())
@@ -1109,7 +1109,7 @@ func TestOpenAIGatewayServiceForwardImages_OAuthNonStreamServerErrorReturnsFailo
 	require.Len(t, events, 1)
 	require.Equal(t, "failover", events[0].Kind)
 	require.Equal(t, account.ID, events[0].AccountID)
-	require.Equal(t, http.StatusBadGateway, events[0].UpstreamStatusCode)
+	require.Equal(t, http.StatusInternalServerError, events[0].UpstreamStatusCode)
 }
 
 func TestOpenAIGatewayServiceForwardImages_OAuth429CarriesSameAccountRetryWindow(t *testing.T) {
@@ -1302,6 +1302,24 @@ func TestOpenAIGatewayServiceForwardImages_OAuthStreamServerErrorAfterFlushDoesN
 	require.Len(t, events, 1)
 	require.Equal(t, "retry_exhausted_failover", events[0].Kind)
 	require.Equal(t, account.ID, events[0].AccountID)
+}
+
+func TestOpenAIImagesSSEServerErrorsPreserveStatus(t *testing.T) {
+	for _, test := range []struct {
+		payload string
+		status  int
+	}{
+		{`{"type":"error","error":{"type":"server_error","message":"unavailable"}}`, 500},
+		{`{"type":"error","error":{"code":"api_error","message":"unavailable"}}`, 500},
+		{`{"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}`, 529},
+		{`{"type":"error","error":{"code":"overloaded","message":"overloaded"}}`, 529},
+		{`{"type":"error","error":{"code":"server_is_overloaded","message":"overloaded"}}`, 529},
+	} {
+		failure := openAIImagesUpstreamErrorFromSSEPayload([]byte(test.payload))
+		require.NotNil(t, failure)
+		require.Equal(t, test.status, failure.StatusCode)
+		require.True(t, IsOpenAIImagesRetryableUpstreamError(failure))
+	}
 }
 
 func TestOpenAIImagesSSEClientErrorsAreNotRetryable(t *testing.T) {

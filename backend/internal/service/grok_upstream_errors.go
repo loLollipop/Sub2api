@@ -140,6 +140,7 @@ func grokAccountAccessMessage(value string) bool {
 		"ip address",
 		"ip blocked",
 		"ip has been blocked",
+		"blocked by global ip blacklist",
 		"account access denied",
 		"insufficient permissions",
 	} {

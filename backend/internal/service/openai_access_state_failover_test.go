@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 type openAIStream403AccountRepo struct {
@@ -235,13 +237,57 @@ func TestOpenAIStreamSemanticStatusesPreservedAcrossTerminalShapes(t *testing.T)
 		{"forbidden", `{"type":"response.failed","response":{"error":{"type":"permission_error","message":"forbidden"}}}`, http.StatusForbidden, false},
 		{"rate_limit", `{"error":{"type":"rate_limit_error","code":"rate_limit_exceeded","message":"slow down"}}`, http.StatusTooManyRequests, true},
 		{"overload_529", `{"type":"error","error":{"status_code":529,"code":"overloaded","message":"overloaded"}}`, 529, true},
+		{"server_error", `{"type":"response.failed","response":{"error":{"type":"server_error","message":"provider unavailable"}}}`, http.StatusInternalServerError, true},
+		{"api_error", `{"type":"error","error":{"type":"api_error","message":"provider unavailable"}}`, http.StatusInternalServerError, false},
+		{"explicit_520", `{"type":"response.failed","response":{"error":{"status_code":520,"type":"server_error","message":"provider unavailable"}}}`, 520, true},
+		{"explicit_503", `{"error":{"status_code":503,"type":"server_error","message":"temporarily unavailable"}}`, http.StatusServiceUnavailable, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			payload := []byte(tt.body)
 			message := extractOpenAISSEErrorMessage(payload)
 			require.Equal(t, tt.status, openAIStreamFailureStatus(payload, message))
-			require.Equal(t, tt.wantFailover, openAIStreamErrorEventShouldFailover(payload, message))
+			if gjson.GetBytes(payload, "type").String() == "response.failed" {
+				require.Equal(t, tt.wantFailover, openAIStreamFailedEventShouldFailover(payload, message))
+			} else {
+				require.Equal(t, tt.wantFailover, openAIStreamErrorEventShouldFailover(payload, message))
+			}
+		})
+	}
+}
+
+func TestOpenAIStreamServerFailureAfterOutputDoesNotFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, passthrough := range []bool{false, true} {
+		name := "native"
+		if passthrough {
+			name = "passthrough"
+		}
+		t.Run(name, func(t *testing.T) {
+			svc := &OpenAIGatewayService{cfg: &config.Config{}, toolCorrector: NewCodexToolCorrector()}
+			account := &Account{ID: 925, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			stream := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n" +
+				"data: {\"type\":\"response.failed\",\"response\":{\"id\":\"resp_failed\",\"error\":{\"status_code\":520,\"type\":\"server_error\",\"message\":\"provider unavailable\"}}}\n\n"
+			resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}},
+				Body: io.NopCloser(strings.NewReader(stream))}
+			var err error
+			if passthrough {
+				result, forwardErr := svc.handleStreamingResponsePassthrough(context.Background(), resp, c, account, time.Now(), "gpt-5", "gpt-5")
+				require.NotNil(t, result)
+				err = forwardErr
+			} else {
+				result, forwardErr := svc.handleStreamingResponse(context.Background(), resp, c, account, time.Now(), "gpt-5", "gpt-5")
+				require.NotNil(t, result)
+				err = forwardErr
+			}
+			require.Error(t, err)
+			var failover *UpstreamFailoverError
+			require.False(t, errors.As(err, &failover))
+			require.Contains(t, rec.Body.String(), "partial")
+			require.Contains(t, rec.Body.String(), "response.failed")
 		})
 	}
 }

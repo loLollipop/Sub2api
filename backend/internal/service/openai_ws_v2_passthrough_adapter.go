@@ -1046,6 +1046,15 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 						turnLifecycle.cancelResponseCreate()
 					}
 				}()
+				if hooks != nil && hooks.CheckRequest != nil {
+					model := usageMeta.requestModelForFrame(payload)
+					if model == "" {
+						model = loadCapturedSessionModel()
+					}
+					if err := hooks.CheckRequest(int(completedTurns.Load())+1, payload, model); err != nil {
+						return payload, nil, err
+					}
+				}
 			}
 			responsesLite := isResponseCreate && isOpenAIResponsesLiteWebSocketPayload(payload)
 			if isResponseCreate {
@@ -1111,11 +1120,6 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 						return payload, nil, err
 					} else if next != nil {
 						payload = next
-					}
-				}
-				if hooks != nil && hooks.BeforeTurn != nil {
-					if err := hooks.BeforeTurn(turnNo); err != nil {
-						return payload, nil, err
 					}
 				}
 				if hooks != nil && hooks.MapRequestModel != nil {

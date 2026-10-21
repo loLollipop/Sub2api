@@ -123,7 +123,9 @@ func TestOpenAIResponsesWebSocket_SmartKeyResolvesFirstFrameFromAccountCatalog(t
 			billing := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil)
 			t.Cleanup(billing.Stop)
 			usage := &openAIWSUsageHandlerUsageLogRepoStub{created: make(chan *service.UsageLog, 1)}
-			gateway := service.NewOpenAIGatewayService(repo, usage, smartRouteHandlerBilling{}, nil, nil, nil, nil, cfg, snapshot, nil,
+			refusals := &refusalHandlerRepo{durableMediaHandlerRepo: &durableMediaHandlerRepo{jobs: map[string]*service.MediaBillingJob{}}}
+			billingRepo := smartRouteHandlerRefusalBilling{MediaBillingJobRepository: refusals, GrokRefusalRepository: refusals}
+			gateway := service.NewOpenAIGatewayService(repo, usage, billingRepo, nil, nil, nil, nil, cfg, snapshot, nil,
 				service.NewBillingService(cfg, nil), nil, billing, nil, &service.DeferredService{}, nil, nil, nil, channelService, nil, nil, nil)
 			cache := &concurrencyCacheMock{
 				acquireUserSlotFn:    func(context.Context, int64, int, string) (bool, error) { return true, nil },

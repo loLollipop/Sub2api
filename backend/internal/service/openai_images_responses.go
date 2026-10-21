@@ -111,6 +111,8 @@ func openAIImagesSSEErrorStatus(errType, code string) int {
 	code = strings.ToLower(strings.TrimSpace(code))
 
 	switch {
+	case errType == "overloaded_error" || code == "overloaded_error" || code == "overloaded" || code == "server_is_overloaded":
+		return 529
 	case strings.Contains(errType, "rate_limit"), strings.Contains(code, "rate_limit"):
 		return http.StatusTooManyRequests
 	case strings.Contains(errType, "authentication"), strings.Contains(code, "invalid_api_key"), code == "unauthorized":
@@ -119,6 +121,8 @@ func openAIImagesSSEErrorStatus(errType, code string) int {
 		return http.StatusForbidden
 	case strings.Contains(errType, "not_found"), strings.Contains(code, "not_found"):
 		return http.StatusNotFound
+	case errType == "server_error" || errType == "api_error" || code == "server_error" || code == "api_error":
+		return http.StatusInternalServerError
 	case strings.Contains(errType, "invalid_request"),
 		errType == "image_generation_user_error",
 		code == "moderation_blocked",

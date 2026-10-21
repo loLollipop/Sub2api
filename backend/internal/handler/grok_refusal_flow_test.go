@@ -5,6 +5,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	middleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -18,12 +19,24 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type refusalHandlerRepo struct {
 	*durableMediaHandlerRepo
 	blocks               map[int64]map[string]string
 	lookupErr, commitErr error
+	allowOrdinaryUsage   bool
+}
+
+func (r *refusalHandlerRepo) Apply(ctx context.Context, cmd *service.UsageBillingCommand) (*service.UsageBillingApplyResult, error) {
+	if !r.allowOrdinaryUsage {
+		return r.durableMediaHandlerRepo.Apply(ctx, cmd)
+	}
+	r.mu.Lock()
+	r.directApply++
+	r.mu.Unlock()
+	return &service.UsageBillingApplyResult{}, nil
 }
 
 func (r *refusalHandlerRepo) FindGrokRefusal(_ context.Context, user int64, keys []string) (bool, error) {
@@ -69,13 +82,36 @@ func (r *refusalHandlerRepo) CommitGrokRefusal(_ context.Context, job *service.M
 
 type refusalHandlerUpstream struct {
 	service.HTTPUpstream
-	calls atomic.Int32
-	body  string
+	calls           atomic.Int32
+	body            string
+	status          int
+	contentType     string
+	responseForCall func(int32) (int, string, string)
+}
+
+type refusalHandlerAccountRepo struct {
+	openAIImagesFailoverAccountRepo
+}
+
+func (refusalHandlerAccountRepo) SetTempUnschedulable(context.Context, int64, time.Time, string) error {
+	return nil
 }
 
 func (u *refusalHandlerUpstream) Do(*http.Request, string, int64, int) (*http.Response, error) {
-	u.calls.Add(1)
-	return &http.Response{StatusCode: 403, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(u.body))}, nil
+	call := u.calls.Add(1)
+	if u.responseForCall != nil {
+		status, contentType, body := u.responseForCall(call)
+		return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {contentType}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+	}
+	status := u.status
+	if status == 0 {
+		status = http.StatusForbidden
+	}
+	contentType := u.contentType
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {contentType}}, Body: io.NopCloser(strings.NewReader(u.body))}, nil
 }
 
 func newRefusalHandler(t *testing.T, price *float64) (*OpenAIGatewayHandler, *refusalHandlerRepo, *refusalHandlerUpstream, *service.APIKey) {
@@ -85,7 +121,7 @@ func newRefusalHandler(t *testing.T, price *float64) (*OpenAIGatewayHandler, *re
 	primary := &service.Group{ID: 9, Platform: service.PlatformGrok, Status: service.StatusActive, Hydrated: true, CrossProtocolConversionEnabled: true, RateMultiplier: 13, GrokModerationRefusalPrice: &primaryPrice}
 	selected := &service.Group{ID: 17, Platform: service.PlatformGrok, Status: service.StatusActive, Hydrated: true, CrossProtocolConversionEnabled: true, RateMultiplier: 7, GrokModerationRefusalPrice: price}
 	accounts := []service.Account{{ID: 17001, Platform: service.PlatformGrok, Type: service.AccountTypeAPIKey, Status: service.StatusActive, Schedulable: true, GroupIDs: []int64{17}, Concurrency: 10, Credentials: map[string]any{"api_key": "synthetic", "model_mapping": map[string]any{"grok-4": "grok-4", "grok-4-fast": "grok-4-fast"}}}}
-	accountRepo := openAIImagesFailoverAccountRepo{accounts: accounts}
+	accountRepo := refusalHandlerAccountRepo{openAIImagesFailoverAccountRepo{accounts: accounts}}
 	cfg := &config.Config{RunMode: config.RunModeStandard}
 	cfg.Default.RateMultiplier = 3
 	cfg.Billing.BalancePreauthorizationEnabled = false
@@ -173,7 +209,7 @@ func TestGrokRefusalHTTPThreeProtocolsSelectedRouteAndLocalBlock(t *testing.T) {
 	}
 }
 func TestGrokRefusalHTTPStorageFailureAndNonContentExclusions(t *testing.T) {
-	for _, mode := range []string{"lookup", "commit", "account", "ip", "cyber"} {
+	for _, mode := range []string{"lookup", "commit", "account", "ip", "global_ip", "cyber"} {
 		t.Run(mode, func(t *testing.T) {
 			h, repo, up, key := newRefusalHandler(t, nil)
 			switch mode {
@@ -185,6 +221,8 @@ func TestGrokRefusalHTTPStorageFailureAndNonContentExclusions(t *testing.T) {
 				up.body = `{"error":{"code":"account_disabled","message":"I'm sorry, I can't help with that request."}}`
 			case "ip":
 				up.body = `{"error":{"message":"IP address blocked. I'm sorry, I can't help with that request."}}`
+			case "global_ip":
+				up.body = `{"error":{"message":"blocked by global ip blacklist. I'm sorry, I can't help with that request. Failed check: SAFETY_CHECK_TYPE"}}`
 			case "cyber":
 				up.body = `{"error":{"code":"cyber_policy","message":"request rejected"}}`
 			}
@@ -233,4 +271,20 @@ func TestGrokRefusalCheckDoesNotAffectNonGrokRequest(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil).WithContext(service.ContextWithAPIKeyRoute(context.Background(), &keyCopy))
 	require.False(t, rejectGrokRefusedRequest(c, h.gatewayService, &keyCopy, []byte(`{"model":"gpt-5","messages":[{"role":"user","content":"x"}]}`), nil, h.errorResponse))
+}
+
+func TestGrokRefusalHTTPThreeProtocolsRequireReal403(t *testing.T) {
+	for _, endpoint := range []string{"chat/completions", "responses", "messages"} {
+		for _, status := range []int{http.StatusBadRequest, http.StatusOK} {
+			t.Run(fmt.Sprintf("%s/%d", endpoint, status), func(t *testing.T) {
+				h, repo, up, key := newRefusalHandler(t, nil)
+				up.status = status
+				up.body = `{"error":{"status":403,"code":"content_policy_violation","message":"I'm sorry, I can't help with that request. Failed check: SAFETY_CHECK_TYPE"}}`
+				_ = refusalHandlerRequest(h, key, endpoint, "grok-4", "refuse")
+				require.Empty(t, repo.jobs)
+				require.Empty(t, repo.blocks)
+				require.Zero(t, repo.applyCount)
+			})
+		}
+	}
 }

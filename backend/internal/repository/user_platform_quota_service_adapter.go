@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -59,6 +60,52 @@ func (a *userPlatformQuotaServiceAdapter) ListByUser(ctx context.Context, userID
 			DailyWindowStart:   r.DailyWindowStart,
 			WeeklyWindowStart:  r.WeeklyWindowStart,
 			MonthlyWindowStart: r.MonthlyWindowStart,
+		}
+	}
+	// Only the API-facing list merges the durable refusal component. The single
+	// record getter remains the base used to refill Redis/flusher snapshots.
+	for i := range out {
+		rec := &out[i]
+		if rec.Platform != service.PlatformGrok {
+			continue
+		}
+		quota, err := a.GetGrokRefusalQuotaUsage(ctx, userID, rec.Platform)
+		if err != nil {
+			return nil, err
+		}
+		if quota == nil {
+			continue
+		}
+		now := time.Now()
+		d, w, m := quota.Current(now)
+		if d > 0 {
+			day := timezone.StartOfDay(now)
+			if rec.DailyWindowStart == nil || rec.DailyWindowStart.Before(day) {
+				rec.DailyUsageUSD = 0
+			}
+			rec.DailyUsageUSD = service.QuantizeUsageBillingAmount(rec.DailyUsageUSD + d)
+			rec.DailyWindowStart = &day
+		}
+		if w > 0 {
+			week := timezone.StartOfWeek(now)
+			if rec.WeeklyWindowStart == nil || rec.WeeklyWindowStart.Before(week) {
+				rec.WeeklyUsageUSD = 0
+			}
+			rec.WeeklyUsageUSD = service.QuantizeUsageBillingAmount(rec.WeeklyUsageUSD + w)
+			rec.WeeklyWindowStart = &week
+		}
+		if m > 0 {
+			if rec.MonthlyWindowStart == nil || now.Sub(*rec.MonthlyWindowStart) >= 30*24*time.Hour {
+				rec.MonthlyUsageUSD = 0
+			}
+			limit := rec.MonthlyUsageUSD + m + 1
+			if rec.MonthlyLimitUSD != nil {
+				limit = *rec.MonthlyLimitUSD
+			}
+			resetAt := quota.MonthlyResetAt(rec.MonthlyUsageUSD, rec.MonthlyWindowStart, limit, now)
+			start := resetAt.Add(-30 * 24 * time.Hour)
+			rec.MonthlyWindowStart = &start
+			rec.MonthlyUsageUSD = service.QuantizeUsageBillingAmount(rec.MonthlyUsageUSD + m)
 		}
 	}
 	return out, nil

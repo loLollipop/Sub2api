@@ -2,28 +2,30 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.7",
-  "imported_commit": "24fa1a78b6f81117f1ce4ece982e355aeb11c94b",
-  "personal_baseline_commit": "564915f22f2e1d251b7fb249d7dd4c396557a23b",
-  "latest_observed_version": "2.2.7",
-  "latest_observed_release_commit": "24fa1a78b6f81117f1ce4ece982e355aeb11c94b",
-  "latest_observed_main_commit": "648c17cc14846c901726f866fa76059d61aacc75",
+  "imported_version": "2.2.11",
+  "imported_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
+  "personal_baseline_commit": "4d20b02849ca51dbb5a2b61f675a599d4411c3ca",
+  "latest_observed_version": "2.2.11",
+  "latest_observed_release_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
+  "latest_observed_main_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.7",
-  "reviewed_release_commit": "24fa1a78b6f81117f1ce4ece982e355aeb11c94b",
+  "reviewed_release_tag": "v2.2.11",
+  "reviewed_release_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
   "observed_delta_review": {
-    "from_commit": "152b7758da66076e36c732c4b933aa5899193049",
-    "to_commit": "24fa1a78b6f81117f1ce4ece982e355aeb11c94b",
-    "status": "selective_formal_v227_backport",
-    "scope": "Review only formal v2.2.7: complete successful-provider SSE readiness and Bedrock idle heartbeat; preserve local bounded sync JSON/SSE support, atomic retry gating, ordinary-stream commitment and compact exception. Keep prior feature and migration deferrals.",
-    "evidence": "maintenance/notes/upstream-sync-20261020-v227.md"
+    "from_commit": "24fa1a78b6f81117f1ce4ece982e355aeb11c94b",
+    "to_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
+    "status": "selective_formal_v2211_backport",
+    "scope": "Review formal v2.2.8 through v2.2.11: bounded wallet preload, additive Claude catalog, stale modal-load isolation, bulk model allowlist parsing, and locally corrected Grok refusal charging/permanent conversation blocks. Preserve authoritative empty catalogs and all unrelated feature/migration deferrals.",
+    "evidence": "maintenance/notes/upstream-sync-20261021-v2211.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "24fa1a78b6f81117f1ce4ece982e355aeb11c94b",
+    "source_head": "6c6a9efc96573c879b049265bc57a2d42509bda1",
     "implemented_with_local_regression": [
+      "Formal v2.2.8-v2.2.11 bounded wallet preload before statistics, four additive Claude aliases, stale modal-load isolation, bulk allowlist parsing and non-failover Grok safety-check classification; preserve authoritative empty catalogs (see dated sync note)",
+      "Grok refusal charging and permanent conversation blocks: exact zero-price override, user-scoped full-history identity, atomic billing/block/quota commit and existing-worker recovery; full local backend/frontend regressions pass, live PostgreSQL/Redis validation pending (see Grok adaptation note)",
       "Formal v2.2.7 successful-provider SSE readiness and Bedrock idle heartbeat; retain local bounded sync JSON/SSE parsing and retry/commitment contracts (see dated sync note)",
       "Formal v2.2.6 streaming/config and privacy-preserving cyber excerpt adaptations; release-only upstream reminders with exact tag checkpoints (see dated sync note)",
       "OpenAI Responses legacy web_search_preview alias normalization on HTTP and WebSocket outbound paths, with dated-type boundaries and native-provider preservation (v2.2.2 source review)",
@@ -115,17 +117,11 @@
       "reason": "Implemented through the local authorized dynamic catalog rather than the source static platform list; local catalog/scope regressions pass. Live native-provider verification remains outstanding. See cumulative_sync rather than treating the old deferral as unimplemented."
     },
     {
-      "feature": "grok-moderation-refusal-billing",
+      "feature": "unconditional-single-group-default-model-injection",
       "upstream_commits": [
-        "8d487b465",
-        "f0d3865f3",
-        "8262ca158",
-        "c928b8670",
-        "80bffc964",
-        "323793755",
-        "c0f193e70"
+        "3f453f544"
       ],
-      "reason": "Re-reviewed through formal v2.2.6. Raw Chat refusal remains a plain error but the added charging/blocking branch is nested under failover-only handling; real entry lacks the matching block read and group-only keys lack API-key isolation. Fixed group pricing also collides with immutable local migration261 and has no proven exactly-once local settlement contract. Preserve existing pricing/session behavior; defer all dependent billing/schema/test changes until these issues are covered."
+      "reason": "Local catalogs distinguish unknown nil from authoritative empty results and preserve retired-model, native-provider, explicit mapping and group allowlist boundaries. Keep existing fallback behavior instead of globally enabling static defaults for every single-group key. The four missing Claude aliases and frontend bulk allowlist improvements are adapted independently."
     },
     {
       "feature": "plaintext-reasoning-request-history",
@@ -233,5 +229,21 @@
     "source": "kiss-kedaya/sub2api@f7bde184592d6855d4b27d1f705a8aad13f49e3f",
     "status": "implemented_native_regressions_verified_pending_release_ci",
     "scope": "Retire local Mixed platform, protocol fallback/probes, provider rates and key category scopes. Restore independent native providers and native forwarding, retaining Command Code/Cline shared provider profiles, TypeSafe isolation and unrelated local fixes. Applied migrations255-266 remain immutable; legacy mixed and non-all scope configurations require explicit operator migration."
+  },
+  "grok_refusal_adaptation": {
+    "source_commits": [
+      "8d487b465",
+      "f0d3865f3",
+      "8262ca158",
+      "c928b8670",
+      "80bffc964",
+      "323793755",
+      "c0f193e70",
+      "8b8a190e3",
+      "6c6a9efc9"
+    ],
+    "status": "implemented_local_regressions_verified_live_db_pending",
+    "evidence": "maintenance/notes/grok-refusal-adaptation-20261021.md",
+    "scope": "Three text protocols; explicit zero-price override; user-scoped durable full-history/conversation blocks; atomic billing/block/platform-quota effects and replay-safe cache invalidation using the existing settlement worker; zero-only simple-mode recovery. Full local backend/frontend regression, vet and embedded build pass. Real PostgreSQL/Redis validation pending. No paid upstream calls or deployment."
   }
 }

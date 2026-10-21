@@ -111,7 +111,21 @@ export const addCustomModelAllowlistItem = (
   state: ModelAllowlistState,
   raw: string,
 ): ModelAllowlistAddError | null => {
-  const entry = raw.trim()
+  const entries = raw.split(/[\r\n,;\t ]+/).map(item => item.trim()).filter(Boolean)
+  if (entries.length > 1) {
+    for (const entry of entries) {
+      appendModelAllowlistEntry(state, entry)
+    }
+    return null
+  }
+  return appendModelAllowlistEntry(state, entries[0] ?? '')
+}
+
+// Bulk additions skip invalid and duplicate entries; single additions return the error.
+const appendModelAllowlistEntry = (
+  state: ModelAllowlistState,
+  entry: string,
+): ModelAllowlistAddError | null => {
   if (!entry) {
     return 'empty'
   }

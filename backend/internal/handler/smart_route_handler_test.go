@@ -61,6 +61,12 @@ func (smartRouteHandlerBilling) Apply(context.Context, *service.UsageBillingComm
 	return &service.UsageBillingApplyResult{Applied: true}, nil
 }
 
+type smartRouteHandlerRefusalBilling struct {
+	smartRouteHandlerBilling
+	service.MediaBillingJobRepository
+	service.GrokRefusalRepository
+}
+
 type smartRouteHandlerUpstream struct {
 	service.HTTPUpstream
 	groupID int64
@@ -126,8 +132,10 @@ func TestSmartRouteHandlerFallbackUpdatesForwardingAndUsage(t *testing.T) {
 			t.Cleanup(billingCache.Stop)
 			usage := smartRouteHandlerUsage{logs: make(chan *service.UsageLog, 1)}
 			upstream := &smartRouteHandlerUpstream{}
-			gateway := service.NewOpenAIGatewayService(accountRepo, usage, smartRouteHandlerBilling{}, nil, nil, nil, nil, cfg, snapshot, nil,
+			refusalRepo := &unblockedGrokHandlerBillingRepo{t: t}
+			gateway := service.NewOpenAIGatewayService(accountRepo, usage, smartRouteHandlerRefusalBilling{smartRouteHandlerBilling{}, refusalRepo, refusalRepo}, nil, nil, nil, nil, cfg, snapshot, nil,
 				service.NewBillingService(cfg, nil), nil, billingCache, upstream, &service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil)
+			t.Cleanup(gateway.CloseOpenAIWSPool)
 			h := NewOpenAIGatewayHandler(gateway, service.NewConcurrencyService(nil), billingCache, &service.APIKeyService{}, nil, nil, nil, nil, cfg)
 			key := &service.APIKey{ID: 7, UserID: 42, User: &service.User{ID: 42, Status: service.StatusActive}, GroupID: &primary.ID, Group: primary, RouteGroupIDs: []int64{9, 17}}
 			body := `{"model":"gpt-5.1","stream":false,"input":"hello"}`

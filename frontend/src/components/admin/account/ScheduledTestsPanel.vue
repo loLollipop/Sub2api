@@ -553,7 +553,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onUnmounted, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
@@ -659,6 +659,8 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 let refreshInFlight = false
 let resultsRevision: string | null = null
 let resultsWindowRevision: string | null = null
+let panelRevision = 0
+let plansRequestId = 0
 const planRevision = (plan?: ScheduledTestPlan) => JSON.stringify([plan?.last_run_at, plan?.quality_provider, plan?.quality_check_enabled, plan?.max_results])
 const resultLimit = (plan?: ScheduledTestPlan) => Math.min(Math.max(plan?.max_results || 50, 1), 200)
 const resultWindowRevision = (plan?: ScheduledTestPlan) => JSON.stringify([plan?.quality_provider, plan?.quality_check_enabled, resultLimit(plan)])
@@ -666,11 +668,13 @@ function stopRefresh() { if (refreshTimer) clearInterval(refreshTimer); refreshT
 onUnmounted(stopRefresh)
 const refreshOpenPanel = async () => {
   const accountId = props.accountId
+  const revision = panelRevision
+  const isCurrent = () => revision === panelRevision && props.show && props.accountId === accountId
   if (!props.show || !accountId || creating.value || updating.value || loadingResults.value || refreshInFlight || document.visibilityState === 'hidden') return
   refreshInFlight = true
   try {
     const latest = await adminAPI.scheduledTests.listByAccount(accountId)
-    if (!props.show || props.accountId !== accountId) return
+    if (!isCurrent()) return
     plans.value = latest
     const planId = expandedPlanId.value
     if (planId) {
@@ -684,7 +688,7 @@ const refreshOpenPanel = async () => {
       const afterId = windowChanged ? undefined : results.value.reduce((id, result) => Math.max(id, result.id), 0)
       const requestId = resultsRequestId
       const latestResults = await adminAPI.scheduledTests.listResults(planId, limit, afterId)
-      if (requestId === resultsRequestId && props.show && expandedPlanId.value === planId && props.accountId === accountId) {
+      if (isCurrent() && requestId === resultsRequestId && expandedPlanId.value === planId) {
         if (windowChanged) {
           results.value = latestResults.slice(0, limit)
         } else {
@@ -698,42 +702,52 @@ const refreshOpenPanel = async () => {
       }
     }
   } catch { /* Background refresh must not spam error toasts. */ }
-  finally { refreshInFlight = false }
+  finally { if (isCurrent()) refreshInFlight = false }
 }
-
-// Load plans when dialog opens
-let panelUnmounted = false
-onUnmounted(() => { panelUnmounted = true })
-const onVisibilityChange = async (visible: boolean) => {
-    if (visible && props.accountId) {
-      await loadPlans()
-      stopRefresh()
-      if (props.show && !panelUnmounted) refreshTimer = setInterval(() => { void refreshOpenPanel() }, 15000)
-    } else {
-      stopRefresh()
-      plans.value = []
-      results.value = []
-      expandedPlanId.value = null
-      selectedResultId.value = null
-      previewMode.value = 'preview'
-      showAddForm.value = false
-      showDeleteConfirm.value = false
-    }
-  }
-watch(() => props.show, onVisibilityChange)
-onMounted(() => { void onVisibilityChange(props.show) })
 
 const loadPlans = async () => {
-  if (!props.accountId) return
+  const accountId = props.accountId
+  if (!props.show || !accountId) return
+  const revision = panelRevision
+  const requestId = ++plansRequestId
+  const isCurrent = () => revision === panelRevision && requestId === plansRequestId && props.show && props.accountId === accountId
   loading.value = true
   try {
-    plans.value = await adminAPI.scheduledTests.listByAccount(props.accountId)
+    const data = await adminAPI.scheduledTests.listByAccount(accountId)
+    if (isCurrent()) plans.value = data
   } catch (error: any) {
-    appStore.showError(error?.message || 'Failed to load plans')
+    if (isCurrent()) appStore.showError(error?.message || 'Failed to load plans')
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
+
+watch(
+  [() => props.show, () => props.accountId],
+  async ([visible, accountId], _previous, onCleanup) => {
+    const revision = ++panelRevision
+    onCleanup(() => { panelRevision++; stopRefresh() })
+    stopRefresh()
+    refreshInFlight = false
+    loading.value = false
+    plans.value = []
+    results.value = []
+    expandedPlanId.value = null
+    selectedResultId.value = null
+    resultsRevision = null
+    resultsWindowRevision = null
+    previewMode.value = 'preview'
+    showAddForm.value = false
+    showDeleteConfirm.value = false
+    editingPlanId.value = null
+    if (visible && accountId) {
+      await loadPlans()
+      if (revision !== panelRevision || !props.show || props.accountId !== accountId) return
+      refreshTimer = setInterval(() => { void refreshOpenPanel() }, 15000)
+    }
+  },
+  { immediate: true }
+)
 
 const handleCreate = async () => {
   if (!props.accountId || !newPlan.model_id || !newPlan.cron_expression) return

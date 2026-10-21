@@ -38,6 +38,68 @@ describe('scheduled test result selection', () => {
     listByAccount.mockResolvedValue([1, 2].map(id => ({ id, model_id: `model-${id}`, enabled: true })))
   })
 
+  it.each(['resolve', 'reject'] as const)('does not let an old account load that %ss start polling or clear current loading', async outcome => {
+    vi.useFakeTimers()
+    const old = deferred<unknown[]>()
+    const current = deferred<unknown[]>()
+    listByAccount.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise)
+    const wrapper = shallowMount(ScheduledTestsPanel, {
+      props: { show: true, accountId: 1, modelOptions: [] },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' } } },
+    })
+    try {
+      await wrapper.setProps({ accountId: 2 })
+      expect(listByAccount.mock.calls).toEqual([[1], [2]])
+      if (outcome === 'resolve') old.resolve([{ id: 1, model_id: 'obsolete' }])
+      else old.reject(new Error('obsolete'))
+      await flushPromises()
+      expect(wrapper.text()).toContain('common.loading')
+      expect(wrapper.text()).not.toContain('obsolete')
+      expect(showError).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(30000)
+      expect(listByAccount).toHaveBeenCalledTimes(2)
+      current.resolve([{ id: 2, model_id: 'current', enabled: true }])
+      await flushPromises()
+      expect(wrapper.text()).toContain('current')
+      expect(wrapper.text()).not.toContain('common.loading')
+      expect(vi.getTimerCount()).toBe(1)
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('ignores a background plan refresh from an earlier opening of the same account', async () => {
+    vi.useFakeTimers()
+    const oldRefresh = deferred<unknown[]>()
+    const currentRefresh = deferred<unknown[]>()
+    listByAccount.mockResolvedValueOnce([{ id: 1, model_id: 'first', enabled: true }])
+      .mockReturnValueOnce(oldRefresh.promise)
+      .mockResolvedValueOnce([{ id: 2, model_id: 'reopened', enabled: true }])
+      .mockReturnValueOnce(currentRefresh.promise)
+    const wrapper = await openPanel()
+    try {
+      await vi.advanceTimersByTimeAsync(15000)
+      await wrapper.setProps({ show: false })
+      await wrapper.setProps({ show: true })
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(listByAccount).toHaveBeenCalledTimes(4)
+      oldRefresh.resolve([{ id: 1, model_id: 'obsolete' }])
+      await flushPromises()
+      expect(wrapper.text()).toContain('reopened')
+      expect(wrapper.text()).not.toContain('obsolete')
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(listByAccount).toHaveBeenCalledTimes(4)
+      currentRefresh.resolve([{ id: 2, model_id: 'current refresh', enabled: true }])
+      await flushPromises()
+      expect(wrapper.text()).toContain('current refresh')
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it.each(['resolve', 'reject'] as const)('ignores an old plan request that later %ss', async outcome => {
     const old = deferred<ReturnType<typeof result>[]>()
     listResults.mockReturnValueOnce(old.promise).mockResolvedValueOnce([result(22)])

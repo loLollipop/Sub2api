@@ -4,7 +4,7 @@ package ent
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"sync"
@@ -22245,6 +22245,8 @@ type GroupMutation struct {
 	addweb_search_price_per_call            *float64
 	search_price_per_1k                     *float64
 	addsearch_price_per_1k                  *float64
+	grok_moderation_refusal_price           *float64
+	addgrok_moderation_refusal_price        *float64
 	audio_realtime_price_per_min            *float64
 	addaudio_realtime_price_per_min         *float64
 	audio_tts_price_per_million_chars       *float64
@@ -22252,8 +22254,8 @@ type GroupMutation struct {
 	audio_stt_price_per_hour                *float64
 	addaudio_stt_price_per_hour             *float64
 	long_context_pricing_enabled            *bool
-	model_pricing                           *json.RawMessage
-	appendmodel_pricing                     json.RawMessage
+	model_pricing                           *jsontext.Value
+	appendmodel_pricing                     jsontext.Value
 	claude_code_only                        *bool
 	fallback_group_id                       *int64
 	addfallback_group_id                    *int64
@@ -24357,6 +24359,76 @@ func (m *GroupMutation) ResetSearchPricePer1k() {
 	delete(m.clearedFields, group.FieldSearchPricePer1k)
 }
 
+// SetGrokModerationRefusalPrice sets the "grok_moderation_refusal_price" field.
+func (m *GroupMutation) SetGrokModerationRefusalPrice(f float64) {
+	m.grok_moderation_refusal_price = &f
+	m.addgrok_moderation_refusal_price = nil
+}
+
+// GrokModerationRefusalPrice returns the value of the "grok_moderation_refusal_price" field in the mutation.
+func (m *GroupMutation) GrokModerationRefusalPrice() (r float64, exists bool) {
+	v := m.grok_moderation_refusal_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGrokModerationRefusalPrice returns the old "grok_moderation_refusal_price" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldGrokModerationRefusalPrice(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGrokModerationRefusalPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGrokModerationRefusalPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGrokModerationRefusalPrice: %w", err)
+	}
+	return oldValue.GrokModerationRefusalPrice, nil
+}
+
+// AddGrokModerationRefusalPrice adds f to the "grok_moderation_refusal_price" field.
+func (m *GroupMutation) AddGrokModerationRefusalPrice(f float64) {
+	if m.addgrok_moderation_refusal_price != nil {
+		*m.addgrok_moderation_refusal_price += f
+	} else {
+		m.addgrok_moderation_refusal_price = &f
+	}
+}
+
+// AddedGrokModerationRefusalPrice returns the value that was added to the "grok_moderation_refusal_price" field in this mutation.
+func (m *GroupMutation) AddedGrokModerationRefusalPrice() (r float64, exists bool) {
+	v := m.addgrok_moderation_refusal_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearGrokModerationRefusalPrice clears the value of the "grok_moderation_refusal_price" field.
+func (m *GroupMutation) ClearGrokModerationRefusalPrice() {
+	m.grok_moderation_refusal_price = nil
+	m.addgrok_moderation_refusal_price = nil
+	m.clearedFields[group.FieldGrokModerationRefusalPrice] = struct{}{}
+}
+
+// GrokModerationRefusalPriceCleared returns if the "grok_moderation_refusal_price" field was cleared in this mutation.
+func (m *GroupMutation) GrokModerationRefusalPriceCleared() bool {
+	_, ok := m.clearedFields[group.FieldGrokModerationRefusalPrice]
+	return ok
+}
+
+// ResetGrokModerationRefusalPrice resets all changes to the "grok_moderation_refusal_price" field.
+func (m *GroupMutation) ResetGrokModerationRefusalPrice() {
+	m.grok_moderation_refusal_price = nil
+	m.addgrok_moderation_refusal_price = nil
+	delete(m.clearedFields, group.FieldGrokModerationRefusalPrice)
+}
+
 // SetAudioRealtimePricePerMin sets the "audio_realtime_price_per_min" field.
 func (m *GroupMutation) SetAudioRealtimePricePerMin(f float64) {
 	m.audio_realtime_price_per_min = &f
@@ -24604,13 +24676,13 @@ func (m *GroupMutation) ResetLongContextPricingEnabled() {
 }
 
 // SetModelPricing sets the "model_pricing" field.
-func (m *GroupMutation) SetModelPricing(jm json.RawMessage) {
-	m.model_pricing = &jm
+func (m *GroupMutation) SetModelPricing(j jsontext.Value) {
+	m.model_pricing = &j
 	m.appendmodel_pricing = nil
 }
 
 // ModelPricing returns the value of the "model_pricing" field in the mutation.
-func (m *GroupMutation) ModelPricing() (r json.RawMessage, exists bool) {
+func (m *GroupMutation) ModelPricing() (r jsontext.Value, exists bool) {
 	v := m.model_pricing
 	if v == nil {
 		return
@@ -24621,7 +24693,7 @@ func (m *GroupMutation) ModelPricing() (r json.RawMessage, exists bool) {
 // OldModelPricing returns the old "model_pricing" field's value of the Group entity.
 // If the Group object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldModelPricing(ctx context.Context) (v json.RawMessage, err error) {
+func (m *GroupMutation) OldModelPricing(ctx context.Context) (v jsontext.Value, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldModelPricing is only allowed on UpdateOne operations")
 	}
@@ -24635,13 +24707,13 @@ func (m *GroupMutation) OldModelPricing(ctx context.Context) (v json.RawMessage,
 	return oldValue.ModelPricing, nil
 }
 
-// AppendModelPricing adds jm to the "model_pricing" field.
-func (m *GroupMutation) AppendModelPricing(jm json.RawMessage) {
-	m.appendmodel_pricing = append(m.appendmodel_pricing, jm...)
+// AppendModelPricing adds j to the "model_pricing" field.
+func (m *GroupMutation) AppendModelPricing(j jsontext.Value) {
+	m.appendmodel_pricing = append(m.appendmodel_pricing, j...)
 }
 
 // AppendedModelPricing returns the list of values that were appended to the "model_pricing" field in this mutation.
-func (m *GroupMutation) AppendedModelPricing() (json.RawMessage, bool) {
+func (m *GroupMutation) AppendedModelPricing() (jsontext.Value, bool) {
 	if len(m.appendmodel_pricing) == 0 {
 		return nil, false
 	}
@@ -26153,7 +26225,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 69)
+	fields := make([]string, 0, 70)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26267,6 +26339,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.search_price_per_1k != nil {
 		fields = append(fields, group.FieldSearchPricePer1k)
+	}
+	if m.grok_moderation_refusal_price != nil {
+		fields = append(fields, group.FieldGrokModerationRefusalPrice)
 	}
 	if m.audio_realtime_price_per_min != nil {
 		fields = append(fields, group.FieldAudioRealtimePricePerMin)
@@ -26445,6 +26520,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.WebSearchPricePerCall()
 	case group.FieldSearchPricePer1k:
 		return m.SearchPricePer1k()
+	case group.FieldGrokModerationRefusalPrice:
+		return m.GrokModerationRefusalPrice()
 	case group.FieldAudioRealtimePricePerMin:
 		return m.AudioRealtimePricePerMin()
 	case group.FieldAudioTtsPricePerMillionChars:
@@ -26592,6 +26669,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldWebSearchPricePerCall(ctx)
 	case group.FieldSearchPricePer1k:
 		return m.OldSearchPricePer1k(ctx)
+	case group.FieldGrokModerationRefusalPrice:
+		return m.OldGrokModerationRefusalPrice(ctx)
 	case group.FieldAudioRealtimePricePerMin:
 		return m.OldAudioRealtimePricePerMin(ctx)
 	case group.FieldAudioTtsPricePerMillionChars:
@@ -26929,6 +27008,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSearchPricePer1k(v)
 		return nil
+	case group.FieldGrokModerationRefusalPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGrokModerationRefusalPrice(v)
+		return nil
 	case group.FieldAudioRealtimePricePerMin:
 		v, ok := value.(float64)
 		if !ok {
@@ -26958,7 +27044,7 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		m.SetLongContextPricingEnabled(v)
 		return nil
 	case group.FieldModelPricing:
-		v, ok := value.(json.RawMessage)
+		v, ok := value.(jsontext.Value)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -27208,6 +27294,9 @@ func (m *GroupMutation) AddedFields() []string {
 	if m.addsearch_price_per_1k != nil {
 		fields = append(fields, group.FieldSearchPricePer1k)
 	}
+	if m.addgrok_moderation_refusal_price != nil {
+		fields = append(fields, group.FieldGrokModerationRefusalPrice)
+	}
 	if m.addaudio_realtime_price_per_min != nil {
 		fields = append(fields, group.FieldAudioRealtimePricePerMin)
 	}
@@ -27279,6 +27368,8 @@ func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedWebSearchPricePerCall()
 	case group.FieldSearchPricePer1k:
 		return m.AddedSearchPricePer1k()
+	case group.FieldGrokModerationRefusalPrice:
+		return m.AddedGrokModerationRefusalPrice()
 	case group.FieldAudioRealtimePricePerMin:
 		return m.AddedAudioRealtimePricePerMin()
 	case group.FieldAudioTtsPricePerMillionChars:
@@ -27432,6 +27523,13 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddSearchPricePer1k(v)
 		return nil
+	case group.FieldGrokModerationRefusalPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddGrokModerationRefusalPrice(v)
+		return nil
 	case group.FieldAudioRealtimePricePerMin:
 		v, ok := value.(float64)
 		if !ok {
@@ -27551,6 +27649,9 @@ func (m *GroupMutation) ClearedFields() []string {
 	if m.FieldCleared(group.FieldSearchPricePer1k) {
 		fields = append(fields, group.FieldSearchPricePer1k)
 	}
+	if m.FieldCleared(group.FieldGrokModerationRefusalPrice) {
+		fields = append(fields, group.FieldGrokModerationRefusalPrice)
+	}
 	if m.FieldCleared(group.FieldAudioRealtimePricePerMin) {
 		fields = append(fields, group.FieldAudioRealtimePricePerMin)
 	}
@@ -27633,6 +27734,9 @@ func (m *GroupMutation) ClearField(name string) error {
 		return nil
 	case group.FieldSearchPricePer1k:
 		m.ClearSearchPricePer1k()
+		return nil
+	case group.FieldGrokModerationRefusalPrice:
+		m.ClearGrokModerationRefusalPrice()
 		return nil
 	case group.FieldAudioRealtimePricePerMin:
 		m.ClearAudioRealtimePricePerMin()
@@ -27776,6 +27880,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldSearchPricePer1k:
 		m.ResetSearchPricePer1k()
+		return nil
+	case group.FieldGrokModerationRefusalPrice:
+		m.ResetGrokModerationRefusalPrice()
 		return nil
 	case group.FieldAudioRealtimePricePerMin:
 		m.ResetAudioRealtimePricePerMin()
@@ -43956,8 +44063,8 @@ type UsageCleanupTaskMutation struct {
 	created_at      *time.Time
 	updated_at      *time.Time
 	status          *string
-	filters         *json.RawMessage
-	appendfilters   json.RawMessage
+	filters         *jsontext.Value
+	appendfilters   jsontext.Value
 	created_by      *int64
 	addcreated_by   *int64
 	deleted_rows    *int64
@@ -44181,13 +44288,13 @@ func (m *UsageCleanupTaskMutation) ResetStatus() {
 }
 
 // SetFilters sets the "filters" field.
-func (m *UsageCleanupTaskMutation) SetFilters(jm json.RawMessage) {
-	m.filters = &jm
+func (m *UsageCleanupTaskMutation) SetFilters(j jsontext.Value) {
+	m.filters = &j
 	m.appendfilters = nil
 }
 
 // Filters returns the value of the "filters" field in the mutation.
-func (m *UsageCleanupTaskMutation) Filters() (r json.RawMessage, exists bool) {
+func (m *UsageCleanupTaskMutation) Filters() (r jsontext.Value, exists bool) {
 	v := m.filters
 	if v == nil {
 		return
@@ -44198,7 +44305,7 @@ func (m *UsageCleanupTaskMutation) Filters() (r json.RawMessage, exists bool) {
 // OldFilters returns the old "filters" field's value of the UsageCleanupTask entity.
 // If the UsageCleanupTask object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageCleanupTaskMutation) OldFilters(ctx context.Context) (v json.RawMessage, err error) {
+func (m *UsageCleanupTaskMutation) OldFilters(ctx context.Context) (v jsontext.Value, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldFilters is only allowed on UpdateOne operations")
 	}
@@ -44212,13 +44319,13 @@ func (m *UsageCleanupTaskMutation) OldFilters(ctx context.Context) (v json.RawMe
 	return oldValue.Filters, nil
 }
 
-// AppendFilters adds jm to the "filters" field.
-func (m *UsageCleanupTaskMutation) AppendFilters(jm json.RawMessage) {
-	m.appendfilters = append(m.appendfilters, jm...)
+// AppendFilters adds j to the "filters" field.
+func (m *UsageCleanupTaskMutation) AppendFilters(j jsontext.Value) {
+	m.appendfilters = append(m.appendfilters, j...)
 }
 
 // AppendedFilters returns the list of values that were appended to the "filters" field in this mutation.
-func (m *UsageCleanupTaskMutation) AppendedFilters() (json.RawMessage, bool) {
+func (m *UsageCleanupTaskMutation) AppendedFilters() (jsontext.Value, bool) {
 	if len(m.appendfilters) == 0 {
 		return nil, false
 	}
@@ -44769,7 +44876,7 @@ func (m *UsageCleanupTaskMutation) SetField(name string, value ent.Value) error 
 		m.SetStatus(v)
 		return nil
 	case usagecleanuptask.FieldFilters:
-		v, ok := value.(json.RawMessage)
+		v, ok := value.(jsontext.Value)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -54522,6 +54629,7 @@ type UserPlatformQuotaMutation struct {
 	addweekly_usage_usd  *float64
 	monthly_usage_usd    *float64
 	addmonthly_usage_usd *float64
+	grok_refusal_usage   *map[string]interface{}
 	daily_window_start   *time.Time
 	weekly_window_start  *time.Time
 	monthly_window_start *time.Time
@@ -55202,6 +55310,42 @@ func (m *UserPlatformQuotaMutation) ResetMonthlyUsageUsd() {
 	m.addmonthly_usage_usd = nil
 }
 
+// SetGrokRefusalUsage sets the "grok_refusal_usage" field.
+func (m *UserPlatformQuotaMutation) SetGrokRefusalUsage(value map[string]interface{}) {
+	m.grok_refusal_usage = &value
+}
+
+// GrokRefusalUsage returns the value of the "grok_refusal_usage" field in the mutation.
+func (m *UserPlatformQuotaMutation) GrokRefusalUsage() (r map[string]interface{}, exists bool) {
+	v := m.grok_refusal_usage
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGrokRefusalUsage returns the old "grok_refusal_usage" field's value of the UserPlatformQuota entity.
+// If the UserPlatformQuota object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserPlatformQuotaMutation) OldGrokRefusalUsage(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGrokRefusalUsage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGrokRefusalUsage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGrokRefusalUsage: %w", err)
+	}
+	return oldValue.GrokRefusalUsage, nil
+}
+
+// ResetGrokRefusalUsage resets all changes to the "grok_refusal_usage" field.
+func (m *UserPlatformQuotaMutation) ResetGrokRefusalUsage() {
+	m.grok_refusal_usage = nil
+}
+
 // SetDailyWindowStart sets the "daily_window_start" field.
 func (m *UserPlatformQuotaMutation) SetDailyWindowStart(t time.Time) {
 	m.daily_window_start = &t
@@ -55410,7 +55554,7 @@ func (m *UserPlatformQuotaMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserPlatformQuotaMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 15)
 	if m.created_at != nil {
 		fields = append(fields, userplatformquota.FieldCreatedAt)
 	}
@@ -55443,6 +55587,9 @@ func (m *UserPlatformQuotaMutation) Fields() []string {
 	}
 	if m.monthly_usage_usd != nil {
 		fields = append(fields, userplatformquota.FieldMonthlyUsageUsd)
+	}
+	if m.grok_refusal_usage != nil {
+		fields = append(fields, userplatformquota.FieldGrokRefusalUsage)
 	}
 	if m.daily_window_start != nil {
 		fields = append(fields, userplatformquota.FieldDailyWindowStart)
@@ -55483,6 +55630,8 @@ func (m *UserPlatformQuotaMutation) Field(name string) (ent.Value, bool) {
 		return m.WeeklyUsageUsd()
 	case userplatformquota.FieldMonthlyUsageUsd:
 		return m.MonthlyUsageUsd()
+	case userplatformquota.FieldGrokRefusalUsage:
+		return m.GrokRefusalUsage()
 	case userplatformquota.FieldDailyWindowStart:
 		return m.DailyWindowStart()
 	case userplatformquota.FieldWeeklyWindowStart:
@@ -55520,6 +55669,8 @@ func (m *UserPlatformQuotaMutation) OldField(ctx context.Context, name string) (
 		return m.OldWeeklyUsageUsd(ctx)
 	case userplatformquota.FieldMonthlyUsageUsd:
 		return m.OldMonthlyUsageUsd(ctx)
+	case userplatformquota.FieldGrokRefusalUsage:
+		return m.OldGrokRefusalUsage(ctx)
 	case userplatformquota.FieldDailyWindowStart:
 		return m.OldDailyWindowStart(ctx)
 	case userplatformquota.FieldWeeklyWindowStart:
@@ -55611,6 +55762,13 @@ func (m *UserPlatformQuotaMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMonthlyUsageUsd(v)
+		return nil
+	case userplatformquota.FieldGrokRefusalUsage:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGrokRefusalUsage(v)
 		return nil
 	case userplatformquota.FieldDailyWindowStart:
 		v, ok := value.(time.Time)
@@ -55834,6 +55992,9 @@ func (m *UserPlatformQuotaMutation) ResetField(name string) error {
 		return nil
 	case userplatformquota.FieldMonthlyUsageUsd:
 		m.ResetMonthlyUsageUsd()
+		return nil
+	case userplatformquota.FieldGrokRefusalUsage:
+		m.ResetGrokRefusalUsage()
 		return nil
 	case userplatformquota.FieldDailyWindowStart:
 		m.ResetDailyWindowStart()

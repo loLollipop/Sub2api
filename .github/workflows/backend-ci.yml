@@ -71,7 +71,7 @@ jobs:
         run: go test -race -p 1 -tags=unit ./internal/server/middleware ./internal/handler ./internal/handler/admin ./internal/service ./internal/repository -run 'Test(UsageInflight|TrackUsageInflight|PageUsageInflight|UserUsageInflight|AdminUsageInflight|KeyRouteBindingUsesSelectedPricing)' -count=1
       - name: Billing and media concurrency regression
         working-directory: backend
-        run: go test -race -p 1 -tags=unit ./internal/handler ./internal/service ./internal/repository -run 'Test(ContentDownload|ForwardGrokMediaContent|GrokVideoDurable|MediaBilling|AsyncImage|ImageTask|OpenAIResponsesWebSocket.*(Balance|Subscription|Settlement)|SmartBilling|.*Refund.*Pending)' -count=1
+        run: go test -race -p 1 -tags=unit ./internal/handler ./internal/service ./internal/repository -run 'Test(ContentDownload|ForwardGrokMediaContent|GrokVideoDurable|GrokRefusal|MediaBilling|AsyncImage|ImageTask|OpenAIResponsesWebSocket.*(Balance|Subscription|Settlement)|SmartBilling|.*Refund.*Pending)' -count=1
       - name: Public probes, DeepSeek tools and moderation queue concurrency regression
         working-directory: backend
         run: go test -race -p 1 -tags=unit ./internal/handler ./internal/service ./internal/repository -run 'Test(ParseDeepSeekTools|DeepSeekTools|ForwardDeepSeekTools|ContentModeration|AccountTest.*(Target|Security)|PublicProbe|SMTP)' -count=1

@@ -296,3 +296,12 @@ func TestDuplicateGroupAtomicCreateFailureReturnsNoCopy(t *testing.T) {
 	require.Len(t, repo.groups, 1)
 	require.Empty(t, repo.byOperation)
 }
+
+func TestCloneGroupForDuplicatePreservesExplicitZeroGrokRefusalPrice(t *testing.T) {
+	source := &Group{GrokModerationRefusalPrice: groupDuplicateTestPointer(0.0)}
+	duplicate := cloneGroupForDuplicate(source, "operation")
+	require.NotNil(t, duplicate.GrokModerationRefusalPrice)
+	require.Zero(t, *duplicate.GrokModerationRefusalPrice)
+	*duplicate.GrokModerationRefusalPrice = .9
+	require.Zero(t, *source.GrokModerationRefusalPrice)
+}

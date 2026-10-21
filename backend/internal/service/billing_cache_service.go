@@ -1309,6 +1309,11 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 	if platform == "" || s.userPlatformQuotaRepo == nil {
 		return nil
 	}
+	refusalQuota, refusalErr := s.refusalQuotaUsage(ctx, userID, platform)
+	if refusalErr != nil {
+		return refusalErr
+	}
+	refusalDaily, refusalWeekly, refusalMonthly := refusalQuota.Current(time.Now())
 	rememberLimit := func(hasLimit bool) {
 		if state := userPlatformQuotaRequestStateFromContext(ctx); state != nil {
 			state.rememberLimit(userID, platform, hasLimit)
@@ -1396,14 +1401,14 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 			}
 			setCancel()
 		}
-		if entry.DailyLimitUSD != nil && dailyUsage >= *entry.DailyLimitUSD {
+		if entry.DailyLimitUSD != nil && combinedRefusalQuotaUsage(dailyUsage, refusalDaily) >= *entry.DailyLimitUSD {
 			return withWindowResetsMetadata(ErrUserPlatformDailyQuotaExhausted, nextDailyReset(now))
 		}
-		if entry.WeeklyLimitUSD != nil && weeklyUsage >= *entry.WeeklyLimitUSD {
+		if entry.WeeklyLimitUSD != nil && combinedRefusalQuotaUsage(weeklyUsage, refusalWeekly) >= *entry.WeeklyLimitUSD {
 			return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyReset(now))
 		}
-		if entry.MonthlyLimitUSD != nil && monthlyUsage >= *entry.MonthlyLimitUSD {
-			return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, nextMonthlyResetFrom(entry.MonthlyWindowStart, now))
+		if entry.MonthlyLimitUSD != nil && combinedRefusalQuotaUsage(monthlyUsage, refusalMonthly) >= *entry.MonthlyLimitUSD {
+			return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, refusalQuota.MonthlyResetAt(monthlyUsage, entry.MonthlyWindowStart, *entry.MonthlyLimitUSD, now))
 		}
 		return nil
 	}
@@ -1487,14 +1492,14 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 	// Redis 故障时 fail-open：不回填，直接用 DB 数据做一次性检查
 	if cacheErr != nil {
 		rememberLimit(true)
-		if rec.DailyLimitUSD != nil && dailyUsage >= *rec.DailyLimitUSD {
+		if rec.DailyLimitUSD != nil && combinedRefusalQuotaUsage(dailyUsage, refusalDaily) >= *rec.DailyLimitUSD {
 			return withWindowResetsMetadata(ErrUserPlatformDailyQuotaExhausted, nextDailyReset(now))
 		}
-		if rec.WeeklyLimitUSD != nil && weeklyUsage >= *rec.WeeklyLimitUSD {
+		if rec.WeeklyLimitUSD != nil && combinedRefusalQuotaUsage(weeklyUsage, refusalWeekly) >= *rec.WeeklyLimitUSD {
 			return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyReset(now))
 		}
-		if rec.MonthlyLimitUSD != nil && monthlyUsage >= *rec.MonthlyLimitUSD {
-			return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, nextMonthlyResetFrom(rec.MonthlyWindowStart, now))
+		if rec.MonthlyLimitUSD != nil && combinedRefusalQuotaUsage(monthlyUsage, refusalMonthly) >= *rec.MonthlyLimitUSD {
+			return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, refusalQuota.MonthlyResetAt(monthlyUsage, rec.MonthlyWindowStart, *rec.MonthlyLimitUSD, now))
 		}
 		return nil
 	}
@@ -1525,14 +1530,14 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 	}
 	rememberLimit(rec.DailyLimitUSD != nil || rec.WeeklyLimitUSD != nil || rec.MonthlyLimitUSD != nil)
 
-	if rec.DailyLimitUSD != nil && dailyUsage >= *rec.DailyLimitUSD {
+	if rec.DailyLimitUSD != nil && combinedRefusalQuotaUsage(dailyUsage, refusalDaily) >= *rec.DailyLimitUSD {
 		return withWindowResetsMetadata(ErrUserPlatformDailyQuotaExhausted, nextDailyReset(now))
 	}
-	if rec.WeeklyLimitUSD != nil && weeklyUsage >= *rec.WeeklyLimitUSD {
+	if rec.WeeklyLimitUSD != nil && combinedRefusalQuotaUsage(weeklyUsage, refusalWeekly) >= *rec.WeeklyLimitUSD {
 		return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyReset(now))
 	}
-	if rec.MonthlyLimitUSD != nil && monthlyUsage >= *rec.MonthlyLimitUSD {
-		return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, nextMonthlyResetFrom(rec.MonthlyWindowStart, now))
+	if rec.MonthlyLimitUSD != nil && combinedRefusalQuotaUsage(monthlyUsage, refusalMonthly) >= *rec.MonthlyLimitUSD {
+		return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, refusalQuota.MonthlyResetAt(monthlyUsage, rec.MonthlyWindowStart, *rec.MonthlyLimitUSD, now))
 	}
 	return nil
 }

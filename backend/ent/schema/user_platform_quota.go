@@ -72,6 +72,11 @@ func (UserPlatformQuota) Fields() []ent.Field {
 		field.Float("monthly_usage_usd").
 			Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
+		// Transactional refusal component, excluded from Redis absolute snapshots.
+		field.JSON("grok_refusal_usage", map[string]any{}).
+			Default(func() map[string]any { return map[string]any{} }).
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Annotations(entsql.Default("'{}'::jsonb")),
 
 		// 窗口起点（NULL = 首次还未初始化，由 InitWindowStarts 用 COALESCE 兜底）
 		field.Time("daily_window_start").

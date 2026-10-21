@@ -430,7 +430,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
@@ -488,26 +488,31 @@ const matchModeOptions = computed(() => [
 
 const platformOptions = CONCRETE_PLATFORM_OPTIONS
 
-// Load rules when dialog opens
-const onVisibilityChange = (newVal: boolean) => {
-  if (newVal) {
-    loadRules()
-  }
-}
-watch(() => props.show, onVisibilityChange)
-onMounted(() => { void onVisibilityChange(props.show) })
-
+let loadRevision = 0
 const loadRules = async () => {
+  if (!props.show) return
+  const revision = ++loadRevision
+  const isCurrent = () => props.show && revision === loadRevision
   loading.value = true
   try {
-    rules.value = await adminAPI.errorPassthrough.list()
+    const data = await adminAPI.errorPassthrough.list()
+    if (isCurrent()) rules.value = data
   } catch (error) {
-    appStore.showError(t('admin.errorPassthrough.failedToLoad'))
-    console.error('Error loading rules:', error)
+    if (isCurrent()) {
+      appStore.showError(t('admin.errorPassthrough.failedToLoad'))
+      console.error('Error loading rules:', error)
+    }
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
+
+watch(() => props.show, (visible, _previous, onCleanup) => {
+  onCleanup(() => { loadRevision++ })
+  rules.value = []
+  loading.value = false
+  if (visible) void loadRules()
+}, { immediate: true })
 
 const resetForm = () => {
   form.name = ''

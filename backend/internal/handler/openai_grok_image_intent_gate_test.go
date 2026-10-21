@@ -97,8 +97,11 @@ func runOpenAIResponsesImagePermissionGateTest(t *testing.T, platform string, bo
 	})
 	c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: userID, Concurrency: 1})
 
+	gateway := service.NewOpenAIGatewayService(nil, nil, &unblockedGrokHandlerBillingRepo{t: t}, nil, nil, nil, nil,
+		&config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	t.Cleanup(gateway.CloseOpenAIWSPool)
 	h := &OpenAIGatewayHandler{
-		gatewayService:      &service.OpenAIGatewayService{},
+		gatewayService:      gateway,
 		billingCacheService: service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil),
 		apiKeyService:       &service.APIKeyService{},
 		concurrencyHelper: &ConcurrencyHelper{concurrencyService: service.NewConcurrencyService(

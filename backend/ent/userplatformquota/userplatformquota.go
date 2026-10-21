@@ -37,6 +37,8 @@ const (
 	FieldWeeklyUsageUsd = "weekly_usage_usd"
 	// FieldMonthlyUsageUsd holds the string denoting the monthly_usage_usd field in the database.
 	FieldMonthlyUsageUsd = "monthly_usage_usd"
+	// FieldGrokRefusalUsage holds the string denoting the grok_refusal_usage field in the database.
+	FieldGrokRefusalUsage = "grok_refusal_usage"
 	// FieldDailyWindowStart holds the string denoting the daily_window_start field in the database.
 	FieldDailyWindowStart = "daily_window_start"
 	// FieldWeeklyWindowStart holds the string denoting the weekly_window_start field in the database.
@@ -70,6 +72,7 @@ var Columns = []string{
 	FieldDailyUsageUsd,
 	FieldWeeklyUsageUsd,
 	FieldMonthlyUsageUsd,
+	FieldGrokRefusalUsage,
 	FieldDailyWindowStart,
 	FieldWeeklyWindowStart,
 	FieldMonthlyWindowStart,
@@ -107,6 +110,8 @@ var (
 	DefaultWeeklyUsageUsd float64
 	// DefaultMonthlyUsageUsd holds the default value on creation for the "monthly_usage_usd" field.
 	DefaultMonthlyUsageUsd float64
+	// DefaultGrokRefusalUsage holds the default value on creation for the "grok_refusal_usage" field.
+	DefaultGrokRefusalUsage func() map[string]interface{}
 )
 
 // OrderOption defines the ordering options for the UserPlatformQuota queries.

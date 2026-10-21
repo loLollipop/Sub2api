@@ -140,9 +140,16 @@ func (s *OpenAIGatewayService) settleMediaBillingJob(ctx context.Context, job *M
 	if job == nil || job.Intent == nil {
 		return errors.New("media settlement intent is missing")
 	}
+	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple && (job.Kind != MediaBillingKindGrokRefusal || job.Intent.Command.BalanceCost != 0 || job.Intent.Command.SubscriptionCost != 0 || job.Intent.Command.APIKeyQuotaCost != 0 || job.Intent.Command.APIKeyRateLimitCost != 0 || job.Intent.Command.AccountQuotaCost != 0) {
+		return errors.New("simple mode cannot settle billable jobs")
+	}
 	result, err := s.mediaBillingJobs.ApplyMediaBillingJob(ctx, job.ID)
 	if err != nil {
 		return err
+	}
+	if job.CommitResult != nil {
+		result = job.CommitResult
+		job.CommitResult = nil
 	}
 	intent := job.Intent
 	cmd := &intent.Command
@@ -161,15 +168,31 @@ func (s *OpenAIGatewayService) settleMediaBillingJob(ctx context.Context, job *M
 		}
 	}
 	if s.billingCacheService != nil {
+		if job.Kind == MediaBillingKindGrokRefusal && cmd.APIKeyRateLimitCost > 0 {
+			if err := s.billingCacheService.InvalidateAPIKeyRateLimit(ctx, cmd.APIKeyID); err != nil {
+				return err
+			}
+		}
 		if result != nil && result.NewBalance != nil && s.billingCacheService.balanceBelowEligibilityThreshold(*result.NewBalance) {
 			s.billingCacheService.setBalanceCacheAtMost(ctx, cmd.UserID, *result.NewBalance)
 		} else if !cmd.BalancePreauthorized {
-			_ = s.billingCacheService.InvalidateUserBalance(ctx, cmd.UserID)
+			if err := s.billingCacheService.InvalidateUserBalance(ctx, cmd.UserID); err != nil && job.Kind == MediaBillingKindGrokRefusal {
+				return err
+			}
 		}
 		if cmd.SubscriptionID != nil {
 			_ = s.billingCacheService.InvalidateSubscription(ctx, cmd.UserID, job.GroupID)
 			if result != nil && result.Applied && cmd.APIKeyRateLimitCost > 0 {
 				s.billingCacheService.QueueUpdateAPIKeyRateLimitUsage(cmd.APIKeyID, cmd.APIKeyRateLimitCost)
+			}
+		}
+	}
+	if job.Kind == MediaBillingKindGrokRefusal && intent.AuthCacheKey != "" && s.billingCacheService != nil {
+		if cache, ok := s.billingCacheService.cache.(interface {
+			InvalidateAPIKeyAuthCacheHash(context.Context, string) error
+		}); ok {
+			if err := cache.InvalidateAPIKeyAuthCacheHash(ctx, intent.AuthCacheKey); err != nil {
+				return err
 			}
 		}
 	}
@@ -182,7 +205,14 @@ func (s *OpenAIGatewayService) settleMediaBillingJob(ctx context.Context, job *M
 			if cmd.SubscriptionID != nil {
 				params.Cost.ActualCost = 0
 			}
-			finalizePostUsageBilling(ctx, params, s.billingDeps(), result, true)
+			if job.Kind == MediaBillingKindGrokRefusal {
+				// Every counter was committed atomically. Only notifications are first-commit effects.
+				s.deferredService.ScheduleLastUsedUpdate(cmd.AccountID)
+				go notifyBalanceLow(params, s.billingDeps(), result)
+				go notifyAccountQuota(params, s.billingDeps(), result)
+			} else {
+				finalizePostUsageBilling(ctx, params, s.billingDeps(), result, true)
+			}
 		}
 	}
 	if s.usageLogRepo == nil {
@@ -421,7 +451,7 @@ func runGrokMediaBeforePublish(ctx context.Context, result *OpenAIForwardResult)
 }
 
 func (s *OpenAIGatewayService) StartMediaBillingWorker() {
-	if !s.HasDurableMediaBilling() {
+	if s == nil || s.mediaBillingJobs == nil {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -447,7 +477,20 @@ func (s *OpenAIGatewayService) recoverMediaBillingJobs(ctx context.Context) {
 	// the leases of other jobs waiting in the same batch.
 	for processed := 0; processed < 16 && ctx.Err() == nil; processed++ {
 		listCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		jobs, err := s.mediaBillingJobs.ListMediaBillingJobs(listCtx, 1)
+		var jobs []*MediaBillingJob
+		var err error
+		if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+			repo, ok := s.mediaBillingJobs.(interface {
+				ListGrokRefusalBillingJobs(context.Context, int) ([]*MediaBillingJob, error)
+			})
+			if !ok {
+				cancel()
+				return
+			}
+			jobs, err = repo.ListGrokRefusalBillingJobs(listCtx, 1)
+		} else {
+			jobs, err = s.mediaBillingJobs.ListMediaBillingJobs(listCtx, 1)
+		}
 		cancel()
 		if err != nil {
 			logger.L().Error("media_billing.list_failed", zap.Error(err))

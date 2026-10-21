@@ -195,7 +195,7 @@ func normalizeNewMediaBillingJob(input *service.MediaBillingJob) (*service.Media
 		if job.Status != service.MediaBillingCreating || job.Intent != nil || job.UpstreamTaskID != "" {
 			return nil, nil, nil, errors.New("video media billing job must start in creating state")
 		}
-	case service.MediaBillingKindImage:
+	case service.MediaBillingKindImage, service.MediaBillingKindGrokRefusal:
 		if job.Status != service.MediaBillingReady || job.Intent == nil || job.ReservedAmount != 0 {
 			return nil, nil, nil, errors.New("image media billing job must start ready with zero repository hold")
 		}
@@ -516,7 +516,7 @@ func (r *usageBillingRepository) ApplyMediaBillingJob(ctx context.Context, id st
 			}
 			result.NewBalance = holdResult.NewBalance
 		}
-		result.BalanceFinalizationPending = job.Kind == service.MediaBillingKindImage && cmd.BalancePreauthorized
+		result.BalanceFinalizationPending = (job.Kind == service.MediaBillingKindImage || job.Kind == service.MediaBillingKindGrokRefusal) && cmd.BalancePreauthorized
 	} else {
 		effectsCommand := cmd
 		if job.Kind == service.MediaBillingKindGrokVideo && job.SubscriptionID == nil {
@@ -553,7 +553,7 @@ func (r *usageBillingRepository) ApplyMediaBillingJob(ctx context.Context, id st
 
 func mediaBillingAlreadyBilledResult(job *service.MediaBillingJob) *service.UsageBillingApplyResult {
 	result := &service.UsageBillingApplyResult{}
-	if job != nil && job.Kind == service.MediaBillingKindImage && job.Intent != nil {
+	if job != nil && (job.Kind == service.MediaBillingKindImage || job.Kind == service.MediaBillingKindGrokRefusal) && job.Intent != nil {
 		result.BalanceFinalizationPending = job.Intent.Command.BalancePreauthorized
 	}
 	return result
@@ -673,6 +673,14 @@ func (r *usageBillingRepository) CompleteMediaBillingJob(ctx context.Context, id
 }
 
 func (r *usageBillingRepository) ListMediaBillingJobs(ctx context.Context, limit int) ([]*service.MediaBillingJob, error) {
+	return r.listMediaBillingJobs(ctx, limit, false)
+}
+
+func (r *usageBillingRepository) ListGrokRefusalBillingJobs(ctx context.Context, limit int) ([]*service.MediaBillingJob, error) {
+	return r.listMediaBillingJobs(ctx, limit, true)
+}
+
+func (r *usageBillingRepository) listMediaBillingJobs(ctx context.Context, limit int, refusalOnly bool) ([]*service.MediaBillingJob, error) {
 	if err := r.validateMediaBillingRepository(); err != nil {
 		return nil, err
 	}
@@ -682,12 +690,16 @@ func (r *usageBillingRepository) ListMediaBillingJobs(ctx context.Context, limit
 	if limit > 32 {
 		limit = 32
 	}
+	kindFilter := ""
+	if refusalOnly {
+		kindFilter = " AND kind = 'grok_refusal' AND status = 'billed' AND COALESCE((intent->'command'->>'BalanceCost')::numeric, 0) = 0"
+	}
 	rows, err := r.db.QueryContext(ctx, `
 		WITH picked AS (
 			SELECT id
 			FROM media_billing_jobs
 			WHERE status IN ('submitted', 'ready', 'billed')
-				AND available_at <= NOW()
+				AND available_at <= NOW()`+kindFilter+`
 			ORDER BY available_at, created_at
 			FOR UPDATE SKIP LOCKED
 			LIMIT $1

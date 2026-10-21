@@ -436,7 +436,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Chart as ChartJS,
@@ -630,30 +630,32 @@ const lineChartOptions = computed(() => ({
   }
 }))
 
-// Load stats when modal opens
-const onVisibilityChange = async (newVal: boolean) => {
-    if (newVal && props.account) {
-      await loadStats()
-    } else {
-      stats.value = null
-    }
-  }
-watch(() => props.show, onVisibilityChange)
-onMounted(() => { void onVisibilityChange(props.show) })
-
-const loadStats = async () => {
-  if (!props.account) return
-
+const loadStats = async (accountId: number, isCurrent: () => boolean) => {
   loading.value = true
   try {
-    stats.value = await adminAPI.accounts.getStats(props.account.id, 30)
+    const data = await adminAPI.accounts.getStats(accountId, 30)
+    if (isCurrent()) stats.value = data
   } catch (error) {
-    console.error('Failed to load account stats:', error)
-    stats.value = null
+    if (isCurrent()) {
+      console.error('Failed to load account stats:', error)
+      stats.value = null
+    }
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
+
+watch(
+  [() => props.show, () => props.account?.id],
+  ([visible, accountId], _previous, onCleanup) => {
+    let active = true
+    onCleanup(() => { active = false })
+    stats.value = null
+    loading.value = false
+    if (visible && accountId) void loadStats(accountId, () => active)
+  },
+  { immediate: true }
+)
 
 const handleClose = () => {
   emit('close')

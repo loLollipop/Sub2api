@@ -246,24 +246,20 @@ func (r *userPlatformQuotaRepository) IncrementUsageWithReset(ctx context.Contex
 //
 // 未命中活跃记录时返回 ErrUserPlatformQuotaNotFound。
 func (r *userPlatformQuotaRepository) ResetExpiredWindow(ctx context.Context, userID int64, platform string, window string, newStart time.Time) error {
-	client := clientFromContext(ctx, r.client)
-	upd := client.UserPlatformQuota.Update().
-		Where(
-			userplatformquota.UserIDEQ(userID),
-			userplatformquota.PlatformEQ(platform),
-			userplatformquota.DeletedAtIsNil(),
-		)
 	switch window {
-	case "daily":
-		upd = upd.SetDailyUsageUsd(0).SetDailyWindowStart(newStart)
-	case "weekly":
-		upd = upd.SetWeeklyUsageUsd(0).SetWeeklyWindowStart(newStart)
-	case "monthly":
-		upd = upd.SetMonthlyUsageUsd(0).SetMonthlyWindowStart(newStart)
+	case "daily", "weekly", "monthly":
 	default:
 		return fmt.Errorf("unknown window %q", window)
 	}
-	n, err := upd.Save(ctx)
+	// One statement resets both components, serialized with refusal commits.
+	query := fmt.Sprintf(`UPDATE user_platform_quotas SET %s_usage_usd = 0, %s_window_start = $3,
+ grok_refusal_usage = grok_refusal_usage - $4::text - $5::text, updated_at = NOW()
+ WHERE user_id = $1 AND platform = $2 AND deleted_at IS NULL`, window, window)
+	result, err := clientFromContext(ctx, r.client).ExecContext(ctx, query, userID, platform, newStart, window, window+"_start")
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}

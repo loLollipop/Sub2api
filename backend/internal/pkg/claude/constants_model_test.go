@@ -18,3 +18,19 @@ func TestDefaultModelsContainsClaudeFable51(t *testing.T) {
 	}
 	t.Fatal("claude-fable-5-1 missing from DefaultModels")
 }
+
+func TestDefaultModelsRetainAliasesAndUniqueIDs(t *testing.T) {
+	t.Parallel()
+	ids := make(map[string]bool, len(DefaultModels))
+	for _, model := range DefaultModels {
+		require.False(t, ids[model.ID], "duplicate model: %s", model.ID)
+		ids[model.ID] = true
+	}
+	for _, id := range []string{
+		"claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-4-5",
+		"claude-sonnet-4-5", "claude-haiku-4-5", "claude-fable-5-1",
+		"claude-opus-4-5-20251101", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001",
+	} {
+		require.True(t, ids[id], "missing model: %s", id)
+	}
+}

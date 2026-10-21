@@ -185,6 +185,12 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	user := input.User
 	account := input.Account
 	subscription := input.Subscription
+	if result.GrokModerationRefusalPrice != nil {
+		subscription = nil
+		copyInput := *input
+		copyInput.Subscription = nil
+		input = &copyInput
+	}
 	if err := validateAPIKeyRouteSubscriptionIdentity(apiKey, user, subscription); err != nil {
 		return err
 	}
@@ -232,6 +238,10 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	pricingAt := openAIUsagePricingAt(input)
 	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, baseMultiplier, pricingAt)
 	videoMultiplier := resolveVideoRateMultiplier(apiKey, baseMultiplier)
+	if result.GrokModerationRefusalPrice != nil {
+		multiplier = 1
+		baseMultiplier = 1
+	}
 
 	var cost *CostBreakdown
 	billingModel := forwardResultBillingModel(result.Model, result.UpstreamModel)
@@ -631,6 +641,13 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	pricingAt time.Time,
 	modelLongContextExemptions ...bool,
 ) (*CostBreakdown, error) {
+	if result != nil && result.GrokModerationRefusalPrice != nil {
+		price := *result.GrokModerationRefusalPrice
+		if err := validateGrokRefusalPrice(&price); err != nil {
+			return nil, err
+		}
+		return &CostBreakdown{TotalCost: price, ActualCost: price, BillingMode: string(BillingModePerRequest)}, nil
+	}
 	modelLongContextExempt := len(modelLongContextExemptions) > 0 && modelLongContextExemptions[0]
 	billingModel := firstUsageBillingModel(billingModels)
 	if result != nil && result.SearchOnly {

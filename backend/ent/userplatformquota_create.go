@@ -161,6 +161,12 @@ func (_c *UserPlatformQuotaCreate) SetNillableMonthlyUsageUsd(v *float64) *UserP
 	return _c
 }
 
+// SetGrokRefusalUsage sets the "grok_refusal_usage" field.
+func (_c *UserPlatformQuotaCreate) SetGrokRefusalUsage(v map[string]interface{}) *UserPlatformQuotaCreate {
+	_c.mutation.SetGrokRefusalUsage(v)
+	return _c
+}
+
 // SetDailyWindowStart sets the "daily_window_start" field.
 func (_c *UserPlatformQuotaCreate) SetDailyWindowStart(v time.Time) *UserPlatformQuotaCreate {
 	_c.mutation.SetDailyWindowStart(v)
@@ -271,6 +277,13 @@ func (_c *UserPlatformQuotaCreate) defaults() error {
 		v := userplatformquota.DefaultMonthlyUsageUsd
 		_c.mutation.SetMonthlyUsageUsd(v)
 	}
+	if _, ok := _c.mutation.GrokRefusalUsage(); !ok {
+		if userplatformquota.DefaultGrokRefusalUsage == nil {
+			return fmt.Errorf("ent: uninitialized userplatformquota.DefaultGrokRefusalUsage (forgotten import ent/runtime?)")
+		}
+		v := userplatformquota.DefaultGrokRefusalUsage()
+		_c.mutation.SetGrokRefusalUsage(v)
+	}
 	return nil
 }
 
@@ -301,6 +314,9 @@ func (_c *UserPlatformQuotaCreate) check() error {
 	}
 	if _, ok := _c.mutation.MonthlyUsageUsd(); !ok {
 		return &ValidationError{Name: "monthly_usage_usd", err: errors.New(`ent: missing required field "UserPlatformQuota.monthly_usage_usd"`)}
+	}
+	if _, ok := _c.mutation.GrokRefusalUsage(); !ok {
+		return &ValidationError{Name: "grok_refusal_usage", err: errors.New(`ent: missing required field "UserPlatformQuota.grok_refusal_usage"`)}
 	}
 	if len(_c.mutation.UserIDs()) == 0 {
 		return &ValidationError{Name: "user", err: errors.New(`ent: missing required edge "UserPlatformQuota.user"`)}
@@ -371,6 +387,10 @@ func (_c *UserPlatformQuotaCreate) createSpec() (*UserPlatformQuota, *sqlgraph.C
 	if value, ok := _c.mutation.MonthlyUsageUsd(); ok {
 		_spec.SetField(userplatformquota.FieldMonthlyUsageUsd, field.TypeFloat64, value)
 		_node.MonthlyUsageUsd = value
+	}
+	if value, ok := _c.mutation.GrokRefusalUsage(); ok {
+		_spec.SetField(userplatformquota.FieldGrokRefusalUsage, field.TypeJSON, value)
+		_node.GrokRefusalUsage = value
 	}
 	if value, ok := _c.mutation.DailyWindowStart(); ok {
 		_spec.SetField(userplatformquota.FieldDailyWindowStart, field.TypeTime, value)
@@ -630,6 +650,18 @@ func (u *UserPlatformQuotaUpsert) UpdateMonthlyUsageUsd() *UserPlatformQuotaUpse
 // AddMonthlyUsageUsd adds v to the "monthly_usage_usd" field.
 func (u *UserPlatformQuotaUpsert) AddMonthlyUsageUsd(v float64) *UserPlatformQuotaUpsert {
 	u.Add(userplatformquota.FieldMonthlyUsageUsd, v)
+	return u
+}
+
+// SetGrokRefusalUsage sets the "grok_refusal_usage" field.
+func (u *UserPlatformQuotaUpsert) SetGrokRefusalUsage(v map[string]interface{}) *UserPlatformQuotaUpsert {
+	u.Set(userplatformquota.FieldGrokRefusalUsage, v)
+	return u
+}
+
+// UpdateGrokRefusalUsage sets the "grok_refusal_usage" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsert) UpdateGrokRefusalUsage() *UserPlatformQuotaUpsert {
+	u.SetExcluded(userplatformquota.FieldGrokRefusalUsage)
 	return u
 }
 
@@ -939,6 +971,20 @@ func (u *UserPlatformQuotaUpsertOne) AddMonthlyUsageUsd(v float64) *UserPlatform
 func (u *UserPlatformQuotaUpsertOne) UpdateMonthlyUsageUsd() *UserPlatformQuotaUpsertOne {
 	return u.Update(func(s *UserPlatformQuotaUpsert) {
 		s.UpdateMonthlyUsageUsd()
+	})
+}
+
+// SetGrokRefusalUsage sets the "grok_refusal_usage" field.
+func (u *UserPlatformQuotaUpsertOne) SetGrokRefusalUsage(v map[string]interface{}) *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.SetGrokRefusalUsage(v)
+	})
+}
+
+// UpdateGrokRefusalUsage sets the "grok_refusal_usage" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsertOne) UpdateGrokRefusalUsage() *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.UpdateGrokRefusalUsage()
 	})
 }
 
@@ -1423,6 +1469,20 @@ func (u *UserPlatformQuotaUpsertBulk) AddMonthlyUsageUsd(v float64) *UserPlatfor
 func (u *UserPlatformQuotaUpsertBulk) UpdateMonthlyUsageUsd() *UserPlatformQuotaUpsertBulk {
 	return u.Update(func(s *UserPlatformQuotaUpsert) {
 		s.UpdateMonthlyUsageUsd()
+	})
+}
+
+// SetGrokRefusalUsage sets the "grok_refusal_usage" field.
+func (u *UserPlatformQuotaUpsertBulk) SetGrokRefusalUsage(v map[string]interface{}) *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.SetGrokRefusalUsage(v)
+	})
+}
+
+// UpdateGrokRefusalUsage sets the "grok_refusal_usage" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsertBulk) UpdateGrokRefusalUsage() *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.UpdateGrokRefusalUsage()
 	})
 }
 

@@ -109,7 +109,7 @@ func isGrokContentPolicyCode(value string) bool {
 
 func isGrokAccountAccessCode(value string) bool {
 	switch normalizeGrokErrorMarker(value) {
-	case "account_suspended",
+	case "ip_blocked", "ip_banned", "ip_forbidden", "account_suspended",
 		"account_disabled",
 		"user_suspended",
 		"user_disabled",
@@ -137,6 +137,11 @@ func grokAccountAccessMessage(value string) bool {
 		"subscription required",
 		"entitlement required",
 		"not entitled",
+		"ip address",
+		"ip blocked",
+		"ip has been blocked",
+		"account access denied",
+		"insufficient permissions",
 	} {
 		if strings.Contains(lower, phrase) {
 			return true
@@ -155,6 +160,7 @@ func grokContentPolicyMessage(value string) bool {
 	// enough not to classify a generic account-policy or entitlement message.
 	for _, phrase := range []string{
 		"the moderation feature is not available",
+		"i'm sorry, i can't help with that request.",
 		"image is sensitive",
 		"text is sensitive",
 		"prohibited content",
@@ -175,6 +181,7 @@ func grokContentPolicyMessage(value string) bool {
 		"input violates content policy",
 		"input violates policy",
 		"violates usage guidelines",
+		"failed check: safety_check_type",
 	} {
 		if strings.Contains(lower, phrase) {
 			return true

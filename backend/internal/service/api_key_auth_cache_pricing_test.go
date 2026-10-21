@@ -48,3 +48,16 @@ func TestAPIKeyAuthSnapshotGroupPricingRoundtrip(t *testing.T) {
 	require.InDelta(t, inputPrice, resolved.BasePricing.InputPricePerToken, 1e-12)
 	require.InDelta(t, outputPrice, resolved.BasePricing.OutputPricePerToken, 1e-12)
 }
+
+func TestAPIKeyAuthSnapshotGrokRefusalPriceRoundtrip(t *testing.T) {
+	for _, price := range []*float64{nil, func() *float64 { v := 0.0; return &v }(), func() *float64 { v := 0.37; return &v }()} {
+		key := &APIKey{ID: 7, UserID: 42, User: &User{ID: 42}, Group: &Group{ID: 11, GrokModerationRefusalPrice: price}}
+		svc := &APIKeyService{}
+		data, err := json.Marshal(svc.snapshotFromAPIKey(context.Background(), key))
+		require.NoError(t, err)
+		var decoded APIKeyAuthSnapshot
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		actual := svc.snapshotToAPIKey("test", &decoded)
+		require.Equal(t, price, actual.Group.GrokModerationRefusalPrice)
+	}
+}

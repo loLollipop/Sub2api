@@ -261,6 +261,28 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				nil,
 			)
 		}
+		originalModel := strings.TrimSpace(values[1].String())
+		modelMissing := originalModel == ""
+		if originalModel == "" {
+			// 入站 WS 长会话里，部分客户端只在第一轮 response.create 上声明
+			// model，后续 turn 复用同一 session-level model。为避免因省略
+			// model 直接断开用户连接，这里回落到上一轮已通过校验的客户端模型，
+			// 并在下方写回上游 payload，保证账号模型映射/fast policy/图片权限
+			// 仍按同一模型执行。
+			originalModel = ingressSessionOriginalModel
+			if originalModel == "" {
+				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(
+					coderws.StatusPolicyViolation,
+					"model is required in response.create payload",
+					nil,
+				)
+			}
+		}
+		if turn > 1 && hooks != nil && hooks.CheckRequest != nil {
+			if err := hooks.CheckRequest(turn, raw, originalModel); err != nil {
+				return openAIWSClientPayload{}, err
+			}
+		}
 		if next, policyErr := applyOpenAIWSReasoningEffortPolicy(normalized, hooks); policyErr != nil {
 			return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, policyErr.Error(), policyErr)
 		} else {
@@ -283,23 +305,6 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			}
 		}
 
-		originalModel := strings.TrimSpace(values[1].String())
-		modelMissing := originalModel == ""
-		if originalModel == "" {
-			// 入站 WS 长会话里，部分客户端只在第一轮 response.create 上声明
-			// model，后续 turn 复用同一 session-level model。为避免因省略
-			// model 直接断开用户连接，这里回落到上一轮已通过校验的客户端模型，
-			// 并在下方写回上游 payload，保证账号模型映射/fast policy/图片权限
-			// 仍按同一模型执行。
-			originalModel = ingressSessionOriginalModel
-			if originalModel == "" {
-				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(
-					coderws.StatusPolicyViolation,
-					"model is required in response.create payload",
-					nil,
-				)
-			}
-		}
 		promptCacheKey := strings.TrimSpace(values[2].String())
 		previousResponseID := strings.TrimSpace(values[3].String())
 		previousResponseIDKind := ClassifyOpenAIPreviousResponseIDKind(previousResponseID)
@@ -687,6 +692,10 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			)
 			if bridgeErr != nil && isOpenAIWSSessionPreempted(ctx) {
 				return errOpenAIWSSessionPreempted
+			}
+			if refusalErr := s.settleGrokRefusalWebSocketFailure(c, account, bridgeErr); refusalErr != nil {
+				bridgeErr = refusalErr
+				result = nil
 			}
 			if hooks != nil && hooks.AfterTurn != nil {
 				hooks.AfterTurn(turn, result, bridgeErr)

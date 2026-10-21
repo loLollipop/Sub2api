@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"math"
@@ -150,10 +151,65 @@ func TestGrokRefusalIdentityStrongIDsAndPreciseContent(t *testing.T) {
 }
 
 func TestGrokRefusalExcludesAccountAndIPBeforeApology(t *testing.T) {
-	for _, prefix := range []string{"account suspended: ", "IP address blocked: ", "insufficient permissions: "} {
+	for _, prefix := range []string{"account suspended: ", "IP address blocked: ", "insufficient permissions: ", "blocked by global ip blacklist: "} {
 		require.False(t, isGrokContentPolicyRejection(403, []byte(prefix+GrokModerationRefusalMessage())))
 	}
 	require.True(t, isGrokContentPolicyRejection(403, []byte("I'm sorry, I can't help with that request.")))
+}
+
+func TestGrokRefusalWSRequiresTypedHTTP403AndBoundIdentity(t *testing.T) {
+	for _, mode := range []string{"valid", "forged_error", "non_403", "global_ip", "wrong_platform", "missing_binding", "commit_failure"} {
+		t.Run(mode, func(t *testing.T) {
+			svc, media, input, _ := newMediaBillingServiceTest(t)
+			repo := &grokRefusalMemoryRepo{mediaJobMemoryRepo: media}
+			svc.usageBillingRepo, svc.mediaBillingJobs = repo, repo
+			input.Account.Platform = PlatformGrok
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("GET", "/openai/v1/responses", nil)
+			if mode != "missing_binding" {
+				blocked, err := svc.CheckGrokRefusalWebSocketRequest(c, input.APIKey, []byte(`{"type":"response.create","input":"refuse"}`), "grok-4", nil)
+				require.NoError(t, err)
+				require.False(t, blocked)
+			}
+			upstream := &openAIWSHTTPBridgeUpstreamError{StatusCode: 403, ResponseBody: []byte(`{"error":{"code":"content_policy_violation","message":"explicit refusal"}}`)}
+			var forwardErr error = upstream
+			if mode == "forged_error" {
+				forwardErr = fmt.Errorf("upstream status=403: %s", GrokModerationRefusalMessage())
+			}
+			if mode == "non_403" {
+				upstream.StatusCode = 400
+			}
+			if mode == "global_ip" {
+				upstream.ResponseBody = []byte("blocked by global ip blacklist: " + GrokModerationRefusalMessage())
+			}
+			if mode == "wrong_platform" {
+				input.Account.Platform = PlatformOpenAI
+			}
+			if mode == "commit_failure" {
+				repo.commitErr = errors.New("database unavailable")
+			}
+			err := svc.settleGrokRefusalWebSocketFailure(c, input.Account, forwardErr)
+			switch mode {
+			case "valid", "missing_binding", "commit_failure":
+				require.True(t, IsGrokRefusalWSFailure(err))
+				var closeErr *OpenAIWSClientCloseError
+				require.ErrorAs(t, err, &closeErr)
+				want := coderws.StatusInternalError
+				if mode == "valid" {
+					want = coderws.StatusPolicyViolation
+				}
+				require.Equal(t, want, closeErr.StatusCode())
+			default:
+				require.NoError(t, err)
+			}
+			if mode == "valid" {
+				require.Len(t, repo.jobs, 1)
+			} else {
+				require.Empty(t, repo.jobs)
+				require.Zero(t, repo.applied)
+			}
+		})
+	}
 }
 
 func TestGrokRefusalFixedPriceIgnoresOtherPricingAndSubscription(t *testing.T) {

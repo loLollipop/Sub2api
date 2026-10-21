@@ -2,30 +2,31 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.11",
-  "imported_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
-  "personal_baseline_commit": "4d20b02849ca51dbb5a2b61f675a599d4411c3ca",
-  "latest_observed_version": "2.2.11",
-  "latest_observed_release_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
-  "latest_observed_main_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
+  "imported_version": "2.2.13",
+  "imported_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
+  "personal_baseline_commit": "6e2e5b5da8c4ac9d07c11dcb5e33f92141a5eeb0",
+  "latest_observed_version": "2.2.13",
+  "latest_observed_release_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
+  "latest_observed_main_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.11",
-  "reviewed_release_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
+  "reviewed_release_tag": "v2.2.13",
+  "reviewed_release_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
   "observed_delta_review": {
-    "from_commit": "24fa1a78b6f81117f1ce4ece982e355aeb11c94b",
-    "to_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
-    "status": "selective_formal_v2211_backport",
-    "scope": "Review formal v2.2.8 through v2.2.11: bounded wallet preload, additive Claude catalog, stale modal-load isolation, bulk model allowlist parsing, and locally corrected Grok refusal charging/permanent conversation blocks. Preserve authoritative empty catalogs and all unrelated feature/migration deferrals.",
-    "evidence": "maintenance/notes/upstream-sync-20261021-v2211.md"
+    "from_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
+    "to_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
+    "status": "selective_formal_v2213_backport",
+    "scope": "Review official v2.2.12-v2.2.13: stream error status classification and durable Grok refusal admission/settlement for Responses WebSocket. Preserve actual HTTP status provenance, atomic accounting, explicit zero price, full refused history, established terminal error policy and unrelated deferrals. Exclude permanent conversation bans for infrastructure IP failures.",
+    "evidence": "maintenance/notes/upstream-sync-20261021-v2213.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "6c6a9efc96573c879b049265bc57a2d42509bda1",
+    "source_head": "6c624219955f467114edb5ae91dc1e3904c1c878",
     "implemented_with_local_regression": [
+      "Formal v2.2.12-v2.2.13 stream error status classification and local durable Responses WebSocket refusal adaptation; see dated sync note for verification and exclusions",
       "Formal v2.2.8-v2.2.11 bounded wallet preload before statistics, four additive Claude aliases, stale modal-load isolation, bulk allowlist parsing and non-failover Grok safety-check classification; preserve authoritative empty catalogs (see dated sync note)",
-      "Grok refusal charging and permanent conversation blocks: exact zero-price override, user-scoped full-history identity, atomic billing/block/quota commit and existing-worker recovery; full local backend/frontend regressions pass, live PostgreSQL/Redis validation pending (see Grok adaptation note)",
+      "Grok refusal charging and permanent conversation blocks: exact zero-price override, user-scoped full-history identity, atomic billing/block/quota commit and existing-worker recovery. Real PostgreSQL/Redis integration and race regressions passed in v2.1.27 CI; production migration267 and release acceptance passed on 2026-10-21.",
       "Formal v2.2.7 successful-provider SSE readiness and Bedrock idle heartbeat; retain local bounded sync JSON/SSE parsing and retry/commitment contracts (see dated sync note)",
       "Formal v2.2.6 streaming/config and privacy-preserving cyber excerpt adaptations; release-only upstream reminders with exact tag checkpoints (see dated sync note)",
       "OpenAI Responses legacy web_search_preview alias normalization on HTTP and WebSocket outbound paths, with dated-type boundaries and native-provider preservation (v2.2.2 source review)",
@@ -240,10 +241,12 @@
       "323793755",
       "c0f193e70",
       "8b8a190e3",
-      "6c6a9efc9"
+      "6c6a9efc9",
+      "372db7d96",
+      "6c6242199"
     ],
-    "status": "implemented_local_regressions_verified_live_db_pending",
+    "status": "http_released_v2127_websocket_locally_verified_pending_release_ci",
     "evidence": "maintenance/notes/grok-refusal-adaptation-20261021.md",
-    "scope": "Three text protocols; explicit zero-price override; user-scoped durable full-history/conversation blocks; atomic billing/block/platform-quota effects and replay-safe cache invalidation using the existing settlement worker; zero-only simple-mode recovery. Full local backend/frontend regression, vet and embedded build pass. Real PostgreSQL/Redis validation pending. No paid upstream calls or deployment."
+    "scope": "Three text HTTP protocols released in v2.1.27 with real PostgreSQL/Redis integration, race tests, migration267 and production acceptance. v2.2.12-v2.2.13 extends Responses WebSocket using the same durable accounting and block repository; reject infrastructure-IP permanent bans and unproven embedded/error-string HTTP statuses. New adaptation validation recorded in the dated v2.2.13 sync note. No paid upstream calls."
   }
 }

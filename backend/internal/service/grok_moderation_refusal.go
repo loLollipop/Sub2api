@@ -13,6 +13,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -45,6 +46,7 @@ type grokRefusalRequest struct {
 	input         OpenAIRecordUsageInput
 	model         string
 	stream        bool
+	webSocket     bool
 }
 
 // CheckGrokRefusalRequest runs before admission or account selection and freezes
@@ -65,6 +67,50 @@ func (s *OpenAIGatewayService) CheckGrokRefusalRequest(c *gin.Context, key *APIK
 			SessionID: ExtractClientSessionID(c), RequestPayloadHash: HashUsageRequestPayload(body), QuotaPlatform: PlatformGrok}}
 	c.Set(grokRefusalRequestKey, request)
 	return repo.FindGrokRefusal(c.Request.Context(), key.User.ID, lookup)
+}
+
+// WebSocket turns bind the original client frame before admission or rewriting.
+// The effective model may be inherited from an earlier response.create frame.
+func (s *OpenAIGatewayService) CheckGrokRefusalWebSocketRequest(c *gin.Context, key *APIKey, body []byte, model string, updater APIKeyQuotaUpdater) (bool, error) {
+	blocked, err := s.CheckGrokRefusalRequest(c, key, body, updater)
+	if err != nil {
+		return false, err
+	}
+	request := c.MustGet(grokRefusalRequestKey).(*grokRefusalRequest)
+	request.model = model
+	request.stream = true
+	request.webSocket = true
+	return blocked, nil
+}
+
+type grokRefusalWSFailure struct{ error }
+
+// IsGrokRefusalWSFailure excludes an atomically handled refusal (including a
+// failed commit) from ordinary or standalone cyber-policy usage accounting.
+func IsGrokRefusalWSFailure(err error) bool {
+	var refusal *grokRefusalWSFailure
+	return errors.As(err, &refusal)
+}
+
+func (e *grokRefusalWSFailure) Unwrap() error { return e.error }
+
+func (s *OpenAIGatewayService) settleGrokRefusalWebSocketFailure(c *gin.Context, account *Account, forwardErr error) error {
+	var upstream *openAIWSHTTPBridgeUpstreamError
+	if account == nil || account.Platform != PlatformGrok || !errors.As(forwardErr, &upstream) || !isGrokBillableRefusal(upstream.StatusCode, upstream.ResponseBody) {
+		return nil
+	}
+	value, exists := c.Get(grokRefusalRequestKey)
+	request, valid := value.(*grokRefusalRequest)
+	var err error
+	if !exists || !valid || request == nil || !request.webSocket {
+		err = errors.New("grok refusal websocket request context is unavailable")
+	} else {
+		err = s.settleGrokRefusal(c, account)
+	}
+	if err != nil {
+		return &grokRefusalWSFailure{NewOpenAIWSClientCloseError(coderws.StatusInternalError, "Unable to persist upstream refusal; retry later", err)}
+	}
+	return &grokRefusalWSFailure{NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, GrokModerationRefusalMessage(), forwardErr)}
 }
 
 // settleGrokRefusal executes before writing HTTP 403. The transaction also fixes
@@ -92,7 +138,7 @@ func (s *OpenAIGatewayService) settleGrokRefusal(c *gin.Context, account *Accoun
 	}
 	input := request.input
 	input.Account = account
-	input.Result = &OpenAIForwardResult{Model: request.model, UpstreamModel: request.model, Stream: request.stream, GrokModerationRefusalPrice: &price}
+	input.Result = &OpenAIForwardResult{Model: request.model, UpstreamModel: request.model, Stream: request.stream, OpenAIWSMode: request.webSocket, GrokModerationRefusalPrice: &price}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 15*time.Second)
 	defer cancel()
 	intent, err := s.prepareMediaUsage(ctx, &input)

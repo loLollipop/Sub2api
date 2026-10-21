@@ -51,11 +51,11 @@ type grokRefusalRequest struct {
 // only hashed conversation identity. A storage error must stop the request.
 func (s *OpenAIGatewayService) CheckGrokRefusalRequest(c *gin.Context, key *APIKey, body []byte, updater APIKeyQuotaUpdater) (bool, error) {
 	if s == nil || key == nil || key.User == nil {
-		return false, errors.New("Grok refusal gateway is unavailable")
+		return false, errors.New("grok refusal gateway is unavailable")
 	}
 	repo, ok := s.usageBillingRepo.(GrokRefusalRepository)
 	if !ok || s.mediaBillingJobs == nil {
-		return false, errors.New("Grok refusal repository is unavailable")
+		return false, errors.New("grok refusal repository is unavailable")
 	}
 	lookup, write := grokRefusalIdentity(c, body)
 	request := &grokRefusalRequest{apiKey: key, lookup: lookup, write: write,
@@ -75,10 +75,13 @@ func (s *OpenAIGatewayService) settleGrokRefusal(c *gin.Context, account *Accoun
 	if !bound {
 		return nil
 	} // non-text callers retain their existing error contract
-	request := value.(*grokRefusalRequest)
+	request, ok := value.(*grokRefusalRequest)
+	if !ok || request == nil {
+		return errors.New("grok refusal request context is invalid")
+	}
 	repo, ok := s.usageBillingRepo.(GrokRefusalRepository)
 	if !ok {
-		return errors.New("Grok refusal repository is unavailable")
+		return errors.New("grok refusal repository is unavailable")
 	}
 	price := GrokModerationRefusalBilledCost(request.apiKey.Group)
 	if err := validateGrokRefusalPrice(&price); err != nil {
@@ -199,7 +202,7 @@ func grokRefusalIdentity(c *gin.Context, body []byte) (lookup, write []string) {
 					plain = false
 					break
 				}
-				text.WriteString(block.Get("text").String())
+				_, _ = text.WriteString(block.Get("text").String())
 			}
 			if plain {
 				return text.String()
@@ -260,7 +263,10 @@ func (s *OpenAIGatewayService) writeGrokRefusalError(c *gin.Context, account *Ac
 // multi-group key routing rather than freezing its initial primary group.
 func UpdateGrokRefusalRoute(c *gin.Context, key *APIKey, fields ChannelUsageFields) {
 	if value, ok := c.Get(grokRefusalRequestKey); ok {
-		request := value.(*grokRefusalRequest)
+		request, ok := value.(*grokRefusalRequest)
+		if !ok || request == nil {
+			return
+		}
 		request.apiKey = key
 		request.input.APIKey = key
 		request.input.User = key.User

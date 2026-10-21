@@ -49,7 +49,7 @@ func (a *userPlatformQuotaServiceAdapter) GetGrokRefusalQuotaUsage(ctx context.C
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		return nil, rows.Err()
 	}

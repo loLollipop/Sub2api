@@ -76,7 +76,11 @@ func (s *OpenAIGatewayService) CheckGrokRefusalWebSocketRequest(c *gin.Context, 
 	if err != nil {
 		return false, err
 	}
-	request := c.MustGet(grokRefusalRequestKey).(*grokRefusalRequest)
+	value, exists := c.Get(grokRefusalRequestKey)
+	request, valid := value.(*grokRefusalRequest)
+	if !exists || !valid || request == nil {
+		return false, errors.New("grok refusal websocket request context is unavailable")
+	}
 	request.model = model
 	request.stream = true
 	request.webSocket = true

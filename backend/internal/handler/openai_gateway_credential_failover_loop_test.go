@@ -938,7 +938,7 @@ func newGrokCredentialFailoverHandler(t *testing.T, mode string) (*OpenAIGateway
 	cfg.Gateway.MaxAccountSwitches = 3
 	billingCache := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
 	gateway := service.NewOpenAIGatewayService(
-		repo, nil, nil, nil, nil, nil, testutil.StubGatewayCache{}, cfg, nil, nil,
+		repo, nil, &unblockedGrokHandlerBillingRepo{t: t}, nil, nil, nil, testutil.StubGatewayCache{}, cfg, nil, nil,
 		service.NewBillingService(cfg, nil), nil, billingCache, upstream,
 		&service.DeferredService{}, nil, provider, nil, nil, nil, nil, nil,
 	)
@@ -969,6 +969,7 @@ func newGrokCredentialFailoverHandler(t *testing.T, mode string) (*OpenAIGateway
 	handlerRefresherStarted.Store(router, refresher.started)
 	cleanup := func() {
 		handlerRefresherStarted.Delete(router)
+		gateway.CloseOpenAIWSPool()
 		billingCache.Stop()
 	}
 	return h, repo, upstream, router, cleanup

@@ -327,7 +327,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -379,26 +379,31 @@ const form = reactive({
   enable_grease: false
 })
 
-// Load profiles when dialog opens
-const onVisibilityChange = (newVal: boolean) => {
-  if (newVal) {
-    loadProfiles()
-  }
-}
-watch(() => props.show, onVisibilityChange)
-onMounted(() => { void onVisibilityChange(props.show) })
-
+let loadRevision = 0
 const loadProfiles = async () => {
+  if (!props.show) return
+  const revision = ++loadRevision
+  const isCurrent = () => props.show && revision === loadRevision
   loading.value = true
   try {
-    profiles.value = await adminAPI.tlsFingerprintProfiles.list()
+    const data = await adminAPI.tlsFingerprintProfiles.list()
+    if (isCurrent()) profiles.value = data
   } catch (error) {
-    appStore.showError(t('admin.tlsFingerprintProfiles.loadFailed'))
-    console.error('Error loading TLS fingerprint profiles:', error)
+    if (isCurrent()) {
+      appStore.showError(t('admin.tlsFingerprintProfiles.loadFailed'))
+      console.error('Error loading TLS fingerprint profiles:', error)
+    }
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
+
+watch(() => props.show, (visible, _previous, onCleanup) => {
+  onCleanup(() => { loadRevision++ })
+  profiles.value = []
+  loading.value = false
+  if (visible) void loadProfiles()
+}, { immediate: true })
 
 const resetForm = () => {
   form.name = ''

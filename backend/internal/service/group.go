@@ -67,7 +67,8 @@ type Group struct {
 	WebSearchPricePerCall *float64
 
 	// 搜索工具显式定价（per 1k calls）。
-	SearchPricePer1k *float64
+	SearchPricePer1k           *float64
+	GrokModerationRefusalPrice *float64
 	// Grok Voice 显式定价（分组级，不按文本 RateMultiplier）。
 	AudioRealtimePricePerMin     *float64
 	AudioTTSPricePerMillionChars *float64

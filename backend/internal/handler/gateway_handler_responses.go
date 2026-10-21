@@ -115,6 +115,10 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 
+	if rejectGrokRefusedRequest(c, h.openAIGatewayService, apiKey, body, h.apiKeyService, h.responsesErrorResponse) {
+		return
+	}
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.responsesSecurityAuditError(c, decision)
 		return
@@ -332,6 +336,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				}
 				return
 			}
+			service.UpdateGrokRefusalRoute(c, apiKey, clientRequestedUsageFields(c, channelMapping, reqModel, ""))
 			oaResult, oaErr := h.openAIGatewayService.Forward(requestCtx, c, account, forwardBody)
 			err = oaErr
 			result = openAIForwardResultAsGateway(oaResult)

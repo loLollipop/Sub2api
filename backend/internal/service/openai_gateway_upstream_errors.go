@@ -579,6 +579,13 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	defer GuardUpstreamFinancialError(c, resp.StatusCode, body)()
 	body = s.redactAgentIdentitySensitiveBody(ctx, account, body)
 
+	if account != nil && account.Platform == PlatformGrok && isGrokBillableRefusal(resp.StatusCode, body) {
+		clientMsg := grokContentPolicyClientMessage(body)
+		setOpsUpstreamError(c, resp.StatusCode, clientMsg, truncateString(string(body), 2048))
+		return nil, s.writeGrokRefusalError(c, account, clientMsg, func(c *gin.Context, code int, typ, message string) {
+			c.JSON(code, gin.H{"error": gin.H{"type": typ, "message": message}})
+		})
+	}
 	// cyber_policy 硬阻断：透传上游原始错误体给客户端（不重包成通用 502），不冷却账号。
 	// 当前请求恒透传（需求1）；标记供 handler 事后写风控/邮件。400 cyber 不可 failover
 	// （shouldFailoverUpstreamError(400)=false），故走到此处即可安全早返回。
@@ -600,19 +607,6 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
 		}
 		return nil, fmt.Errorf("openai cyber_policy: %s", cyberMsg)
-	}
-	if account != nil && account.Platform == PlatformGrok && isGrokContentPolicyRejection(resp.StatusCode, body) {
-		clientMsg := grokContentPolicyClientMessage(body)
-		setOpsUpstreamError(c, resp.StatusCode, clientMsg, truncateString(string(body), 2048))
-		writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
-		MarkResponseCommitted(c)
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": gin.H{
-				"type":    "invalid_request_error",
-				"message": clientMsg,
-			},
-		})
-		return nil, fmt.Errorf("grok content policy rejection: %s", clientMsg)
 	}
 
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))
@@ -807,6 +801,11 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 	defer GuardUpstreamFinancialError(c, resp.StatusCode, body)()
 	body = s.redactAgentIdentitySensitiveBody(context.Background(), account, body)
 
+	if account != nil && account.Platform == PlatformGrok && isGrokBillableRefusal(resp.StatusCode, body) {
+		clientMsg := grokContentPolicyClientMessage(body)
+		setOpsUpstreamError(c, resp.StatusCode, clientMsg, truncateString(string(body), 2048))
+		return nil, s.writeGrokRefusalError(c, account, clientMsg, writeError)
+	}
 	// cyber_policy：兼容路径（Chat Completions / Anthropic）以各自格式回写错误，
 	// 不原样透传 responses 格式的 cyber body（否则对下游格式不合法）。cyber 是上游网络
 	// 安全策略拦截，不冷却账号，故标记后直接以兼容格式回写错误并返回，跳过下方
@@ -828,13 +827,6 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
 		}
 		return nil, fmt.Errorf("openai cyber_policy: %s", cyberMsg)
-	}
-	if account != nil && account.Platform == PlatformGrok && isGrokContentPolicyRejection(resp.StatusCode, body) {
-		clientMsg := grokContentPolicyClientMessage(body)
-		setOpsUpstreamError(c, resp.StatusCode, clientMsg, truncateString(string(body), 2048))
-		MarkResponseCommitted(c)
-		writeError(c, http.StatusForbidden, "invalid_request_error", clientMsg)
-		return nil, fmt.Errorf("grok content policy rejection: %s", clientMsg)
 	}
 
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))

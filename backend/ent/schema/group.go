@@ -176,6 +176,7 @@ func (Group) Fields() []ent.Field {
 			Comment("搜索工具价格 per 1000 calls（web_search 等）"),
 
 		// Grok Voice 显式定价（realtime / TTS / STT），不按文本 RateMultiplier。
+		field.Float("grok_moderation_refusal_price").Optional().Nillable().Min(0).SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).Comment("Grok refusal USD per occurrence; null defaults to 0.1, zero disables charge"),
 		field.Float("audio_realtime_price_per_min").
 			Optional().
 			Nillable().

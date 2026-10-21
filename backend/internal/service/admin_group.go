@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -390,6 +391,9 @@ func normalizeUpdateGroupInputForSimpleMode(input *UpdateGroupInput) {
 }
 
 func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error) {
+	if err := validateGrokRefusalPrice(input.GrokModerationRefusalPrice); err != nil {
+		return nil, err
+	}
 	if err := validateGroupLimitValues(input.DailyLimitUSD, input.WeeklyLimitUSD, input.MonthlyLimitUSD); err != nil {
 		return nil, err
 	}
@@ -612,6 +616,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		VideoModelPrices:                NormalizeVideoModelPrices(input.VideoModelPrices),
 		WebSearchPricePerCall:           webSearchPricePerCall,
 		SearchPricePer1k:                searchPricePer1k,
+		GrokModerationRefusalPrice:      input.GrokModerationRefusalPrice,
 		AudioRealtimePricePerMin:        audioRealtimePricePerMin,
 		AudioTTSPricePerMillionChars:    audioTTSPricePerMillionChars,
 		AudioSTTPricePerHour:            audioSTTPricePerHour,
@@ -767,6 +772,9 @@ func (s *adminServiceImpl) validateFallbackGroupOnInvalidRequest(ctx context.Con
 }
 
 func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *UpdateGroupInput) (*Group, error) {
+	if err := validateGrokRefusalPrice(input.GrokModerationRefusalPrice); err != nil {
+		return nil, err
+	}
 	if err := validateGroupLimitValues(input.DailyLimitUSD, input.WeeklyLimitUSD, input.MonthlyLimitUSD); err != nil {
 		return nil, err
 	}
@@ -947,6 +955,11 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.SearchPricePer1k != nil {
 		group.SearchPricePer1k = normalizePrice(input.SearchPricePer1k)
+	}
+	if input.ClearGrokModerationRefusalPrice {
+		group.GrokModerationRefusalPrice = nil
+	} else if input.GrokModerationRefusalPrice != nil {
+		group.GrokModerationRefusalPrice = input.GrokModerationRefusalPrice
 	}
 	if input.AudioRealtimePricePerMin != nil {
 		group.AudioRealtimePricePerMin = normalizePrice(input.AudioRealtimePricePerMin)
@@ -1577,4 +1590,11 @@ func (s *adminServiceImpl) ReplaceUserGroup(ctx context.Context, userID, oldGrou
 	}
 
 	return &ReplaceUserGroupResult{MigratedKeys: migrated}, nil
+}
+
+func validateGrokRefusalPrice(price *float64) error {
+	if price != nil && (*price < 0 || math.IsNaN(*price) || math.IsInf(*price, 0)) {
+		return infraerrors.New(http.StatusBadRequest, "INVALID_GROK_REFUSAL_PRICE", "Grok refusal price must be finite and nonnegative")
+	}
+	return nil
 }

@@ -582,6 +582,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
+	if rejectGrokRefusedRequest(c, h.gatewayService, apiKey, body, h.apiKeyService, h.errorResponse) {
+		return
+	}
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.openAISecurityAuditError(c, decision)
 		return
@@ -898,6 +902,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
+			service.UpdateGrokRefusalRoute(c, apiKey, clientRequestedUsageFields(c, channelMapping, reqModel, ""))
 			return h.gatewayService.Forward(attemptCtx, c, account, attemptBody)
 		}()
 		if service.IsOpenAIAccountPreauthorizationError(err) {
@@ -1350,6 +1355,10 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
+	if rejectGrokRefusedRequest(c, h.gatewayService, apiKey, body, h.apiKeyService, h.anthropicErrorResponse) {
+		return
+	}
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolAnthropicMessages, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.anthropicSecurityAuditError(c, decision)
 		return
@@ -1571,6 +1580,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
+			service.UpdateGrokRefusalRoute(c, apiKey, clientRequestedUsageFields(c, channelMappingMsg, reqModel, ""))
 			return h.gatewayService.ForwardAsAnthropic(attemptCtx, c, account, forwardBody, promptCacheKey, defaultMappedModel)
 		}()
 		if service.IsOpenAIAccountPreauthorizationError(err) {

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   addCustomModelAllowlistItem,
-  createModelAllowlistState,
   type ModelAllowlistAddError,
 } from "../groupModelAllowlist";
 
@@ -157,5 +156,24 @@ describe("addCustomModelAllowlistItem", () => {
   it("rejects duplicates case-insensitively", () => {
     const s = state();
     expect(addCustomModelAllowlistItem(s, "GPT-5.4")).toBe<ModelAllowlistAddError>("duplicate");
+  });
+
+  it("adds models in paste order and skips invalid or case-insensitive duplicate entries", () => {
+    const s = state();
+    expect(addCustomModelAllowlistItem(s, "GPT-5.4,claude-*;gemini\nclaude-*\tbad*model good GOOD\r\n")).toBeNull();
+    expect(s.items).toEqual([
+      { id: "claude-*", selected: true },
+      { id: "gemini", selected: true },
+      { id: "good", selected: true },
+    ]);
+  });
+
+  it("normalizes trailing separators while preserving single-item errors", () => {
+    const s = state();
+    expect(addCustomModelAllowlistItem(s, "claude-sonnet,;\n")).toBeNull();
+    expect(s.items).toEqual([{ id: "claude-sonnet", selected: true }]);
+    expect(addCustomModelAllowlistItem(s, "CLAUDE-SONNET,\n")).toBe("duplicate");
+    expect(addCustomModelAllowlistItem(s, "bad*model;\n")).toBe("invalid_wildcard");
+    expect(addCustomModelAllowlistItem(s, ", ;\t\r\n")).toBe("empty");
   });
 });

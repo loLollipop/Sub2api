@@ -60,3 +60,7 @@ Mixed 聚合平台及其协议探测回退、厂商倍率、API Key 四类互斥
 ## 二改 v2.2.2 同步（2026-10-19）
 
 二改审查至 `648c17cc1`，个人版本为 v2.1.24。适配 OpenAI Responses 的旧搜索工具名称，覆盖 HTTP 和 WebSocket，保留原生厂商和本地结算；无迁移、依赖或账号配置变更。范围与验证见 [同步记录](maintenance/notes/upstream-sync-20261019-v222.md)。
+
+## 二改 v2.2.11 同步与 Grok 修正（2026-10-21）
+
+二改正式版本审查至 `6c6a9efc9`，个人发布版本为 v2.1.27。选择性适配用量钱包预加载、Claude 别名、弹窗旧请求隔离和白名单批量输入；修正并实现 Grok 拒绝收费和永久会话封禁，包括显式零价、原子记账/封禁、完整历史身份、恢复和额度。追加迁移267，已应用的255–266迁移保持原始内容。生产先备份和排练迁移，再部署个人发行制品，继续使用 validate/disabled 配置。范围、验证及识别边界见[同步记录](maintenance/notes/upstream-sync-20261021-v2211.md)和[Grok适配记录](maintenance/notes/grok-refusal-adaptation-20261021.md)。

@@ -140,6 +140,43 @@ func TestGrokContentPolicy403DoesNotMutateOrFailover(t *testing.T) {
 	require.Zero(t, repo.tempUnschedCalls)
 }
 
+func TestGrokSafetyCheck403DoesNotMutateOrFailover(t *testing.T) {
+	for _, message := range []string{
+		"Failed check: SAFETY_CHECK_TYPE",
+		"Failed check: SAFETY_CHECK_TYPE_TEXT, policy check failed",
+	} {
+		t.Run(message, func(t *testing.T) {
+			repo := &grokQuotaAccountRepo{}
+			svc := &OpenAIGatewayService{accountRepo: repo}
+			account := &Account{ID: 4790, Platform: PlatformGrok, Type: AccountTypeOAuth}
+			body := []byte(message)
+			require.True(t, isGrokContentPolicyRejection(http.StatusForbidden, body))
+			require.False(t, isGrokContentPolicyRejection(http.StatusBadRequest, body))
+			require.False(t, isGrokContentPolicyRejection(http.StatusForbidden, []byte("account suspended: "+message)))
+			svc.handleGrokAccountUpstreamError(context.Background(), account, http.StatusForbidden, nil, body)
+			require.False(t, svc.shouldFailoverGrokUpstreamError(http.StatusForbidden, body))
+
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			resp := &http.Response{
+				StatusCode: http.StatusForbidden,
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+				Body:       io.NopCloser(strings.NewReader(message)),
+			}
+			_, err := svc.handleErrorResponse(context.Background(), resp, c, account, nil, "grok-4.5")
+			require.Error(t, err)
+			require.Equal(t, http.StatusForbidden, recorder.Code)
+			var failoverErr *UpstreamFailoverError
+			require.False(t, errors.As(err, &failoverErr))
+			require.Zero(t, repo.tempUnschedCalls)
+			require.Zero(t, repo.rateLimitedCalls)
+			require.Zero(t, repo.updateCalls)
+			require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+		})
+	}
+}
+
 func TestGrokNonFailoverDoesNotApplyGenericTempUnschedulablePolicy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &grokQuotaAccountRepo{}

@@ -227,6 +227,12 @@ func (_u *UserPlatformQuotaUpdate) AddMonthlyUsageUsd(v float64) *UserPlatformQu
 	return _u
 }
 
+// SetGrokRefusalUsage sets the "grok_refusal_usage" field.
+func (_u *UserPlatformQuotaUpdate) SetGrokRefusalUsage(v map[string]interface{}) *UserPlatformQuotaUpdate {
+	_u.mutation.SetGrokRefusalUsage(v)
+	return _u
+}
+
 // SetDailyWindowStart sets the "daily_window_start" field.
 func (_u *UserPlatformQuotaUpdate) SetDailyWindowStart(v time.Time) *UserPlatformQuotaUpdate {
 	_u.mutation.SetDailyWindowStart(v)
@@ -426,6 +432,9 @@ func (_u *UserPlatformQuotaUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.AddedMonthlyUsageUsd(); ok {
 		_spec.AddField(userplatformquota.FieldMonthlyUsageUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.GrokRefusalUsage(); ok {
+		_spec.SetField(userplatformquota.FieldGrokRefusalUsage, field.TypeJSON, value)
 	}
 	if value, ok := _u.mutation.DailyWindowStart(); ok {
 		_spec.SetField(userplatformquota.FieldDailyWindowStart, field.TypeTime, value)
@@ -692,6 +701,12 @@ func (_u *UserPlatformQuotaUpdateOne) AddMonthlyUsageUsd(v float64) *UserPlatfor
 	return _u
 }
 
+// SetGrokRefusalUsage sets the "grok_refusal_usage" field.
+func (_u *UserPlatformQuotaUpdateOne) SetGrokRefusalUsage(v map[string]interface{}) *UserPlatformQuotaUpdateOne {
+	_u.mutation.SetGrokRefusalUsage(v)
+	return _u
+}
+
 // SetDailyWindowStart sets the "daily_window_start" field.
 func (_u *UserPlatformQuotaUpdateOne) SetDailyWindowStart(v time.Time) *UserPlatformQuotaUpdateOne {
 	_u.mutation.SetDailyWindowStart(v)
@@ -921,6 +936,9 @@ func (_u *UserPlatformQuotaUpdateOne) sqlSave(ctx context.Context) (_node *UserP
 	}
 	if value, ok := _u.mutation.AddedMonthlyUsageUsd(); ok {
 		_spec.AddField(userplatformquota.FieldMonthlyUsageUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.GrokRefusalUsage(); ok {
+		_spec.SetField(userplatformquota.FieldGrokRefusalUsage, field.TypeJSON, value)
 	}
 	if value, ok := _u.mutation.DailyWindowStart(); ok {
 		_spec.SetField(userplatformquota.FieldDailyWindowStart, field.TypeTime, value)

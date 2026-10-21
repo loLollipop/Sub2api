@@ -23,6 +23,8 @@ var ErrMediaBillingJobNotFound = errors.New("media billing job not found")
 // MediaBillingIntent contains no credentials, request body, or media URLs.
 // Both the charge and log are frozen before any result becomes public.
 type MediaBillingIntent struct {
+	// AuthCacheKey is a SHA-256 cache identifier, never an API credential.
+	AuthCacheKey  string              `json:"auth_cache_key,omitempty"`
 	Command       UsageBillingCommand `json:"command"`
 	Usage         UsageLog            `json:"usage"`
 	QuotaPlatform string              `json:"quota_platform,omitempty"`
@@ -30,22 +32,25 @@ type MediaBillingIntent struct {
 }
 
 type MediaBillingJob struct {
-	ID             string              `json:"id"`
-	Kind           string              `json:"kind"`
-	UserID         int64               `json:"user_id"`
-	APIKeyID       int64               `json:"api_key_id"`
-	AccountID      int64               `json:"account_id"`
-	GroupID        int64               `json:"group_id"`
-	SubscriptionID *int64              `json:"subscription_id,omitempty"`
-	UpstreamTaskID string              `json:"upstream_task_id,omitempty"`
-	Status         string              `json:"status"`
-	ReservedAmount float64             `json:"reserved_amount"`
-	Snapshot       json.RawMessage     `json:"snapshot,omitempty"`
-	Intent         *MediaBillingIntent `json:"intent,omitempty"`
-	CreatedAt      time.Time           `json:"created_at"`
-	UpdatedAt      time.Time           `json:"updated_at"`
-	AvailableAt    time.Time           `json:"available_at"`
-	Attempts       int                 `json:"attempts"`
+	// CommitResult carries first-commit cache/notification effects only; recovery
+	// always reads durable accounting state and never replays increments.
+	CommitResult   *UsageBillingApplyResult `json:"-"`
+	ID             string                   `json:"id"`
+	Kind           string                   `json:"kind"`
+	UserID         int64                    `json:"user_id"`
+	APIKeyID       int64                    `json:"api_key_id"`
+	AccountID      int64                    `json:"account_id"`
+	GroupID        int64                    `json:"group_id"`
+	SubscriptionID *int64                   `json:"subscription_id,omitempty"`
+	UpstreamTaskID string                   `json:"upstream_task_id,omitempty"`
+	Status         string                   `json:"status"`
+	ReservedAmount float64                  `json:"reserved_amount"`
+	Snapshot       json.RawMessage          `json:"snapshot,omitempty"`
+	Intent         *MediaBillingIntent      `json:"intent,omitempty"`
+	CreatedAt      time.Time                `json:"created_at"`
+	UpdatedAt      time.Time                `json:"updated_at"`
+	AvailableAt    time.Time                `json:"available_at"`
+	Attempts       int                      `json:"attempts"`
 }
 
 type MediaBillingJobRepository interface {

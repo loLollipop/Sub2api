@@ -2,6 +2,10 @@
 
 FRONTEND_CRITICAL_VITEST := \
 	src/components/admin/account/__tests__/ScheduledTestsPanel.spec.ts \
+	src/components/admin/account/__tests__/ScheduledTestsPanel.results.spec.ts \
+	src/components/admin/__tests__/ModalLoads.spec.ts \
+	src/views/admin/__tests__/groupModelAllowlist.spec.ts \
+	src/views/admin/__tests__/GroupsView.grokRefusal.spec.ts \
 	src/components/admin/account/__tests__/ScheduledQualityConfig.spec.ts \
 	src/components/user/monitor/__tests__/ChannelMonitorV3QualityHistory.spec.ts \
 	src/api/admin/__tests__/customUsage.spec.ts \

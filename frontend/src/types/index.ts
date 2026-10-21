@@ -610,6 +610,7 @@ export interface Group {
   web_search_price_per_call: number | null
   // Grok Voice 显式定价（分组级）
   search_price_per_1k: number | null
+  grok_moderation_refusal_price: number | null
   audio_realtime_price_per_min: number | null
   audio_tts_price_per_million_chars: number | null
   audio_stt_price_per_hour: number | null
@@ -841,6 +842,7 @@ export interface CreateGroupRequest {
   video_model_prices?: VideoModelPrices
   web_search_price_per_call?: number | null
   search_price_per_1k?: number | null
+  grok_moderation_refusal_price?: number | null
   audio_realtime_price_per_min?: number | null
   audio_tts_price_per_million_chars?: number | null
   audio_stt_price_per_hour?: number | null
@@ -909,6 +911,7 @@ export interface UpdateGroupRequest {
   video_model_prices?: VideoModelPrices
   web_search_price_per_call?: number | null
   search_price_per_1k?: number | null
+  grok_moderation_refusal_price?: number | null
   audio_realtime_price_per_min?: number | null
   audio_tts_price_per_million_chars?: number | null
   audio_stt_price_per_hour?: number | null

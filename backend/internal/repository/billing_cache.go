@@ -703,3 +703,15 @@ func (c *billingCache) BatchGetUserPlatformQuotaCache(ctx context.Context, keys 
 	}
 	return results, nil
 }
+
+// InvalidateAPIKeyAuthCacheHash is replay-safe. The journal stores only the hash
+// used by the existing auth cache, never the credential itself.
+func (c *billingCache) InvalidateAPIKeyAuthCacheHash(ctx context.Context, hash string) error {
+	if len(hash) != 64 {
+		return errors.New("invalid auth cache hash")
+	}
+	if err := c.rdb.Del(ctx, apiKeyAuthCacheKey(hash)).Err(); err != nil {
+		return err
+	}
+	return c.rdb.Publish(ctx, authCacheInvalidateChannel, hash).Err()
+}

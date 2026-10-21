@@ -257,6 +257,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 
+	if rejectGrokRefusedRequest(c, h.openAIGatewayService, apiKey, body, h.apiKeyService, h.errorResponse) {
+		return
+	}
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolAnthropicMessages, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.anthropicSecurityAuditError(c, decision)
 		return
@@ -571,6 +575,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					}
 					return
 				}
+				service.UpdateGrokRefusalRoute(c, apiKey, clientRequestedUsageFields(c, channelMapping, reqModel, ""))
 				oaResult, oaErr := h.openAIGatewayService.ForwardAsAnthropic(requestCtx, c, account, body, "", "")
 				err = oaErr
 				result = openAIForwardResultAsGateway(oaResult)
@@ -1809,6 +1814,21 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 		return
 	}
 
+	isQuotaLimited := apiKey.Quota > 0 || apiKey.HasRateLimits()
+	// Read the wallet before best-effort statistics can outlive the client.
+	// Detach cancellation only for this bounded lookup, retaining request values.
+	var latestUser *service.User
+	if !isQuotaLimited && (apiKey.Group == nil || !apiKey.Group.IsSubscriptionType()) {
+		userCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		user, err := h.userService.GetByID(userCtx, subject.UserID)
+		cancel()
+		if err != nil {
+			h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to get user info")
+			return
+		}
+		latestUser = user
+	}
+
 	// Best-effort: 获取用量统计（按当前 API Key 过滤），失败不影响基础响应
 	usageData := h.buildUsageData(ctx, apiKey.ID)
 	dailyUsage := h.buildAPIKeyDailyUsage(c, subject.UserID, apiKey.ID, days)
@@ -1821,15 +1841,12 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 		}
 	}
 
-	// 判断模式: key 有总额度或速率限制 → quota_limited，否则 → unrestricted
-	isQuotaLimited := apiKey.Quota > 0 || apiKey.HasRateLimits()
-
 	if isQuotaLimited {
 		h.usageQuotaLimited(c, ctx, apiKey, usageData, dailyUsage, modelStats)
 		return
 	}
 
-	h.usageUnrestricted(c, ctx, apiKey, subject, usageData, dailyUsage, modelStats)
+	h.usageUnrestricted(c, apiKey, latestUser, usageData, dailyUsage, modelStats)
 }
 
 // parseUsageDateRange 解析 start_date / end_date query params，默认返回近 30 天范围
@@ -1993,7 +2010,7 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 }
 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
-func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
+func (h *GatewayHandler) usageUnrestricted(c *gin.Context, apiKey *service.APIKey, latestUser *service.User, usageData gin.H, dailyUsage any, modelStats any) {
 	// 订阅模式
 	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
 		resp := gin.H{
@@ -2033,9 +2050,8 @@ func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, 
 		return
 	}
 
-	// 余额模式
-	latestUser, err := h.userService.GetByID(ctx, subject.UserID)
-	if err != nil {
+	// The wallet was loaded before statistics; never query using a canceled context.
+	if latestUser == nil {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to get user info")
 		return
 	}

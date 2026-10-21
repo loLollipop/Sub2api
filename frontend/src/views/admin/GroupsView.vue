@@ -790,6 +790,33 @@
           </div>
         </div>
 
+        <!-- Grok 安全拒绝单次扣费（放在模型白名单上方） -->
+        <div
+          v-if="createForm.platform === 'grok' || createForm.platform === 'composite'"
+          class="border-t pt-4"
+        >
+          <h4 class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t("admin.groups.moderationRefusalPricing.title") }}
+          </h4>
+          <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            {{ t("admin.groups.moderationRefusalPricing.hint") }}
+          </p>
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div>
+              <label class="input-label">{{ t("admin.groups.moderationRefusalPricing.pricePerCall") }}</label>
+              <input
+                v-model.number="createForm.grok_moderation_refusal_price"
+                type="number"
+                step="0.00000001"
+                min="0"
+                class="input"
+                :placeholder="t('admin.groups.moderationRefusalPricing.placeholder')"
+                data-testid="create-grok-moderation-refusal-price"
+              />
+            </div>
+          </div>
+        </div>
+
         <div class="border-t pt-4">
           <div class="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -2439,6 +2466,33 @@
                 min="0"
                 class="input"
                 :placeholder="t('admin.groups.subscription.noLimit')"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Grok 安全拒绝单次扣费（放在模型白名单上方） -->
+        <div
+          v-if="editForm.platform === 'grok' || editForm.platform === 'composite'"
+          class="border-t pt-4"
+        >
+          <h4 class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t("admin.groups.moderationRefusalPricing.title") }}
+          </h4>
+          <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            {{ t("admin.groups.moderationRefusalPricing.hint") }}
+          </p>
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div>
+              <label class="input-label">{{ t("admin.groups.moderationRefusalPricing.pricePerCall") }}</label>
+              <input
+                v-model.number="editForm.grok_moderation_refusal_price"
+                type="number"
+                step="0.00000001"
+                min="0"
+                class="input"
+                :placeholder="t('admin.groups.moderationRefusalPricing.placeholder')"
+                data-testid="edit-grok-moderation-refusal-price"
               />
             </div>
           </div>
@@ -5025,6 +5079,7 @@ const createForm = reactive({
   // Codex 网页搜索按次计费（仅 openai 平台使用）；null = 使用默认价 0.01
   web_search_price_per_call: null as number | null,
   search_price_per_1k: null as number | null,
+  grok_moderation_refusal_price: null as number | null,
   audio_realtime_price_per_min: null as number | null,
   audio_tts_price_per_million_chars: null as number | null,
   audio_stt_price_per_hour: null as number | null,
@@ -5400,6 +5455,7 @@ const editForm = reactive({
   // Codex 网页搜索按次计费（仅 openai 平台使用）；null = 使用默认价 0.01
   web_search_price_per_call: null as number | null,
   search_price_per_1k: null as number | null,
+  grok_moderation_refusal_price: null as number | null,
   audio_realtime_price_per_min: null as number | null,
   audio_tts_price_per_million_chars: null as number | null,
   audio_stt_price_per_hour: null as number | null,
@@ -5862,6 +5918,7 @@ const closeCreateModal = () => {
   createForm.model_pricing = [];
   createForm.web_search_price_per_call = null;
   createForm.search_price_per_1k = null;
+  createForm.grok_moderation_refusal_price = null;
   createForm.audio_realtime_price_per_min = null;
   createForm.audio_tts_price_per_million_chars = null;
   createForm.audio_stt_price_per_hour = null;
@@ -6054,6 +6111,7 @@ const handleCreateGroup = async () => {
     requestData.video_price_480p = emptyToNull(requestData.video_price_480p);
     requestData.video_price_720p = emptyToNull(requestData.video_price_720p);
     requestData.video_price_1080p = emptyToNull(requestData.video_price_1080p);
+    requestData.grok_moderation_refusal_price = emptyToNull(requestData.grok_moderation_refusal_price);
     requestData.search_price_per_1k = emptyToNull(
       requestData.search_price_per_1k,
     );
@@ -6150,6 +6208,7 @@ const handleEdit = async (group: AdminGroup) => {
   );
   editForm.web_search_price_per_call = group.web_search_price_per_call ?? null;
   editForm.search_price_per_1k = group.search_price_per_1k ?? null;
+  editForm.grok_moderation_refusal_price = group.grok_moderation_refusal_price ?? null;
   editForm.audio_realtime_price_per_min = group.audio_realtime_price_per_min ?? null;
   editForm.audio_tts_price_per_million_chars = group.audio_tts_price_per_million_chars ?? null;
   editForm.audio_stt_price_per_hour = group.audio_stt_price_per_hour ?? null;
@@ -6273,6 +6332,7 @@ const closeEditModal = () => {
   editForm.model_pricing = [];
   editForm.web_search_price_per_call = null;
   editForm.search_price_per_1k = null;
+  editForm.grok_moderation_refusal_price = null;
   editForm.audio_realtime_price_per_min = null;
   editForm.audio_tts_price_per_million_chars = null;
   editForm.audio_stt_price_per_hour = null;
@@ -6426,6 +6486,7 @@ const handleUpdateGroup = async () => {
     payload.video_price_480p = emptyPriceToClear(payload.video_price_480p);
     payload.video_price_720p = emptyPriceToClear(payload.video_price_720p);
     payload.video_price_1080p = emptyPriceToClear(payload.video_price_1080p);
+    payload.grok_moderation_refusal_price = emptyToNull(payload.grok_moderation_refusal_price);
     payload.search_price_per_1k = emptyPriceToClear(
       payload.search_price_per_1k,
     );

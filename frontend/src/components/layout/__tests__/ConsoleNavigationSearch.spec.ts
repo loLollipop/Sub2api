@@ -31,13 +31,13 @@ async function render(role: 'user' | 'admin', simpleMode = false) {
 describe('console navigation search', () => {
   it('matches the sidebar by hiding users and retaining groups in simple admin mode', async () => {
     const { wrapper } = await render('admin', true)
-    expect(wrapper.text()).not.toContain('admin.users.title')
-    expect(wrapper.text()).toContain('admin.groups.title')
+    expect(wrapper.text()).not.toContain('nav.users')
+    expect(wrapper.text()).toContain('nav.groups')
     wrapper.unmount()
   })
   it('does not expose admin or disabled feature destinations to a user', async () => {
     const { wrapper } = await render('user')
-    expect(wrapper.text()).not.toContain('admin.accounts.title')
+    expect(wrapper.text()).not.toContain('nav.accounts')
     expect(wrapper.text()).not.toContain('nav.buySubscription')
     expect(wrapper.text()).not.toContain('nav.channelStatus')
     expect(wrapper.text()).toContain('nav.apiKeys')

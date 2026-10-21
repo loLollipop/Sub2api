@@ -65,6 +65,7 @@ useMutationObserver(document.documentElement, () => {
 const chartColors = computed(() => ({
   text: isDarkMode.value ? '#e5e7eb' : '#374151',
   grid: props.mode === 'total' ? (isDarkMode.value ? '#29292c' : '#e8e8ec') : (isDarkMode.value ? '#374151' : '#e5e7eb'),
+  accent: isDarkMode.value ? '#fb923c' : '#ea580c',
   input: '#3b82f6',
   output: '#10b981',
   cacheCreation: '#f59e0b',
@@ -99,13 +100,13 @@ const chartData = computed(() => {
     datasets: props.mode === 'total' ? [{
       label: t('dashboard.totalUsage'),
       data: props.trendData.map(d => d.total_tokens),
-      borderColor: chartColors.value.text,
+      borderColor: chartColors.value.accent,
       // 纵向渐变填充：峰顶浓、谷底透明，比平铺低透明度更有深度
-      backgroundColor: makeAreaGradient(chartColors.value.text),
+      backgroundColor: makeAreaGradient(chartColors.value.accent),
       borderWidth: 2,
       pointRadius: 2,
       pointHoverRadius: 4,
-      pointBackgroundColor: chartColors.value.text,
+      pointBackgroundColor: chartColors.value.accent,
       fill: true,
       tension: 0.25,
     }] : [

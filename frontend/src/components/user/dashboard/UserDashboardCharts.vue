@@ -41,7 +41,7 @@ const mode = ref<'total' | 'breakdown'>('total')
 </script>
 
 <style scoped>
-.signal-charts { margin-top: 20px; min-width: 0; }
+.signal-charts { margin-top: 20px; min-width: 0; padding: 20px; border: 1px solid var(--signal-line); border-radius: 8px; background: var(--signal-surface); }
 .signal-chart-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-bottom: 14px; }
 .signal-chart-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .signal-chart-mode { display: flex; padding: 3px; border: 1px solid var(--signal-line); border-radius: 6px; background: var(--signal-inset); }

@@ -57,8 +57,10 @@
 }
 
 .console-signal .signal-key-filters {
-  border-top: 1px solid var(--signal-line);
-  padding-top: 20px;
+  border: 1px solid var(--signal-line);
+  border-radius: 8px;
+  padding: 18px;
+  background: var(--signal-surface);
 }
 
 .console-signal .signal-key-endpoints > div {
@@ -84,7 +86,7 @@
 }
 
 .console-signal .signal-keys .table-scroll-container {
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--signal-surface);
   border-color: var(--signal-line);
   box-shadow: none;
@@ -104,24 +106,18 @@
 }
 
 .console-signal .signal-usage-metrics {
-  gap: 0;
-  border-top: 1px solid var(--signal-line);
-  border-bottom: 1px solid var(--signal-line);
+  gap: 16px;
+  border: 0;
 }
 
 .console-signal .signal-usage-metrics > .card {
   align-items: flex-start;
-  border: 0;
-  border-right: 1px solid var(--signal-line);
-  border-radius: 0;
-  padding: 24px 20px;
-  background: transparent;
+  border: 1px solid var(--signal-line);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--signal-surface);
   box-shadow: none;
   min-width: 0;
-}
-
-.console-signal .signal-usage-metrics > .card:last-child {
-  border-right: 0;
 }
 
 .console-signal .signal-usage-metrics > .card > div:first-child {
@@ -160,17 +156,18 @@
 
 .console-signal .signal-usage-chart-grid > * {
   min-width: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--signal-line);
+  border-radius: 8px;
+  background: var(--signal-surface);
   box-shadow: none;
-  padding: 12px 0 24px;
+  padding: 20px;
 }
 
 .console-signal .signal-log-filters {
-  padding: 24px 0;
-  border-top: 1px solid var(--signal-line);
-  border-bottom: 1px solid var(--signal-line);
+  padding: 20px;
+  border: 1px solid var(--signal-line);
+  border-radius: 8px;
+  background: var(--signal-surface);
 }
 
 .console-signal .signal-log-filters .input-label {
@@ -197,23 +194,6 @@
 
 .console-signal .signal-main .signal-pagination button:hover:not(:disabled) {
   background: var(--signal-hover);
-}
-
-@media (min-width: 1024px) {
-  .console-signal .signal-usage-chart-grid > :nth-child(2) {
-    border-left: 1px solid var(--signal-line);
-    padding-left: 24px;
-  }
-}
-
-@media (max-width: 1023px) {
-  .console-signal .signal-usage-metrics > .card:nth-child(2) {
-    border-right: 0;
-  }
-
-  .console-signal .signal-usage-metrics > .card:nth-child(-n+2) {
-    border-bottom: 1px solid var(--signal-line);
-  }
 }
 
 @media (max-width: 639px) {

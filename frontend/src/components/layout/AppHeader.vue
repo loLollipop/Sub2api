@@ -1,7 +1,7 @@
 <template>
   <header
     class="glass sticky top-0 z-30 border-b border-gray-200/50 dark:border-dark-700/50"
-    :class="{ 'signal-header': isConsoleSignal }"
+    :class="{ 'signal-header': isConsoleSignal, 'consumer-header': !authStore.isAdmin }"
   >
     <div class="header-inner flex h-16 items-center justify-between gap-2 px-2 sm:px-4 md:px-6">
       <!-- Left: Mobile Menu Toggle + Page Title -->
@@ -53,8 +53,8 @@
           :href="docUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="header-shortcut hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white sm:flex"
-          :title="t('nav.docs')"
+          class="header-shortcut inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+          :title="t('nav.docs')" :aria-label="t('nav.docs')"
         >
           <Icon name="book" size="sm" />
           <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
@@ -64,8 +64,8 @@
         <router-link
           v-if="user && modelPlazaEnabled"
           :to="{ path: '/model-plaza', query: { embedded: '1' } }"
-          class="header-shortcut hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white sm:flex"
-          :title="t('nav.modelPlaza')"
+          class="header-shortcut inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+          :title="t('nav.modelPlaza')" :aria-label="t('nav.modelPlaza')"
         >
           <Icon name="grid" size="sm" />
           <span class="hidden sm:inline">{{ t('nav.modelPlaza') }}</span>
@@ -117,6 +117,7 @@
         <AccountMenu />
       </div>
     </div>
+    <UserTopNav v-if="!authStore.isAdmin" />
   </header>
 </template>
 
@@ -135,6 +136,7 @@ import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { useConsoleSignal } from '@/composables/useConsoleSignal'
 import ConsoleNavigationSearch from './ConsoleNavigationSearch.vue'
 import AccountMenu from './AccountMenu.vue'
+import UserTopNav from './UserTopNav.vue'
 
 const route = useRoute()
 const { isConsoleSignal, isAdminSignal } = useConsoleSignal()

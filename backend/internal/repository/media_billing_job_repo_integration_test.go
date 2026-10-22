@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -237,13 +238,27 @@ func TestMediaBillingJobIntegration_ApplyFailureKeepsReadyAndHold(t *testing.T) 
 	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET extra = jsonb_build_object('quota_used', 'invalid-numeric') WHERE id = $1`, fixture.account.ID)
 	require.NoError(t, err)
 	_, err = fixture.repo.ApplyMediaBillingJob(ctx, job.ID)
-	require.ErrorContains(t, err, "invalid input syntax for type numeric")
+	var pgError *pq.Error
+	require.ErrorAs(t, err, &pgError)
+	require.Equal(t, pq.ErrorCode("22P02"), pgError.Code)
 
 	persisted, err := fixture.repo.GetMediaBillingJobByID(ctx, job.ID)
 	require.NoError(t, err)
 	require.Equal(t, service.MediaBillingReady, persisted.Status)
 	assertMediaBillingWallet(t, ctx, fixture.user.ID, 8, 2)
 	assertMediaBillingOutboxDeltas(t, ctx, fixture.user.ID, []float64{-2})
+	var claims int
+	require.NoError(t, integrationDB.QueryRowContext(ctx,
+		`SELECT count(*) FROM usage_billing_dedup WHERE request_id = $1 AND api_key_id = $2`,
+		intent.Command.RequestID, fixture.apiKey.ID).Scan(&claims))
+	require.Zero(t, claims, "failed settlement must not retain its idempotency claim")
+	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET extra = '{}'::jsonb WHERE id = $1`, fixture.account.ID)
+	require.NoError(t, err)
+	result, err := fixture.repo.ApplyMediaBillingJob(ctx, job.ID)
+	require.NoError(t, err)
+	require.True(t, result.Applied)
+	assertMediaBillingWallet(t, ctx, fixture.user.ID, 9, 0)
+	assertMediaBillingOutboxDeltas(t, ctx, fixture.user.ID, []float64{-2, 1})
 }
 
 func TestMediaBillingJobIntegration_DeletedAccountStillCapturesHold(t *testing.T) {
@@ -257,12 +272,17 @@ func TestMediaBillingJobIntegration_DeletedAccountStillCapturesHold(t *testing.T
 	intent.Command.AccountQuotaCost = 1
 	_, err = fixture.repo.PrepareMediaBillingIntent(ctx, job.ID, intent)
 	require.NoError(t, err)
-	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET deleted_at = NOW() WHERE id = $1`, fixture.account.ID)
+	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET deleted_at = NOW(), extra = '{"quota_used":5}'::jsonb WHERE id = $1`, fixture.account.ID)
 	require.NoError(t, err)
 
 	result, err := fixture.repo.ApplyMediaBillingJob(ctx, job.ID)
 	require.NoError(t, err)
 	require.True(t, result.Applied)
+	require.Nil(t, result.QuotaState, "deleted accounts must not receive quota updates")
+	var quotaUsed float64
+	require.NoError(t, integrationDB.QueryRowContext(ctx,
+		`SELECT (extra->>'quota_used')::numeric FROM accounts WHERE id = $1`, fixture.account.ID).Scan(&quotaUsed))
+	require.Equal(t, float64(5), quotaUsed)
 	persisted, err := fixture.repo.GetMediaBillingJobByID(ctx, job.ID)
 	require.NoError(t, err)
 	require.Equal(t, service.MediaBillingBilled, persisted.Status)

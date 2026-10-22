@@ -351,22 +351,6 @@ export const ChevronDoubleLeftIcon = {
     )
 }
 
-const OrderIcon = {
-  render: () =>
-    h(
-      'svg',
-      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
-      [
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z'
-        })
-      ]
-    )
-}
-
-
 export const ChevronDoubleRightIcon = {
   render: () =>
     h(
@@ -471,11 +455,7 @@ export function useConsoleNavigation() {
   // Ignore the retired embedded recharge menu.
   const RECHARGE_CENTER_MENU_ID = '322273f5aaa4d036'
 
-  // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
-  // withDashboard=true 时包含仪表盘（用户端），false 时不含（管理员的个人区已经有独立仪表盘入口）。
-  //
-  // 条目顺序：密钥 → 用量 → 可用渠道 → 渠道状态 → 支付 → 兑换/资料。
-  // 可用渠道紧挨渠道状态之上，让用户"先看自己能用什么、再看对应状态"。
+  // User-workspace destinations, including the browse links shared with the top bar.
   function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     const items: NavItem[] = []
     if (withDashboard) {
@@ -510,10 +490,11 @@ export function useConsoleNavigation() {
   // User navigation items (for regular users)
   const userNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(true)))
 
-  // Personal navigation items (for admin's "My Account" section, without Dashboard).
-  // Admins access 可用渠道 from this section just like regular users — there is no
-  // separate admin entry, since the page is purely a user-facing view.
-  const personalNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(false)))
+  // Keep personal tools in the admin workspace; removing /admin previews users' UI.
+  const personalNavItems = computed((): NavItem[] => [
+    { path: '/admin/keys', label: t('nav.apiKeys'), icon: KeyIcon },
+    { path: '/admin/profile', label: t('nav.profile'), icon: UserIcon },
+  ])
 
   // Custom menu items filtered by visibility
   const customMenuItemsForUser = computed(() => {
@@ -536,17 +517,8 @@ export function useConsoleNavigation() {
       { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
       { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
       { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },
-      {
-        path: '/admin/channels',
-        label: t('nav.channelManagement'),
-        icon: ChannelIcon,
-        hideInSimpleMode: true,
-        expandOnly: true,
-        children: [
-          { path: '/admin/channels/pricing', label: t('nav.channelPricing'), icon: PriceTagIcon },
-          { path: '/admin/channels/monitor', label: t('nav.channelMonitor'), icon: SignalIcon, featureFlag: flagChannelMonitor },
-        ],
-      },
+      { path: '/admin/channels/pricing', label: t('nav.channelPricing'), icon: PriceTagIcon, hideInSimpleMode: true },
+      { path: '/admin/channels/monitor', label: t('nav.channelMonitor'), icon: SignalIcon, hideInSimpleMode: true, featureFlag: flagChannelMonitor },
       { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
       { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
       { path: '/admin/plugins', label: t('nav.plugins'), icon: PluginIcon, featureFlag: flagPluginManagement },
@@ -563,20 +535,23 @@ export function useConsoleNavigation() {
           { path: '/admin/prompt-audit', label: t('nav.promptAudit'), icon: ShieldIcon },
         ],
       },
-      { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
-      { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
+      {
+        path: '/admin/redemption-center',
+        label: t('nav.redemptionCenter'),
+        icon: GiftIcon,
+        hideInSimpleMode: true,
+        expandOnly: true,
+        children: [
+          { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon },
+          { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon },
+        ],
+      },
       {
         path: '/admin/affiliates',
         label: t('nav.affiliateManagement'),
         icon: UsersIcon,
         hideInSimpleMode: true,
-        expandOnly: true,
         featureFlag: flagAffiliate,
-        children: [
-          { path: '/admin/affiliates/invites', label: t('nav.affiliateInviteRecords'), icon: UsersIcon },
-          { path: '/admin/affiliates/rebates', label: t('nav.affiliateRebateRecords'), icon: OrderIcon },
-          { path: '/admin/affiliates/transfers', label: t('nav.affiliateTransferRecords'), icon: CreditCardIcon },
-        ],
       },
       { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
       { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true }
@@ -584,10 +559,8 @@ export function useConsoleNavigation() {
 
     const visible = applyFeatureFlags(baseItems)
 
-    // 简单模式下，在系统设置前插入 API密钥
     if (authStore.isSimpleMode) {
       const filtered = visible.filter(item => !item.hideInSimpleMode)
-      filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
       filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
       for (const cm of customMenuItemsForAdmin.value) {
         filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })

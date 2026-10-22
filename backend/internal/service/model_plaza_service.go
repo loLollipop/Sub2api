@@ -218,8 +218,8 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 				fillGlobalPricingFallback(s.pricingService, one)
 				pg.Models[j].Pricing = one[0].Pricing
 			}
-			s.fillDisplayPricing(ctx, &pg.Models[j], g)
-			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, pg.Models[j].Name, officialMemo)
+			pricingModel := s.fillDisplayPricing(ctx, &pg.Models[j], g)
+			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, pricingModel, officialMemo)
 		}
 		out = append(out, *pg)
 	}
@@ -236,23 +236,70 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 // fillDisplayPricing 把模型的展示定价换成实收口径：
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
 // 图片/按次模型（或阶梯表不可用时）沿用渠道定价与分组图片档位价。
-func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) {
+func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) string {
 	if s.billingService != nil && s.resolver != nil {
-		sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{
-			Model:    m.Name,
-			Group:    g,
-			Platform: m.Platform,
-		})
-		if err == nil && sched != nil && len(sched.Tiers) > 0 {
-			m.Pricing = withDefaultMaxReasoningEffortMultiplier(plazaPricingFromSchedule(m.Pricing, sched), m.Name)
-			if len(sched.Tiers) > 1 {
-				m.LongContextBasis = sched.Basis
+		for _, model := range s.plazaBillingModelCandidates(ctx, m, g) {
+			sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{
+				Model:    model,
+				Group:    g,
+				Platform: m.Platform,
+			})
+			if err != nil {
+				continue
 			}
-			m.TimePricing = sched.TimePricing
-			return
+			if sched != nil && len(sched.Tiers) > 0 {
+				m.Pricing = withDefaultMaxReasoningEffortMultiplier(plazaPricingFromSchedule(m.Pricing, sched), model)
+				if len(sched.Tiers) > 1 {
+					m.LongContextBasis = sched.Basis
+				}
+				m.TimePricing = sched.TimePricing
+				return model
+			}
+			// Non-token prices must follow the same selected billing identity too;
+			// SupportedModels' raw price may belong to the mapping target even when
+			// the channel explicitly bills the requested model instead.
+			resolved := s.resolver.Resolve(WithResolvedTargetPlatform(ctx, m.Platform), PricingInput{Model: model, Group: g, GroupID: plazaGroupID(g)})
+			if resolved != nil && resolved.channelPricing != nil {
+				pricing := resolved.channelPricing.Clone()
+				display := &pricing
+				// OpenAI image accounting applies a model-specific group card
+				// before generic group image prices; preserve that priority.
+				if resolved.Source != PricingSourceGroup {
+					display = plazaImageDisplayPricing(display, g)
+				}
+				m.Pricing = withDefaultMaxReasoningEffortMultiplier(display, model)
+				return model
+			}
 		}
 	}
 	m.Pricing = withDefaultMaxReasoningEffortMultiplier(plazaImageDisplayPricing(m.Pricing, g), m.Name)
+	return m.Name
+}
+
+func plazaGroupID(g *Group) *int64 {
+	if g == nil {
+		return nil
+	}
+	return &g.ID
+}
+
+// Keep request-platform pricing isolation while applying the channel's billing
+// identity, just as OpenAI usage accounting does. Never change the public name
+// or infer billing identity from a model's display logo.
+func (s *ModelPlazaService) plazaBillingModelCandidates(ctx context.Context, m *PlazaModel, g *Group) []string {
+	if g == nil || !isOpenAICompatibleUpstreamPlatform(m.Platform) || s.resolver == nil || s.resolver.channelService == nil {
+		return []string{m.Name}
+	}
+	mapping := s.resolver.channelService.ResolveChannelMapping(WithResolvedTargetPlatform(ctx, m.Platform), g.ID, m.Name)
+	if mapping.BillingModelSource == BillingModelSourceChannelMapped && mapping.Mapped {
+		return usageBillingModelCandidates(mapping.MappedModel, m.Name)
+	}
+	if mapping.BillingModelSource == BillingModelSourceRequested {
+		return usageBillingModelCandidates(m.Name, mapping.MappedModel)
+	}
+	// Upstream/response-declared models are unknown before a request occurs.
+	// Preserve the existing public-model reference for those dynamic modes.
+	return []string{m.Name}
 }
 
 func withDefaultMaxReasoningEffortMultiplier(pricing *ChannelModelPricing, model string) *ChannelModelPricing {

@@ -208,11 +208,6 @@
 .console-signal .signal-sidebar .sidebar-brand-title {
   font-size: 18px;
   font-weight: 600;
-  color: var(--signal-text);
-}
-
-.console-signal .signal-sidebar .sidebar-brand-title:hover {
-  color: var(--signal-accent);
 }
 
 .console-signal .signal-sidebar .sidebar-nav {

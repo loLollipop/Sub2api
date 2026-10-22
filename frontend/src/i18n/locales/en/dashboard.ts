@@ -728,6 +728,7 @@ export default {
       nameDesc: 'Name Z → A',
       byProvider: 'By provider',
       catalogCount: '{count} models / {total} total',
+      groupModelCount: '{count} models',
       catalogPriceHint: 'Prices include the selected group rate and show standard periods. See details for cache, tiers and official references.',
       details: 'Details',
       tierPreview: 'Showing tier {tier}',
@@ -736,7 +737,8 @@ export default {
     },
     filters: {
       clearAll: 'Clear filters',
-      platformLabel: 'Platform',
+      platformLabel: 'Model provider',
+      otherProviders: 'Other providers',
       groupLabel: 'Group',
       rateLabel: 'Rate',
       modelLabel: 'Model',

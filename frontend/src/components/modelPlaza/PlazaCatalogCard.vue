@@ -1,10 +1,10 @@
 <template>
   <article class="plaza-catalog-card" :class="`plaza-catalog-card--${view}`" :data-model-key="entry.key">
     <header class="catalog-identity">
-      <PlazaProviderIcon :platform="entry.platform" size="lg" class="catalog-logo" />
+      <PlazaProviderIcon :platform="provider" size="lg" class="catalog-logo" />
       <div class="catalog-name">
         <h3>{{ entry.name }}</h3>
-        <p class="catalog-muted">{{ platformLabel(entry.platform) }} · {{ billingLabel }}</p>
+        <p class="catalog-muted">{{ providerName }} · {{ billingLabel }}</p>
       </div>
       <button
         type="button" class="catalog-copy" :aria-label="t(copied ? 'modelPlaza.list.copied' : 'modelPlaza.list.copyName')"
@@ -15,12 +15,12 @@
     </header>
 
     <div v-if="activeOffer" class="catalog-offer">
-      <span class="catalog-muted">{{ t('modelPlaza.list.groupLabel') }}</span>
+      <span v-if="!grouped" class="catalog-muted">{{ t('modelPlaza.list.groupLabel') }}</span>
       <Select
         v-if="entry.offers.length > 1" v-model="selectedGroup" :options="groupOptions"
         :aria-label="t('modelPlaza.list.groupLabel')" :searchable="false" class="catalog-group-select"
       />
-      <span v-else class="catalog-group-name">{{ activeOffer.group.name }}</span>
+      <span v-else-if="!grouped" class="catalog-group-name">{{ activeOffer.group.name }}</span>
       <span v-if="!isVideo" class="catalog-rate" :title="t('modelPlaza.table.rate')">
         <s v-if="hasCustomRate && !independentImage">{{ activeOffer.group.rate_multiplier }}x</s>
         {{ activeRate }}x
@@ -57,7 +57,7 @@
     </div>
 
     <footer class="catalog-footer">
-      <span class="catalog-muted">{{ t('modelPlaza.list.offers', { count: entry.offers.length }) }}</span>
+      <span v-if="entry.offers.length > 1" class="catalog-muted">{{ t('modelPlaza.list.offers', { count: entry.offers.length }) }}</span>
       <button
         type="button" class="catalog-details" :disabled="!activeOffer"
         :aria-label="t('modelPlaza.list.viewPricing', { model: entry.name })" @click="detailsOpen = true"
@@ -69,7 +69,7 @@
     <BaseDialog v-if="activeOffer" :show="detailsOpen" :title="entry.name" width="extra-wide" @close="detailsOpen = false">
       <div v-if="detailsOpen" class="catalog-dialog">
         <div class="catalog-dialog-heading">
-          <span>{{ platformLabel(entry.platform) }} · {{ billingLabel }}</span>
+          <span>{{ providerName }} · {{ billingLabel }}</span>
           <Select
             v-if="entry.offers.length > 1" v-model="selectedGroup" :options="groupOptions"
             :aria-label="t('modelPlaza.list.groupLabel')" :searchable="false" class="catalog-dialog-select"
@@ -105,12 +105,12 @@ import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore } from '@/stores/app'
-import { platformLabel } from '@/utils/platformColors'
+import { modelProvider, providerLabel } from './modelPlazaProviders'
 import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import PlazaModelPricingTable from './PlazaModelPricingTable.vue'
 import { useModelPlazaPricing, type ModelPlazaPricingProps } from './useModelPlazaPricing'
 
-const props = withDefaults(defineProps<{ entry: PlazaCatalogEntry; view?: 'grid' | 'list' }>(), { view: 'grid' })
+const props = withDefaults(defineProps<{ entry: PlazaCatalogEntry; view?: 'grid' | 'list'; grouped?: boolean }>(), { view: 'grid', grouped: false })
 const { t } = useI18n()
 const { copied, copyToClipboard } = useClipboard()
 const appStore = useAppStore()
@@ -119,6 +119,8 @@ const selectedGroupId = ref<number | null>(null)
 // Resolve from the current offers on every read, so a filtered or refreshed offer
 // can never leave a stale model or price visible while the selection resets.
 const activeOffer = computed(() => props.entry.offers.find(offer => offer.group.id === selectedGroupId.value) ?? props.entry.offers[0])
+const provider = computed(() => props.entry.provider ?? modelProvider(activeOffer.value?.model ?? props.entry))
+const providerName = computed(() => provider.value === 'other' ? t('modelPlaza.filters.otherProviders') : providerLabel(provider.value))
 watch(() => [props.entry.key, props.entry.offers.map(offer => offer.group.id)] as const, ([key], previous) => {
   if (key !== previous?.[0] || !props.entry.offers.some(offer => offer.group.id === selectedGroupId.value)) {
     selectedGroupId.value = props.entry.offers[0]?.group.id ?? null
@@ -200,7 +202,8 @@ const preview = computed(() => {
 .catalog-prices small { font-weight: 400; white-space: normal; }
 .catalog-request { grid-column: 1 / -1; }
 .catalog-price-notes { display: flex; gap: 4px 10px; flex-wrap: wrap; margin-top: 10px; font-size: 10px; color: var(--signal-muted, #63636c); }
-.catalog-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid var(--signal-line, #dedee4); }
+.catalog-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid var(--signal-line, #dedee4); }
+.catalog-footer > .catalog-muted { margin-right: auto; }
 .catalog-details { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 3px 5px; border-radius: 5px; font-size: 11px; }
 .catalog-details:disabled { opacity: .5; cursor: default; }
 .catalog-copy:focus-visible, .catalog-details:focus-visible, .catalog-table-scroll:focus-visible { outline: 2px solid var(--signal-accent, #0066d6); outline-offset: 3px; }

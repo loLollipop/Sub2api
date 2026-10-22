@@ -1,5 +1,5 @@
 <template>
-  <AppLayout>
+  <div class="min-w-0">
     <TablePageLayout>
       <template #filters>
         <div class="flex flex-wrap items-center gap-3">
@@ -117,7 +117,7 @@
       :show="overviewDialog"
       :title="t('admin.affiliates.overview.title')"
       width="normal"
-      @close="overviewDialog = false"
+      @close="closeUserOverview"
     >
       <div v-if="overviewLoading" class="flex justify-center py-8">
         <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"></div>
@@ -138,13 +138,12 @@
         </div>
       </div>
     </BaseDialog>
-  </AppLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onMounted, reactive, ref, type PropType } from 'vue'
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, reactive, ref, type PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
@@ -175,6 +174,9 @@ const overviewDialog = ref(false)
 const overviewLoading = ref(false)
 const selectedOverview = ref<AffiliateUserOverview | null>(null)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let disposed = false
+let recordsRequestId = 0
+let overviewRequestId = 0
 
 const columns = computed<Column[]>(() => {
   if (props.type === 'invites') {
@@ -263,16 +265,20 @@ async function fetchRecords(params: ListAffiliateRecordsParams): Promise<Paginat
 }
 
 async function loadRecords() {
+  if (disposed) return
+  const requestId = ++recordsRequestId
   loading.value = true
   try {
     const res = await fetchRecords(buildParams())
+    if (disposed || requestId !== recordsRequestId) return
     records.value = res.items || []
     pagination.total = res.total || 0
     if (res.page_size > 0) pagination.page_size = res.page_size
   } catch (error) {
+    if (disposed || requestId !== recordsRequestId) return
     appStore.showError(extractI18nErrorMessage(error, t, 'admin.affiliates.errors', t('common.error')))
   } finally {
-    loading.value = false
+    if (!disposed && requestId === recordsRequestId) loading.value = false
   }
 }
 
@@ -318,18 +324,28 @@ function formatDateTime(value: string | null | undefined): string {
 }
 
 async function openUserOverview(userId: number) {
-  if (!userId) return
+  if (!userId || disposed) return
+  const requestId = ++overviewRequestId
   overviewDialog.value = true
   overviewLoading.value = true
   selectedOverview.value = null
   try {
-    selectedOverview.value = await affiliatesAPI.getUserOverview(userId)
+    const overview = await affiliatesAPI.getUserOverview(userId)
+    if (disposed || requestId !== overviewRequestId) return
+    selectedOverview.value = overview
   } catch (error) {
+    if (disposed || requestId !== overviewRequestId) return
     overviewDialog.value = false
     appStore.showError(extractI18nErrorMessage(error, t, 'admin.affiliates.errors', t('common.error')))
   } finally {
-    overviewLoading.value = false
+    if (!disposed && requestId === overviewRequestId) overviewLoading.value = false
   }
+}
+
+function closeUserOverview() {
+  overviewRequestId++
+  overviewDialog.value = false
+  overviewLoading.value = false
 }
 
 const UserCell = defineComponent({
@@ -404,5 +420,10 @@ const OverviewStat = defineComponent({
 
 onMounted(() => {
   void loadRecords()
+})
+
+onBeforeUnmount(() => {
+  disposed = true
+  if (debounceTimer) clearTimeout(debounceTimer)
 })
 </script>

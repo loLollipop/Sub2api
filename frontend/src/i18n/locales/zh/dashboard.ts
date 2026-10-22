@@ -733,6 +733,7 @@ export default {
       nameDesc: '名称 Z → A',
       byProvider: '按供应商',
       catalogCount: '{count} 个模型 / 共 {total} 个',
+      groupModelCount: '{count} 个模型',
       catalogPriceHint: '价格已按所选分组倍率折算，默认展示标准时段；缓存、阶梯与官方参考价见详情。',
       details: '详情',
       tierPreview: '展示 {tier} 档',
@@ -741,7 +742,8 @@ export default {
     },
     filters: {
       clearAll: '清除筛选',
-      platformLabel: '平台',
+      platformLabel: '模型品牌',
+      otherProviders: '其他品牌',
       groupLabel: '分组',
       rateLabel: '倍率',
       modelLabel: '模型',

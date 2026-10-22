@@ -389,6 +389,8 @@ export default {
     },
 
     affiliates: {
+      title: 'Invite Rebates',
+      description: 'Review invite relationships, rebate orders, and balance transfers.',
       orderStatus: {
       pending: 'Pending',
       paid: 'Paid',

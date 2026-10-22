@@ -26,6 +26,7 @@ async function renderSidebar(role: 'user' | 'admin' = 'user', desktop = true) {
   setActivePinia(pinia)
   const app = useAppStore()
   app.publicSettingsLoaded = true
+  app.cachedPublicSettings = { risk_control_enabled: true, affiliate_enabled: true } as NonNullable<typeof app.cachedPublicSettings>
   const auth = useAuthStore()
   auth.user = { id: 1, role } as NonNullable<typeof auth.user>
   useAdminSettingsStore().fetch = vi.fn().mockResolvedValue(undefined)
@@ -89,9 +90,19 @@ describe('AppSidebar scroll position persistence', () => {
 })
 
 describe('AppSidebar direct navigation and responsive collapse', () => {
-  it('keeps admin children directly accessible in both expanded and collapsed states', async () => {
+  it('keeps channel tools flat and folds redemption children beneath an arrow-free parent', async () => {
     const { app } = await renderSidebar('admin')
-    expect(wrapper!.find('.sidebar-nav button').exists()).toBe(false)
+    const branch = wrapper!.get('button[data-branch="/admin/redemption-center"]')
+    const drawer = wrapper!.get(`#${branch.attributes('aria-controls')}`)
+    expect(branch.attributes('aria-expanded')).toBe('false')
+    expect(branch.findAll('svg')).toHaveLength(1)
+    expect(drawer.attributes('inert')).toBeDefined()
+    await branch.trigger('click')
+    expect(branch.attributes('aria-expanded')).toBe('true')
+    expect(drawer.attributes('inert')).toBeUndefined()
+    expect(wrapper!.get('a[href="/admin/redeem"]').classes()).toContain('sidebar-sublink')
+    await branch.trigger('click')
+    expect(drawer.attributes('inert')).toBeDefined()
     expect(wrapper!.find('.sidebar-nav a[href="/admin/channels"]').exists()).toBe(false)
     expect(wrapper!.get('.sidebar-nav a[href="/admin/channels/pricing"]').exists()).toBe(true)
     expect(wrapper!.get('#sidebar-group-manage').attributes('href')).toBe('/admin/groups')
@@ -102,6 +113,32 @@ describe('AppSidebar direct navigation and responsive collapse', () => {
     const child = wrapper!.get('.sidebar-nav a[href="/admin/channels/pricing"]')
     expect(child.attributes('aria-label')).toBe('nav.channelPricing')
     expect(child.classes()).toContain('sidebar-link-collapsed')
+    await branch.trigger('click')
+    expect(app.sidebarCollapsed).toBe(false)
+    expect(branch.attributes('aria-expanded')).toBe('true')
+  })
+
+  it('opens the active security branch, retains its state and has only two personal tools', async () => {
+    const { app, router } = await renderSidebar('admin')
+    const branch = wrapper!.get('button[data-branch="/admin/security-audit"]')
+    expect(branch.attributes('aria-expanded')).toBe('false')
+    await router.push('/admin/prompt-audit')
+    await flushPromises()
+    expect(branch.attributes('aria-expanded')).toBe('true')
+    expect(wrapper!.get('a[href="/admin/prompt-audit"]').classes()).toContain('sidebar-link-active')
+    await router.push('/admin/dashboard')
+    expect(branch.attributes('aria-expanded')).toBe('true')
+    const personal = wrapper!.findAll('.sidebar-section').at(-1)!
+    expect(personal.findAll('a').map(item => item.attributes('href'))).toEqual(['/admin/keys', '/admin/profile'])
+    expect(wrapper!.get('a[href="/admin/affiliates"]').exists()).toBe(true)
+    expect(wrapper!.find('a[href="/admin/affiliates/invites"]').exists()).toBe(false)
+    expect(wrapper!.findAll('.sidebar-section-title')).toHaveLength(1)
+    app.sidebarCollapsed = true
+    await flushPromises()
+    expect(branch.attributes('aria-expanded')).toBe('false')
+    app.sidebarCollapsed = false
+    await flushPromises()
+    expect(branch.attributes('aria-expanded')).toBe('true')
   })
 
   it('reflects the user desktop collapse state and saves its scroll position', async () => {
@@ -131,7 +168,7 @@ describe('AppSidebar direct navigation and responsive collapse', () => {
     await flushPromises()
     expect(wrapper!.get('.sidebar').attributes('inert')).toBeUndefined()
     const first = wrapper!.get('.sidebar a')
-    const last = wrapper!.get('.sidebar-nav a[href="/monitor"]')
+    const last = wrapper!.get('.sidebar-nav a[href="/profile"]')
     expect(wrapper!.findAll('.sidebar a').at(-1)?.element).toBe(last.element)
     expect(document.activeElement).toBe(first.element)
     await first.trigger('keydown', { key: 'Tab', shiftKey: true })

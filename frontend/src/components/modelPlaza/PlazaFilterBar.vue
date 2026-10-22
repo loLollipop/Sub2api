@@ -22,7 +22,18 @@
         </button>
       </div>
       <p v-if="sidebar" class="plaza-filter-label">{{ t('modelPlaza.filters.groupLabel') }}</p>
+      <div v-if="sidebar" class="plaza-group-options" role="radiogroup" :aria-label="t('modelPlaza.filters.groupLabel')" @keydown="plazaRadioKeyboard">
+        <button
+          v-for="option in groupChoices" :key="option.value" type="button" role="radio"
+          class="plaza-group-option" :aria-checked="groupId === option.value"
+          :tabindex="groupTabStop === option.value ? 0 : -1" :disabled="option.disabled"
+          @click="onGroupChange(option.value)"
+        >
+          <span>{{ option.label }}</span><span class="plaza-group-count">{{ option.count }}</span>
+        </button>
+      </div>
       <Select
+        v-else
         :model-value="groupId"
         :options="groupSelectOptions"
         :aria-label="t('modelPlaza.filters.groupLabel')"
@@ -55,12 +66,12 @@
             role="radio"
             class="plaza-seg-item"
             :aria-checked="platform === p"
-            :tabindex="platform === p ? 0 : -1"
+            :tabindex="platformTabStop === p ? 0 : -1"
             :disabled="p !== 'all' && !platformEnabled(p)"
             @click="$emit('update:platform', p)"
           >
             <PlazaProviderIcon v-if="p !== 'all'" :platform="p" size="xs" />
-            {{ p === 'all' ? t('modelPlaza.filters.all') : platformLabel(p) }}
+            {{ p === 'all' ? t('modelPlaza.filters.all') : p === 'other' ? t('modelPlaza.filters.otherProviders') : providerLabel(p) }}
           </button>
         </div>
       </div>
@@ -77,14 +88,14 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import PlazaProviderIcon from './PlazaProviderIcon.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
-import { platformLabel } from '@/utils/platformColors'
+import { providerLabel } from './modelPlazaProviders'
 import { plazaRadioKeyboard } from './plazaRadioKeyboard'
 
 const props = defineProps<{
-  /** 数据中出现的平台(去重排序后)。 */
+  /** 数据中出现的真实模型品牌，独立于接入协议。 */
   platforms: string[]
   /** 全量分组(含平台与生效倍率),三个维度的置灰联动由此推导。 */
-  groups: Array<{ id: number; name: string; platform: string; platforms?: string[]; rate: number; rates?: number[] }>
+  groups: Array<{ id: number; name: string; platform: string; platforms?: string[]; rate: number; rates?: number[]; modelCount?: number }>
   /** 全量生效倍率去重升序。 */
   rates: number[]
   platform: string
@@ -109,6 +120,14 @@ const { t } = useI18n()
 const hasActiveFilters = computed(() => props.platform !== 'all' || props.groupId !== 'all' || props.rate !== 'all' || props.search.trim() !== '')
 
 const platformChoices = computed(() => ['all', ...props.platforms])
+
+const groupChoices = computed(() => [
+  { value: 'all' as const, label: t('modelPlaza.filters.all'), count: props.groups.reduce((count, group) => count + (group.modelCount ?? 0), 0), disabled: false },
+  ...props.groups.map(group => ({ value: group.id, label: group.name, count: group.modelCount ?? 0, disabled: !groupEnabled(group) }))
+])
+
+const groupTabStop = computed(() => groupChoices.value.some(option => option.value === props.groupId && !option.disabled) ? props.groupId : 'all')
+const platformTabStop = computed(() => platformChoices.value.includes(props.platform) && (props.platform === 'all' || platformEnabled(props.platform)) ? props.platform : 'all')
 
 const groupSelectOptions = computed<SelectOption[]>(() => [
   { value: 'all', label: t('modelPlaza.filters.groupLabel') },
@@ -278,7 +297,15 @@ function onRateChange(value: string | number | boolean | null) {
 }
 
 .plaza-filters-sidebar { gap: 22px; }
-.plaza-filters-sidebar .plaza-toolbar { display: flex; flex-direction: column; order: 2; gap: 8px; }
+.plaza-filters-sidebar .plaza-toolbar { display: flex; flex-direction: column; gap: 8px; }
+.plaza-group-options { display: grid; gap: 3px; }
+.plaza-group-option { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 36px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; font-size: 12px; text-align: left; color: var(--signal-muted, #63636c); }
+.plaza-group-option > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.plaza-group-option[aria-checked='true'] { background: var(--signal-hover, #e9e9ef); color: var(--signal-text, #1c1c1e); border-color: color-mix(in srgb, var(--signal-line, #dedee4) 60%, transparent); font-weight: 500; }
+.plaza-group-option:not(:disabled):hover { background: color-mix(in srgb, var(--signal-hover, #e9e9ef) 60%, transparent); }
+.plaza-group-option:disabled { opacity: .4; cursor: not-allowed; }
+.plaza-group-option:focus-visible { outline: 2px solid var(--signal-accent, #0066d6); outline-offset: -2px; }
+.plaza-group-count { flex-shrink: 0; color: var(--signal-muted, #63636c); font-size: 11px; font-variant-numeric: tabular-nums; }
 .plaza-filter-label { color: var(--signal-text, #1c1c1e); font-size: 12px; font-weight: 500; line-height: 18px; }
 .plaza-filters-sidebar .plaza-filter-label:not(:first-child) { margin-top: 12px; }
 .plaza-filters-sidebar .plaza-platform-toolbar { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
@@ -302,5 +329,6 @@ function onRateChange(value: string | number | boolean | null) {
   }
   .plaza-filters-sidebar .plaza-seg { display: flex; flex-wrap: wrap; }
   .plaza-filters-sidebar .plaza-seg-item { min-height: 44px; }
+  .plaza-group-option { min-height: 44px; }
 }
 </style>

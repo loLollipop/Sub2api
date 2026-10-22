@@ -10,10 +10,16 @@
   html {
     @apply scroll-smooth antialiased;
     color-scheme: light;
+    /* Keep the page and fixed header steady while dialogs lock body scrolling. */
+    scrollbar-gutter: stable;
+    --brand-color: #c2410c;
+    --brand-gradient: linear-gradient(110deg, #9a3412 0%, #c2410c 55%, #b45309 100%);
   }
 
   .dark {
     color-scheme: dark;
+    --brand-color: #fb923c;
+    --brand-gradient: linear-gradient(110deg, #fb923c 0%, #fdba74 55%, #fbbf24 100%);
   }
 
   body {
@@ -98,6 +104,19 @@
 }
 
 @layer components {
+  .brand-gradient {
+    color: var(--brand-color);
+  }
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .brand-gradient {
+      background-image: var(--brand-gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+  }
+
   /* ============ 按钮样式 ============ */
   .btn {
     @apply inline-flex items-center justify-center gap-2;

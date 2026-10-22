@@ -23,6 +23,7 @@ export const useAppStore = defineStore('app', () => {
   const sidebarCollapsed = ref<boolean>(false)
   const mobileOpen = ref<boolean>(false)
   const sidebarScrollTop = ref<number>(0)
+  const sidebarExpandedGroups = ref<Record<string, boolean>>({})
   const loading = ref<boolean>(false)
   const toasts = ref<Toast[]>([])
 
@@ -241,6 +242,7 @@ export const useAppStore = defineStore('app', () => {
    */
   function reset(): void {
     sidebarCollapsed.value = false
+    sidebarExpandedGroups.value = {}
     loading.value = false
     loadingCount.value = 0
     toasts.value = []
@@ -480,6 +482,7 @@ export const useAppStore = defineStore('app', () => {
     sidebarCollapsed,
     mobileOpen,
     sidebarScrollTop,
+    sidebarExpandedGroups,
     loading,
     toasts,
 

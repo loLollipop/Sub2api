@@ -8,7 +8,7 @@
           </button>
           <router-link to="/" class="top-brand" :title="appStore.siteName">
             <img :src="siteLogo || '/logo.svg'" alt="" class="top-brand-logo" />
-            <span>{{ appStore.siteName }}</span>
+            <span class="brand-gradient">{{ appStore.siteName }}</span>
           </router-link>
         </div>
         <UserTopNav />

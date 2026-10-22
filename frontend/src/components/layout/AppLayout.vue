@@ -36,23 +36,24 @@ import { useAuthStore } from '@/stores/auth'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useConsoleSignal } from '@/composables/useConsoleSignal'
+import { useConsoleWorkspace } from '@/composables/useConsoleWorkspace'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const isDesktop = useMediaQuery('(min-width: 1024px)')
 const mobileDrawerOpen = computed(() => appStore.mobileOpen && !isDesktop.value)
-const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const isBrowse = computed(() => ['/model-plaza', '/available-channels', '/monitor'].includes(route.path))
 const { isConsoleSignal, isAdminSignal } = useConsoleSignal()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
-const isAdmin = computed(() => authStore.user?.role === 'admin')
+const { isAdminWorkspace: isAdmin } = useConsoleWorkspace()
 
 const { replayTour: startReplay } = useOnboardingTour({
-  storageKey: isAdmin.value ? 'admin_guide' : 'user_guide',
-  autoStart: () => !isBrowse.value
+  storageKey: authStore.isAdmin ? 'admin_guide' : 'user_guide',
+  autoStart: () => !isBrowse.value && isAdmin.value
 })
 
 const onboardingStore = useOnboardingStore()
@@ -61,13 +62,13 @@ let unmounted = false
 
 const replayTour = async () => {
   if (unmounted || replayPending) return
-  if (!isBrowse.value) {
+  if (!isBrowse.value && (!authStore.isAdmin || isAdmin.value)) {
     startReplay()
     return
   }
 
   replayPending = true
-  const destination = isAdmin.value ? '/admin/dashboard' : '/dashboard'
+  const destination = authStore.isAdmin ? '/admin/dashboard' : '/dashboard'
   try {
     const failure = await router.push(destination)
     await nextTick()

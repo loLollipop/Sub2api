@@ -87,8 +87,22 @@
             </div>
           </div>
           <p class="plaza-catalog-price-hint">{{ t('modelPlaza.list.catalogPriceHint') }}</p>
-          <div v-if="pageEntries.length" class="plaza-catalog" :class="`plaza-catalog-${viewMode}`">
-            <PlazaCatalogCard v-for="entry in pageEntries" :key="entry.key" :entry="entry" :view="viewMode" />
+          <div v-if="pageGroups.length" class="plaza-catalog-sections">
+            <section v-for="section in pageGroups" :key="section.group.id" class="plaza-catalog-section" :data-group-id="section.group.id" :aria-labelledby="`plaza-group-${section.group.id}`">
+              <header class="plaza-section-heading">
+                <div class="plaza-section-title">
+                  <h2 :id="`plaza-group-${section.group.id}`">{{ section.group.name }}</h2>
+                  <span class="plaza-section-count">{{ t('modelPlaza.list.groupModelCount', { count: section.count }) }}</span>
+                  <span v-if="section.group.is_exclusive" class="plaza-section-badge">{{ t('modelPlaza.badges.exclusive') }}</span>
+                  <span v-if="section.group.subscription_type === 'subscription'" class="plaza-section-badge">{{ t('modelPlaza.badges.subscription') }}</span>
+                  <span v-if="section.group.quality_status" class="plaza-section-badge" :class="{ 'plaza-section-warning': section.group.quality_status === 'suspect' }">{{ t(`modelPlaza.badges.quality.${section.group.quality_status}`) }}</span>
+                </div>
+                <p v-if="section.group.description">{{ section.group.description }}</p>
+              </header>
+              <div class="plaza-catalog" :class="`plaza-catalog-${viewMode}`">
+                <PlazaCatalogCard v-for="entry in section.entries" :key="entry.key" :entry="entry" :view="viewMode" grouped />
+              </div>
+            </section>
           </div>
           <div v-else class="plaza-status">
             <p>{{ hasActiveFilters ? t('modelPlaza.noSearchResult') : t('modelPlaza.empty') }}</p>
@@ -111,8 +125,8 @@ import PlazaFilterBar from './PlazaFilterBar.vue'
 import PlazaCatalogCard from './PlazaCatalogCard.vue'
 import Select from '@/components/common/Select.vue'
 import Pagination from '@/components/common/Pagination.vue'
-import { platformLabel } from '@/utils/platformColors'
-import { buildModelCatalog } from './modelPlazaCatalog'
+import { buildModelCatalog, type PlazaCatalogEntry } from './modelPlazaCatalog'
+import { modelProvider, providerLabel } from './modelPlazaProviders'
 import { plazaRadioKeyboard } from './plazaRadioKeyboard'
 import type { ModelPlazaGroup, ModelPlazaResponse } from '@/api/modelPlaza'
 import { useAuthStore } from '@/stores/auth'
@@ -174,15 +188,16 @@ function effectiveRate(g: ModelPlazaGroup): number {
 }
 
 const platforms = computed(() =>
-  [...new Set((props.response?.groups ?? []).flatMap(g => g.models.map(m => m.platform)).filter(Boolean))].sort()
+  [...new Set((props.response?.groups ?? []).flatMap(g => g.models.map(modelProvider)))].sort()
 )
 
 const groupOptions = computed(() =>
   (props.response?.groups ?? []).map((g) => ({
     id: g.id,
     name: g.name,
-    platform: g.platform,
-    platforms: [...new Set(g.models.map(m => m.platform))],
+    platform: '',
+    platforms: [...new Set(g.models.map(modelProvider))],
+    modelCount: g.models.length,
     rate: effectiveRate(g),
     rates: [effectiveRate(g)]
   }))
@@ -200,10 +215,21 @@ watch(rates, (list) => {
   }
 })
 
+watch(() => props.response, () => {
+  if (selectedGroupId.value !== 'all' && !groupOptions.value.some(g => g.id === selectedGroupId.value)) selectedGroupId.value = 'all'
+  // Keep the chosen group when data changes, then release stale brand/rate
+  // constraints. Global existence alone does not guarantee their intersection.
+  const groups = groupOptions.value.filter(g => selectedGroupId.value === 'all' || g.id === selectedGroupId.value)
+  if (selectedPlatform.value !== 'all' && !groups.some(g => g.platforms.includes(selectedPlatform.value))) selectedPlatform.value = 'all'
+  if (selectedRate.value !== 'all' && !groups.some(g =>
+    (selectedPlatform.value === 'all' || g.platforms.includes(selectedPlatform.value)) && g.rate === selectedRate.value
+  )) selectedRate.value = 'all'
+}, { flush: 'sync' })
+
 const filteredGroups = computed(() => {
   let groups = props.response?.groups ?? []
   if (selectedPlatform.value !== 'all') {
-    groups = groups.map(g => ({ ...g, models: g.models.filter(m => m.platform === selectedPlatform.value) })).filter(g => g.models.length > 0)
+    groups = groups.map(g => ({ ...g, models: g.models.filter(m => modelProvider(m) === selectedPlatform.value) })).filter(g => g.models.length > 0)
   }
   if (selectedGroupId.value !== 'all') {
     groups = groups.filter((g) => g.id === selectedGroupId.value)
@@ -215,7 +241,11 @@ const filteredGroups = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     groups = groups
-      .map((g) => ({ ...g, models: g.models.filter((m) => m.name.toLowerCase().includes(q) || platformLabel(m.platform).toLowerCase().includes(q)) }))
+      .map((g) => ({ ...g, models: g.models.filter((m) => {
+        const provider = modelProvider(m)
+        const label = provider === 'other' ? t('modelPlaza.filters.otherProviders') : providerLabel(provider)
+        return m.name.toLowerCase().includes(q) || provider.includes(q) || label.toLowerCase().includes(q)
+      }) }))
       .filter((g) => g.models.length > 0)
   }
   if (selectedBilling.value !== 'all') {
@@ -228,12 +258,27 @@ const filteredGroups = computed(() => {
 })
 
 const allEntries = computed(() => buildModelCatalog(props.response?.groups ?? []))
-const filteredEntries = computed(() => buildModelCatalog(filteredGroups.value).sort((a, b) => {
+const filteredEntries = computed(() => filteredGroups.value.flatMap(group => buildModelCatalog([group]).sort((a, b) => {
   const nameCompare = a.name.localeCompare(b.name, undefined, { numeric: true })
-  if (sortOrder.value === 'provider') return a.platform.localeCompare(b.platform) || nameCompare
-  return (sortOrder.value === 'name-desc' ? -nameCompare : nameCompare) || a.platform.localeCompare(b.platform)
-}))
+  if (sortOrder.value === 'provider') return a.provider.localeCompare(b.provider) || nameCompare
+  return (sortOrder.value === 'name-desc' ? -nameCompare : nameCompare) || a.provider.localeCompare(b.provider)
+})))
 const pageEntries = computed(() => filteredEntries.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
+const pageGroups = computed(() => {
+  const sections = new Map<number, { group: ModelPlazaGroup; entries: PlazaCatalogEntry[]; count: number }>()
+  const counts = new Map<number, number>()
+  for (const entry of filteredEntries.value) {
+    const groupId = entry.offers[0]!.group.id
+    counts.set(groupId, (counts.get(groupId) ?? 0) + 1)
+  }
+  for (const entry of pageEntries.value) {
+    const group = entry.offers[0]!.group
+    const section = sections.get(group.id) ?? { group, entries: [], count: counts.get(group.id) ?? 0 }
+    section.entries.push(entry)
+    sections.set(group.id, section)
+  }
+  return [...sections.values()]
+})
 watch([selectedPlatform, selectedGroupId, selectedRate, selectedBilling, searchQuery, sortOrder, () => props.response], () => { page.value = 1 }, { flush: 'sync' })
 
 function changePage(next: number) {
@@ -312,6 +357,15 @@ function changePage(next: number) {
 .plaza-view-toggle svg { width: 14px; height: 14px; }
 .plaza-catalog-price-hint { margin: 12px 0 16px; color: var(--signal-muted, #63636c); font-size: 11px; line-height: 18px; }
 .plaza-catalog { display: grid; gap: 14px; }
+.plaza-catalog-sections { display: grid; gap: 28px; }
+.plaza-catalog-section { min-width: 0; }
+.plaza-section-heading { margin-bottom: 12px; }
+.plaza-section-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.plaza-section-title h2 { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.plaza-section-count, .plaza-section-heading p { color: var(--signal-muted, #63636c); font-size: 12px; }
+.plaza-section-heading p { margin-top: 6px; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+.plaza-section-badge { padding: 2px 7px; border: 1px solid var(--signal-line, #dedee4); border-radius: 5px; color: var(--signal-muted, #63636c); font-size: 10px; }
+.plaza-section-warning { color: #b45309; background: #f59e0b10; border-color: #f59e0b40; }
 .plaza-catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .plaza-catalog-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .plaza-mobile-filter-toggle { display: none; }

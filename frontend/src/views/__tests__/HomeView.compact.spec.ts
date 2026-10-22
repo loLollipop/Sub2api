@@ -32,12 +32,14 @@ vi.mock('@/composables/useClipboard', async () => {
 vi.mock('@/stores', () => ({
   useAppStore: () => appStore,
   useAuthStore: () => authStore,
+  useAdminSettingsStore: () => ({ customMenuItems: [] }),
   useOnboardingStore: () => ({ replay: vi.fn() }),
 }))
 
 vi.mock('vue-router', async (importOriginal) => ({
   ...await importOriginal<typeof import('vue-router')>(),
   useRouter: () => ({ push: vi.fn() }),
+  useRoute: () => ({ path: '/home', params: {} }),
 }))
 
 vi.mock('@/stores/app', () => ({

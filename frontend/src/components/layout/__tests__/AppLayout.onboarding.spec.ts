@@ -110,6 +110,15 @@ describe('AppLayout onboarding', () => {
     expect(createDriver).not.toHaveBeenCalled()
   })
 
+  it('lets administrators preview the user workspace without starting the management tour', async () => {
+    const { onboarding, startedPaths } = await renderLayout('/dashboard')
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(createDriver).not.toHaveBeenCalled()
+    onboarding.replay()
+    await flushPromises()
+    expect(startedPaths).toEqual(['/admin/dashboard'])
+  })
+
   it.each(['admin', 'user'] as const)('replays %s tours once after replacing the browse layout', async role => {
     const { router, onboarding, startedPaths } = await renderLayout('/model-plaza', role)
     const push = vi.spyOn(router, 'push')

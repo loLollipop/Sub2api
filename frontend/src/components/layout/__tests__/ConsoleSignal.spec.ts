@@ -18,7 +18,7 @@ vi.mock('@/composables/useBatchImageAccess', () => ({
 const userPaths = ['/dashboard', '/keys', '/usage', '/monitor', '/available-channels', '/purchase',
   '/subscriptions', '/profile', '/redeem', '/affiliate',
   '/model-plaza', '/batch-image', '/custom/demo']
-const adminPaths = ['/admin/dashboard', '/admin/accounts', '/admin/groups', '/admin/users', '/admin/keys', '/admin/usage']
+const adminPaths = ['/admin/dashboard', '/admin/accounts', '/admin/groups', '/admin/users', '/admin/keys', '/admin/profile', '/admin/usage']
 const leftoverPaths = ['/login', '/keys/other', '/usage-extra']
 let wrapper: VueWrapper | undefined
 
@@ -105,7 +105,9 @@ describe('SIGNAL shell route isolation', () => {
   it('switches between admin and personal workspace without leaving theme state behind', async () => {
     const { router } = await renderShell('/keys', 'admin')
     expect(wrapper!.classes()).toContain('console-signal')
-    expect(wrapper!.find('.sidebar a[href="/admin/dashboard"]').exists()).toBe(true)
+    expect(wrapper!.classes()).toContain('consumer-layout')
+    expect(wrapper!.find('.sidebar a[href="/admin/dashboard"]').exists()).toBe(false)
+    expect(wrapper!.find('.sidebar a[href="/keys"]').exists()).toBe(true)
     await router.push('/admin/dashboard')
     expect(wrapper!.classes()).toContain('console-signal')
     expect(wrapper!.classes()).toContain('signal-admin')
@@ -119,7 +121,7 @@ describe('SIGNAL shell route isolation', () => {
     const { router } = await renderShell(path, 'admin')
     const home = wrapper!.get('.top-brand')
     expect(home.attributes('href')).toBe('/')
-    expect(wrapper!.get('.top-browse-nav a[href="/admin/dashboard"]').exists()).toBe(true)
+    expect(wrapper!.get('.top-browse-nav a[href="/dashboard"]').exists()).toBe(true)
     await home.trigger('click')
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
   })
@@ -179,7 +181,7 @@ describe('SIGNAL shell route isolation', () => {
     expect(wrapper!.get('.sidebar').classes()).toContain('w-[72px]')
     expect(wrapper!.find('.top-browse-nav').exists()).toBe(true)
     expect(wrapper!.find('.sidebar a[href="/admin/channels/pricing"]').exists()).toBe(true)
-    expect(wrapper!.find('.sidebar a[href="/keys"]').exists()).toBe(true)
+    expect(wrapper!.find('.sidebar a[href="/admin/keys"]').exists()).toBe(true)
   })
 
   it('makes the header and content inert only while the mobile drawer is open', async () => {

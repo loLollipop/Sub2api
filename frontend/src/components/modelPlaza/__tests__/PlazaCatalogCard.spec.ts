@@ -7,6 +7,7 @@ import Select from '@/components/common/Select.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlazaModelPricingTable from '../PlazaModelPricingTable.vue'
 import PlazaCatalogCard from '../PlazaCatalogCard.vue'
+import { buildModelCatalog } from '../modelPlazaCatalog'
 
 const { copyName } = vi.hoisted(() => ({ copyName: vi.fn() }))
 vi.mock('vue-i18n', async () => ({
@@ -50,7 +51,7 @@ function interval(overrides: Partial<UserPricingInterval> = {}): UserPricingInte
   }
 }
 function entry(offers = [{ group: group(), model: model() }]) {
-  return { key: 'openai:shared-model', name: 'shared-model', platform: 'openai', offers }
+  return { key: 'openai:shared-model', name: 'shared-model', platform: 'openai', provider: 'openai', offers }
 }
 const wrappers: VueWrapper[] = []
 function mountCard(catalog = entry(), view: 'grid' | 'list' = 'grid') {
@@ -65,6 +66,32 @@ afterEach(() => {
 })
 
 describe('PlazaCatalogCard', () => {
+  it('keeps same-name group prices and open details bound to refreshed original models', async () => {
+    const firstModel = model({ name: 'deepseek-chat' })
+    const secondModel = model({ name: 'deepseek-chat', pricing: { ...firstModel.pricing!, input_price: 7e-6 } })
+    const firstGroup = group({ models: [firstModel], rate_multiplier: 2 })
+    const secondGroup = group({ id: 2, name: 'Dedicated', models: [secondModel], rate_multiplier: 9, user_rate_multiplier: 0 })
+    const entries = buildModelCatalog([firstGroup, secondGroup])
+    const standard = mountCard(entries[0])
+    const dedicated = mountCard(entries[1])
+    expect(standard.get('[data-price="input"]').text()).toContain('$6.00')
+    expect(dedicated.get('[data-price="input"]').text()).toContain('$0.00')
+    expect(standard.get('.catalog-name p').text()).toContain('DeepSeek')
+    expect(standard.get('.catalog-name p').text()).not.toContain('OpenAI')
+    await standard.get('.catalog-details').trigger('click')
+    const refreshedModel = model({ name: 'deepseek-chat', pricing: { ...firstModel.pricing!, input_price: 8e-6 } })
+    const refreshedGroup = { ...firstGroup, models: [refreshedModel], rate_multiplier: 4 }
+    await standard.setProps({ entry: buildModelCatalog([refreshedGroup])[0] })
+    expect(standard.get('[data-price="input"]').text()).toContain('$32.00')
+    expect(standard.getComponent(PlazaModelPricingTable).props('models')).toEqual([refreshedModel])
+    expect(standard.getComponent(PlazaModelPricingTable).props('rateMultiplier')).toBe(4)
+    expect(dedicated.get('[data-price="input"]').text()).toContain('$0.00')
+    await standard.setProps({ entry: entries[1] })
+    expect(standard.get('[data-price="input"]').text()).toContain('$0.00')
+    expect(standard.getComponent(PlazaModelPricingTable).props('models')).toEqual([secondModel])
+    expect(standard.getComponent(PlazaModelPricingTable).props('userRateMultiplier')).toBe(0)
+  })
+
   it('switches prices and open details together, preserving a zero custom rate and group disclosures', async () => {
     const first = { group: group(), model: model() }
     const freeGroup = group({
@@ -185,7 +212,7 @@ describe('PlazaCatalogCard', () => {
 
   it('keeps same-name models distinguishable by provider and offers copy feedback', async () => {
     const openai = mountCard()
-    const anthropic = mountCard({ ...entry([{ group: group({ platform: 'anthropic' }), model: model({ platform: 'anthropic' }) }]), platform: 'anthropic', key: 'anthropic:shared-model' }, 'list')
+    const anthropic = mountCard({ ...entry([{ group: group({ platform: 'anthropic' }), model: model({ platform: 'anthropic' }) }]), platform: 'anthropic', provider: 'anthropic', key: 'anthropic:shared-model' }, 'list')
     expect(openai.get('h3').text()).toBe(anthropic.get('h3').text())
     expect(openai.get('.catalog-name p').text()).toContain('OpenAI')
     expect(anthropic.get('.catalog-name p').text()).toContain('Anthropic')

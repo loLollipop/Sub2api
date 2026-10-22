@@ -12,7 +12,7 @@
       @keydown.down.prevent="openAndFocus(0)"
       @keydown.up.prevent="openAndFocus(-1)"
     >
-      <div class="header-avatar flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-sm font-medium text-white shadow-sm">
+      <div class="header-avatar flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-sm font-medium text-white shadow-sm">
         <img v-if="avatarUrl" :src="avatarUrl" :alt="displayName" class="h-full w-full object-cover" />
         <span v-else>{{ userInitials }}</span>
       </div>
@@ -46,10 +46,10 @@
         </dl>
 
         <div class="py-1">
-          <router-link to="/profile" class="dropdown-item" @click="closeDropdown()">
+          <router-link :to="isAdminWorkspace ? '/admin/profile' : '/profile'" class="dropdown-item" @click="closeDropdown()">
             <Icon name="user" size="sm" />{{ t('nav.profile') }}
           </router-link>
-          <router-link to="/keys" class="dropdown-item" @click="closeDropdown()">
+          <router-link :to="isAdminWorkspace ? '/admin/keys' : '/keys'" class="dropdown-item" @click="closeDropdown()">
             <Icon name="key" size="sm" />{{ t('nav.apiKeys') }}
           </router-link>
           <a v-if="authStore.isAdmin" href="https://github.com/loLollipop/Sub2api" target="_blank" rel="noopener noreferrer" class="dropdown-item" @click="closeDropdown()">
@@ -90,6 +90,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import Icon from '@/components/icons/Icon.vue'
+import { useConsoleWorkspace } from '@/composables/useConsoleWorkspace'
 
 const props = withDefaults(defineProps<{ showOnboarding?: boolean; compact?: boolean; utilities?: boolean }>(), {
   showOnboarding: true,
@@ -98,6 +99,7 @@ const props = withDefaults(defineProps<{ showOnboarding?: boolean; compact?: boo
 })
 const { t } = useI18n()
 const router = useRouter()
+const { isAdminWorkspace } = useConsoleWorkspace()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const onboardingStore = useOnboardingStore()

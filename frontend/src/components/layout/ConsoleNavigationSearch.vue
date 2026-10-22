@@ -29,6 +29,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { useConsoleNavigation, type NavItem } from '@/composables/useConsoleNavigation'
+import { useConsoleWorkspace } from '@/composables/useConsoleWorkspace'
 import { sanitizeSvg } from '@/utils/sanitize'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -42,17 +43,19 @@ const app = useAppStore()
 const open = ref(false)
 const query = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
-const { userNavItems, adminNavItems } = useConsoleNavigation()
+const { userNavItems, adminNavItems, personalNavItems } = useConsoleNavigation()
+const { isAdminWorkspace } = useConsoleWorkspace()
 function flattenDestinations(items: NavItem[]): NavItem[] {
   return items.flatMap(item => item.children?.length
     ? [...(item.expandOnly ? [] : [item]), ...flattenDestinations(item.children)]
     : [item])
 }
 const destinations = computed(() => {
-  if (!auth.isAdmin) return app.backendModeEnabled ? [] : userNavItems.value
+  if (!isAdminWorkspace.value) return app.backendModeEnabled && !auth.isAdmin ? [] : userNavItems.value
   return flattenDestinations([
     ...adminNavItems.value,
-    ...(!auth.isSimpleMode ? userNavItems.value : []),
+    ...personalNavItems.value,
+    ...(!auth.isSimpleMode ? userNavItems.value.filter(item => ['/available-channels', '/monitor'].includes(item.path)) : []),
   ])
 })
 const results = computed(() => {

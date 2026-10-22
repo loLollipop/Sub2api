@@ -16,7 +16,7 @@ async function render(role: 'user' | 'admin', simpleMode = false) {
   const app = useAppStore()
   app.cachedPublicSettings = { purchase_subscription_enabled: false, channel_monitor_enabled: false } as NonNullable<typeof app.cachedPublicSettings>
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }] })
-  await router.push('/dashboard')
+  await router.push(role === 'admin' ? '/admin/dashboard' : '/dashboard')
   const push = vi.spyOn(router, 'push')
   const wrapper = mount(ConsoleNavigationSearch, {
     global: {
@@ -25,10 +25,22 @@ async function render(role: 'user' | 'admin', simpleMode = false) {
     }
   })
   await wrapper.get('.console-search-trigger').trigger('click')
-  return { wrapper, push }
+  return { wrapper, push, router }
 }
 
 describe('console navigation search', () => {
+  it('keeps only admin personal tools and switches to user destinations with the URL', async () => {
+    const { wrapper, router } = await render('admin')
+    const labels = () => wrapper.findAll('.console-search-result').map(item => item.text())
+    expect(labels().filter(label => label === 'nav.usage')).toHaveLength(1)
+    expect(labels().filter(label => label === 'nav.apiKeys')).toHaveLength(1)
+    expect(labels()).not.toContain('nav.redeem')
+    await router.push('/dashboard')
+    await flushPromises()
+    expect(labels()).not.toContain('nav.accounts')
+    expect(labels()).toContain('nav.redeem')
+    wrapper.unmount()
+  })
   it('matches the sidebar by hiding users and retaining groups in simple admin mode', async () => {
     const { wrapper } = await render('admin', true)
     expect(wrapper.text()).not.toContain('nav.users')

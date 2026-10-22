@@ -55,6 +55,16 @@ function mountBar(props: Record<string, unknown> = {}) {
 
 describe('PlazaFilterBar faceted filters', () => {
 
+  it('keeps an enabled tab stop when a stale selected facet is disabled', () => {
+    const wrapper = mountBar({ sidebar: true, groupId: 2, platform: 'anthropic', rate: 1 })
+    for (const selector of ['.plaza-group-options', '.plaza-seg']) {
+      const tabStops = wrapper.findAll(`${selector} [tabindex="0"]`)
+      expect(tabStops).toHaveLength(1)
+      expect(tabStops[0].attributes('disabled')).toBeUndefined()
+      expect(tabStops[0].text()).toContain('modelPlaza.filters.all')
+    }
+  })
+
   it('offers one reset action only while any filter is selected, including a zero rate', async () => {
     const wrapper = mountBar()
     expect(wrapper.find('[data-testid="plaza-clear-filters"]').exists()).toBe(false)
@@ -150,5 +160,40 @@ describe('PlazaFilterBar faceted filters', () => {
     await wrapper.setProps({ platform: 'openai' })
     await radios[2].trigger('keydown', { key: 'ArrowDown' })
     expect(wrapper.emitted('update:platform')?.at(-1)).toEqual(['all'])
+  })
+
+  it('puts the counted group list first in the sidebar and supports group keyboard navigation', async () => {
+    const wrapper = mountBar({ sidebar: true, groups: groups.map((group, index) => ({ ...group, modelCount: index + 1 })) })
+    document.body.append(wrapper.element)
+    try {
+      const groupRadios = wrapper.get('.plaza-group-options').findAll('[role="radio"]')
+      expect(wrapper.findAll('[role="radiogroup"]')[0].attributes('aria-label')).toBe('modelPlaza.filters.groupLabel')
+      expect(groupRadios.map(radio => radio.get('.plaza-group-count').text())).toEqual(['6', '1', '2', '3'])
+      expect(groupRadios.map(radio => radio.attributes('tabindex'))).toEqual(['0', '-1', '-1', '-1'])
+      for (const [from, key, target, groupId] of [
+        [0, 'ArrowDown', 1, 1],
+        [1, 'End', 3, 3],
+        [3, 'ArrowRight', 0, 'all'],
+        [0, 'ArrowUp', 3, 3],
+        [3, 'Home', 0, 'all']
+      ] as const) {
+        await groupRadios[from].trigger('keydown', { key })
+        expect(wrapper.emitted('update:groupId')?.at(-1)).toEqual([groupId])
+        expect(document.activeElement).toBe(groupRadios[target].element)
+        await wrapper.setProps({ groupId })
+        expect(groupRadios.filter(radio => radio.attributes('tabindex') === '0')).toHaveLength(1)
+      }
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('skips unavailable groups in the sidebar and labels unknown brands independently of protocol', async () => {
+    const wrapper = mountBar({ sidebar: true, platform: 'openai', platforms: ['openai', 'other'] })
+    const groupRadios = wrapper.get('.plaza-group-options').findAll('[role="radio"]')
+    expect(groupRadios[1].attributes('disabled')).toBeDefined()
+    await groupRadios[0].trigger('keydown', { key: 'ArrowDown' })
+    expect(wrapper.emitted('update:groupId')?.at(-1)).toEqual([2])
+    expect(wrapper.get('.plaza-platform-toolbar').text()).toContain('modelPlaza.filters.otherProviders')
   })
 })

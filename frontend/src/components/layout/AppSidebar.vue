@@ -24,7 +24,7 @@
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <router-link
           to="/"
-          class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
+          class="sidebar-brand-title brand-gradient text-lg font-bold"
           @click="handleMenuItemClick('/')"
         >
           {{ siteName }}
@@ -41,24 +41,46 @@
         <!-- Admin Section -->
         <div class="sidebar-section">
           <template v-for="item in adminNavItems" :key="item.path">
-            <!-- Group headings and their links stay expanded, including in the icon rail. -->
+            <!-- Branches open inline; the icon rail keeps just the parent. -->
             <template v-if="item.children?.length">
-              <div class="sidebar-section-title sidebar-group-heading" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
-                <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">{{ item.label }}</span>
-              </div>
-              <router-link
-                v-for="child in item.children"
-                :key="child.path"
-                :to="child.path"
-                class="sidebar-link mb-1"
-                :class="{ 'sidebar-link-active': route.path === child.path, 'sidebar-link-collapsed': sidebarCollapsed }"
-                :title="sidebarCollapsed ? child.label : undefined"
-                :aria-label="sidebarCollapsed ? child.label : undefined"
-                @click="handleMenuItemClick(child.path)"
+              <button
+                type="button"
+                class="sidebar-link sidebar-branch mb-1 w-full text-left"
+                :class="{ 'sidebar-link-active': item.children.some(child => isActive(child.path)), 'sidebar-link-collapsed': sidebarCollapsed, 'sidebar-branch-open': isBranchOpen(item.path) }"
+                :title="sidebarCollapsed ? item.label : undefined"
+                :aria-label="sidebarCollapsed ? item.label : undefined"
+                :aria-expanded="isBranchOpen(item.path)"
+                :aria-controls="branchId(item.path)"
+                :data-branch="item.path"
+                @click="toggleBranch(item.path)"
               >
-                <component :is="child.icon" class="h-5 w-5 flex-shrink-0" />
-                <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ child.label }}</span>
-              </router-link>
+                <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
+              </button>
+              <div
+                :id="branchId(item.path)"
+                class="sidebar-drawer"
+                :class="{ 'sidebar-drawer-open': isBranchOpen(item.path) }"
+                :inert="!isBranchOpen(item.path) ? true : undefined"
+                :aria-hidden="!isBranchOpen(item.path) ? true : undefined"
+              >
+                <div class="sidebar-drawer-clip">
+                  <div class="sidebar-children">
+                    <router-link
+                      v-for="child in item.children"
+                      :key="child.path"
+                      :to="child.path"
+                      class="sidebar-link sidebar-sublink"
+                      :class="{ 'sidebar-link-active': isActive(child.path) }"
+                      :id="child.path === '/admin/redeem' ? 'sidebar-wallet' : undefined"
+                      @click="handleMenuItemClick(child.path)"
+                    >
+                      <span class="sidebar-child-dot" aria-hidden="true"></span>
+                      <span class="sidebar-label">{{ child.label }}</span>
+                    </router-link>
+                  </div>
+                </div>
+              </div>
             </template>
             <!-- Normal item (no children) -->
             <router-link
@@ -87,8 +109,8 @@
           </template>
         </div>
 
-        <!-- Personal Section for Admin (hidden in simple mode) -->
-        <div v-if="!authStore.isSimpleMode" class="sidebar-section">
+        <!-- Personal tools stay inside the admin workspace. -->
+        <div class="sidebar-section">
           <div class="sidebar-section-title" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
             <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">
               {{ t('nav.myAccount') }}
@@ -103,7 +125,7 @@
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
             :title="sidebarCollapsed ? item.label : undefined"
             :aria-label="sidebarCollapsed ? item.label : undefined"
-            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
+            :data-tour="item.path === '/admin/keys' ? 'sidebar-my-keys' : undefined"
             @click="handleMenuItemClick(item.path)"
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
@@ -114,13 +136,10 @@
       </template>
 
       <!-- Regular User View -->
-      <template v-else-if="!appStore.backendModeEnabled">
-        <div v-for="section in userSections" :key="section.label" class="sidebar-section">
-          <div class="sidebar-section-title" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
-            <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">{{ section.label }}</span>
-          </div>
+      <template v-else-if="!appStore.backendModeEnabled || authStore.isAdmin">
+        <div class="sidebar-section">
           <router-link
-            v-for="item in section.items"
+            v-for="item in visibleUserItems"
             :key="item.path"
             :to="item.path"
             class="sidebar-link mb-1"
@@ -161,8 +180,9 @@ import { sanitizeUrl } from '@/utils/url'
 import { useConsoleNavigation } from '@/composables/useConsoleNavigation'
 import { useMediaQuery } from '@vueuse/core'
 import { useConsoleSignal } from '@/composables/useConsoleSignal'
+import { useConsoleWorkspace } from '@/composables/useConsoleWorkspace'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const route = useRoute()
 const { isConsoleSignal } = useConsoleSignal()
@@ -176,20 +196,38 @@ const isDesktop = useMediaQuery('(min-width: 1024px)')
 const sidebarCollapsed = computed(() => isDesktop.value && appStore.sidebarCollapsed)
 const sidebarRef = ref<HTMLElement | null>(null)
 const mobileOpen = computed(() => appStore.mobileOpen)
-const isAdmin = computed(() => authStore.isAdmin)
+const { isAdminWorkspace: isAdmin } = useConsoleWorkspace()
 const sidebarNavRef = ref<HTMLElement | null>(null)
 
 
-const walletPaths = new Set(['/purchase', '/redeem', '/affiliate', '/profile'])
 const browsePaths = new Set(['/available-channels', '/monitor'])
-const userSections = computed(() => {
-  const chinese = locale.value.startsWith('zh')
-  return [
-    { label: chinese ? '常用功能' : 'Frequent tools', items: userNavItems.value.filter(item => !walletPaths.has(item.path) && !browsePaths.has(item.path)) },
-    { label: chinese ? '个人与钱包' : 'Account & wallet', items: userNavItems.value.filter(item => walletPaths.has(item.path)) },
-    { label: chinese ? '发现' : 'Discover', items: isDesktop.value ? [] : userNavItems.value.filter(item => browsePaths.has(item.path)) },
-  ].filter(section => section.items.length)
-})
+const visibleUserItems = computed(() => userNavItems.value.filter(item => !isDesktop.value || !browsePaths.has(item.path)))
+
+function branchId(path: string) {
+  return `sidebar-branch-${path.split('/').filter(Boolean).join('-')}`
+}
+
+function isBranchOpen(path: string) {
+  return !sidebarCollapsed.value && appStore.sidebarExpandedGroups[path] === true
+}
+
+function toggleBranch(path: string) {
+  if (sidebarCollapsed.value) {
+    appStore.sidebarCollapsed = false
+    appStore.sidebarExpandedGroups[path] = true
+    return
+  }
+  appStore.sidebarExpandedGroups[path] = !isBranchOpen(path)
+}
+
+watch([() => route.path, adminNavItems], () => {
+  if (!isAdmin.value) return
+  for (const item of adminNavItems.value) {
+    if (item.children?.some(child => isActive(child.path))) {
+      appStore.sidebarExpandedGroups[item.path] = true
+    }
+  }
+}, { immediate: true })
 
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
@@ -211,7 +249,8 @@ function handleMenuItemClick(itemPath: string) {
   const pathToSelector: Record<string, string> = {
     '/admin/groups': '#sidebar-group-manage',
     '/admin/accounts': '#sidebar-channel-manage',
-    '/keys': '[data-tour="sidebar-my-keys"]'
+    '/keys': '[data-tour="sidebar-my-keys"]',
+    '/admin/keys': '[data-tour="sidebar-my-keys"]'
   }
 
   const selector = pathToSelector[itemPath]
@@ -226,6 +265,7 @@ function isActive(path: string): boolean {
 
 function mobileFocusTargets() {
   return Array.from(sidebarRef.value?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)') ?? [])
+    .filter(item => !item.closest('[inert]'))
 }
 
 function handleMobileKeydown(event: KeyboardEvent) {
@@ -261,7 +301,7 @@ watch(() => route.fullPath, () => {
 
 // Fetch admin settings (for feature-gated nav items like Ops).
 watch(
-  isAdmin,
+  () => authStore.isAdmin,
   (v) => {
     if (v) {
       adminSettingsStore.fetch()
@@ -295,8 +335,20 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sidebar-group-heading {
-  margin-top: 1rem;
+.sidebar-drawer { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 200ms ease, opacity 160ms ease; }
+.sidebar-drawer-open { grid-template-rows: 1fr; opacity: 1; }
+.sidebar-drawer-clip { min-height: 0; overflow: hidden; }
+.sidebar-children { display: grid; gap: 2px; margin: 0 0 6px 23px; padding: 3px; border-radius: 8px; background: var(--signal-hover); }
+.sidebar.signal-sidebar .sidebar-children .sidebar-link.sidebar-sublink { min-height: 32px; gap: 9px; padding: 6px 10px; border-radius: 5px; font-size: 12px; font-weight: 400; color: var(--signal-muted); }
+.sidebar.signal-sidebar .sidebar-children .sidebar-sublink.sidebar-link-active { color: var(--signal-accent); background: var(--signal-accent-soft); font-weight: 500; }
+.sidebar-child-dot { flex: 0 0 4px; width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .55; }
+.sidebar-link-active .sidebar-child-dot { opacity: 1; }
+.sidebar-branch:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 2px; }
+@media (max-width: 1023px) {
+  .sidebar.signal-sidebar .sidebar-children .sidebar-link.sidebar-sublink { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-drawer { transition: none; }
 }
 
 .sidebar-logo {

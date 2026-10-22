@@ -17,6 +17,7 @@ vi.mock('@/stores', () => ({
   useAuthStore: () => authStore,
   useAppStore: () => appStore,
   useOnboardingStore: () => onboardingStore,
+  useAdminSettingsStore: () => ({ customMenuItems: [] }),
 }))
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...await importOriginal<typeof import('vue-i18n')>(),
@@ -27,7 +28,7 @@ const wrappers: VueWrapper[] = []
 async function mountMenu(props: { showOnboarding?: boolean; compact?: boolean; utilities?: boolean } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: ['/', '/profile', '/keys', '/login'].map((path) => ({ path, component: { template: '<div />' } })),
+    routes: ['/', '/profile', '/keys', '/login', '/admin/keys', '/admin/profile'].map((path) => ({ path, component: { template: '<div />' } })),
   })
   await router.push('/')
   await router.isReady()
@@ -50,6 +51,16 @@ afterEach(() => {
 })
 
 describe('shared account menu', () => {
+  it('keeps personal links in the current workspace', async () => {
+    const { wrapper, router } = await mountMenu()
+    await router.push('/admin/keys')
+    await wrapper.get('.header-user-button').trigger('click')
+    expect(wrapper.get('a[href="/admin/profile"]').exists()).toBe(true)
+    expect(wrapper.get('a[href="/admin/keys"]').exists()).toBe(true)
+    await router.push('/keys')
+    expect(wrapper.get('a[href="/profile"]').exists()).toBe(true)
+    expect(wrapper.get('a[href="/keys"]').exists()).toBe(true)
+  })
   it('uses only the avatar in the compact header and shows the three account balance amounts inside its menu', async () => {
     const { wrapper } = await mountMenu({ compact: true, utilities: true })
     expect(wrapper.find('.header-identity').exists()).toBe(false)

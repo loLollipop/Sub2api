@@ -149,7 +149,12 @@ describe('preview server isolation', () => {
       '/api/v1/admin/keys?page=1&page_size=10',
     ]) expect((await http(endpoint)).status, endpoint).toBe(200)
 
-    expect((await http('/admin/keys')).headers.location).toBe('/keys')
+    for (const path of ['/admin/keys', '/admin/profile']) {
+      const response = await http(path)
+      expect(response.status).toBe(200)
+      expect(response.headers.location).toBeUndefined()
+      expect(response.text).toContain('admin-preview@example.test')
+    }
 
     expect((await http('/api/v1/admin/users/910002/balance', 'POST', { 'Content-Type': 'application/json' }, '{"balance":999}')).status).toBe(501)
     const adminHtml = await http('/admin/dashboard')

@@ -100,7 +100,7 @@ Copy `deploy/config.example.yaml` to `backend/config.yaml` for binary deploys. F
 
 ## Releases and install
 
-This personal repository currently has no published binary releases or GHCR images. Build from source for now; the release/Docker commands below apply only after the maintainer publishes matching assets. They do not fall back to another repository's releases.
+This personal repository publishes its own [binary releases](https://github.com/loLollipop/Sub2api/releases) and `ghcr.io/lolollipop/sub2api` images. Verify the version, commit and checksums before updating. The commands below use this repository's assets and do not fall back to another repository's releases.
 
 GitHub Actions [release.yml](.github/workflows/release.yml) publishes assets when a `v*` tag is pushed (for example `v0.1.258`). A branch push only runs CI.
 

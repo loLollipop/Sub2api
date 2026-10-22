@@ -323,6 +323,30 @@ const routes: RouteRecordRaw[] = [
 
   // ==================== Admin Routes ====================
   {
+    path: '/admin/keys',
+    name: 'AdminKeys',
+    component: () => import('@/views/user/KeysView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'API Keys',
+      titleKey: 'keys.title',
+      descriptionKey: 'keys.description'
+    }
+  },
+  {
+    path: '/admin/profile',
+    name: 'AdminProfile',
+    component: () => import('@/views/user/ProfileView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Profile',
+      titleKey: 'profile.title',
+      descriptionKey: 'profile.description'
+    }
+  },
+  {
     path: '/admin',
     redirect: '/admin/dashboard'
   },
@@ -561,12 +585,20 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin/affiliates',
-    redirect: '/admin/affiliates/invites'
+    name: 'AdminAffiliates',
+    component: () => import('@/views/admin/affiliates/AdminAffiliatesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Invite Rebates',
+      titleKey: 'admin.affiliates.title',
+      descriptionKey: 'admin.affiliates.description'
+    }
   },
   {
     path: '/admin/affiliates/invites',
     name: 'AdminAffiliateInvites',
-    component: () => import('@/views/admin/affiliates/AdminAffiliateInvitesView.vue'),
+    redirect: to => ({ path: '/admin/affiliates', query: { ...to.query, tab: 'invites' }, hash: to.hash }),
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
@@ -578,7 +610,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin/affiliates/rebates',
     name: 'AdminAffiliateRebates',
-    component: () => import('@/views/admin/affiliates/AdminAffiliateRebatesView.vue'),
+    redirect: to => ({ path: '/admin/affiliates', query: { ...to.query, tab: 'rebates' }, hash: to.hash }),
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
@@ -590,7 +622,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin/affiliates/transfers',
     name: 'AdminAffiliateTransfers',
-    component: () => import('@/views/admin/affiliates/AdminAffiliateTransfersView.vue'),
+    redirect: to => ({ path: '/admin/affiliates', query: { ...to.query, tab: 'transfers' }, hash: to.hash }),
     meta: {
       requiresAuth: true,
       requiresAdmin: true,

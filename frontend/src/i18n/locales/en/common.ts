@@ -192,6 +192,7 @@ export default {
     plugins: 'Plugins',
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',
+    redemptionCenter: 'Redemption Center',
     ops: 'Ops',
     promoCodes: 'Promo Codes',
     settings: 'Settings',

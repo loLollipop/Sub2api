@@ -14,6 +14,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore } from '@/stores'
 import { useConsoleNavigation } from '@/composables/useConsoleNavigation'
+import { useConsoleWorkspace } from '@/composables/useConsoleWorkspace'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { sanitizeUrl } from '@/utils/url'
 import Icon from '@/components/icons/Icon.vue'
@@ -22,15 +23,16 @@ const route = useRoute()
 const { t, locale } = useI18n()
 const app = useAppStore()
 const auth = useAuthStore()
-const { userNavItems, personalNavItems } = useConsoleNavigation()
-const homePath = computed(() => auth.isAdmin ? '/admin/dashboard' : '/dashboard')
+const { userNavItems } = useConsoleNavigation()
+const { isAdminWorkspace } = useConsoleWorkspace()
+const homePath = computed(() => isAdminWorkspace.value ? '/admin/dashboard' : '/dashboard')
 const consoleLabel = computed(() => locale.value.startsWith('zh') ? '控制台' : 'Console')
 const homeLabel = computed(() => locale.value.startsWith('zh') ? '首页' : 'Home')
 const isBrowse = computed(() => ['/model-plaza', '/available-channels', '/monitor'].includes(route.path))
 const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
 const docUrl = computed(() => sanitizeUrl(app.docUrl))
 const browseItems = computed(() => {
-  const items = auth.isAdmin ? (auth.isSimpleMode ? [] : personalNavItems.value) : app.backendModeEnabled ? [] : userNavItems.value
-  return items.filter(item => ['/available-channels', '/monitor'].includes(item.path))
+  if ((isAdminWorkspace.value && auth.isSimpleMode) || (!auth.isAdmin && app.backendModeEnabled)) return []
+  return userNavItems.value.filter(item => ['/available-channels', '/monitor'].includes(item.path))
 })
 </script>

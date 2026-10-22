@@ -192,6 +192,7 @@ export default {
     plugins: '插件管理',
     proxies: 'IP管理',
     redeemCodes: '兑换码',
+    redemptionCenter: '兑换中心',
     ops: '运维监控',
     promoCodes: '优惠码',
     settings: '系统设置',
@@ -212,7 +213,7 @@ export default {
     riskControl: '风控中心',
     securityAudit: '安全审计',
     contentModeration: '内容审核',
-    promptAudit: '提示词审计',
+    promptAudit: '提示词审核',
     auditLogs: '操作日志',
   },
 

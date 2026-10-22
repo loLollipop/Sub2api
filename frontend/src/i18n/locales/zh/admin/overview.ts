@@ -389,6 +389,8 @@ export default {
     },
 
     affiliates: {
+      title: '邀请返利',
+      description: '查看邀请关系、订单返利和返利提取记录。',
       orderStatus: {
       pending: '待支付',
       paid: '已支付',

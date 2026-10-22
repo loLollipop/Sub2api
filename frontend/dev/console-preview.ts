@@ -96,11 +96,6 @@ export function consolePreviewPlugin(): Plugin {
           res.end()
           return
         }
-        if (path === '/admin/keys') {
-          res.writeHead(302, { Location: '/keys' })
-          res.end()
-          return
-        }
         if (path === '/__preview/admin' || path === '/__preview/user') {
           const role = path.endsWith('/admin') ? 'admin' : 'user'
           api.handle('POST', '/api/v1/__preview/role', new URLSearchParams(), { role })

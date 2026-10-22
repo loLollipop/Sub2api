@@ -32,12 +32,14 @@ vi.mock('@/composables/useClipboard', async () => {
 vi.mock('@/stores', () => ({
   useAppStore: () => appStore,
   useAuthStore: () => authStore,
+  useAdminSettingsStore: () => ({ customMenuItems: [] }),
   useOnboardingStore: () => ({ replay: vi.fn() }),
 }))
 
 vi.mock('vue-router', async (importOriginal) => ({
   ...await importOriginal<typeof import('vue-router')>(),
   useRouter: () => ({ push: vi.fn() }),
+  useRoute: () => ({ path: '/home', params: {} }),
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -204,8 +206,8 @@ describe('HomeView compact mode', () => {
       expect(wrapper.find('[data-testid="home-account-entry"]').exists()).toBe(false)
       const accountMenu = wrapper.get('[data-testid="home-account-menu"]')
       expect(accountMenu.get('.header-avatar').text()).toBe('LO')
-      expect(accountMenu.get('.header-identity').text()).toContain('Lollipop')
-      expect(accountMenu.get('.header-identity').text()).toContain(`admin.users.roles.${admin ? 'admin' : 'user'}`)
+      expect(accountMenu.find('.header-identity').exists()).toBe(false)
+      expect(accountMenu.get('.header-user-button').classes()).toContain('avatar-only')
       expect(wrapper.findAllComponents(RouterLinkStub).filter((link) => link.props('to') === path)).toHaveLength(1)
     } else {
       expect(wrapper.getComponent('[data-testid="home-account-entry"]').props('to')).toBe('/login')

@@ -33,7 +33,7 @@ async function render(simple = false, enabled = true, role: 'user' | 'admin' = '
   vi.spyOn(auth, 'isSimpleMode', 'get').mockReturnValue(simple)
   useAdminSettingsStore().fetch = vi.fn().mockResolvedValue(undefined)
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }] })
-  await router.push('/dashboard')
+  await router.push(role === 'admin' ? '/admin/dashboard' : '/dashboard')
   await router.isReady()
   wrapper = mount({ components: { AppSidebar, UserTopNav }, template: '<div><AppSidebar /><UserTopNav /><button id="outside">Outside</button></div>' }, {
     attachTo: document.body,
@@ -66,14 +66,15 @@ afterEach(() => {
 })
 
 describe('browse navigation and sidebar operations', () => {
-  it('keeps top links flat and places frequent operations into two sidebar sections', async () => {
+  it('keeps navigation flat without category headings', async () => {
     await render()
     expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1', '/available-channels', '/monitor'])
     expect(wrapper!.find('.top-browse-nav button').exists()).toBe(false)
     expect(wrapper!.find('.consumer-more-menu').exists()).toBe(false)
     const sections = wrapper!.findAll('.sidebar-nav .sidebar-section')
-    expect(sections[0].findAll('a').map(link => link.attributes('href'))).toEqual(['/dashboard', '/keys', '/batch-image', '/usage', '/custom/extra'])
-    expect(sections[1].findAll('a').map(link => link.attributes('href'))).toEqual(['/purchase', '/redeem', '/affiliate', '/profile'])
+    expect(sections).toHaveLength(1)
+    expect(sections[0].findAll('a').map(link => link.attributes('href'))).toEqual(['/dashboard', '/keys', '/batch-image', '/usage', '/purchase', '/redeem', '/affiliate', '/profile', '/custom/extra'])
+    expect(wrapper!.find('.sidebar-section-title').exists()).toBe(false)
     expect(wrapper!.text()).not.toContain('Admin only')
     expect(wrapper!.text()).not.toContain('Embedded recharge')
     expect(wrapper!.get('.sidebar-svg-icon path').attributes('fill')).toBe('red')
@@ -99,7 +100,7 @@ describe('browse navigation and sidebar operations', () => {
   it('preserves simple and backend mode restrictions', async () => {
     const { app } = await render(true)
     expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1', '/monitor'])
-    expect(sidebarLinks()).toEqual(['/dashboard', '/keys', '/custom/extra', '/profile'])
+    expect(sidebarLinks()).toEqual(['/dashboard', '/keys', '/profile', '/custom/extra'])
     app.cachedPublicSettings!.backend_mode_enabled = true
     await flushPromises()
     expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1'])
@@ -127,9 +128,16 @@ describe('browse navigation and sidebar operations', () => {
   })
 
   it('keeps browse links available for administrators and uses their dashboard', async () => {
-    await render(false, true, 'admin')
+    const { router, app } = await render(false, true, 'admin')
     expect(primary()).toEqual(['/', '/admin/dashboard', '/model-plaza?embedded=1', '/available-channels', '/monitor'])
     expect(sidebarLinks()).toContain('/admin/accounts')
+    expect(sidebarLinks()).toContain('/admin/keys')
+    expect(sidebarLinks()).not.toContain('/keys')
+    await router.push('/dashboard')
+    app.cachedPublicSettings!.backend_mode_enabled = true
+    await flushPromises()
+    expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1', '/available-channels', '/monitor'])
     expect(sidebarLinks()).toContain('/keys')
+    expect(sidebarLinks()).not.toContain('/admin/accounts')
   })
 })

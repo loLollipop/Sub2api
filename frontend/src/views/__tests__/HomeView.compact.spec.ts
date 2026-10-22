@@ -206,8 +206,8 @@ describe('HomeView compact mode', () => {
       expect(wrapper.find('[data-testid="home-account-entry"]').exists()).toBe(false)
       const accountMenu = wrapper.get('[data-testid="home-account-menu"]')
       expect(accountMenu.get('.header-avatar').text()).toBe('LO')
-      expect(accountMenu.get('.header-identity').text()).toContain('Lollipop')
-      expect(accountMenu.get('.header-identity').text()).toContain(`admin.users.roles.${admin ? 'admin' : 'user'}`)
+      expect(accountMenu.find('.header-identity').exists()).toBe(false)
+      expect(accountMenu.get('.header-user-button').classes()).toContain('avatar-only')
       expect(wrapper.findAllComponents(RouterLinkStub).filter((link) => link.props('to') === path)).toHaveLength(1)
     } else {
       expect(wrapper.getComponent('[data-testid="home-account-entry"]').props('to')).toBe('/login')

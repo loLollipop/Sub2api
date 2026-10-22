@@ -20,7 +20,7 @@
           >
             <Icon :name="isDark ? 'sun' : 'moon'" size="md" aria-hidden="true" />
           </button>
-          <AccountMenu v-if="isAuthenticated" :show-onboarding="false" data-testid="home-account-menu" />
+          <AccountMenu v-if="isAuthenticated" compact :show-onboarding="false" data-testid="home-account-menu" />
           <router-link v-else to="/login" class="landing-login" data-testid="home-account-entry">
             <span>{{ t('home.login') }}</span>
             <Icon name="arrowUpRight" size="sm" aria-hidden="true" />

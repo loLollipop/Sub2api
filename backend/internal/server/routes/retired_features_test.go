@@ -42,3 +42,27 @@ func TestSupportTicketRoutesRemoved(t *testing.T) {
 		}
 	}
 }
+
+// Channel configuration remains readable internally for legacy forwarding
+// features. No public management/pricing route may mutate that compatibility data.
+func TestChannelPricingManagementRoutesRemoved(t *testing.T) {
+	router := retiredFeatureRouteEnvironment(t)
+	for _, path := range []string{
+		"/api/v1/admin/channels", "/api/v1/admin/channels/1",
+		"/api/v1/admin/channels/model-pricing", "/api/v1/admin/channels/pricing/sync-models",
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete} {
+			t.Run(method+path, func(t *testing.T) {
+				require.Equal(t, http.StatusNotFound, retiredFeatureRouteRequest(router, method, path).Code)
+			})
+		}
+	}
+	// The shared official reference lookup is still registered for group cards.
+	found := false
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodGet && route.Path == "/api/v1/admin/groups/model-pricing" {
+			found = true
+		}
+	}
+	require.True(t, found)
+}

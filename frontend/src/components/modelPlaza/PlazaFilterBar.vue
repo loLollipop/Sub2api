@@ -26,10 +26,11 @@
         <button
           v-for="option in groupChoices" :key="option.value" type="button" role="radio"
           class="plaza-group-option" :aria-checked="groupId === option.value"
-          :tabindex="groupTabStop === option.value ? 0 : -1" :disabled="option.disabled"
+          :tabindex="groupTabStop === option.value ? 0 : -1"
           @click="onGroupChange(option.value)"
         >
-          <span>{{ option.label }}</span><span class="plaza-group-count">{{ option.count }}</span>
+          <span>{{ option.label }} <span v-if="option.rate !== undefined" class="plaza-group-rate">{{ option.rate }}x</span></span>
+          <span class="plaza-group-count">{{ option.count }}</span>
         </button>
       </div>
       <Select
@@ -39,14 +40,6 @@
         :aria-label="t('modelPlaza.filters.groupLabel')"
         class="plaza-select"
         @update:model-value="onGroupChange"
-      />
-      <p v-if="sidebar" class="plaza-filter-label">{{ t('modelPlaza.filters.rateLabel') }}</p>
-      <Select
-        :model-value="rate"
-        :options="rateSelectOptions"
-        :aria-label="t('modelPlaza.filters.rateLabel')"
-        class="plaza-select plaza-select-rate"
-        @update:model-value="onRateChange"
       />
     </div>
 
@@ -67,7 +60,6 @@
             class="plaza-seg-item"
             :aria-checked="platform === p"
             :tabindex="platformTabStop === p ? 0 : -1"
-            :disabled="p !== 'all' && !platformEnabled(p)"
             @click="$emit('update:platform', p)"
           >
             <PlazaProviderIcon v-if="p !== 'all'" :platform="p" size="xs" />
@@ -92,15 +84,12 @@ import { providerLabel } from './modelPlazaProviders'
 import { plazaRadioKeyboard } from './plazaRadioKeyboard'
 
 const props = defineProps<{
-  /** 数据中出现的真实模型品牌，独立于接入协议。 */
+  /** 当前分组中出现的真实模型品牌，独立于接入协议。 */
   platforms: string[]
-  /** 全量分组(含平台与生效倍率),三个维度的置灰联动由此推导。 */
-  groups: Array<{ id: number; name: string; platform: string; platforms?: string[]; rate: number; rates?: number[]; modelCount?: number }>
-  /** 全量生效倍率去重升序。 */
-  rates: number[]
+  /** 所有分组始终可选，倍率仅在名称旁展示。 */
+  groups: Array<{ id: number; name: string; platforms: string[]; rate: number; modelCount?: number }>
   platform: string
   groupId: number | 'all'
-  rate: number | 'all'
   /** 模型名搜索词(纯前端过滤)。 */
   search: string
   hideSearch?: boolean
@@ -110,82 +99,35 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:platform': [value: string]
   'update:groupId': [value: number | 'all']
-  'update:rate': [value: number | 'all']
   'update:search': [value: string]
   reset: []
 }>()
 
 const { t } = useI18n()
 
-const hasActiveFilters = computed(() => props.platform !== 'all' || props.groupId !== 'all' || props.rate !== 'all' || props.search.trim() !== '')
+const hasActiveFilters = computed(() => props.platform !== 'all' || props.groupId !== 'all' || props.search.trim() !== '')
 
-const platformChoices = computed(() => ['all', ...props.platforms])
+const platformChoices = computed(() => ['all', ...props.platforms.filter(platform => props.groupId === 'all' ||
+  props.groups.some(group => group.id === props.groupId && group.platforms.includes(platform)))])
 
 const groupChoices = computed(() => [
-  { value: 'all' as const, label: t('modelPlaza.filters.all'), count: props.groups.reduce((count, group) => count + (group.modelCount ?? 0), 0), disabled: false },
-  ...props.groups.map(group => ({ value: group.id, label: group.name, count: group.modelCount ?? 0, disabled: !groupEnabled(group) }))
+  { value: 'all' as const, label: t('modelPlaza.filters.all'), count: props.groups.reduce((count, group) => count + (group.modelCount ?? 0), 0), rate: undefined },
+  ...props.groups.map(group => ({ value: group.id, label: group.name, count: group.modelCount ?? 0, rate: group.rate }))
 ])
 
-const groupTabStop = computed(() => groupChoices.value.some(option => option.value === props.groupId && !option.disabled) ? props.groupId : 'all')
-const platformTabStop = computed(() => platformChoices.value.includes(props.platform) && (props.platform === 'all' || platformEnabled(props.platform)) ? props.platform : 'all')
+const groupTabStop = computed(() => groupChoices.value.some(option => option.value === props.groupId) ? props.groupId : 'all')
+const platformTabStop = computed(() => platformChoices.value.includes(props.platform) ? props.platform : 'all')
 
 const groupSelectOptions = computed<SelectOption[]>(() => [
   { value: 'all', label: t('modelPlaza.filters.groupLabel') },
   ...props.groups.map((g) => ({
     value: g.id,
-    label: g.name,
-    disabled: !groupEnabled(g)
+    label: `${g.name} ${g.rate}x`
   }))
 ])
-
-const rateSelectOptions = computed<SelectOption[]>(() => [
-  { value: 'all', label: t('modelPlaza.filters.rateLabel') },
-  ...props.rates.map((r) => ({
-    value: r,
-    label: `${r}x`,
-    disabled: !rateEnabled(r)
-  }))
-])
-
-/**
- * 三个维度互为约束(faceted):某选项可点 ⟺ 在「其他两维」当前选择下仍有分组命中。
- * 「全部」永远可点,作为解除本维约束的出口;可点项组合恒有结果,无需选择修正。
- */
-function matchesRate(g: { rate: number; rates?: number[] }, rate: number): boolean {
-  return (g.rates ?? [g.rate]).includes(rate)
-}
-
-function platformEnabled(p: string): boolean {
-  return props.groups.some(
-    (g) =>
-      (g.platforms ?? [g.platform]).includes(p) &&
-      (props.groupId === 'all' || g.id === props.groupId) &&
-      (props.rate === 'all' || matchesRate(g, props.rate))
-  )
-}
-
-function groupEnabled(g: { platform: string; platforms?: string[]; rate: number; rates?: number[] }): boolean {
-  return (
-    (props.platform === 'all' || (g.platforms ?? [g.platform]).includes(props.platform)) &&
-    (props.rate === 'all' || matchesRate(g, props.rate))
-  )
-}
-
-function rateEnabled(r: number): boolean {
-  return props.groups.some(
-    (g) =>
-      matchesRate(g, r) &&
-      (props.platform === 'all' || (g.platforms ?? [g.platform]).includes(props.platform)) &&
-      (props.groupId === 'all' || g.id === props.groupId)
-  )
-}
 
 function onGroupChange(value: string | number | boolean | null) {
   emit('update:groupId', value === 'all' || value === null ? 'all' : Number(value))
-}
-
-function onRateChange(value: string | number | boolean | null) {
-  emit('update:rate', value === 'all' || value === null ? 'all' : Number(value))
 }
 </script>
 
@@ -199,7 +141,7 @@ function onRateChange(value: string | number | boolean | null) {
 
 .plaza-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(168px, 220px) minmax(112px, 150px);
+  grid-template-columns: minmax(0, 1fr) minmax(168px, 260px);
   gap: 8px;
   align-items: stretch;
 }
@@ -291,11 +233,6 @@ function onRateChange(value: string | number | boolean | null) {
   color: var(--signal-text, #202426);
 }
 
-.plaza-seg-item:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
 .plaza-filters-sidebar { gap: 22px; }
 .plaza-filters-sidebar .plaza-toolbar { display: flex; flex-direction: column; gap: 8px; }
 .plaza-group-options { display: grid; gap: 3px; }
@@ -303,9 +240,9 @@ function onRateChange(value: string | number | boolean | null) {
 .plaza-group-option > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .plaza-group-option[aria-checked='true'] { background: var(--signal-hover, #e9e9ef); color: var(--signal-text, #1c1c1e); border-color: color-mix(in srgb, var(--signal-line, #dedee4) 60%, transparent); font-weight: 500; }
 .plaza-group-option:not(:disabled):hover { background: color-mix(in srgb, var(--signal-hover, #e9e9ef) 60%, transparent); }
-.plaza-group-option:disabled { opacity: .4; cursor: not-allowed; }
 .plaza-group-option:focus-visible { outline: 2px solid var(--signal-accent, #0066d6); outline-offset: -2px; }
 .plaza-group-count { flex-shrink: 0; color: var(--signal-muted, #63636c); font-size: 11px; font-variant-numeric: tabular-nums; }
+.plaza-group-rate { margin-left: 4px; color: var(--signal-muted, #63636c); font-size: 11px; font-weight: 400; white-space: nowrap; }
 .plaza-filter-label { color: var(--signal-text, #1c1c1e); font-size: 12px; font-weight: 500; line-height: 18px; }
 .plaza-filters-sidebar .plaza-filter-label:not(:first-child) { margin-top: 12px; }
 .plaza-filters-sidebar .plaza-platform-toolbar { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }

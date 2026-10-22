@@ -49,6 +49,16 @@ beforeEach(() => {
 })
 
 describe('admin hub routes', () => {
+  it.each(['/admin/channels', '/admin/channels/pricing'])('redirects the retired %s page to protected groups', async path => {
+    const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
+    const routes = harness.routes.map(route => route.redirect ? route : { ...route, component: { template: '<div />' } })
+    const redirectRouter = actual.createRouter({ history: actual.createMemoryHistory(), routes })
+    await redirectRouter.push(path)
+    expect(redirectRouter.currentRoute.value.path).toBe('/admin/groups')
+    expect(redirectRouter.currentRoute.value.meta).toMatchObject({ requiresAuth: true, requiresAdmin: true })
+    expect(router.hasRoute('AdminChannels')).toBe(false)
+  })
+
   it.each(['invites', 'rebates', 'transfers'])('redirects the legacy %s route with query/hash preserved', async tab => {
     const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
     // Use the registered route records with inert views so redirects execute without loading page dependencies.

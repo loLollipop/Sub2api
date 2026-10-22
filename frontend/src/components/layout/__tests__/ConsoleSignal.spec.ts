@@ -180,7 +180,7 @@ describe('SIGNAL shell route isolation', () => {
     expect(wrapper!.classes()).toContain('signal-nav-collapsed')
     expect(wrapper!.get('.sidebar').classes()).toContain('w-[72px]')
     expect(wrapper!.find('.top-browse-nav').exists()).toBe(true)
-    expect(wrapper!.find('.sidebar a[href="/admin/channels/pricing"]').exists()).toBe(true)
+    expect(wrapper!.find('.sidebar a[href="/admin/channels/pricing"]').exists()).toBe(false)
     expect(wrapper!.find('.sidebar a[href="/admin/keys"]').exists()).toBe(true)
   })
 

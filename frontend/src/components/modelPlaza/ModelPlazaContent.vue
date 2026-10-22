@@ -55,16 +55,13 @@
           <PlazaFilterBar
             :platforms="platforms"
             :groups="groupOptions"
-            :rates="rates"
             :platform="selectedPlatform"
             :group-id="selectedGroupId"
-            :rate="selectedRate"
             :search="searchQuery"
             hide-search
             sidebar
             @update:platform="selectedPlatform = $event"
             @update:group-id="selectedGroupId = $event"
-            @update:rate="selectedRate = $event"
             @update:search="searchQuery = $event"
             @reset="resetFilters"
           />
@@ -92,6 +89,7 @@
               <header class="plaza-section-heading">
                 <div class="plaza-section-title">
                   <h2 :id="`plaza-group-${section.group.id}`">{{ section.group.name }}</h2>
+                  <span class="plaza-section-rate">{{ effectiveRate(section.group) }}x</span>
                   <span class="plaza-section-count">{{ t('modelPlaza.list.groupModelCount', { count: section.count }) }}</span>
                   <span v-if="section.group.is_exclusive" class="plaza-section-badge">{{ t('modelPlaza.badges.exclusive') }}</span>
                   <span v-if="section.group.subscription_type === 'subscription'" class="plaza-section-badge">{{ t('modelPlaza.badges.subscription') }}</span>
@@ -145,7 +143,6 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 const selectedPlatform = ref<string>('all')
 const selectedGroupId = ref<number | 'all'>('all')
-const selectedRate = ref<number | 'all'>('all')
 const searchQuery = ref('')
 const selectedBilling = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
@@ -167,11 +164,10 @@ const sortOptions = computed(() => [
   { value: 'provider', label: t('modelPlaza.list.byProvider') }
 ])
 
-const hasActiveFilters = computed(() => selectedPlatform.value !== 'all' || selectedGroupId.value !== 'all' || selectedRate.value !== 'all' || searchQuery.value.trim() !== '' || selectedBilling.value !== 'all')
+const hasActiveFilters = computed(() => selectedPlatform.value !== 'all' || selectedGroupId.value !== 'all' || searchQuery.value.trim() !== '' || selectedBilling.value !== 'all')
 const resetFilters = () => {
   selectedPlatform.value = 'all'
   selectedGroupId.value = 'all'
-  selectedRate.value = 'all'
   searchQuery.value = ''
   selectedBilling.value = 'all'
 }
@@ -187,55 +183,33 @@ function effectiveRate(g: ModelPlazaGroup): number {
   return g.user_rate_multiplier ?? g.rate_multiplier
 }
 
-const platforms = computed(() =>
-  [...new Set((props.response?.groups ?? []).flatMap(g => g.models.map(modelProvider)))].sort()
-)
+const selectedGroups = computed(() => (props.response?.groups ?? [])
+  .filter(group => selectedGroupId.value === 'all' || group.id === selectedGroupId.value))
+const platforms = computed(() => [...new Set(selectedGroups.value.flatMap(group => group.models.map(modelProvider)))].sort())
 
 const groupOptions = computed(() =>
   (props.response?.groups ?? []).map((g) => ({
     id: g.id,
     name: g.name,
-    platform: '',
     platforms: [...new Set(g.models.map(modelProvider))],
     modelCount: g.models.length,
-    rate: effectiveRate(g),
-    rates: [effectiveRate(g)]
+    rate: effectiveRate(g)
   }))
 )
 
-/** 全量生效倍率;当前组合下不可用的项由 FilterBar 置灰而非隐藏。 */
-const rates = computed(() =>
-  [...new Set((props.response?.groups ?? []).map(effectiveRate))].sort((a, b) => a - b)
-)
-
-/** 数据刷新后选中的倍率可能不复存在,重置为全部。 */
-watch(rates, (list) => {
-  if (selectedRate.value !== 'all' && !list.includes(selectedRate.value)) {
-    selectedRate.value = 'all'
-  }
-})
-
 watch(() => props.response, () => {
   if (selectedGroupId.value !== 'all' && !groupOptions.value.some(g => g.id === selectedGroupId.value)) selectedGroupId.value = 'all'
-  // Keep the chosen group when data changes, then release stale brand/rate
-  // constraints. Global existence alone does not guarantee their intersection.
-  const groups = groupOptions.value.filter(g => selectedGroupId.value === 'all' || g.id === selectedGroupId.value)
-  if (selectedPlatform.value !== 'all' && !groups.some(g => g.platforms.includes(selectedPlatform.value))) selectedPlatform.value = 'all'
-  if (selectedRate.value !== 'all' && !groups.some(g =>
-    (selectedPlatform.value === 'all' || g.platforms.includes(selectedPlatform.value)) && g.rate === selectedRate.value
-  )) selectedRate.value = 'all'
+}, { flush: 'sync' })
+
+// A group can always be selected; release a brand absent from its actual models.
+watch(platforms, available => {
+  if (selectedPlatform.value !== 'all' && !available.includes(selectedPlatform.value)) selectedPlatform.value = 'all'
 }, { flush: 'sync' })
 
 const filteredGroups = computed(() => {
-  let groups = props.response?.groups ?? []
+  let groups = selectedGroups.value
   if (selectedPlatform.value !== 'all') {
     groups = groups.map(g => ({ ...g, models: g.models.filter(m => modelProvider(m) === selectedPlatform.value) })).filter(g => g.models.length > 0)
-  }
-  if (selectedGroupId.value !== 'all') {
-    groups = groups.filter((g) => g.id === selectedGroupId.value)
-  }
-  if (selectedRate.value !== 'all') {
-    groups = groups.filter((g) => effectiveRate(g) === selectedRate.value)
   }
   // 模型名搜索:分组内只留命中的模型,整组无命中则隐藏该分组。
   const q = searchQuery.value.trim().toLowerCase()
@@ -279,7 +253,7 @@ const pageGroups = computed(() => {
   }
   return [...sections.values()]
 })
-watch([selectedPlatform, selectedGroupId, selectedRate, selectedBilling, searchQuery, sortOrder, () => props.response], () => { page.value = 1 }, { flush: 'sync' })
+watch([selectedPlatform, selectedGroupId, selectedBilling, searchQuery, sortOrder, () => props.response], () => { page.value = 1 }, { flush: 'sync' })
 
 function changePage(next: number) {
   page.value = next
@@ -362,7 +336,8 @@ function changePage(next: number) {
 .plaza-section-heading { margin-bottom: 12px; }
 .plaza-section-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .plaza-section-title h2 { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.plaza-section-count, .plaza-section-heading p { color: var(--signal-muted, #63636c); font-size: 12px; }
+.plaza-section-rate, .plaza-section-count, .plaza-section-heading p { color: var(--signal-muted, #63636c); font-size: 12px; }
+.plaza-section-rate { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .plaza-section-heading p { margin-top: 6px; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
 .plaza-section-badge { padding: 2px 7px; border: 1px solid var(--signal-line, #dedee4); border-radius: 5px; color: var(--signal-muted, #63636c); font-size: 10px; }
 .plaza-section-warning { color: #b45309; background: #f59e0b10; border-color: #f59e0b40; }

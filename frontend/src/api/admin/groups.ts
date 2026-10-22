@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from '../client'
+import type { ModelDefaultPricing } from './channels'
 import type {
   AdminGroup,
   GroupPlatform,
@@ -450,7 +451,16 @@ export async function getCapacitySummary(): Promise<
   return data
 }
 
+/** Official catalog lookup shared by the group pricing form. */
+export async function getModelDefaultPricing(model: string): Promise<ModelDefaultPricing> {
+  const { data } = await apiClient.get<ModelDefaultPricing>('/admin/groups/model-pricing', {
+    params: { model }
+  })
+  return data
+}
+
 export const groupsAPI = {
+  getModelDefaultPricing,
   list,
   getAll,
   getByPlatform,

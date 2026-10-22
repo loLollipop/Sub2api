@@ -42,17 +42,16 @@ describe('ModelPlazaContent catalog', () => {
     expect(wrapper.find('[data-testid="plaza-empty-clear-filters"]').exists()).toBe(false)
   })
 
-  it('clears search, billing and all three facets together', async () => {
+  it('clears search, billing, group and brand together', async () => {
     const wrapper = mountContent([group(1, 'openai', 0, [model('gpt')]), group(2, 'kimi', 2, [model('moonshot', 'kimi')])])
     const filter = wrapper.findComponent(PlazaFilterBar)
     filter.vm.$emit('update:platform', 'openai')
     filter.vm.$emit('update:groupId', 1)
-    filter.vm.$emit('update:rate', 0)
     await wrapper.get('.plaza-billing-filters button:last-child').trigger('click')
     await wrapper.get('input[type="search"]').setValue('missing')
     expect(wrapper.text()).toContain('modelPlaza.noSearchResult')
     await wrapper.get('[data-testid="plaza-empty-clear-filters"]').trigger('click')
-    expect(filter.props()).toMatchObject({ platform: 'all', groupId: 'all', rate: 'all', search: '' })
+    expect(filter.props()).toMatchObject({ platform: 'all', groupId: 'all', search: '' })
     expect(wrapper.findAllComponents(PlazaCatalogCard)).toHaveLength(2)
     expect(wrapper.get('.plaza-billing-filters button:first-child').attributes('aria-checked')).toBe('true')
     filter.vm.$emit('update:groupId', 999)
@@ -78,11 +77,14 @@ describe('ModelPlazaContent catalog', () => {
     expect(entries.every(entry => entry.offers.length === 1)).toBe(true)
     expect(wrapper.findAll('.plaza-catalog-section').map(section => section.attributes('data-group-id'))).toEqual(['3', '2', '4', '1'])
     const filter = wrapper.findComponent(PlazaFilterBar)
-    expect(filter.props('rates')).toEqual([0, 0.5, 1, 2])
+    expect(filter.props('groups').map((option: { rate: number }) => option.rate)).toEqual([2, 0.5, 0, 1])
+    expect(wrapper.get('[data-group-id="3"] .plaza-section-rate').text()).toBe('0x')
+    // A legacy rate event cannot leave an invisible constraint on the catalog.
     filter.vm.$emit('update:rate', 0)
     await wrapper.vm.$nextTick()
-    expect(wrapper.findComponent(PlazaCatalogCard).props('entry').offers[0].group.id).toBe(3)
-    expect(wrapper.findAllComponents(PlazaCatalogCard)).toHaveLength(1)
+    expect(wrapper.findAllComponents(PlazaCatalogCard)).toHaveLength(4)
+    expect(filter.props()).not.toHaveProperty('rate')
+    expect(filter.props()).not.toHaveProperty('rates')
   })
 
   it('filters actual vendors inside composite groups and searches provider names', async () => {
@@ -95,6 +97,35 @@ describe('ModelPlazaContent catalog', () => {
     await wrapper.get('input[type="search"]').setValue('')
     filter.vm.$emit('update:platform', 'openai')
     await wrapper.vm.$nextTick()
+    expect(wrapper.findAllComponents(PlazaCatalogCard).map(card => card.props('entry').name)).toEqual(['gpt-4.1'])
+  })
+
+  it('switches between disjoint groups, releases stale brands and restores the full brand list', async () => {
+    const wrapper = mount(ModelPlazaContent, {
+      props: { response: { description: '', groups: [
+        group(1, 'openai', 0.15, [model('gpt-4.1')]),
+        group(2, 'openai', 2, [model('qwen3-max')])
+      ] }, loading: false },
+      global: { stubs: { Icon: true, Select: true, Pagination: true, PlazaCatalogCard: true, PlazaProviderIcon: true } }
+    })
+    const filter = wrapper.findComponent(PlazaFilterBar)
+    const groups = filter.findAll('.plaza-group-option')
+    const brands = () => filter.findAll('.plaza-seg-item').map(button => button.text())
+    expect(brands()).toEqual(['modelPlaza.filters.all', 'OpenAI', 'Qwen'])
+    await groups[1].trigger('click')
+    expect(brands()).toEqual(['modelPlaza.filters.all', 'OpenAI'])
+    await filter.findAll('.plaza-seg-item')[1].trigger('click')
+    expect(filter.props('platform')).toBe('openai')
+    await groups[2].trigger('click')
+    expect(filter.props()).toMatchObject({ groupId: 2, platform: 'all' })
+    expect(brands()).toEqual(['modelPlaza.filters.all', 'Qwen'])
+    expect(wrapper.findAllComponents(PlazaCatalogCard).map(card => card.props('entry').name)).toEqual(['qwen3-max'])
+    await filter.findAll('.plaza-seg-item')[1].trigger('click')
+    await groups[0].trigger('click')
+    expect(filter.props('platform')).toBe('qwen')
+    expect(brands()).toEqual(['modelPlaza.filters.all', 'OpenAI', 'Qwen'])
+    await groups[1].trigger('click')
+    expect(filter.props('platform')).toBe('all')
     expect(wrapper.findAllComponents(PlazaCatalogCard).map(card => card.props('entry').name)).toEqual(['gpt-4.1'])
   })
 
@@ -147,7 +178,7 @@ describe('ModelPlazaContent catalog', () => {
     expect(wrapper.findComponent(Pagination).props('page')).toBe(1)
   })
 
-  it('releases incompatible brand and rate selections after a refresh while preserving the chosen group', async () => {
+  it('releases an incompatible brand after a refresh while preserving the chosen group', async () => {
     const wrapper = mountContent([
       group(1, 'openai', 1, [model('qwen3-max')]),
       group(2, 'openai', 2, [model('deepseek-chat')])
@@ -155,13 +186,12 @@ describe('ModelPlazaContent catalog', () => {
     const filter = wrapper.findComponent(PlazaFilterBar)
     filter.vm.$emit('update:groupId', 1)
     filter.vm.$emit('update:platform', 'qwen')
-    filter.vm.$emit('update:rate', 1)
     await wrapper.vm.$nextTick()
     await wrapper.setProps({ response: { description: '', groups: [
       group(1, 'openai', 2, [model('deepseek-chat')]),
       group(2, 'openai', 1, [model('qwen3-max')])
     ] } })
-    expect(filter.props()).toMatchObject({ groupId: 1, platform: 'all', rate: 'all' })
+    expect(filter.props()).toMatchObject({ groupId: 1, platform: 'all', platforms: ['deepseek'] })
     expect(wrapper.findAllComponents(PlazaCatalogCard).map(card => card.props('entry').name)).toEqual(['deepseek-chat'])
   })
 

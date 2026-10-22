@@ -389,6 +389,21 @@ export default {
     },
 
     affiliates: {
+      orderStatus: {
+      pending: '待支付',
+      paid: '已支付',
+      recharging: '充值中',
+      completed: '已完成',
+      expired: '已过期',
+      cancelled: '已取消',
+      failed: '失败',
+      refund_requested: '退款申请中',
+      refunding: '退款中',
+      refund_pending: '退款处理中',
+      refunded: '已退款',
+      partially_refunded: '部分退款',
+      refund_failed: '退款失败',
+    },
       invitesDescription: '查看全站邀请关系和被邀请用户累计返利',
       rebatesDescription: '查看每一笔产生返利的充值订单',
       transfersDescription: '查看返利额度转入账户余额的提取流水',

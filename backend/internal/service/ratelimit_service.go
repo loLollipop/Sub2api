@@ -1046,6 +1046,12 @@ func buildForbiddenErrorMessage(prefix string, upstreamMsg string, responseBody 
 // Antigravity 平台区分 validation/violation/generic 三种类型，均 SetError 永久禁用；
 // 其他平台保持原有 SetError 行为。
 func (s *RateLimitService) handle403(ctx context.Context, account *Account, upstreamMsg string, responseBody []byte) (shouldDisable bool) {
+	// Edge identity failures are not evidence that any platform account is invalid.
+	// Explicit administrator error policies are evaluated before this handler.
+	if isCloudflareBotBlockResponse(responseBody) {
+		slog.Warn("403_waf_skips_account_penalty", "account_id", account.ID, "platform", account.Platform)
+		return false
+	}
 	if account.Platform == PlatformAntigravity {
 		return s.handleAntigravity403(ctx, account, upstreamMsg, responseBody)
 	}

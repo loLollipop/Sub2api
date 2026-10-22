@@ -374,6 +374,7 @@ export function useAffiliateCustomUsersPanel(enabled: () => boolean) {
 </script>
 
 <script setup lang="ts">
+import BaseDialog from "@/components/common/BaseDialog.vue";
 const props = defineProps<{ controller: ReturnType<typeof useAffiliateCustomUsersPanel>; enabled: boolean }>();
 const { t } = useI18n();
 const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDialog, handleAffiliateConfirm, cancelAffiliateConfirm, onAffiliateSearchInput, changeAffiliatePage, toggleAffiliateSelectAll, toggleAffiliateSelect, openAffiliateModal, closeAffiliateModal, onAffiliateUserSearchInput, selectAffiliateUser, clearSelectedAffiliateUser, affiliateModalCanSubmit, submitAffiliateModal, askResetAffiliateUser, openAffiliateBatchModal, submitAffiliateBatchModal } = toRefs(props.controller);
@@ -381,7 +382,7 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
 
 <template>
 <div v-if="enabled" class="!mt-6 border-t border-gray-100 pt-6 dark:border-dark-700">
-                <div class="mb-3 flex items-center justify-between">
+                <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
                       {{ t('admin.settings.features.affiliate.customUsers.title') }}
@@ -392,18 +393,18 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                   </div>
                   <button
                     type="button"
-                    class="btn btn-primary btn-sm"
+                    class="btn btn-primary btn-sm shrink-0 whitespace-nowrap"
                     @click="openAffiliateModal(null)"
                   >
                     + {{ t('admin.settings.features.affiliate.customUsers.addButton') }}
                   </button>
                 </div>
 
-                <div class="mb-3 flex items-center gap-2">
+                <div class="mb-3 flex flex-wrap items-center gap-2">
                   <input
                     v-model="affiliateState.search"
                     type="text"
-                    class="input flex-1"
+                    class="input min-w-0 flex-1"
                     :placeholder="t('admin.settings.features.affiliate.customUsers.searchPlaceholder')"
                     @input="onAffiliateSearchInput"
                   />
@@ -511,15 +512,14 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                   </div>
                 </div>
               </div>
-<div
-          v-if="affiliateModal.open"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          @click.self="closeAffiliateModal"
+<BaseDialog
+          :show="affiliateModal.open"
+          :title="affiliateModal.mode === 'add' ? t('admin.settings.features.affiliate.modal.addTitle') : t('admin.settings.features.affiliate.modal.editTitle')"
+          width="narrow"
+          :close-on-escape="!affiliateModal.saving"
+          :close-on-click-outside="!affiliateModal.saving"
+          @close="closeAffiliateModal"
         >
-          <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-dark-900">
-            <h3 class="mb-4 text-lg font-semibold">
-              {{ affiliateModal.mode === 'add' ? t('admin.settings.features.affiliate.modal.addTitle') : t('admin.settings.features.affiliate.modal.editTitle') }}
-            </h3>
             <div class="space-y-4">
               <div v-if="affiliateModal.mode === 'add'">
                 <label class="input-label">{{ t('admin.settings.features.affiliate.modal.userLabel') }}</label>
@@ -528,7 +528,7 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                   v-if="affiliateModal.selectedUser"
                   class="flex items-center justify-between rounded-md border border-primary-200 bg-primary-50 px-3 py-2 dark:border-primary-700/50 dark:bg-primary-900/20"
                 >
-                  <div class="text-sm">
+                  <div class="min-w-0 break-words text-sm [overflow-wrap:anywhere]">
                     <span class="font-medium text-gray-900 dark:text-white">{{ affiliateModal.selectedUser.email }}</span>
                     <span class="ml-1 text-xs text-gray-500">({{ affiliateModal.selectedUser.username }})</span>
                   </div>
@@ -545,6 +545,7 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                 <template v-else>
                   <input
                     v-model="affiliateModal.userQuery"
+                    :aria-label="t('admin.settings.features.affiliate.modal.userLabel')"
                     type="text"
                     class="input"
                     :placeholder="t('admin.settings.features.affiliate.modal.userPlaceholder')"
@@ -558,7 +559,7 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                       v-for="u in affiliateModal.userResults"
                       :key="u.id"
                       type="button"
-                      class="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-dark-800"
+                      class="w-full break-words px-3 py-1.5 text-left text-sm [overflow-wrap:anywhere] hover:bg-gray-100 dark:hover:bg-dark-800"
                       @click="selectAffiliateUser(u)"
                     >
                       {{ u.email }} <span class="text-xs text-gray-500">({{ u.username }})</span>
@@ -580,6 +581,7 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                 <label class="input-label">{{ t('admin.settings.features.affiliate.modal.codeLabel') }}</label>
                 <input
                   v-model="affiliateModal.code"
+                    :aria-label="t('admin.settings.features.affiliate.modal.codeLabel')"
                   type="text"
                   class="input font-mono"
                   :placeholder="t('admin.settings.features.affiliate.modal.codePlaceholder')"
@@ -595,6 +597,7 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                 <div class="relative">
                   <input
                     v-model="affiliateModal.rate"
+                    :aria-label="t('admin.settings.features.affiliate.modal.rateLabel')"
                     type="number"
                     step="0.01"
                     min="0"
@@ -610,7 +613,8 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
               </div>
             </div>
 
-            <div class="mt-6 flex items-center justify-between gap-3">
+            <template #footer>
+            <div class="flex flex-wrap items-center justify-between gap-3">
               <p
                 v-if="!affiliateModalCanSubmit"
                 class="text-xs text-gray-500 dark:text-gray-400"
@@ -632,23 +636,23 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-<div
-          v-if="affiliateBatchModal.open"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          @click.self="affiliateBatchModal.open = false"
+            </template>
+        </BaseDialog>
+<BaseDialog
+          :show="affiliateBatchModal.open"
+          :title="t('admin.settings.features.affiliate.batchModal.title', { count: affiliateState.selected.length })"
+          width="narrow"
+          :close-on-escape="!affiliateBatchModal.saving"
+          :close-on-click-outside="!affiliateBatchModal.saving"
+          @close="affiliateBatchModal.open = false"
         >
-          <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-dark-900">
-            <h3 class="mb-4 text-lg font-semibold">
-              {{ t('admin.settings.features.affiliate.batchModal.title', { count: affiliateState.selected.length }) }}
-            </h3>
             <p class="mb-4 text-sm text-gray-500">
               {{ t('admin.settings.features.affiliate.batchModal.hint') }}
             </p>
             <div class="relative">
               <input
                 v-model="affiliateBatchModal.rate"
+                    :aria-label="t('admin.settings.features.affiliate.modal.rateLabel')"
                 type="number"
                 step="0.01"
                 min="0"
@@ -661,7 +665,8 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
             <p class="mt-2 text-xs text-gray-400">
               {{ t('admin.settings.features.affiliate.batchModal.clearHint') }}
             </p>
-            <div class="mt-6 flex justify-end gap-2">
+            <template #footer>
+            <div class="flex justify-end gap-2">
               <button type="button" class="btn btn-secondary" @click="affiliateBatchModal.open = false">
                 {{ t('common.cancel') }}
               </button>
@@ -674,8 +679,8 @@ const { affiliateState, affiliateModal, affiliateBatchModal, affiliateConfirmDia
                 {{ affiliateBatchModal.saving ? t('common.saving') : t('common.save') }}
               </button>
             </div>
-          </div>
-        </div>
+            </template>
+        </BaseDialog>
 <ConfirmDialog
         :show="affiliateConfirmDialog.show"
         :title="affiliateConfirmDialog.title"

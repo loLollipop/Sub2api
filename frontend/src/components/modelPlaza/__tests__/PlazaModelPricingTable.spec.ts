@@ -58,6 +58,18 @@ function mountTable(
 
 describe('PlazaModelPricingTable', () => {
 
+  it('labels video billing without presenting a fallback price or ordinary group multiplier', () => {
+    const video = tokenModel({ name: 'video-model', official_pricing: null })
+    video.pricing = { ...video.pricing!, billing_mode: 'video', per_request_price: 0.37 }
+    const wrapper = mountTable([video], 9, 0)
+    const cells = wrapper.find('tbody tr').findAll('td')
+    expect(cells[0].text()).toContain('modelPlaza.list.videoBilling')
+    expect(cells[1].text()).toBe('modelPlaza.list.videoPricingUnavailable')
+    expect(cells.at(-1)?.text()).toBe('-')
+    expect(wrapper.text()).not.toContain('modelPlaza.table.perRequest')
+    expect(wrapper.text()).not.toContain('$0.00')
+  })
+
 
   it.each([0, 9])('preserves explicit user rate %s', (userRate) => {
     const wrapper = mountTable([tokenModel()], 9, userRate)

@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-6xl space-y-6">
+    <div class="console-settings mx-auto max-w-6xl space-y-6">
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-12">
         <div
@@ -4522,7 +4522,29 @@
                 {{ t("admin.settings.webSearchEmulation.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
+            <div
+              v-if="webSearchConfigLoadFailed"
+              role="alert"
+              class="flex items-center justify-between gap-3 p-6 text-sm text-red-600 dark:text-red-400"
+              data-testid="web-search-load-error"
+            >
+              <span>{{ localText(
+                "联网搜索配置加载失败，请重试；保存其他设置不会更改此配置。",
+                "Web search settings failed to load. Retry to edit them; saving other settings will preserve this configuration.",
+              ) }}</span>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                :disabled="webSearchConfigLoading"
+                @click="loadWebSearchConfig"
+                data-testid="web-search-retry"
+              >{{ t("common.tryAgain") }}</button>
+            </div>
+            <fieldset
+              :disabled="!webSearchConfigLoaded || webSearchConfigLoading"
+              class="min-w-0 space-y-5 p-6"
+              data-testid="web-search-fields"
+            >
               <!-- Global Toggle -->
               <div class="flex items-center justify-between">
                 <div>
@@ -4806,7 +4828,7 @@
                   </div>
                 </div>
               </div>
-            </div>
+            </fieldset>
           </div>
 
           <!-- Web Search Test Dialog -->
@@ -6049,30 +6071,9 @@
         </div><!-- /Tab: Features -->
 
         <!-- Tab: Email -->
-        <!-- Tab: Payment -->
-        <div v-show="activeTab === 'payment'" class="space-y-6">
-          <!-- Payment System Settings -->
-          <div class="card">
-            <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
-            >
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {{ t("admin.settings.payment.title") }}
-              </h2>
-              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {{ t("admin.settings.payment.description") }}
-                <a
-                  :href="paymentGuideHref"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="ml-2 inline-flex items-center text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-                >
-                  <Icon name="externalLink" size="none" class="mr-0.5 h-3.5 w-3.5" :stroke-width="2" />
-                  {{ t("admin.settings.payment.configGuide") }}
-                </a>
-              </p>
-            </div>
-            <div class="space-y-4 p-6">
+        <!-- External shop -->
+        <div v-show="activeTab === 'purchase'" class="space-y-6">
+          <div class="card p-6">
               <section class="rounded-lg border border-gray-200 p-4 dark:border-dark-700" data-testid="external-shop-settings">
                 <div class="flex items-center justify-between gap-4">
                   <div>
@@ -6090,519 +6091,7 @@
                   <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.purchase.urlHint") }}</p>
                 </div>
               </section>
-              <!-- Enable toggle -->
-              <div class="flex items-center justify-between">
-                <div>
-                  <label class="font-medium text-gray-900 dark:text-white">{{
-                    t("admin.settings.payment.enabled")
-                  }}</label>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ t("admin.settings.payment.enabledHint") }}
-                  </p>
-                </div>
-                <Toggle v-model="form.payment_enabled" />
-              </div>
-              <template v-if="form.payment_enabled">
-                <div class="flex items-center justify-between gap-4 border-b border-gray-200 pb-4 dark:border-dark-700">
-                  <div>
-                    <label class="font-medium text-gray-900 dark:text-white">
-                      {{ t("admin.settings.payment.rechargeCenterEnabled") }}
-                    </label>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {{ t("admin.settings.payment.rechargeCenterEnabledHint") }}
-                    </p>
-                  </div>
-                  <Toggle v-model="form.payment_recharge_center_enabled" :aria-label="t('admin.settings.payment.rechargeCenterEnabled')" />
-                </div>
-                <!-- Row 1: Product name -->
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.productNamePrefix")
-                    }}</label
-                    ><input
-                      v-model="form.payment_product_name_prefix"
-                      type="text"
-                      class="input"
-                      placeholder="Sub2API"
-                    />
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.productNameSuffix")
-                    }}</label
-                    ><input
-                      v-model="form.payment_product_name_suffix"
-                      type="text"
-                      class="input"
-                      placeholder="CNY"
-                    />
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.preview")
-                    }}</label>
-                    <div
-                      class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300"
-                    >
-                      {{
-                        (form.payment_product_name_prefix || "Sub2API") +
-                        " 100 " +
-                        (form.payment_product_name_suffix || "CNY")
-                      }}
-                    </div>
-                  </div>
-                </div>
-                <!-- Row 2: Balance toggle + amounts -->
-                <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.minAmount")
-                    }}</label
-                    ><input
-                      :value="form.payment_min_amount || ''"
-                      @input="
-                        form.payment_min_amount =
-                          parseFloat(
-                            ($event.target as HTMLInputElement).value,
-                          ) || 0
-                      "
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="input"
-                      :placeholder="t('admin.settings.payment.noLimit')"
-                    />
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.maxAmount")
-                    }}</label
-                    ><input
-                      :value="form.payment_max_amount || ''"
-                      @input="
-                        form.payment_max_amount =
-                          parseFloat(
-                            ($event.target as HTMLInputElement).value,
-                          ) || 0
-                      "
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="input"
-                      :placeholder="t('admin.settings.payment.noLimit')"
-                    />
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.dailyLimit")
-                    }}</label
-                    ><input
-                      :value="form.payment_daily_limit || ''"
-                      @input="
-                        form.payment_daily_limit =
-                          parseFloat(
-                            ($event.target as HTMLInputElement).value,
-                          ) || 0
-                      "
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="input"
-                      :placeholder="t('admin.settings.payment.noLimit')"
-                    />
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.balanceRechargeMultiplier")
-                    }}</label>
-                    <input
-                      :value="form.payment_balance_recharge_multiplier || ''"
-                      @input="
-                        form.payment_balance_recharge_multiplier =
-                          parseFloat(
-                            ($event.target as HTMLInputElement).value,
-                          ) || 1
-                      "
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      class="input"
-                    />
-                    <p class="mt-0.5 text-xs text-gray-400">
-                      {{
-                        t(
-                          "admin.settings.payment.balanceRechargeMultiplierHint",
-                        )
-                      }}
-                    </p>
-                    <p
-                      class="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400"
-                    >
-                      {{
-                        t("admin.settings.payment.balanceRechargePreview", {
-                          usd: (
-                            Number(form.payment_balance_recharge_multiplier) ||
-                            1
-                          ).toFixed(2),
-                        })
-                      }}
-                    </p>
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.subscriptionUsdToCnyRate")
-                    }}</label>
-                    <input
-                      :value="form.payment_subscription_usd_to_cny_rate || ''"
-                      @input="
-                        form.payment_subscription_usd_to_cny_rate =
-                          parseFloat(
-                            ($event.target as HTMLInputElement).value,
-                          ) || 0
-                      "
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="input"
-                      :placeholder="
-                        t(
-                          'admin.settings.payment.subscriptionUsdToCnyRateDisabled',
-                        )
-                      "
-                    />
-                    <p class="mt-0.5 text-xs text-gray-400">
-                      {{
-                        t("admin.settings.payment.subscriptionUsdToCnyRateHint")
-                      }}
-                    </p>
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.rechargeFeeRate")
-                    }}</label>
-                    <div class="relative">
-                      <input
-                        :value="form.payment_recharge_fee_rate ?? ''"
-                        @input="
-                          form.payment_recharge_fee_rate = Math.min(
-                            100,
-                            Math.max(
-                              0,
-                              Math.round(
-                                parseFloat(
-                                  ($event.target as HTMLInputElement).value ||
-                                    '0',
-                                ) * 100,
-                              ) / 100,
-                            ),
-                          )
-                        "
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        class="input pr-8"
-                      />
-                      <span
-                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
-                        >%</span
-                      >
-                    </div>
-                    <p class="mt-0.5 text-xs text-gray-400">
-                      {{ t("admin.settings.payment.rechargeFeeRateHint") }}
-                    </p>
-                    <p
-                      v-if="(Number(form.payment_recharge_fee_rate) || 0) > 0"
-                      class="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400"
-                    >
-                      {{
-                        t("admin.settings.payment.rechargeFeePreview", {
-                          fee: (
-                            Number(form.payment_recharge_fee_rate) || 0
-                          ).toFixed(2),
-                        })
-                      }}
-                    </p>
-                  </div>
-                  <div>
-                    <label class="input-label"
-                      >{{ t("admin.settings.payment.orderTimeout") }}
-                      <span class="text-red-500">*</span></label
-                    ><input
-                      v-model.number="form.payment_order_timeout_minutes"
-                      type="number"
-                      min="1"
-                      class="input"
-                      required
-                    />
-                    <p class="mt-0.5 text-xs text-gray-400">
-                      {{ t("admin.settings.payment.orderTimeoutHint") }}
-                    </p>
-                  </div>
-                </div>
-                <!-- Row 3: Pending orders + load balance + cancel rate limit (all in one row) -->
-                <div class="flex flex-wrap items-end gap-4">
-                  <div class="w-28">
-                    <label class="input-label">{{
-                      t("admin.settings.payment.maxPendingOrders")
-                    }}</label
-                    ><input
-                      v-model.number="form.payment_max_pending_orders"
-                      type="number"
-                      min="1"
-                      class="input"
-                    />
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.loadBalanceStrategy")
-                    }}</label>
-                    <Select
-                      v-model="form.payment_load_balance_strategy"
-                      :options="loadBalanceOptions"
-                      class="w-40"
-                    />
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.cancelRateLimit")
-                    }}</label>
-                    <div class="flex items-center gap-2">
-                      <button
-                        type="button"
-                        :class="[
-                          'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-                          form.payment_cancel_rate_limit_enabled
-                            ? 'bg-primary-500'
-                            : 'bg-gray-300 dark:bg-dark-600',
-                        ]"
-                        @click="
-                          form.payment_cancel_rate_limit_enabled =
-                            !form.payment_cancel_rate_limit_enabled
-                        "
-                      >
-                        <span
-                          :class="[
-                            'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                            form.payment_cancel_rate_limit_enabled
-                              ? 'translate-x-5'
-                              : 'translate-x-0',
-                          ]"
-                        />
-                      </button>
-                      <Select
-                        v-model="form.payment_cancel_rate_limit_window_mode"
-                        :options="cancelRateLimitModeOptions"
-                        class="w-24"
-                        :disabled="!form.payment_cancel_rate_limit_enabled"
-                      />
-                      <span
-                        :class="[
-                          'text-sm whitespace-nowrap',
-                          form.payment_cancel_rate_limit_enabled
-                            ? 'text-gray-700 dark:text-gray-300'
-                            : 'text-gray-400 dark:text-gray-600',
-                        ]"
-                        >{{
-                          t("admin.settings.payment.cancelRateLimitEvery")
-                        }}</span
-                      >
-                      <input
-                        v-model.number="form.payment_cancel_rate_limit_window"
-                        type="number"
-                        min="1"
-                        required
-                        class="input w-14 text-center"
-                        :disabled="!form.payment_cancel_rate_limit_enabled"
-                      />
-                      <Select
-                        v-model="form.payment_cancel_rate_limit_unit"
-                        :options="cancelRateLimitUnitOptions"
-                        class="w-28"
-                        :disabled="!form.payment_cancel_rate_limit_enabled"
-                      />
-                      <span
-                        :class="[
-                          'text-sm whitespace-nowrap',
-                          form.payment_cancel_rate_limit_enabled
-                            ? 'text-gray-700 dark:text-gray-300'
-                            : 'text-gray-400 dark:text-gray-600',
-                        ]"
-                        >{{
-                          t("admin.settings.payment.cancelRateLimitAllowMax")
-                        }}</span
-                      >
-                      <input
-                        v-model.number="form.payment_cancel_rate_limit_max"
-                        type="number"
-                        min="1"
-                        required
-                        class="input w-14 text-center"
-                        :disabled="!form.payment_cancel_rate_limit_enabled"
-                      />
-                      <span
-                        :class="[
-                          'text-sm whitespace-nowrap',
-                          form.payment_cancel_rate_limit_enabled
-                            ? 'text-gray-700 dark:text-gray-300'
-                            : 'text-gray-400 dark:text-gray-600',
-                        ]"
-                        >{{
-                          t("admin.settings.payment.cancelRateLimitTimes")
-                        }}</span
-                      >
-                    </div>
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.alipayForceQRCode")
-                    }}</label>
-                    <div class="flex items-center gap-2">
-                      <button
-                        type="button"
-                        :class="[
-                          'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-                          form.payment_alipay_force_qrcode
-                            ? 'bg-primary-500'
-                            : 'bg-gray-300 dark:bg-dark-600',
-                        ]"
-                        @click="
-                          form.payment_alipay_force_qrcode =
-                            !form.payment_alipay_force_qrcode
-                        "
-                      >
-                        <span
-                          :class="[
-                            'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                            form.payment_alipay_force_qrcode
-                              ? 'translate-x-5'
-                              : 'translate-x-0',
-                          ]"
-                        />
-                      </button>
-                      <span class="text-sm text-gray-500 dark:text-gray-400">{{
-                        t("admin.settings.payment.alipayForceQRCodeHint")
-                      }}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.alipayMobilePrecreateDeepLink")
-                    }}</label>
-                    <div class="flex items-center gap-2">
-                      <button
-                        type="button"
-                        :class="[
-                          'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-                          form.payment_alipay_mobile_precreate_deep_link
-                            ? 'bg-primary-500'
-                            : 'bg-gray-300 dark:bg-dark-600',
-                        ]"
-                        @click="
-                          form.payment_alipay_mobile_precreate_deep_link =
-                            !form.payment_alipay_mobile_precreate_deep_link
-                        "
-                      >
-                        <span
-                          :class="[
-                            'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                            form.payment_alipay_mobile_precreate_deep_link
-                              ? 'translate-x-5'
-                              : 'translate-x-0',
-                          ]"
-                        />
-                      </button>
-                      <span class="text-sm text-gray-500 dark:text-gray-400">{{
-                        t("admin.settings.payment.alipayMobilePrecreateDeepLinkHint")
-                      }}</span>
-                    </div>
-                  </div>
-                </div>
-                <!-- Row 4: Enabled payment types (provider badges like sub2apipay) -->
-                <div>
-                  <label class="input-label">{{
-                    t("admin.settings.payment.enabledPaymentTypes")
-                  }}</label>
-                  <div class="mt-1.5 flex flex-wrap gap-2">
-                    <button
-                      v-for="pt in allPaymentTypes"
-                      :key="pt.value"
-                      type="button"
-                      @click="togglePaymentType(pt.value)"
-                      :class="[
-                        'rounded-lg border px-3 py-1.5 text-sm font-medium transition-all',
-                        isPaymentTypeEnabled(pt.value)
-                          ? 'border-primary-500 bg-primary-500 text-white shadow-sm'
-                          : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:border-dark-500',
-                      ]"
-                    >
-                      {{ pt.label }}
-                    </button>
-                  </div>
-                  <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                    {{ t("admin.settings.payment.enabledPaymentTypesHint") }}
-                    <a
-                      :href="paymentMethodsHref"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="ml-1 text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300"
-                    >
-                      {{ t("admin.settings.payment.findProvider") }}
-                      <Icon name="externalLink" size="none" class="mb-0.5 ml-0.5 inline h-3 w-3" :stroke-width="2" />
-                    </a>
-                  </p>
-                </div>
-                <!-- Row 5: Help image + text -->
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.helpImage")
-                    }}</label>
-                    <ImageUpload
-                      v-model="form.payment_help_image_url"
-                      :upload-label="t('admin.settings.site.uploadImage')"
-                      :remove-label="t('admin.settings.site.remove')"
-                      :placeholder="
-                        t('admin.settings.payment.helpImagePlaceholder')
-                      "
-                    />
-                  </div>
-                  <div>
-                    <label class="input-label">{{
-                      t("admin.settings.payment.helpText")
-                    }}</label>
-                    <textarea
-                      v-model="form.payment_help_text"
-                      rows="3"
-                      class="input"
-                      :placeholder="
-                        t('admin.settings.payment.helpTextPlaceholder')
-                      "
-                    ></textarea>
-                  </div>
-                </div>
-              </template>
-            </div>
           </div>
-
-          <!-- Provider Management -->
-          <PaymentProviderList
-            v-if="form.payment_enabled"
-            :providers="providers"
-            :loading="providersLoading"
-            :can-create="hasAnyPaymentTypeEnabled"
-            :enabled-payment-types="form.payment_enabled_types"
-            :all-payment-types="allPaymentTypes"
-            :redirect-label="t('admin.settings.payment.easypayRedirect')"
-            @refresh="loadProviders"
-            @create="openCreateProvider"
-            @edit="openEditProvider"
-            @delete="confirmDeleteProvider"
-            @toggle-field="handleToggleField"
-            @toggle-type="handleToggleType"
-            @reorder="handleReorderProviders"
-          />
         </div>
 
         <div v-show="activeTab === 'email'" class="space-y-6">
@@ -7067,28 +6556,6 @@
         </div>
       </form>
 
-      <!-- Provider dialogs placed outside the settings form to prevent form submission bubbling -->
-      <PaymentProviderDialog
-        ref="providerDialogRef"
-        :show="showProviderDialog"
-        :saving="providerSaving"
-        :editing="editingProvider"
-        :all-key-options="providerKeyOptions"
-        :enabled-key-options="enabledProviderKeyOptions"
-        :all-payment-types="allPaymentTypes"
-        :redirect-label="t('admin.settings.payment.easypayRedirect')"
-        @close="showProviderDialog = false"
-        @save="handleSaveProvider"
-      />
-      <ConfirmDialog
-        :show="showDeleteProviderDialog"
-        :title="t('admin.settings.payment.deleteProvider')"
-        :message="t('admin.settings.payment.deleteProviderConfirm')"
-        :confirm-text="t('common.delete')"
-        danger
-        @confirm="handleDeleteProvider"
-        @cancel="showDeleteProviderDialog = false"
-      />
       <!-- 关闭 step-up 开关等敏感保存操作触发的 TOTP 二次验证 -->
       <TotpStepUpDialog :controller="settingsStepUp" />
     </div>
@@ -7140,13 +6607,9 @@ import type {
   NotifyEmailEntry,
   Proxy,
 } from "@/types";
-import type { ProviderInstance } from "@/types/payment";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import Icon from "@/components/icons/Icon.vue";
 import Select from "@/components/common/Select.vue";
-import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
-import PaymentProviderList from "@/components/payment/PaymentProviderList.vue";
-import PaymentProviderDialog from "@/components/payment/PaymentProviderDialog.vue";
 import GroupBadge from "@/components/common/GroupBadge.vue";
 import GroupOptionItem from "@/components/common/GroupOptionItem.vue";
 import Toggle from "@/components/common/Toggle.vue";
@@ -7164,11 +6627,10 @@ import {
 } from "@/composables/useStepUp";
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 import AffiliateCustomUsersPanel, { useAffiliateCustomUsersPanel } from "./settings/AffiliateCustomUsersPanel.vue";
-import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
+import { extractApiErrorMessage } from "@/utils/apiError";
 import { parseTableDefaultPageSizeInput, parseTablePageSizeOptionsInput } from "@/utils/tablePreferences";
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
-import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
 import {
   bundledLegalDocuments,
   resolveLegalDocumentId,
@@ -7203,18 +6665,6 @@ const isZhLocale = computed(() => locale.value.startsWith("zh"));
 function localText(zh: string, en: string): string {
   return isZhLocale.value ? zh : en;
 }
-
-const paymentGuideHref = computed(() =>
-  locale.value.startsWith("zh")
-    ? "https://github.com/loLollipop/Sub2api/blob/main/docs/PAYMENT_CN.md"
-    : "https://github.com/loLollipop/Sub2api/blob/main/docs/PAYMENT.md",
-);
-
-const paymentMethodsHref = computed(() =>
-  locale.value.startsWith("zh")
-    ? "https://github.com/loLollipop/Sub2api/blob/main/docs/PAYMENT_CN.md#支持的支付方式"
-    : "https://github.com/loLollipop/Sub2api/blob/main/docs/PAYMENT.md#supported-payment-methods",
-);
 
 const activeTab = ref<SettingsTab>("general");
 
@@ -7671,7 +7121,6 @@ function resetClaudeOAuthSystemPromptBlocks(): void {
   syncClaudeOAuthSystemPromptBlocksFormField();
 }
 
-
 interface DefaultSubscriptionGroupOption {
   value: number;
   label: string;
@@ -7692,7 +7141,7 @@ type SettingsForm = Omit<
   channel_monitor_hide_throughput: boolean;
   channel_monitor_show_quota: boolean;
   channel_monitor_hide_user_ranking: boolean;
-  payment_recharge_center_enabled: boolean;
+
   smtp_password: string;
   turnstile_secret_key: string;
   tencent_captcha_app_secret_key: string;
@@ -7789,33 +7238,11 @@ const form = reactive<SettingsForm>({
   purchase_subscription_enabled: false,
   purchase_subscription_url: "",
   purchase_subscription_products: {},
-  payment_enabled: false,
-  payment_recharge_center_enabled: false,
+
   risk_control_enabled: false,
   cyber_session_block_enabled: false,
   cyber_session_block_ttl_seconds: 3600,
-  payment_min_amount: 1,
-  payment_max_amount: 10000,
-  payment_daily_limit: 50000,
-  payment_max_pending_orders: 3,
-  payment_order_timeout_minutes: 30,
-  payment_balance_disabled: false,
-  payment_balance_recharge_multiplier: 1,
-  payment_subscription_usd_to_cny_rate: 0,
-  payment_recharge_fee_rate: 0,
-  payment_enabled_types: [],
-  payment_help_image_url: "",
-  payment_help_text: "",
-  payment_product_name_prefix: "",
-  payment_product_name_suffix: "",
-  payment_load_balance_strategy: "round-robin",
-  payment_cancel_rate_limit_enabled: false,
-  payment_cancel_rate_limit_max: 10,
-  payment_cancel_rate_limit_window: 1,
-  payment_cancel_rate_limit_unit: "day",
-  payment_cancel_rate_limit_window_mode: "rolling",
-  payment_alipay_force_qrcode: false,
-  payment_alipay_mobile_precreate_deep_link: false,
+
   table_default_page_size: tablePageSizeDefault,
   table_page_size_options: [10, 20, 50, 100],
   custom_menu_items: [] as Array<{
@@ -8264,6 +7691,10 @@ const webSearchConfig = reactive<WebSearchEmulationConfig>({
   providers: [],
 });
 
+const webSearchConfigLoaded = ref(false);
+const webSearchConfigLoading = ref(false);
+const webSearchConfigLoadFailed = ref(false);
+
 const expandedProviders = reactive<Record<number, boolean>>({});
 const apiKeyVisible = reactive<Record<number, boolean>>({});
 const wsTestQuery = ref("");
@@ -8383,26 +7814,39 @@ async function testWebSearchProvider() {
 }
 
 async function loadWebSearchConfig() {
+  // Once editable, never reload over unsaved provider/key changes.
+  if (webSearchConfigLoading.value || webSearchConfigLoaded.value) return;
+  webSearchConfigLoading.value = true;
   try {
     const [resp, proxiesResp] = await Promise.all([
       adminAPI.settings.getWebSearchEmulationConfig(),
       adminAPI.proxies.list().catch(() => ({ items: [] as Proxy[] })),
     ]);
-    if (resp) {
-      webSearchConfig.enabled = resp.enabled || false;
-      webSearchConfig.providers = resp.providers || [];
-    }
+    if (!resp) throw new Error("Missing web search configuration");
+    webSearchConfig.enabled = resp.enabled || false;
+    webSearchConfig.providers = resp.providers || [];
     webSearchProxies.value = proxiesResp.items || [];
+    webSearchConfigLoaded.value = true;
+    webSearchConfigLoadFailed.value = false;
   } catch (err: unknown) {
-    // 404 is expected when config hasn't been created yet; show error for other failures
-    const status = (err as { status?: number })?.status;
-    if (status !== 404 && status !== undefined) {
+    const error = err as { status?: number; response?: { status?: number } };
+    if ((error?.status ?? error?.response?.status) === 404) {
+      // Confirmed absent configuration is safe to initialize.
+      webSearchConfig.enabled = false;
+      webSearchConfig.providers = [];
+      webSearchConfigLoaded.value = true;
+      webSearchConfigLoadFailed.value = false;
+    } else {
+      webSearchConfigLoadFailed.value = true;
       appStore.showError(extractApiErrorMessage(err, t("common.error")));
     }
+  } finally {
+    webSearchConfigLoading.value = false;
   }
 }
 
 async function saveWebSearchConfig(): Promise<boolean> {
+  if (!webSearchConfigLoaded.value || webSearchConfigLoading.value) return false;
   try {
     for (const p of webSearchConfig.providers) {
       const raw = p.quota_limit;
@@ -9041,8 +8485,6 @@ async function loadSettings() {
   loadFailed.value = false;
   try {
     const settings = await adminAPI.settings.getSettings();
-    settings.payment_load_balance_strategy =
-      settings.payment_load_balance_strategy || "round-robin";
     // Only assign non-null values from backend (null means unconfigured, keep defaults)
     for (const [key, value] of Object.entries(settings)) {
       if (value !== null && value !== undefined) {
@@ -9692,44 +9134,15 @@ async function saveSettings() {
       codex_cli_only_whitelist: serializeCodexRowsToJSON(
         codexWhitelistRows.value,
       ),
-      // Payment configuration
+      // External shop configuration
       purchase_subscription_enabled: form.purchase_subscription_enabled,
       purchase_subscription_products: purchaseProducts,
-      payment_enabled: form.payment_enabled,
-      payment_recharge_center_enabled: form.payment_recharge_center_enabled,
+
       risk_control_enabled: form.risk_control_enabled,
       cyber_session_block_enabled: form.cyber_session_block_enabled,
       cyber_session_block_ttl_seconds:
         Number(form.cyber_session_block_ttl_seconds) || 3600,
-      payment_min_amount: Number(form.payment_min_amount) || 0,
-      payment_max_amount: Number(form.payment_max_amount) || 0,
-      payment_daily_limit: Number(form.payment_daily_limit) || 0,
-      payment_max_pending_orders: Number(form.payment_max_pending_orders) || 0,
-      payment_order_timeout_minutes:
-        Number(form.payment_order_timeout_minutes) || 0,
-      payment_balance_disabled: form.payment_balance_disabled,
-      payment_balance_recharge_multiplier:
-        Number(form.payment_balance_recharge_multiplier) || 1,
-      payment_subscription_usd_to_cny_rate:
-        Number(form.payment_subscription_usd_to_cny_rate) || 0,
-      payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,
-      payment_enabled_types: form.payment_enabled_types,
-      payment_load_balance_strategy: form.payment_load_balance_strategy,
-      payment_product_name_prefix: form.payment_product_name_prefix,
-      payment_product_name_suffix: form.payment_product_name_suffix,
-      payment_help_image_url: form.payment_help_image_url,
-      payment_help_text: form.payment_help_text,
-      payment_cancel_rate_limit_enabled: form.payment_cancel_rate_limit_enabled,
-      payment_cancel_rate_limit_max:
-        Number(form.payment_cancel_rate_limit_max) || 10,
-      payment_cancel_rate_limit_window:
-        Number(form.payment_cancel_rate_limit_window) || 1,
-      payment_cancel_rate_limit_unit: form.payment_cancel_rate_limit_unit,
-      payment_cancel_rate_limit_window_mode:
-        form.payment_cancel_rate_limit_window_mode,
-      payment_alipay_force_qrcode: form.payment_alipay_force_qrcode,
-      payment_alipay_mobile_precreate_deep_link:
-        form.payment_alipay_mobile_precreate_deep_link,
+
       openai_low_upstream_rate_priority_enabled:
         form.openai_low_upstream_rate_priority_enabled,
       openai_oauth_scheduling_rate_multiplier:
@@ -9918,6 +9331,11 @@ async function saveSettings() {
     await adminSettingsStore.fetch(true);
     if (wsOk) {
       appStore.showSuccess(t("admin.settings.settingsSaved"));
+    } else if (!webSearchConfigLoaded.value) {
+      appStore.showSuccess(localText(
+        "其他设置已保存；联网搜索配置未加载，未作更改。",
+        "Other settings saved. Web search settings were not loaded and have been preserved.",
+      ));
     }
   } catch (error: unknown) {
     // 用户取消 step-up 验证：静默返回，不弹错误
@@ -10109,366 +9527,6 @@ async function savePanelRateLimitSettings() {
 
 // ==================== Provider Management ====================
 
-const allPaymentTypes = computed(() => [
-  { value: "easypay", label: t("payment.methods.easypay") },
-  { value: "alipay", label: t("payment.methods.alipay") },
-  { value: "wxpay", label: t("payment.methods.wxpay") },
-  { value: "stripe", label: t("payment.methods.stripe") },
-  { value: "airwallex", label: t("payment.methods.airwallex") },
-  { value: "epusdt", label: t("payment.methods.epusdt") },
-]);
-
-function isPaymentTypeEnabled(type: string): boolean {
-  return form.payment_enabled_types.includes(type);
-}
-
-const hasAnyPaymentTypeEnabled = computed(
-  () => form.payment_enabled_types.length > 0,
-);
-
-function togglePaymentType(type: string) {
-  if (form.payment_enabled_types.includes(type)) {
-    form.payment_enabled_types = form.payment_enabled_types.filter(
-      (t) => t !== type,
-    );
-    // Disable all provider instances matching this type
-    disableProvidersByType(type);
-  } else {
-    form.payment_enabled_types = [...form.payment_enabled_types, type];
-  }
-}
-
-async function disableProvidersByType(type: string) {
-  const matching = providers.value.filter(
-    (p) => p.provider_key === type && p.enabled,
-  );
-  for (const p of matching) {
-    try {
-      await adminAPI.payment.updateProvider(p.id, { enabled: false });
-      p.enabled = false;
-    } catch (err: unknown) {
-      slog("disable provider failed", p.id, err);
-    }
-  }
-}
-
-function slog(...args: unknown[]) {
-  console.warn("[payment]", ...args);
-}
-
-const providersLoading = ref(false);
-const providerSaving = ref(false);
-const providers = ref<ProviderInstance[]>([]);
-const showProviderDialog = ref(false);
-const showDeleteProviderDialog = ref(false);
-const editingProvider = ref<ProviderInstance | null>(null);
-const deletingProviderId = ref<number | null>(null);
-const providerDialogRef = ref<InstanceType<
-  typeof PaymentProviderDialog
-> | null>(null);
-
-const providerKeyOptions = computed(() => [
-  { value: "easypay", label: t("admin.settings.payment.providerEasypay") },
-  { value: "alipay", label: t("admin.settings.payment.providerAlipay") },
-  { value: "wxpay", label: t("admin.settings.payment.providerWxpay") },
-  { value: "stripe", label: t("admin.settings.payment.providerStripe") },
-  { value: "airwallex", label: t("admin.settings.payment.providerAirwallex") },
-  { value: "epusdt", label: t("admin.settings.payment.providerEpusdt") },
-]);
-
-const enabledProviderKeyOptions = computed(() => {
-  const enabled = form.payment_enabled_types;
-  return providerKeyOptions.value.filter((opt) => enabled.includes(opt.value));
-});
-
-const loadBalanceOptions = computed(() => [
-  {
-    value: "round-robin",
-    label: t("admin.settings.payment.strategyRoundRobin"),
-  },
-  {
-    value: "least-amount",
-    label: t("admin.settings.payment.strategyLeastAmount"),
-  },
-]);
-
-const cancelRateLimitUnitOptions = computed(() => [
-  {
-    value: "minute",
-    label: t("admin.settings.payment.cancelRateLimitUnitMinute"),
-  },
-  { value: "hour", label: t("admin.settings.payment.cancelRateLimitUnitHour") },
-  { value: "day", label: t("admin.settings.payment.cancelRateLimitUnitDay") },
-]);
-
-const cancelRateLimitModeOptions = computed(() => [
-  {
-    value: "rolling",
-    label: t("admin.settings.payment.cancelRateLimitWindowModeRolling"),
-  },
-  {
-    value: "fixed",
-    label: t("admin.settings.payment.cancelRateLimitWindowModeFixed"),
-  },
-]);
-
-type ProviderEnablementCandidate = Pick<
-  ProviderInstance,
-  "id" | "provider_key" | "supported_types" | "enabled" | "name"
->;
-
-function getProviderVisibleMethods(
-  provider: ProviderEnablementCandidate,
-): Array<"alipay" | "wxpay"> {
-  if (!provider.enabled) {
-    return [];
-  }
-
-  const supportedTypes = Array.isArray(provider.supported_types)
-    ? provider.supported_types
-    : [];
-  const methods = new Set<"alipay" | "wxpay">();
-  const addMethod = (type: string) => {
-    const method = normalizeVisibleMethod(type);
-    if (method === "alipay" || method === "wxpay") {
-      methods.add(method);
-    }
-  };
-
-  if (provider.provider_key === "alipay") {
-    if (supportedTypes.length === 0) {
-      methods.add("alipay");
-    } else {
-      supportedTypes.forEach((type) => {
-        if (normalizeVisibleMethod(type) === "alipay") {
-          methods.add("alipay");
-        }
-      });
-    }
-  } else if (provider.provider_key === "wxpay") {
-    if (supportedTypes.length === 0) {
-      methods.add("wxpay");
-    } else {
-      supportedTypes.forEach((type) => {
-        if (normalizeVisibleMethod(type) === "wxpay") {
-          methods.add("wxpay");
-        }
-      });
-    }
-  } else if (provider.provider_key === "easypay") {
-    supportedTypes.forEach(addMethod);
-  }
-
-  return Array.from(methods);
-}
-
-function findProviderEnablementConflict(
-  candidate: ProviderEnablementCandidate,
-): { method: "alipay" | "wxpay"; conflicting: ProviderInstance } | null {
-  const claimedMethods = getProviderVisibleMethods(candidate);
-  if (claimedMethods.length === 0) {
-    return null;
-  }
-
-  for (const other of providers.value) {
-    if (other.id === candidate.id || !other.enabled) {
-      continue;
-    }
-
-    const otherMethods = getProviderVisibleMethods(other);
-    const matchedMethod = claimedMethods.find((method) =>
-      otherMethods.includes(method),
-    );
-    if (matchedMethod) {
-      return {
-        method: matchedMethod,
-        conflicting: other,
-      };
-    }
-  }
-
-  return null;
-}
-
-function showProviderEnablementConflict(
-  conflict: { method: "alipay" | "wxpay"; conflicting: ProviderInstance },
-) {
-  appStore.showError(
-    t("admin.settings.payment.enableConflict", {
-      method: t(`payment.methods.${conflict.method}`),
-      provider: conflict.conflicting.name,
-    }),
-  );
-}
-
-async function loadProviders() {
-  providersLoading.value = true;
-  try {
-    const res = await adminAPI.payment.getProviders();
-    // Normalize supported_types: backend returns null when the list is empty
-    // (Go nil slice → JSON null). Without this, ProviderCard's isSelected()
-    // throws TypeError on null.includes(), causing the card to vanish.
-    providers.value = (res.data || []).map((p) => ({
-      ...p,
-      supported_types: Array.isArray(p.supported_types)
-        ? p.supported_types
-        : [],
-    }));
-  } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, "payment.errors", t("common.error")));
-  } finally {
-    providersLoading.value = false;
-  }
-}
-
-function openCreateProvider() {
-  editingProvider.value = null;
-  providerDialogRef.value?.reset(
-    enabledProviderKeyOptions.value[0]?.value || "easypay",
-  );
-  showProviderDialog.value = true;
-}
-
-function openEditProvider(provider: ProviderInstance) {
-  editingProvider.value = provider;
-  providerDialogRef.value?.loadProvider(provider);
-  showProviderDialog.value = true;
-}
-
-async function handleSaveProvider(payload: Partial<ProviderInstance>) {
-  providerSaving.value = true;
-  try {
-    const candidate: ProviderEnablementCandidate = {
-      id: editingProvider.value?.id ?? 0,
-      provider_key:
-        payload.provider_key ?? editingProvider.value?.provider_key ?? "",
-      supported_types:
-        payload.supported_types ?? editingProvider.value?.supported_types ?? [],
-      enabled: payload.enabled ?? editingProvider.value?.enabled ?? false,
-      name: payload.name ?? editingProvider.value?.name ?? "",
-    };
-    const conflict = findProviderEnablementConflict(candidate);
-    if (conflict) {
-      showProviderEnablementConflict(conflict);
-      return;
-    }
-
-    if (editingProvider.value) {
-      await adminAPI.payment.updateProvider(editingProvider.value.id, payload);
-    } else {
-      await adminAPI.payment.createProvider(payload);
-    }
-    showProviderDialog.value = false;
-    // Reload full list (API returns decrypted/formatted data with correct sort order)
-    await loadProviders();
-    // Auto-save settings so provider changes take effect immediately
-    await saveSettings();
-  } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, "payment.errors", t("common.error")));
-  } finally {
-    providerSaving.value = false;
-  }
-}
-
-async function handleToggleField(
-  provider: ProviderInstance,
-  field: "enabled" | "refund_enabled" | "allow_user_refund",
-) {
-  let newValue: boolean;
-  if (field === "enabled") newValue = !provider.enabled;
-  else if (field === "refund_enabled") newValue = !provider.refund_enabled;
-  else newValue = !provider.allow_user_refund;
-
-  if (field === "enabled" && newValue) {
-    const conflict = findProviderEnablementConflict({
-      id: provider.id,
-      provider_key: provider.provider_key,
-      supported_types: provider.supported_types,
-      enabled: true,
-      name: provider.name,
-    });
-    if (conflict) {
-      showProviderEnablementConflict(conflict);
-      return;
-    }
-  }
-
-  const payload: Record<string, boolean> = { [field]: newValue };
-  // Cascade: turning off refund_enabled also turns off allow_user_refund
-  if (field === "refund_enabled" && !newValue) {
-    payload.allow_user_refund = false;
-  }
-  try {
-    await adminAPI.payment.updateProvider(provider.id, payload);
-    await loadProviders();
-  } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, "payment.errors", t("common.error")));
-  }
-}
-
-async function handleToggleType(provider: ProviderInstance, type: string) {
-  const currentTypes = Array.isArray(provider.supported_types)
-    ? provider.supported_types
-    : [];
-  const updated = currentTypes.includes(type)
-    ? currentTypes.filter((t) => t !== type)
-    : [...currentTypes, type];
-  const conflict = findProviderEnablementConflict({
-    id: provider.id,
-    provider_key: provider.provider_key,
-    supported_types: updated,
-    enabled: provider.enabled,
-    name: provider.name,
-  });
-  if (conflict) {
-    showProviderEnablementConflict(conflict);
-    return;
-  }
-  try {
-    await adminAPI.payment.updateProvider(provider.id, {
-      supported_types: updated,
-    } as any);
-    await loadProviders();
-  } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, "payment.errors", t("common.error")));
-  }
-}
-
-function confirmDeleteProvider(provider: ProviderInstance) {
-  deletingProviderId.value = provider.id;
-  showDeleteProviderDialog.value = true;
-}
-
-async function handleReorderProviders(
-  updates: { id: number; sort_order: number }[],
-) {
-  try {
-    await Promise.all(
-      updates.map((u) =>
-        adminAPI.payment.updateProvider(u.id, {
-          sort_order: u.sort_order,
-        } as Partial<ProviderInstance>),
-      ),
-    );
-    await loadProviders();
-  } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, "payment.errors", t("common.error")));
-    loadProviders();
-  }
-}
-
-async function handleDeleteProvider() {
-  if (!deletingProviderId.value) return;
-  try {
-    await adminAPI.payment.deleteProvider(deletingProviderId.value);
-    appStore.showSuccess(t("common.deleted"));
-    showDeleteProviderDialog.value = false;
-    loadProviders();
-  } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, "payment.errors", t("common.error")));
-  }
-}
-
 onMounted(() => {
   loadSettings();
   loadSubscriptionGroups();
@@ -10481,7 +9539,6 @@ onMounted(() => {
   streamTimeoutCard.loadStreamTimeoutSettings();
   requestRectifierCard.loadRectifierSettings();
   betaPolicyCard.loadBetaPolicySettings();
-  loadProviders();
 });
 
 // bypass_registration 与身份同步三开关仅在 internal_only 模式下生效。切换 policy 到其它值时，

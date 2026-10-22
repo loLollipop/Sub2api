@@ -1,0 +1,72 @@
+/* Public account flows share the console's quiet surfaces and warm accent. */
+:is(.auth-shell, body:has(.auth-shell) > .modal-overlay) {
+  --auth-bg: #f8f9fb;
+  --auth-panel: #ffffffc9;
+  --auth-inset: #f3f4f680;
+  --auth-edge: #e5e7eb;
+  --auth-text: #1f2937;
+  --auth-muted: #6b7280;
+  --auth-accent: #c2410c;
+  --auth-warm: #edcdb96b;
+  --auth-cool: #bbd7e77a;
+  --auth-low: #d3e6df73;
+}
+.dark :is(.auth-shell, body:has(.auth-shell) > .modal-overlay) {
+  --auth-bg: #111318;
+  --auth-panel: #1b1e24e6;
+  --auth-inset: #24283080;
+  --auth-edge: #343943;
+  --auth-text: #f3f4f6;
+  --auth-muted: #a7aeb9;
+  --auth-accent: #fb923c;
+  --auth-warm: #73513b3d;
+  --auth-cool: #34567759;
+  --auth-low: #304f4b40;
+}
+.auth-shell { position: relative; isolation: isolate; min-height: 100dvh; padding: 116px 24px 32px; background: var(--auth-bg); color: var(--auth-text); font-size: 13px; line-height: 1.6; }
+.auth-shell::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 72vw 68vh at 0 0, var(--auth-warm), transparent 78%), radial-gradient(ellipse 70vw 80vh at 100% 8%, var(--auth-cool), transparent 76%), radial-gradient(ellipse 70vw 60vh at 36% 100%, var(--auth-low), transparent 80%); }
+.auth-content { width: 100%; max-width: 440px; min-width: 0; margin-inline: auto; }
+.auth-brand-block { position: absolute; top: 28px; left: 32px; right: 32px; }
+.auth-brand { display: inline-flex; align-items: center; max-width: 100%; gap: 10px; border-radius: 8px; color: var(--auth-text); }
+.auth-logo { display: block; flex-shrink: 0; width: 34px; height: 34px; overflow: hidden; border: 1px solid var(--auth-edge); border-radius: 50%; }
+.auth-brand h1 { min-width: 0; font-size: 18px; line-height: 26px; font-weight: 600; overflow-wrap: anywhere; }
+.auth-card { padding: 0; }
+.auth-card h2 { font-size: 24px; line-height: 32px; font-weight: 600; text-align: left; }
+.auth-card > div > .text-center { text-align: left; }
+.auth-card h2 + p { font-size: 13px; line-height: 21px; overflow-wrap: anywhere; }
+.auth-card .input-label { font-size: 12px; }
+.auth-card .input { min-height: 42px; border-radius: 9px; border-color: var(--auth-edge); background: var(--auth-panel); box-shadow: none; }
+.auth-card .input:not([autocomplete='one-time-code']) { font-size: 13px; }
+.auth-card .input:focus { border-color: var(--auth-accent); }
+.auth-card .input-error { border-color: #dc2626; }
+.auth-card .btn { min-height: 40px; border-radius: 8px; font-size: 13px; }
+.auth-card .btn-primary { background: var(--auth-accent); color: white; box-shadow: none; }
+.auth-card .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--auth-accent) 88%, #000); transform: none; }
+.dark .auth-card .btn-primary { color: #25160c; }
+.auth-card .password-toggle { justify-content: center; width: 42px; padding: 0; border-radius: 7px; }
+.auth-password-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.auth-password-label .input-label { margin: 0; }
+.auth-inline-link { border-radius: 3px; color: var(--auth-text); font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 4px; }
+.auth-inline-link:hover { color: var(--auth-accent); }
+.auth-social { padding-top: 8px; padding-bottom: 2px; }
+.auth-social .btn-secondary { min-height: 46px; border: 1px solid var(--auth-edge); background: color-mix(in srgb, var(--auth-panel) 50%, transparent); color: var(--auth-text); }
+.auth-social .btn-secondary:hover:not(:disabled) { background: var(--auth-inset); }
+.auth-brand:focus-visible, .auth-card .password-toggle:focus-visible { outline: 2px solid var(--auth-accent); outline-offset: 3px; }
+.auth-footer { margin-top: 18px; text-align: center; font-size: 13px; }
+.auth-legal { margin-top: 22px; color: var(--auth-muted); }
+.auth-copyright { margin-top: 20px; color: var(--auth-muted); text-align: center; font-size: 11px; overflow-wrap: anywhere; }
+
+/* Auth dialogs also use the shared focus, scroll and keyboard layer. */
+body:has(.auth-shell) > .modal-overlay .modal-content { border: 1px solid var(--auth-edge); border-radius: 14px; background: var(--auth-bg); backdrop-filter: none; box-shadow: 0 16px 56px #00000026; }
+body:has(.auth-shell) > .modal-overlay :is(.modal-header, .modal-footer) { padding: 16px 20px; }
+body:has(.auth-shell) > .modal-overlay :is(.modal-header::after, .modal-footer::before) { display: none; }
+body:has(.auth-shell) > .modal-overlay .modal-title { font-size: 15px; line-height: 24px; }
+body:has(.auth-shell) > .modal-overlay .modal-body { padding: 16px 20px; }
+body:has(.auth-shell) > .modal-overlay .modal-footer { border-top: 1px solid var(--auth-edge); background: var(--auth-inset); }
+
+@media (max-width: 479px) {
+  .auth-shell { padding: 100px 24px 24px; }
+  .auth-brand-block { top: 24px; left: 24px; right: 24px; }
+  .auth-card .input:not([autocomplete='one-time-code']) { font-size: 16px; } /* Avoid input-focus zoom on mobile Safari. */
+  .auth-card .btn { min-height: 44px; }
+}

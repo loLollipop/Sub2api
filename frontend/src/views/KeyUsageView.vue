@@ -4,7 +4,7 @@
     <header class="relative z-20 px-6 py-4">
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
         <router-link to="/home" class="flex items-center gap-3">
-          <div class="h-10 w-10 overflow-hidden rounded-xl shadow-md">
+          <div class="h-10 w-10 overflow-hidden rounded-full shadow-md">
             <img :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
           </div>
           <span class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">{{ siteName }}</span>
@@ -403,6 +403,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useMutationObserver } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
@@ -424,6 +425,9 @@ const githubUrl = 'https://github.com/loLollipop/Sub2api'
 // ==================== Theme (same as HomeView) ====================
 
 const isDark = ref(document.documentElement.classList.contains('dark'))
+useMutationObserver(document.documentElement, () => {
+  isDark.value = document.documentElement.classList.contains('dark')
+}, { attributes: true, attributeFilter: ['class'] })
 
 function toggleTheme() {
   isDark.value = !isDark.value
@@ -893,7 +897,7 @@ async function queryKey() {
 
 function initTheme() {
   const savedTheme = localStorage.getItem('theme')
-  if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  if (savedTheme === 'dark' || ((!savedTheme || savedTheme === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true
     document.documentElement.classList.add('dark')
   }

@@ -2076,7 +2076,7 @@
 
       <!-- 配额控制 (非 Anthropic apikey/bedrock) -->
       <div
-        v-else-if="form.type === 'apikey' || form.type === 'cloudflare' || form.type === 'bedrock'"
+        v-else-if="supportsAccountQuota(form.type) || form.type === 'cloudflare'"
         class="border-t border-gray-200 pt-4 dark:border-dark-600 space-y-4"
       >
         <div class="mb-3">
@@ -2961,10 +2961,10 @@
         <input v-model="expiresAtInput" type="datetime-local" class="input" />
         <div class="mt-2 flex gap-2">
           <button type="button" class="btn btn-secondary btn-sm" @click="form.expires_at = getAccountExpiryTimestamp(1)">
-            {{ t('payment.oneMonth') }}
+            {{ t('common.oneMonth') }}
           </button>
           <button type="button" class="btn btn-secondary btn-sm" @click="form.expires_at = getAccountExpiryTimestamp(12)">
-            {{ t('payment.oneYear') }}
+            {{ t('common.oneYear') }}
           </button>
         </div>
         <p class="input-hint">
@@ -3881,6 +3881,7 @@ import {
   parseDateTimeLocalInput
 } from '@/utils/format'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
+import { supportsAccountQuota } from '@/utils/accountQuota'
 import { getAccountExpiryTimestamp } from '@/components/account/accountExpiry'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
 import {
@@ -5567,7 +5568,7 @@ const applyVertexServiceAccountJson = (value: string) => {
 const parseVertexServiceAccountJson = () => applyVertexServiceAccountJson(vertexServiceAccountJson.value)
 
 const applyAPIKeyQuotaExtra = (extra: Record<string, unknown> | undefined, type: AccountType) => {
-  if (type !== 'apikey' && type !== 'cloudflare' && type !== 'bedrock') {
+  if (!supportsAccountQuota(type) && type !== 'cloudflare') {
     return extra
   }
   const quotaExtra: Record<string, unknown> = { ...(extra || {}) }

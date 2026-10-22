@@ -38,7 +38,7 @@ func TestGatewayStabilityAnthropicErrorIsTerminal(t *testing.T) {
 		kind string
 		want int
 	}{
-		{"overloaded_error", 529}, {"rate_limit_error", 429}, {"api_error", 502},
+		{"overloaded_error", 529}, {"rate_limit_error", 429}, {"api_error", 500},
 	} {
 		for _, raw := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/raw=%t", test.kind, raw), func(t *testing.T) {

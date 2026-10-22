@@ -1,5 +1,5 @@
 <template>
-  <div :class="props.embedded ? 'space-y-4' : 'card'">
+  <div :class="[props.embedded ? 'space-y-4' : 'card', { 'profile-avatar-editor': props.inDialog }]" :aria-busy="avatarSaving || avatarPreparing">
     <div
       v-if="!props.embedded"
       class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
@@ -14,6 +14,7 @@
 
     <div :class="props.embedded ? 'space-y-3' : 'flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-start'">
       <div
+        class="profile-avatar-preview"
         :class="props.embedded
           ? 'flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-xl font-bold text-white shadow-lg shadow-primary-500/20'
           : 'flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-3xl font-bold text-white shadow-lg shadow-primary-500/20'"
@@ -30,10 +31,10 @@
 
       <div :class="props.embedded ? 'space-y-3' : 'min-w-0 flex-1 space-y-4'">
         <div class="space-y-1">
-          <p v-if="props.embedded" class="text-sm font-semibold text-gray-900 dark:text-white">
+          <p v-if="props.embedded && !props.inDialog" class="text-sm font-semibold text-gray-900 dark:text-white">
             {{ t('profile.avatar.title') }}
           </p>
-          <p v-else class="text-sm font-medium text-gray-900 dark:text-white">
+          <p v-else-if="!props.inDialog" class="text-sm font-medium text-gray-900 dark:text-white">
             {{ displayName }}
           </p>
           <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -47,30 +48,37 @@
               data-testid="profile-avatar-file-input"
               type="file"
               accept="image/*"
-              class="hidden"
+              class="sr-only"
+              :disabled="avatarSaving || avatarPreparing"
+              :aria-label="t('profile.avatar.uploadAction')"
               @change="handleAvatarFileChange"
             >
-            {{ t('profile.avatar.uploadAction') }}
+            {{ avatarPreparing ? t('common.processing') : t('profile.avatar.uploadAction') }}
           </label>
 
           <button
             data-testid="profile-avatar-save"
             type="button"
             class="btn btn-primary btn-sm"
-            :disabled="avatarSaving || !avatarDraft"
+            :disabled="avatarSaving || avatarPreparing || !avatarDraft"
             @click="handleAvatarSave"
           >
-            {{ t('common.save') }}
+            {{ avatarSaving ? t('common.saving') : t('common.save') }}
           </button>
 
           <button
             data-testid="profile-avatar-delete"
             type="button"
             class="btn btn-secondary btn-sm"
-            :disabled="avatarSaving"
+            :disabled="avatarSaving || avatarPreparing || (!avatarDraft && !props.user?.avatar_url)"
             @click="handleAvatarDelete"
           >
             {{ t('common.delete') }}
+          </button>
+        </div>
+        <div v-if="props.inDialog" class="flex justify-end pt-2">
+          <button data-testid="profile-avatar-close" type="button" class="btn btn-secondary btn-sm" :disabled="avatarSaving || avatarPreparing" @click="emit('cancel')">
+            {{ t('common.close') }}
           </button>
         </div>
       </div>
@@ -90,9 +98,12 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 const props = withDefaults(defineProps<{
   user: User | null
   embedded?: boolean
+  inDialog?: boolean
 }>(), {
   embedded: false,
+  inDialog: false,
 })
+const emit = defineEmits<{ busy: [value: boolean]; saved: []; cancel: [] }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -103,6 +114,8 @@ const avatarScaleSteps = [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36]
 const avatarQualitySteps = [0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36]
 const avatarDraft = ref('')
 const avatarSaving = ref(false)
+const avatarPreparing = ref(false)
+watch(() => avatarSaving.value || avatarPreparing.value, (value) => emit('busy', value), { flush: 'sync' })
 
 const displayName = computed(() => props.user?.username?.trim() || props.user?.email?.trim() || t('profile.user'))
 const avatarInitial = computed(() => displayName.value.charAt(0).toUpperCase() || 'U')
@@ -205,6 +218,7 @@ async function prepareAvatarUpload(file: File): Promise<File> {
 }
 
 async function handleAvatarFileChange(event: Event) {
+  if (avatarSaving.value || avatarPreparing.value) return
   const input = event.target as HTMLInputElement | null
   const file = input?.files?.[0]
   if (input) {
@@ -214,6 +228,7 @@ async function handleAvatarFileChange(event: Event) {
     return
   }
 
+  avatarPreparing.value = true
   try {
     const preparedFile = await prepareAvatarUpload(file)
     const dataURL = await readFileAsDataURL(preparedFile)
@@ -224,10 +239,13 @@ async function handleAvatarFileChange(event: Event) {
     avatarDraft.value = normalized
   } catch (error: unknown) {
     appStore.showError(extractApiErrorMessage(error, t('common.error')))
+  } finally {
+    avatarPreparing.value = false
   }
 }
 
 async function handleAvatarSave() {
+  if (avatarSaving.value || avatarPreparing.value) return
   const normalized = normalizeUploadedAvatar(avatarDraft.value)
   if (!normalized) {
     return
@@ -239,6 +257,7 @@ async function handleAvatarSave() {
     authStore.user = updated
     avatarDraft.value = updated.avatar_url?.trim() || ''
     appStore.showSuccess(t('profile.avatar.saveSuccess'))
+    emit('saved')
   } catch (error: unknown) {
     appStore.showError(extractApiErrorMessage(error, t('common.error')))
   } finally {
@@ -247,7 +266,7 @@ async function handleAvatarSave() {
 }
 
 async function handleAvatarDelete() {
-  if (avatarSaving.value) {
+  if (avatarSaving.value || avatarPreparing.value) {
     return
   }
   if (!avatarDraft.value.trim() && !props.user?.avatar_url?.trim()) {
@@ -261,6 +280,7 @@ async function handleAvatarDelete() {
     authStore.user = updated
     avatarDraft.value = ''
     appStore.showSuccess(t('profile.avatar.deleteSuccess'))
+    emit('saved')
   } catch (error: unknown) {
     appStore.showError(extractApiErrorMessage(error, t('common.error')))
   } finally {

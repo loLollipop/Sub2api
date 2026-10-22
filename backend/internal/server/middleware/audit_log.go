@@ -147,9 +147,6 @@ var auditActionOverrides = map[string]string{
 // auditBodyOmittedRoutes 请求体几乎整体由凭证构成的路由（如整块粘贴 auth JSON 的导入接口）。
 // 这类 body 的凭证内嵌在普通字符串值里，键级脱敏无法覆盖，整体不入库。
 var auditBodyOmittedRoutes = map[string]struct{}{
-	"POST /api/v1/tickets":                                      {},
-	"POST /api/v1/tickets/:id/replies":                          {},
-	"POST /api/v1/admin/tickets/:id/replies":                    {},
 	"POST /api/v1/auth/passkey/login/finish":                    {},
 	"POST /api/v1/user/passkeys/register/finish":                {},
 	"POST /api/v1/admin/accounts/import/codex-session":          {},
@@ -164,7 +161,7 @@ var auditBodyOmittedRoutes = map[string]struct{}{
 
 // NewAuditLogMiddleware 创建审计中间件。
 // 记录范围：变更类请求（POST/PUT/PATCH/DELETE）+ 白名单内的敏感 GET 读取。
-// 挂载位置：admin / user / admin-payment 组挂在各自认证中间件之后（只审计已认证请求，
+// 挂载位置：admin / user 组挂在各自认证中间件之后（只审计已认证请求，
 // 未过认证的 401/403 不入库）；auth 组（登录/注册/刷新）无前置认证，天然记录失败尝试。
 func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddleware {
 	return AuditLogMiddleware(func(c *gin.Context) {

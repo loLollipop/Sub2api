@@ -72,13 +72,8 @@ describe('User UI request marker', () => {
     '/subscriptions/active',
     '/channel-monitors',
     '/channel-monitors/9/status',
-    '/payment/config',
-    '/payment/plans',
-    '/payment/orders',
-    '/payment/orders/my',
     '/api/v1/auth/me',
     '/api/v1/keys?page=1',
-    'https://api.example.test/api/v1/payment/orders/1',
   ])('marks user timing API %s', (requestURL) => {
     expect(shouldMarkUserUIRequest(requestURL)).toBe(true)
     expect(isUserTimingAPIPath(requestURL)).toBe(true)
@@ -90,6 +85,8 @@ describe('User UI request marker', () => {
     '/admin/users',
     '/groups',
     '/channels',
+    '/payment/config',
+    '/payment/orders',
     '/payment/public/orders/verify',
     '/payment/webhook/stripe',
     '/api/v1/payment/public/orders/resolve',

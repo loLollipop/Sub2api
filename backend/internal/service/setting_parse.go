@@ -252,10 +252,6 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyOpenAICodexClientVersion:                           "",
 		SettingKeyOpenAICodexClientVersionSynced:                     "",
 		SettingKeyOpenAICodexVersionAutoSyncEnabled:                  "true",
-		SettingPaymentVisibleMethodAlipaySource:                      "",
-		SettingPaymentVisibleMethodWxpaySource:                       "",
-		SettingPaymentVisibleMethodAlipayEnabled:                     "false",
-		SettingPaymentVisibleMethodWxpayEnabled:                      "false",
 		openAIAdvancedSchedulerSettingKey:                            "false",
 		SettingKeyOpenAIAdvancedSchedulerStickyWeightedEnabled:       "false",
 		SettingKeyOpenAIAdvancedSchedulerSubscriptionPriorityEnabled: "false",
@@ -930,10 +926,6 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 			result.WebSearchEmulationEnabled = wsCfg.Enabled && len(wsCfg.Providers) > 0
 		}
 	}
-	result.PaymentVisibleMethodAlipaySource = NormalizeVisibleMethodSource("alipay", settings[SettingPaymentVisibleMethodAlipaySource])
-	result.PaymentVisibleMethodWxpaySource = NormalizeVisibleMethodSource("wxpay", settings[SettingPaymentVisibleMethodWxpaySource])
-	result.PaymentVisibleMethodAlipayEnabled = settings[SettingPaymentVisibleMethodAlipayEnabled] == "true"
-	result.PaymentVisibleMethodWxpayEnabled = settings[SettingPaymentVisibleMethodWxpayEnabled] == "true"
 	result.OpenAILowUpstreamRatePriorityEnabled = settings[SettingKeyOpenAILowUpstreamRatePriorityEnabled] == "true"
 	result.OpenAIOAuthSchedulingRateMultiplier = parseOpenAIOAuthSchedulingRateMultiplier(settings[SettingKeyOpenAIOAuthSchedulingRateMultiplier])
 	if value, ok := settings[SettingKeyCodexQuotaOverdraftEnabled]; ok && strings.TrimSpace(value) != "" {
@@ -1071,23 +1063,6 @@ func isTrueSettingValue(value string) bool {
 	default:
 		return false
 	}
-}
-
-func normalizeVisibleMethodSettingSource(method, source string, enabled bool) (string, error) {
-	_ = enabled
-	source = strings.TrimSpace(source)
-	if source == "" {
-		return "", nil
-	}
-
-	normalized := NormalizeVisibleMethodSource(method, source)
-	if normalized == "" {
-		return "", infraerrors.BadRequest(
-			"INVALID_PAYMENT_VISIBLE_METHOD_SOURCE",
-			fmt.Sprintf("%s source must be one of the supported payment providers", method),
-		)
-	}
-	return normalized, nil
 }
 
 func (s *SettingService) openAIAdvancedSchedulerEffectiveLBTopK() string {

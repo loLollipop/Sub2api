@@ -167,14 +167,14 @@
   letter-spacing: 0;
 }
 
-.console-signal :is(.signal-heading h1, .signal-workspace-heading h1, .signal-account-heading h1, .signal-channel-heading h1, .signal-payment-heading h1) {
+.console-signal :is(.signal-heading h1, .signal-workspace-heading h1, .signal-account-heading h1, .signal-channel-heading h1) {
   font-family: var(--signal-display-font);
   font-size: 26px;
   line-height: 34px;
   font-weight: 600;
 }
 
-.console-signal :is(.signal-mark, .signal-channel-mark, .signal-payment-heading__icon, .admin-overview-mark) {
+.console-signal :is(.signal-mark, .signal-channel-mark, .admin-overview-mark) {
   border-radius: 8px;
   background: var(--signal-accent-soft);
   box-shadow: none;
@@ -290,38 +290,6 @@ body:has(.console-signal) > .select-dropdown-portal {
   .console-signal .signal-dashboard .signal-actions-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .console-signal .signal-dashboard .signal-telemetry { justify-content: flex-start; }
   .console-signal .signal-dashboard .signal-lead-grid--simple > .signal-metric { grid-column: 1 / -1; }
-}
-
-.console-signal .signal-payment :is(.payment-method-selector__option, .payment-amount-input__option):not([aria-pressed='true']) {
-  background: var(--signal-surface);
-  border-color: var(--signal-line);
-  box-shadow: none;
-}
-
-.console-signal .signal-payment :is(.payment-method-selector__option, .payment-amount-input__option)[aria-pressed='true'] {
-  color: var(--signal-text);
-  border-color: var(--signal-accent);
-  background: var(--signal-accent-soft);
-  box-shadow: inset 0 1px 0 var(--signal-highlight), inset 0 -2px var(--signal-accent);
-}
-
-.console-signal .signal-payment :is(.payment-method-selector__option, .payment-amount-input__option):hover:not(:disabled):not([aria-pressed='true']) {
-  border-color: var(--signal-control-line);
-}
-
-.console-signal .signal-checkout-summary {
-  box-shadow: inset 0 1px 0 var(--signal-highlight), var(--signal-shadow);
-}
-
-.console-signal .signal-checkout-summary__header {
-  background: var(--signal-raised);
-}
-
-.console-signal .signal-payment [data-testid='payment-method-label'] {
-  overflow: visible;
-  white-space: normal;
-  font-size: 13px;
-  line-height: 18px;
 }
 
 .console-signal .signal-profile :is(.rounded-3xl, .rounded-2xl) {
@@ -531,8 +499,7 @@ body:has(.console-signal) > .select-dropdown-portal {
   color: var(--signal-muted);
 }
 
-.console-signal .custom-page-layout > .card,
-.console-signal .canvas-page-layout > .card {
+.console-signal .custom-page-layout > .card {
   border: 1px solid var(--signal-line);
   border-radius: 8px;
   background: var(--signal-surface);

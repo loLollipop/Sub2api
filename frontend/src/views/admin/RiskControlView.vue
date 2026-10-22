@@ -591,7 +591,8 @@
                           <img :src="image" alt="" class="h-full w-full object-cover" />
                           <button
                             type="button"
-                            class="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                            class="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+                            :aria-label="t('common.delete')"
                             @click="removeModerationTestImage(index)"
                           >
                             <Icon name="x" size="xs" :stroke-width="2" />

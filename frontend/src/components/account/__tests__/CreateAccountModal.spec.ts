@@ -236,6 +236,28 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     wrapper.unmount()
   })
 
+  it('saves configured Vertex quota limits during account creation', async () => {
+    createAccountMock.mockReset().mockResolvedValue({ id: 74, platform: 'gemini', type: 'service_account' })
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'Gemini')
+    await selectButtonByText(wrapper, 'admin.accounts.vertexLabel')
+    await wrapper.get('[data-testid="vertex-auth-mode-apikey"]').setValue(true)
+    await flushPromises()
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Vertex quota')
+    await wrapper.get('[data-testid="vertex-api-key-input"]').setValue('test-vertex-quota-key')
+    const quota = wrapper.getComponent({ name: 'QuotaLimitCard' })
+    quota.vm.$emit('update:totalLimit', 200)
+    quota.vm.$emit('update:dailyLimit', 20)
+    quota.vm.$emit('update:weeklyLimit', 80)
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      type: 'service_account', extra: { quota_limit: 200, quota_daily_limit: 20, quota_weekly_limit: 80 }
+    })
+    wrapper.unmount()
+  })
+
   it('keeps Vertex API key credentials isolated when changing authentication mode or platform', async () => {
     const wrapper = mountModal()
     await selectButtonByText(wrapper, 'Gemini')
@@ -344,8 +366,8 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     const input = wrapper.get<HTMLInputElement>('input[type="datetime-local"]')
 
     for (const [label, expected] of [
-      ['payment.oneMonth', '2026-02-28T12:34'],
-      ['payment.oneYear', '2027-01-31T12:34'],
+      ['common.oneMonth', '2026-02-28T12:34'],
+      ['common.oneYear', '2027-01-31T12:34'],
     ]) {
       const button = wrapper.findAll('button').find((candidate) => candidate.text() === label)!
       expect(button.attributes('type')).toBe('button')
@@ -366,7 +388,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     await selectButtonByText(wrapper, 'API Key')
     await wrapper.get('form#create-account-form input[type="text"]').setValue('custom expiry account')
     await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
-    await selectButtonByText(wrapper, 'payment.oneMonth')
+    await selectButtonByText(wrapper, 'common.oneMonth')
     await wrapper.get('input[type="datetime-local"]').setValue('2030-04-15T09:20')
 
     await wrapper.get('form#create-account-form').trigger('submit.prevent')

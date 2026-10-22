@@ -150,12 +150,12 @@ func TestPublicRedeemCounterWriteFailurePreservesDomainError(t *testing.T) {
 
 func TestSuccessfulPublicRedeemDoesNotMutateFailureCounter(t *testing.T) {
 	ctx := context.Background()
-	client := newPaymentConfigServiceTestClient(t)
+	client := newRedeemFixtureClient(t)
 	userID := int64(42)
 	code := &RedeemCode{
 		ID: 101, Code: "PUBLIC-SUCCESS", Type: RedeemTypeBalance, Value: 10, Status: StatusUnused,
 	}
-	redeemRepo := &paymentOrderLifecycleRedeemRepo{
+	redeemRepo := &redeemFixtureCodeRepo{
 		codesByCode: map[string]*RedeemCode{code.Code: code},
 	}
 	userRepo := &mockUserRepo{getByIDUser: &User{ID: userID}}

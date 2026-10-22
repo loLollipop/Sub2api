@@ -952,6 +952,20 @@ func (s *BillingService) initFallbackPricing() {
 		LongContextOutputMultiplier:   2,
 	}
 
+	// xAI Grok 4.7 Fast (Cursor and Grok Build only): the same model on faster
+	// infrastructure at $4 input / $1 cached input / $12 output below 200k;
+	// long-context rates are $6 / $1.50 / $18 (1.5x of the Fast base card).
+	s.fallbackPrices["grok-4.7-fast"] = &ModelPricing{
+		InputPricePerToken:            4e-6,
+		OutputPricePerToken:           12e-6,
+		CacheReadPricePerToken:        1e-6,
+		SupportsCacheBreakdown:        false,
+		LongContextInputThreshold:     200000,
+		LongContextThresholdInclusive: true,
+		LongContextInputMultiplier:    1.5,
+		LongContextOutputMultiplier:   1.5,
+	}
+
 	// xAI Grok 4.3: $1.25 input / $0.20 cached / $2.50 output below 200k;
 	// long-context rates are $2.50 / $0.40 / $5.
 	s.fallbackPrices["grok-4.3"] = &ModelPricing{
@@ -1249,9 +1263,11 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 		}
 	}
 
-	switch modelLower {
+	switch strings.ToLower(xai.StripGrokProviderPrefix(modelLower)) {
 	case "grok", "grok-latest", "grok-4.6", "grok-4.6-latest":
 		return s.fallbackPrices["grok-4.6"]
+	case "grok-4.7-fast", "grok-4.7-build-fast":
+		return s.fallbackPrices["grok-4.7-fast"]
 	case "grok-4.5", "grok-4.5-latest":
 		return s.fallbackPrices["grok-4.5"]
 	case "grok-3-mini":

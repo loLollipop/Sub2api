@@ -10,7 +10,7 @@
     </div>
     <div :class="props.embedded ? '' : 'px-6 py-6'">
       <form @submit.prevent="handleUpdateProfile" class="space-y-4">
-        <div v-if="props.embedded">
+        <div v-if="props.embedded && !props.inDialog">
           <p class="text-sm font-semibold text-gray-900 dark:text-white">
             {{ t('profile.editProfile') }}
           </p>
@@ -28,7 +28,10 @@
           />
         </div>
 
-        <div class="flex justify-end pt-4">
+        <div class="flex justify-end gap-2 pt-4">
+          <button v-if="props.inDialog" type="button" class="btn btn-secondary" :disabled="loading" @click="emit('cancel')">
+            {{ t('common.cancel') }}
+          </button>
           <button type="submit" :disabled="loading" class="btn btn-primary">
             {{ loading ? t('profile.updating') : t('profile.updateProfile') }}
           </button>
@@ -49,9 +52,12 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 const props = withDefaults(defineProps<{
   initialUsername: string
   embedded?: boolean
+  inDialog?: boolean
 }>(), {
   embedded: false,
+  inDialog: false,
 })
+const emit = defineEmits<{ busy: [value: boolean]; saved: []; cancel: [] }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -60,6 +66,7 @@ const appStore = useAppStore()
 const username = ref(props.initialUsername)
 let savedUsername = props.initialUsername
 const loading = ref(false)
+watch(loading, (value) => emit('busy', value), { flush: 'sync' })
 
 watch(() => props.initialUsername, (val) => {
   if (username.value === savedUsername) username.value = val
@@ -67,6 +74,7 @@ watch(() => props.initialUsername, (val) => {
 })
 
 const handleUpdateProfile = async () => {
+  if (loading.value) return
   if (!username.value.trim()) {
     appStore.showError(t('profile.usernameRequired'))
     return
@@ -78,10 +86,12 @@ const handleUpdateProfile = async () => {
     const updatedUser = await userAPI.updateProfile({
       username: submittedUsername
     })
-    if (username.value === submittedUsername) username.value = updatedUser.username
+    const hasNewDraft = username.value !== submittedUsername
+    if (!hasNewDraft) username.value = updatedUser.username
     savedUsername = updatedUser.username
     authStore.user = updatedUser
     appStore.showSuccess(t('profile.updateSuccess'))
+    if (!hasNewDraft) emit('saved')
   } catch (error: unknown) {
     appStore.showError(extractApiErrorMessage(error, t('profile.updateFailed')))
   } finally {

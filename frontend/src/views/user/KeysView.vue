@@ -8,7 +8,7 @@
               v-model="filterSearch"
               :placeholder="t('keys.searchPlaceholder')"
               class="w-full sm:w-64"
-              @search="onFilterChange"
+              @search="onSearchChange"
             />
             <Select
               :model-value="filterGroupId"
@@ -22,6 +22,9 @@
               :options="statusFilterOptions"
               @update:model-value="onStatusFilterChange"
             />
+            <button v-if="hasActiveFilters" type="button" class="btn btn-secondary" data-testid="keys-clear-filters" @click="clearFilters">
+              {{ t('keys.clearFilters') }}
+            </button>
           </div>
           <EndpointPopover
             class="signal-key-endpoints"
@@ -425,10 +428,11 @@
 
           <template #empty>
             <EmptyState
-              :title="t('keys.noKeysYet')"
-              :description="t('keys.createFirstKey')"
-              :action-text="t('keys.createKey')"
-              @action="showCreateModal = true"
+              :title="t(hasActiveFilters ? 'keys.noMatchingKeys' : 'keys.noKeysYet')"
+              :description="t(hasActiveFilters ? 'keys.noMatchingKeysHint' : 'keys.createFirstKey')"
+              :action-text="t(hasActiveFilters ? 'keys.clearFilters' : 'keys.createKey')"
+              :action-icon="!hasActiveFilters"
+              @action="hasActiveFilters ? clearFilters() : (showCreateModal = true)"
             />
           </template>
         </DataTable>
@@ -943,6 +947,7 @@
             <button
               type="button"
               @click="formData.enable_expiration = !formData.enable_expiration"
+              data-testid="key-expiration-toggle"
               :class="[
                 'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
                 formData.enable_expiration ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
@@ -1240,7 +1245,7 @@ import '@/styles/console-workspace.css'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI, endpointsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -1421,6 +1426,8 @@ const sortState = ref({
 const filterSearch = ref('')
 const filterStatus = ref('')
 const filterGroupId = ref<string | number>('')
+const hasActiveFilters = computed(() => filterSearch.value !== '' || filterStatus.value !== '' || filterGroupId.value !== '')
+let lastAppliedFilterSearch = ''
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -1556,7 +1563,22 @@ const statusFilterOptions = computed(() => [
 
 const onFilterChange = () => {
   pagination.value.page = 1
+  lastAppliedFilterSearch = filterSearch.value
   loadApiKeys()
+}
+
+// SearchInput can still emit a queued debounced value after filters are cleared.
+// Ignore stale text and searches already included by a group/status/reset request.
+const onSearchChange = (value = filterSearch.value) => {
+  if (value !== filterSearch.value || value === lastAppliedFilterSearch) return
+  onFilterChange()
+}
+
+const clearFilters = () => {
+  filterSearch.value = ''
+  filterStatus.value = ''
+  filterGroupId.value = ''
+  onFilterChange()
 }
 
 const onGroupFilterChange = (value: string | number | boolean | null) => {
@@ -1956,19 +1978,14 @@ const handleSubmit = async () => {
   const quota = formData.value.quota && formData.value.quota > 0 ? formData.value.quota : 0
 
   // Calculate expiration
-  let expiresInDays: number | undefined
   let expiresAt: string | null | undefined
-  if (formData.value.enable_expiration && formData.value.expiration_date) {
-    if (!showEditModal.value) {
-      // Create mode: calculate days from date
-      const expDate = new Date(formData.value.expiration_date)
-      const now = new Date()
-      const diffDays = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      expiresInDays = diffDays > 0 ? diffDays : 1
-    } else {
-      // Edit mode: use custom date directly
-      expiresAt = new Date(formData.value.expiration_date).toISOString()
+  if (formData.value.enable_expiration && (formData.value.expiration_date || !showEditModal.value)) {
+    const expiry = new Date(formData.value.expiration_date)
+    if (!Number.isFinite(expiry.getTime()) || (!showEditModal.value && expiry.getTime() <= Date.now())) {
+      appStore.showError(locale.value.startsWith('zh') ? '请选择有效的未来到期时间。' : 'Choose a valid future expiration time.')
+      return
     }
+    expiresAt = expiry.toISOString()
   } else if (showEditModal.value) {
     // Edit mode: if expiration disabled or date cleared, send empty string to clear
     expiresAt = ''
@@ -2011,10 +2028,12 @@ const handleSubmit = async () => {
         ipWhitelist,
         ipBlacklist,
         quota,
-        expiresInDays,
+        undefined,
         rateLimitData,
         formData.value.smart_routing ? formData.value.group_ids : undefined,
-        formData.value.anthropic_cache_ttl_mode
+        formData.value.anthropic_cache_ttl_mode,
+        undefined,
+        expiresAt || undefined
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded

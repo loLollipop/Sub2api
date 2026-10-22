@@ -30,6 +30,7 @@
                   v-model="searchQuery"
                   type="text"
                   :placeholder="t('availableChannels.searchPlaceholder')"
+                  :aria-label="t('availableChannels.searchPlaceholder')"
                   class="input pl-10"
                 />
               </div>
@@ -58,8 +59,12 @@
             pricing-key-prefix="availableChannels.pricing"
             :no-pricing-label="t('availableChannels.noPricing')"
             :no-models-label="t('availableChannels.noModels')"
-            :empty-label="t('availableChannels.empty')"
-          />
+            :empty-label="t(searchQuery.trim() ? 'availableChannels.emptyFiltered' : 'availableChannels.empty')"
+          >
+            <template v-if="searchQuery.trim()" #empty-action>
+              <button type="button" class="btn btn-secondary btn-sm mt-3" @click="searchQuery = ''">{{ t('availableChannels.clearSearch') }}</button>
+            </template>
+          </AvailableChannelsTable>
         </template>
       </TablePageLayout>
     </div>

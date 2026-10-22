@@ -13,6 +13,24 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 describe('Ops per-request output TPS', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('opens health diagnosis with an accessible button instead of requiring hover', async () => {
+    const wrapper = shallowMount(OpsDashboardHeader, {
+      props: {
+        overview: { tps: { current: 0, peak: 0, avg: 0 } } as OpsDashboardOverview,
+        platform: '', groupId: null, timeRange: '1h', queryMode: 'auto', loading: false, lastUpdated: null,
+      },
+    })
+    const trigger = wrapper.get('[aria-label="admin.ops.diagnosis.title"]')
+    expect(trigger.element.tagName).toBe('BUTTON')
+    await trigger.trigger('click')
+    const dialog = wrapper.findAllComponents({ name: 'BaseDialog' }).find(dialog => dialog.props('title') === 'admin.ops.diagnosis.title')!
+    expect(dialog.props('show')).toBe(true)
+    dialog.vm.$emit('close')
+    await wrapper.vm.$nextTick()
+    expect(dialog.props('show')).toBe(false)
+    wrapper.unmount()
+  })
+
   it.each([
     { stats: { p5: 0, p10: 12.34, p50: 45.67, avg: 89.01, sample_count: 4 }, expected: ['0.0', '12.3', '45.7', '89.0'], samples: '4' },
     { stats: { p5: null, p10: null, p50: null, avg: null, sample_count: 0 }, expected: ['—', '—', '—', '—'], samples: '0' },

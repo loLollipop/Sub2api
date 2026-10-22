@@ -1,61 +1,84 @@
 <template>
   <AppLayout>
-    <div
-      data-testid="profile-shell"
-      class="signal-account-page signal-profile mx-auto max-w-[950px] space-y-6"
-    >
-      <header class="signal-account-heading">
-        <span class="signal-account-index">ACCOUNT</span>
-        <h1>{{ t('profile.title') }}</h1>
-      </header>
-      <ProfileInfoCard
-        :user="user"
-        :linuxdo-enabled="linuxdoOAuthEnabled"
-        :dingtalk-enabled="dingtalkOAuthEnabled"
-        :oidc-enabled="oidcOAuthEnabled"
-        :oidc-provider-name="oidcOAuthProviderName"
-        :wechat-enabled="wechatOAuthEnabled"
-        :wechat-open-enabled="wechatOAuthOpenEnabled"
-        :wechat-mp-enabled="wechatOAuthMPEnabled"
-      />
+    <div data-testid="profile-shell" class="signal-account-page signal-profile">
+      <ProfileInfoCard :user="user" :oidc-provider-name="oidcOAuthProviderName" />
 
-      <div
-        v-if="contactInfo"
-        class="signal-account-support"
-      >
-        <div class="flex items-center gap-4">
-          <div class="rounded-xl bg-primary-100 p-3 text-primary-600">
-            <Icon name="chat" size="lg" />
+      <div class="profile-settings-grid">
+        <section data-testid="profile-auth-bindings-panel" class="card profile-settings-panel profile-login-panel">
+          <ProfileIdentityBindingsSection
+            :user="user"
+            :linuxdo-enabled="linuxdoOAuthEnabled"
+            :dingtalk-enabled="dingtalkOAuthEnabled"
+            :oidc-enabled="oidcOAuthEnabled"
+            :oidc-provider-name="oidcOAuthProviderName"
+            :wechat-enabled="wechatOAuthEnabled"
+            :wechat-open-enabled="wechatOAuthOpenEnabled"
+            :wechat-mp-enabled="wechatOAuthMPEnabled"
+            embedded compact
+          />
+        </section>
+
+        <section class="card profile-settings-panel profile-security-panel" aria-labelledby="profile-security-title">
+          <header class="profile-section-heading">
+            <h2 id="profile-security-title">{{ t('profile.securityTitle') }}</h2>
+            <p>{{ t('profile.securityDescription') }}</p>
+          </header>
+          <div class="profile-security-row">
+            <span class="profile-setting-icon"><Icon name="lock" size="sm" /></span>
+            <div class="profile-setting-copy">
+              <h3>{{ t('profile.loginPassword') }}</h3>
+              <p>{{ t('profile.passwordSummary') }}</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-testid="profile-password-open" :aria-label="t('profile.changePassword')" aria-haspopup="dialog" @click="passwordOpen = true">
+              {{ t('common.edit') }}
+            </button>
           </div>
-          <div>
-            <h3 class="font-semibold text-primary-800 dark:text-primary-200">
-              {{ t('common.contactSupport') }}
-            </h3>
-            <p class="text-sm font-medium">{{ contactInfo }}</p>
-          </div>
-        </div>
+          <ProfileTotpCard embedded />
+          <ProfilePasskeyCard :enabled="passkeyEnabled" embedded />
+        </section>
+
+        <ProfileBalanceNotifyCard
+          v-if="user && balanceLowNotifyEnabled"
+          class="profile-notifications-panel"
+          :enabled="user.balance_notify_enabled ?? true"
+          :threshold="user.balance_notify_threshold"
+          :extra-emails="user.balance_notify_extra_emails ?? []"
+          :system-default-threshold="systemDefaultThreshold"
+          :user-email="user.email"
+        />
       </div>
 
-      <ProfilePasswordForm />
+      <div v-if="contactInfo" class="profile-support">
+        <Icon name="chat" size="sm" />
+        <span>{{ t('common.contactSupport') }}</span><p>{{ contactInfo }}</p>
+      </div>
 
-      <ProfileBalanceNotifyCard
-        v-if="user && balanceLowNotifyEnabled"
-        :enabled="user.balance_notify_enabled ?? true"
-        :threshold="user.balance_notify_threshold"
-        :extra-emails="user.balance_notify_extra_emails ?? []"
-        :system-default-threshold="systemDefaultThreshold"
-        :user-email="user.email"
-      />
-
-      <ProfileTotpCard />
-      <ProfilePasskeyCard :enabled="passkeyEnabled" />
+      <BaseDialog
+        :show="passwordOpen"
+        :title="t('profile.changePassword')"
+        width="narrow"
+        :close-on-escape="!passwordBusy"
+        :show-close-button="!passwordBusy"
+        @close="closePassword"
+      >
+        <div class="profile-dialog-form">
+          <ProfilePasswordForm
+            v-if="passwordOpen"
+            embedded in-dialog
+            @busy="passwordBusy = $event"
+            @saved="passwordOpen = false"
+            @cancel="closePassword"
+          />
+        </div>
+      </BaseDialog>
     </div>
   </AppLayout>
 </template>
-
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import BaseDialog from '@/components/common/BaseDialog.vue'
+import ProfileIdentityBindingsSection from '@/components/user/profile/ProfileIdentityBindingsSection.vue'
 import { Icon } from '@/components/icons'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import ProfileBalanceNotifyCard from '@/components/user/profile/ProfileBalanceNotifyCard.vue'
@@ -71,6 +94,9 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
+const passwordOpen = ref(false)
+const passwordBusy = ref(false)
+function closePassword() { if (!passwordBusy.value) passwordOpen.value = false }
 
 const contactInfo = ref('')
 const balanceLowNotifyEnabled = ref(false)

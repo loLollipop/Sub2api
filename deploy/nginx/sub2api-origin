@@ -29,7 +29,6 @@ server {
     proxy_send_timeout 3600s;
 
     include /etc/nginx/snippets/grafana-location.conf;
-    include /etc/nginx/snippets/infinite-canvas.conf;
     include /etc/nginx/snippets/sub2api-backend-locations.conf;
     include /etc/nginx/snippets/sub2api-spa.conf;
 }

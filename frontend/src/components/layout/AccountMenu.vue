@@ -4,36 +4,46 @@
       ref="triggerRef"
       type="button"
       class="header-user-button flex items-center gap-2 rounded-xl p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
+      :class="{ 'avatar-only': compact }"
       :aria-label="t('common.userMenu')"
       :aria-expanded="dropdownOpen"
       :aria-controls="dropdownOpen ? menuId : undefined"
       @click="dropdownOpen = !dropdownOpen"
+      @keydown.down.prevent="openAndFocus(0)"
+      @keydown.up.prevent="openAndFocus(-1)"
     >
       <div class="header-avatar flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-sm font-medium text-white shadow-sm">
         <img v-if="avatarUrl" :src="avatarUrl" :alt="displayName" class="h-full w-full object-cover" />
         <span v-else>{{ userInitials }}</span>
       </div>
-      <div class="header-identity hidden text-left md:block">
+      <div v-if="!compact" class="header-identity hidden text-left md:block">
         <div class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ displayName }}</div>
         <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.users.roles.' + user.role) }}</div>
       </div>
-      <Icon name="chevronDown" size="sm" class="hidden text-gray-400 md:block" />
+      <Icon v-if="!compact" name="chevronDown" size="sm" class="hidden text-gray-400 md:block" />
     </button>
 
     <transition name="account-dropdown">
-      <div v-if="dropdownOpen" :id="menuId" class="dropdown right-0 mt-2 w-56">
-        <div class="border-b border-gray-100 px-4 py-3 dark:border-dark-700">
+      <div v-if="dropdownOpen || utilities" v-show="dropdownOpen" :id="menuId" ref="menuRef" class="dropdown right-0 mt-2 w-56" :class="{ 'account-utilities-panel': utilities }" @keydown="handleMenuKeydown">
+        <div class="account-identity border-b border-gray-100 px-4 py-3 dark:border-dark-700">
           <div class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ displayName }}</div>
           <div class="break-words text-xs text-gray-500 dark:text-dark-400">{{ user.email }}</div>
         </div>
 
-        <div v-if="showBalance" class="border-b border-gray-100 px-4 py-2 dark:border-dark-700 sm:hidden">
-          <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('common.balance') }}</div>
-          <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">{{ formatMoney(availableBalance) }}</div>
-          <div v-if="frozenBalance > 0" class="mt-1 text-xs text-amber-600 dark:text-amber-300">
-            {{ balanceFrozenText }} {{ formatMoney(frozenBalance) }}
+        <dl v-if="utilities" class="account-balance">
+          <div class="account-balance-row">
+            <dt>{{ t('common.availableBalance') }}</dt>
+            <dd>{{ formatMoney(availableBalance) }}</dd>
           </div>
-        </div>
+          <div class="account-balance-row account-balance-frozen">
+            <dt>{{ t('common.frozenBalance') }}</dt>
+            <dd>{{ formatMoney(frozenBalance) }}</dd>
+          </div>
+          <div class="account-balance-row account-balance-total">
+            <dt>{{ t('common.totalBalance') }}</dt>
+            <dd>{{ formatMoney(totalBalance) }}</dd>
+          </div>
+        </dl>
 
         <div class="py-1">
           <router-link to="/profile" class="dropdown-item" @click="closeDropdown()">
@@ -75,15 +85,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import Icon from '@/components/icons/Icon.vue'
 
-const props = withDefaults(defineProps<{ showBalance?: boolean; showOnboarding?: boolean }>(), {
-  showBalance: true,
+const props = withDefaults(defineProps<{ showOnboarding?: boolean; compact?: boolean; utilities?: boolean }>(), {
   showOnboarding: true,
+  compact: false,
+  utilities: false,
 })
 const { t } = useI18n()
 const router = useRouter()
@@ -94,23 +105,43 @@ const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
 const menuId = useId()
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 const displayName = computed(() => user.value?.username || user.value?.email?.split('@')[0] || '')
 const userInitials = computed(() => Array.from(displayName.value).slice(0, 2).join('').toUpperCase())
 const contactInfo = computed(() => appStore.contactInfo)
-const availableBalance = computed(() => Number(user.value?.balance || 0))
-const frozenBalance = computed(() => Number(user.value?.frozen_balance || 0))
-const balanceFrozenText = computed(() => t('common.frozenBalance') === 'common.frozenBalance' ? '冻结金额' : t('common.frozenBalance'))
+const availableBalance = computed(() => Number(user.value?.balance ?? 0))
+const frozenBalance = computed(() => Number(user.value?.frozen_balance ?? 0))
+const totalBalance = computed(() => availableBalance.value + frozenBalance.value)
 const showOnboardingButton = computed(() => props.showOnboarding && !authStore.isSimpleMode && user.value?.role === 'admin')
 
 function formatMoney(value: number) {
-  return Number.isFinite(value) ? `$${value.toFixed(2)}` : '$0.00'
+  return Number.isFinite(value) ? `$${value.toFixed(2)}` : '—'
 }
 
 function closeDropdown(restoreFocus = false) {
   dropdownOpen.value = false
   if (restoreFocus) triggerRef.value?.focus()
+}
+
+function menuItems() {
+  return Array.from(menuRef.value?.querySelectorAll<HTMLElement>('a, button:not(:disabled)') ?? [])
+    .filter(item => item.getAttribute('tabindex') !== '-1' && !item.closest('[style*="display: none"]'))
+}
+async function openAndFocus(index: number) {
+  dropdownOpen.value = true
+  await nextTick()
+  menuItems().at(index)?.focus()
+}
+function handleMenuKeydown(event: KeyboardEvent) {
+  const items = menuItems()
+  if (!items.length) return
+  const index = items.indexOf(document.activeElement as HTMLElement)
+  const target = event.key === 'ArrowDown' ? (index + 1) % items.length : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length : event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : -1
+  if (target < 0) return
+  event.preventDefault()
+  items[target]?.focus()
 }
 
 function handleClickOutside(event: MouseEvent) {

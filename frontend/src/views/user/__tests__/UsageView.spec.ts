@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 
 import UsageView from '../UsageView.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
@@ -31,6 +31,12 @@ const {
   showWarning: vi.fn(),
   showSuccess: vi.fn(),
   showInfo: vi.fn(),
+}))
+
+const desktopMatches = ref(false)
+vi.mock('@vueuse/core', async () => ({
+  ...await vi.importActual<typeof import('@vueuse/core')>('@vueuse/core'),
+  useMediaQuery: () => desktopMatches,
 }))
 
 const messages: Record<string, string> = {
@@ -145,8 +151,9 @@ const usageLog = {
   native_compaction_v2: false,
 }
 
-function mountUsageView() {
+function mountUsageView(attachTo?: HTMLElement) {
   return mount(UsageView, {
+    attachTo,
     global: {
       stubs: {
         AppLayout: simpleStub,
@@ -167,6 +174,56 @@ function mountUsageView() {
 }
 
 describe('user UsageView', () => {
+
+  it('keeps the latest error filters and loading state when requests finish out of order', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+    const pending: { resolve: (value: unknown) => void; signal: AbortSignal }[] = []
+    listMyErrorRequests.mockImplementation((_params, options) => new Promise(resolve => {
+      pending.push({ resolve, signal: options.signal })
+    }))
+    const errorsTab = wrapper.findAll('button').find(button => button.text() === 'Error records')!
+    await errorsTab.trigger('click')
+    await flushPromises()
+    const selects = wrapper.findAllComponents(Select)
+    // Changing an error filter triggers another request while the first is pending.
+    const vm = wrapper.vm as unknown as { errorFilter: { model: string }; loadErrors: () => Promise<void>; errorLoading: boolean; errorRows: { request_id: string }[]; errorTotal: number }
+    expect(selects.length).toBeGreaterThan(0)
+    vm.errorFilter.model = 'latest'
+    void vm.loadErrors()
+    await flushPromises()
+    expect(pending.length).toBeGreaterThanOrEqual(2)
+    const latest = pending.at(-1)!
+    pending[0].resolve({ items: [{ request_id: 'stale' }], total: 99 })
+    await flushPromises()
+    expect(pending[0].signal.aborted).toBe(true)
+    expect(vm.errorLoading).toBe(true)
+    latest.resolve({ items: [{ request_id: 'latest' }], total: 1 })
+    await flushPromises()
+    expect(vm.errorRows.map(row => row.request_id)).toEqual(['latest'])
+    expect(vm.errorTotal).toBe(1)
+    expect(vm.errorLoading).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('aborts an error request on unmount without reporting a stale failure', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+    let rejectRequest!: (error: Error) => void
+    let signal!: AbortSignal
+    listMyErrorRequests.mockImplementationOnce((_params, options) => {
+      signal = options.signal
+      return new Promise((_, reject) => { rejectRequest = reject })
+    })
+    await wrapper.findAll('button').find(button => button.text() === 'Error records')!.trigger('click')
+    await flushPromises()
+    wrapper.unmount()
+    expect(signal.aborted).toBe(true)
+    showError.mockClear()
+    rejectRequest(new Error('late failure'))
+    await flushPromises()
+    expect(showError).not.toHaveBeenCalled()
+  })
 
   it('keeps latest completed logs when an older silent response arrives', async () => {
     const wrapper = mountUsageView()
@@ -257,6 +314,7 @@ describe('user UsageView', () => {
     wrapper.unmount()
   })
   beforeEach(() => {
+    desktopMatches.value = false
     query.mockReset()
     getStats.mockReset()
     getDashboardModels.mockReset()
@@ -299,6 +357,53 @@ describe('user UsageView', () => {
     listMyErrorRequests.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
     list.mockResolvedValue({ items: [{ id: 1, name: 'demo-key' }], total: 1, page: 1, page_size: 100, pages: 1 })
     getAvailable.mockResolvedValue([{ id: 1, name: 'default' }])
+  })
+
+
+  it('collapses secondary mobile filters, preserves zero/false values and adapts to desktop and tabs', async () => {
+    const wrapper = mountUsageView(document.body)
+    await flushPromises()
+    const vm = wrapper.vm as unknown as {
+      filters: { model: string; group_id: number; native_compaction_v2: boolean; billing_type: number }
+      errorFilter: { category: string; status_code: number }
+    }
+    const toggle = () => wrapper.get('[data-testid="usage-secondary-filters-toggle"]')
+    const secondary = () => wrapper.get('#usage-secondary-filters')
+    expect(toggle().attributes('aria-expanded')).toBe('false')
+    expect(toggle().attributes('aria-controls')).toBe('usage-secondary-filters')
+    expect(secondary().isVisible()).toBe(false)
+    expect(secondary().findAllComponents(Select)).toHaveLength(6)
+    expect(wrapper.get('#usage-request-id').isVisible()).toBe(true)
+    vm.filters.group_id = 0
+    vm.filters.native_compaction_v2 = false
+    vm.filters.billing_type = 0
+    await wrapper.vm.$nextTick()
+    expect(toggle().text()).toContain('(3)')
+    await toggle().trigger('click')
+    expect(secondary().isVisible()).toBe(true)
+    expect(toggle().attributes('aria-expanded')).toBe('true')
+    await toggle().trigger('click')
+    expect(document.activeElement).toBe(toggle().element)
+    expect(vm.filters.native_compaction_v2).toBe(false)
+    expect(vm.filters.group_id).toBe(0)
+    desktopMatches.value = true
+    await wrapper.vm.$nextTick()
+    expect(secondary().isVisible()).toBe(true)
+    expect(wrapper.find('[data-testid="usage-secondary-filters-toggle"]').exists()).toBe(false)
+    desktopMatches.value = false
+    await wrapper.vm.$nextTick()
+    expect(secondary().isVisible()).toBe(false)
+    await wrapper.findAll('button').find(button => button.text() === 'Error records')!.trigger('click')
+    await flushPromises()
+    expect(secondary().findAllComponents(Select)).toHaveLength(3)
+    expect(toggle().text()).toContain('(0)')
+    vm.errorFilter.category = 'quota'
+    vm.errorFilter.status_code = 0
+    await wrapper.vm.$nextTick()
+    expect(toggle().text()).toContain('(2)')
+    await wrapper.findAll('button').find(button => button.text() === 'Usage records')!.trigger('click')
+    expect(toggle().text()).toContain('(3)')
+    wrapper.unmount()
   })
 
   it('preserves named toolbar commands and a semantic page heading', async () => {
@@ -380,7 +485,7 @@ describe('user UsageView', () => {
     await flushPromises()
 
     expect(listMyErrorRequests).toHaveBeenCalledWith(
-      expect.objectContaining({ api_key_id: laterKey.id, page: 1 })
+      expect.objectContaining({ api_key_id: laterKey.id, page: 1 }), expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
     expect(list).toHaveBeenCalledTimes(2)
     wrapper.unmount()

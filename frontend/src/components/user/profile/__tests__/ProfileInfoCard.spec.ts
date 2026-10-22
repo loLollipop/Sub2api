@@ -1,7 +1,14 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { DOMWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ProfileInfoCard from '@/components/user/profile/ProfileInfoCard.vue'
 import type { User } from '@/types'
+const { updateProfileMock, authState } = vi.hoisted(() => ({
+  updateProfileMock: vi.fn(), authState: { user: null as User | null }
+}))
+vi.mock('@/api', () => ({ userAPI: { updateProfile: updateProfileMock } }))
+enableAutoUnmount(afterEach)
+afterEach(() => { document.body.innerHTML = '' })
+beforeEach(() => { updateProfileMock.mockReset(); authState.user = null })
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({
@@ -10,9 +17,7 @@ vi.mock('vue-router', () => ({
 }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({
-    user: null
-  })
+  useAuthStore: () => authState
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -85,8 +90,9 @@ describe('ProfileInfoCard', () => {
     expect(wrapper.text()).toContain('alice@example.com')
     expect(wrapper.text()).toContain('alice')
     expect(wrapper.text()).toContain('User')
-    expect(wrapper.get('[data-testid="profile-basics-panel"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="profile-auth-bindings-panel"]').exists()).toBe(true)
+    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="profile-avatar-open"]').attributes('aria-haspopup')).toBe('dialog')
+    expect(wrapper.get('[data-testid="profile-username-open"]').exists()).toBe(true)
   })
 
   it('renders third-party source hints from profile sources', () => {
@@ -172,7 +178,7 @@ describe('ProfileInfoCard', () => {
     expect(wrapper.text()).not.toContain('legacy-user@wechat-connect.invalid')
   })
 
-  it('renders the approved overview hero and two-column content shell', () => {
+  it('keeps the account summary without duplicated editing panels', () => {
     const wrapper = mount(ProfileInfoCard, {
       props: {
         user: createUser()
@@ -189,9 +195,85 @@ describe('ProfileInfoCard', () => {
     expect(wrapper.get('[data-testid="profile-overview-metric-concurrency"]').text()).toContain('Concurrency Limit')
     expect(wrapper.get('[data-testid="profile-overview-metric-member-since"]').text()).toContain('Member Since')
     expect(wrapper.find('[data-testid="profile-info-summary-grid"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="profile-main-column"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="profile-side-column"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="profile-basics-panel"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="profile-auth-bindings-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="profile-basics-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-side-column"]').exists()).toBe(false)
+  })
+
+  function mountDialog() {
+    mount(ProfileInfoCard, {
+      attachTo: document.body,
+      props: { user: createUser() },
+      global: { stubs: { Icon: true, transition: true } }
+    })
+    return new DOMWrapper(document.body)
+  }
+
+  it('opens username editing on demand and discards a cancelled draft', async () => {
+    const wrapper = mountDialog()
+    await wrapper.get('[data-testid="profile-username-open"]').trigger('click')
+    expect(wrapper.get('#username').element).toHaveProperty('value', 'alice')
+    await wrapper.get('#username').setValue('unsaved')
+    await wrapper.get('form button[type="button"]').trigger('click')
+    expect(wrapper.find('#username').exists()).toBe(false)
+    await wrapper.get('[data-testid="profile-username-open"]').trigger('click')
+    expect(wrapper.get('#username').element).toHaveProperty('value', 'alice')
+    expect(updateProfileMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the username dialog open on error and closes after a successful retry', async () => {
+    updateProfileMock.mockRejectedValueOnce(new Error('retry')).mockResolvedValueOnce(createUser({ username: 'new name' }))
+    const wrapper = mountDialog()
+    await wrapper.get('[data-testid="profile-username-open"]').trigger('click')
+    await wrapper.get('#username').setValue('new name')
+    expect(wrapper.get('#username').element).toHaveProperty('value', 'new name')
+    await wrapper.get('form').trigger('submit')
+    expect(updateProfileMock).toHaveBeenCalledWith({ username: 'new name' })
+    await flushPromises()
+    expect(wrapper.get('#username').element).toHaveProperty('value', 'new name')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.find('#username').exists()).toBe(false)
+    expect(authState.user?.username).toBe('new name')
+  })
+
+  it('blocks Escape while saving and preserves a newer username draft', async () => {
+    let resolve!: (user: User) => void
+    updateProfileMock.mockReturnValue(new Promise<User>((done) => { resolve = done }))
+    const wrapper = mountDialog()
+    await wrapper.get('[data-testid="profile-username-open"]').trigger('click')
+    await wrapper.get('#username').setValue('submitted')
+    await wrapper.get('form').trigger('submit')
+    expect(updateProfileMock).toHaveBeenCalledWith({ username: 'submitted' })
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    expect(wrapper.get('#username').element).toHaveProperty('value', 'submitted')
+    await wrapper.get('#username').setValue('newer draft')
+    resolve(createUser({ username: 'submitted' }))
+    await flushPromises()
+    expect(wrapper.get('#username').element).toHaveProperty('value', 'newer draft')
+    expect(authState.user?.username).toBe('submitted')
+  })
+
+  it('keeps the dialog open when Escape cancels Chinese input composition', async () => {
+    const wrapper = mountDialog()
+    await wrapper.get('[data-testid="profile-username-open"]').trigger('click')
+    const event = new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true, cancelable: true })
+    wrapper.get('#username').element.dispatchEvent(event)
+    await flushPromises()
+    expect(wrapper.find('#username').exists()).toBe(true)
+    expect(event.defaultPrevented).toBe(false)
+    wrapper.get('#username').element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    expect(wrapper.find('#username').exists()).toBe(false)
+  })
+
+  it('opens the avatar preview without showing a separate editor on the page', async () => {
+    const wrapper = mountDialog()
+    expect(wrapper.find('[data-testid="profile-avatar-file-input"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="profile-avatar-open"]').trigger('click')
+    expect(wrapper.find('[data-testid="profile-avatar-file-input"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="profile-avatar-delete"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-testid="profile-avatar-close"]').trigger('click')
+    expect(wrapper.find('[data-testid="profile-avatar-file-input"]').exists()).toBe(false)
   })
 })

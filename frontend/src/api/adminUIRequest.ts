@@ -36,7 +36,7 @@ function normalizeAPIPath(path: string): string {
 
 /**
  * User-facing web APIs that may emit Server-Timing when ENABLE_SERVER_TIMING is on.
- * Mirrors backend isUserTimingPath allowlist (excluding public payment surfaces).
+ * Mirrors backend isUserTimingPath allowlist.
  */
 export function isUserTimingAPIPath(requestURL: string): boolean {
   const path = normalizeAPIPath(requestURL)
@@ -58,12 +58,6 @@ export function isUserTimingAPIPath(requestURL: string): boolean {
   if (path === '/redeem' || path.startsWith('/redeem/')) return true
   if (path === '/subscriptions' || path.startsWith('/subscriptions/')) return true
   if (path === '/channel-monitors' || path.startsWith('/channel-monitors/')) return true
-  if (path.startsWith('/payment/')) {
-    if (path.startsWith('/payment/public') || path.startsWith('/payment/webhook')) {
-      return false
-    }
-    return true
-  }
   return false
 }
 

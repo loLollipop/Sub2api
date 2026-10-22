@@ -26,6 +26,27 @@ const endpoint = (): PromptAuditEndpointDraft => ({
 describe('Prompt Audit components', () => {
   beforeEach(() => vi.restoreAllMocks())
 
+  it.each([
+    ['admin.promptAudit.pool.timeout', '99'],
+    ['admin.promptAudit.pool.timeout', '30001'],
+    ['admin.promptAudit.pool.inputLimit', '127'],
+    ['admin.promptAudit.pool.inputLimit', '100001'],
+  ])('keeps the editor open when %s is out of range (%s)', async (label, value) => {
+    const wrapper = mount(EndpointPool, {
+      props: { endpoints: [endpoint()], probeResults: {}, probingIds: [] },
+      global: { stubs: { BaseDialog: DialogStub } },
+    })
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await wrapper.get(`[aria-label="${label}"]`).setValue(value)
+    await wrapper.get('[data-test="save-endpoint"]').trigger('click')
+    expect(wrapper.emitted('update:endpoints')).toBeUndefined()
+    expect(wrapper.find('[data-test="dialog"]').exists()).toBe(true)
+    await wrapper.get(`[aria-label="${label}"]`).setValue(label.endsWith('timeout') ? '100' : '128')
+    await wrapper.get('[data-test="save-endpoint"]').trigger('click')
+    expect(wrapper.emitted('update:endpoints')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
   it('edits a saved endpoint with blank-secret keep, explicit clear, replacement, and probe actions', async () => {
     const wrapper = mount(EndpointPool, {
       props: { endpoints: [endpoint()], probeResults: {}, probingIds: [] },

@@ -11,7 +11,6 @@ import type {
   ApiKey,
 } from '../src/types'
 import type { MonitorMatrixGroupBy, MonitorMatrixRow } from '../src/api/channelMonitorV2'
-import type { PaymentOrder } from '../src/types/payment'
 import { readFileSync } from 'node:fs'
 
 // Local preview fixture: a real generated artwork so the hover player shows a
@@ -171,13 +170,10 @@ export function createMockApi(now = new Date()) {
   const adminSettings = () => ({
     ...settings, ops_monitoring_enabled: false, ops_realtime_monitoring_enabled: false,
     ops_query_mode_default: 'auto', custom_menu_items: [],
-    payment_recharge_center_enabled: data.checkoutInfo.recharge_center_enabled === true,
-    payment_enabled_types: data.paymentConfig.enabled_payment_types,
   })
   const scheduledPlanOverrides = new Map<number, Record<string, unknown>>()
   let nextScheduledPlanID = 99
   let nextId = data.keys.length + 1
-  let nextOrderId = Math.max(...data.paymentOrders.map(order => order.id)) + 1
   let nextRedeemId = Math.max(...data.redeemHistory.map(item => item.id)) + 1
   const usedDemoCodes = new Set<string>()
   const timezoneOf = (query: URLSearchParams) => {
@@ -421,26 +417,6 @@ export function createMockApi(now = new Date()) {
       }]
     })
   }
-  function publicOrder(order: PaymentOrder) {
-    return {
-      out_trade_no: order.out_trade_no,
-      status: order.status,
-      paid: ['PAID', 'RECHARGING', 'COMPLETED'].includes(order.status),
-      created_at: order.created_at,
-      expires_at: order.expires_at,
-    }
-  }
-  function findOrder(id: number) {
-    const order = data.paymentOrders.find(item => item.id === id)
-    if (!order) throw new PreviewError(404, '本地演示订单不存在')
-    return order
-  }
-  function orderByTradeNo(value: unknown) {
-    if (typeof value !== 'string' || !value) throw new PreviewError(422, '缺少演示订单号')
-    const order = data.paymentOrders.find(item => item.out_trade_no === value)
-    if (!order) throw new PreviewError(404, '本地演示订单不存在')
-    return order
-  }
   return {
     user: data.user,
     handle(method: string, path: string, query: URLSearchParams, body: Record<string, unknown> = {}): unknown {
@@ -482,7 +458,6 @@ export function createMockApi(now = new Date()) {
           document_url_zh: '', document_url_en: '', ack_phrase_zh: '', ack_phrase_en: '',
         }
         if (path === '/api/v1/admin/settings') return adminSettings()
-        if (path === '/api/v1/admin/payment/config') return { enabled: true }
         if (path === '/api/v1/admin/settings/web-search-emulation') return { enabled: false, providers: [] }
         if (path === '/api/v1/admin/system/check-updates') return {
           current_version: 'local-preview', latest_version: 'local-preview', has_update: false,
@@ -746,18 +721,6 @@ export function createMockApi(now = new Date()) {
         ] }
         if (path === '/api/v1/channels/available') return data.availableChannels
         if (path === '/api/v1/model-plaza') return data.modelPlaza
-        if (path === '/api/v1/payment/config') return data.paymentConfig
-        if (path === '/api/v1/payment/plans') return data.paymentPlans
-        if (path === '/api/v1/payment/checkout-info') return data.checkoutInfo
-        if (path === '/api/v1/payment/limits') return { methods: data.checkoutInfo.methods, global_min: data.checkoutInfo.global_min, global_max: data.checkoutInfo.global_max }
-        if (path === '/api/v1/payment/orders/my') {
-          const status = query.get('status')
-          const orders = data.paymentOrders.filter(order => !status || order.status === status).sort((a, b) => b.id - a.id)
-          return page(orders, query)
-        }
-        if (path === '/api/v1/payment/orders/refund-eligible-providers') return { provider_instance_ids: ['local-demo-alipay', 'local-demo-wxpay'] }
-        const paymentOrder = path.match(/^\/api\/v1\/payment\/orders\/(\d+)$/)
-        if (paymentOrder) return findOrder(Number(paymentOrder[1]))
         if (path === '/api/v1/subscriptions') return data.subscriptions
         if (path === '/api/v1/subscriptions/active') return data.subscriptions.filter(item => item.status === 'active')
         if (path === '/api/v1/subscriptions/progress') return data.subscriptionProgress
@@ -901,68 +864,6 @@ export function createMockApi(now = new Date()) {
             today_actual_cost: summarize(rows.filter(row => dateLabel(row.created_at, 'UTC') === today)).total_actual_cost }]
         })) }
       }
-      if (method === 'POST' && path === '/api/v1/payment/orders') {
-        const amount = body.amount
-        const paymentType = body.payment_type
-        const orderType = body.order_type
-        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) throw new PreviewError(422, '演示订单金额必须大于 0')
-        if (typeof paymentType !== 'string' || !data.checkoutInfo.methods[paymentType]?.available) throw new PreviewError(422, '演示支付方式不可用')
-        if (orderType !== 'balance' && orderType !== 'subscription') throw new PreviewError(422, '无效的演示订单类型')
-        const plan = orderType === 'subscription' ? data.paymentPlans.find(item => item.id === body.plan_id) : undefined
-        if (orderType === 'subscription' && !plan) throw new PreviewError(422, '本地演示套餐不存在')
-        const limits = data.checkoutInfo.methods[paymentType]
-        if (amount < limits.single_min || amount > limits.single_max) throw new PreviewError(422, '演示订单金额超出该方式限额')
-        const currency = limits.currency || 'CNY'
-        const converted = orderType === 'subscription' && currency === 'CNY' ? amount * data.checkoutInfo.subscription_usd_to_cny_rate : amount
-        const feeRate = limits.recharge_fee_rate ?? data.checkoutInfo.recharge_fee_rate
-        const payAmount = Math.round(converted * (1 + feeRate / 100) * 100) / 100
-        const outTradeNo = `LOCAL-DEMO-${now.toISOString().slice(0, 10).replaceAll('-', '')}-${String(nextOrderId)}`
-        const order: PaymentOrder = {
-          id: nextOrderId++, user_id: data.user.id, amount, pay_amount: payAmount, currency,
-          fee_rate: feeRate, payment_type: paymentType, out_trade_no: outTradeNo, status: 'PENDING',
-          order_type: orderType, plan_id: plan?.id, created_at: now.toISOString(),
-          expires_at: new Date(now.getTime() + 30 * 60_000).toISOString(), refund_amount: 0,
-          provider_instance_id: `local-demo-${paymentType}`,
-        }
-        data.paymentOrders.unshift(order)
-        return {
-          order_id: order.id,
-          amount: order.amount,
-          pay_amount: order.pay_amount,
-          fee_rate: order.fee_rate,
-          currency: order.currency,
-          expires_at: order.expires_at,
-          payment_type: order.payment_type,
-          out_trade_no: order.out_trade_no,
-          payment_mode: 'qrcode',
-          result_type: 'order_created',
-          qr_code: `LOCAL-DEMO-PAYMENT:${order.out_trade_no}`,
-          resume_token: `local-demo-resume-${order.id}`,
-        }
-      }
-      const cancelOrder = path.match(/^\/api\/v1\/payment\/orders\/(\d+)\/cancel$/)
-      if (method === 'POST' && cancelOrder) {
-        const order = findOrder(Number(cancelOrder[1]))
-        if (order.status !== 'PENDING') throw new PreviewError(409, '只有待支付的本地演示订单可以取消')
-        order.status = 'CANCELLED'
-        return { message: '本地演示订单已取消' }
-      }
-      const refundOrder = path.match(/^\/api\/v1\/payment\/orders\/(\d+)\/refund-request$/)
-      if (method === 'POST' && refundOrder) {
-        const order = findOrder(Number(refundOrder[1]))
-        if (order.status !== 'COMPLETED') throw new PreviewError(409, '只有已完成的本地演示订单可以申请退款')
-        if (typeof body.reason !== 'string' || !body.reason.trim()) throw new PreviewError(422, '请输入本地演示退款原因')
-        order.status = 'REFUND_REQUESTED'
-        order.refund_request_reason = body.reason.trim()
-        order.refund_requested_at = now.toISOString()
-        return order
-      }
-      if (method === 'POST' && path === '/api/v1/payment/orders/verify') return orderByTradeNo(body.out_trade_no)
-      if (method === 'POST' && path === '/api/v1/payment/public/orders/verify') return publicOrder(orderByTradeNo(body.out_trade_no))
-      if (method === 'POST' && path === '/api/v1/payment/public/orders/resolve') {
-        if (typeof body.resume_token !== 'string' || !/^local-demo-resume-\d+$/.test(body.resume_token)) throw new PreviewError(404, '本地演示恢复令牌不存在')
-        return publicOrder(findOrder(Number(body.resume_token.split('-').pop())))
-      }
       if (method === 'POST' && path === '/api/v1/redeem') {
         const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : ''
         if (!['DEMO-BALANCE-10', 'DEMO-SUB-30'].includes(code)) throw new PreviewError(422, '请输入本地演示兑换码 DEMO-BALANCE-10 或 DEMO-SUB-30')
@@ -1003,14 +904,6 @@ export function createMockApi(now = new Date()) {
         data.affiliateDetail.aff_history_quota += amount
         data.user.balance = Math.round((data.user.balance + amount) * 100) / 100
         return { transferred_quota: amount, balance: data.user.balance }
-      }
-      if (method === 'PUT' && path === '/api/v1/admin/settings') {
-        if (!('payment_recharge_center_enabled' in body)) throw new PreviewError(405, '演示不支持修改其他系统设置')
-        if ('payment_recharge_center_enabled' in body) {
-          if (typeof body.payment_recharge_center_enabled !== 'boolean') throw new PreviewError(422, '页面开关必须是布尔值')
-          data.checkoutInfo.recharge_center_enabled = body.payment_recharge_center_enabled
-        }
-        return adminSettings()
       }
       const planWrite = path.match(/^\/api\/v1\/admin\/scheduled-test-plans(?:\/(\d+))?$/)
       if (planWrite) {

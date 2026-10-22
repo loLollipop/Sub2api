@@ -14,6 +14,10 @@ func IsUpstreamWAFBody(body []byte) bool {
 	if len(body) == 0 {
 		return false
 	}
+	if isCloudflareBotBlockResponse(body) {
+		return true
+	}
+
 	for _, path := range []string{
 		"error.message",
 		"response.error.message",
@@ -30,6 +34,41 @@ func IsUpstreamWAFBody(body []byte) bool {
 		return isUpstreamWAFMessage(string(body))
 	}
 	return false
+}
+
+// isCloudflareBotBlockResponse identifies the specific Cloudflare 1010 block
+// across platforms without broadening generic WAF exemptions.
+func isCloudflareBotBlockResponse(body []byte) bool {
+	// Inspect only the error envelope, never echoed request/tool parameters.
+	for _, path := range []string{"@this", "error", "response.error"} {
+		node := gjson.GetBytes(body, path)
+		if !node.IsObject() {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(node.Get("error_name").String()), "browser_signature_banned") {
+			return true
+		}
+		if node.Get("cloudflare_error").Type == gjson.True {
+			for _, key := range []string{"error_code", "code"} {
+				code := node.Get(key)
+				if (code.Type == gjson.Number && code.Num == 1010) ||
+					(code.Type == gjson.String && strings.TrimSpace(code.Str) == "1010") {
+					return true
+				}
+			}
+		}
+	}
+	for _, path := range []string{"error.message", "response.error.message", "message", "error.code", "response.error.code", "code"} {
+		if isCloudflare1010Message(gjson.GetBytes(body, path).String()) {
+			return true
+		}
+	}
+	return !gjson.ValidBytes(body) && isCloudflare1010Message(string(body))
+}
+
+func isCloudflare1010Message(value string) bool {
+	lower := strings.ToLower(value)
+	return strings.Contains(lower, "error code: 1010") || strings.Contains(lower, "error 1010")
 }
 
 func isUpstreamWAFMessage(value string) bool {

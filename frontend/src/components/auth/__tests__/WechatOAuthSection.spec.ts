@@ -71,7 +71,7 @@ function buildPublicSettings(overrides: Partial<WeChatPublicSettings> = {}): WeC
     home_content: '',
     compact_home_enabled: false,
     hide_ccs_import_button: false,
-    payment_enabled: false,
+    purchase_subscription_enabled: false,
     table_default_page_size: 20,
     table_page_size_options: [10, 20, 50, 100],
     custom_menu_items: [],

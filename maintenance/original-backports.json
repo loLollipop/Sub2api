@@ -7,7 +7,7 @@
     "v0.2.16": "01842576b3d5c1e2545b5a99ad555d36e28ed306",
     "v0.2.17": "060d0160417782cd962a0c7f460f6cd4565d4916"
   },
-  "latest_reviewed_main_commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
+  "latest_reviewed_main_commit": "dba770d56a0ee0ae5bad1b3dc5e11614d323163c",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
   "reviewed_release_tag": "v0.2.17",
   "reviewed_release_commit": "060d0160417782cd962a0c7f460f6cd4565d4916",
@@ -16,7 +16,7 @@
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
+    "source_head": "dba770d56a0ee0ae5bad1b3dc5e11614d323163c",
     "implemented_with_local_regression": [
       "Toolchain, cooldown scopes and frontend lifecycle fixes",
       "2026-10-17 Responses created_at, Gemini compatibility thinking, subscription retirement/public catalogs and payment compatibility; dated sync note records local adaptations and verification",
@@ -85,7 +85,22 @@
     { "commit": "44e35fbf8", "scope": "pending-refund-atomic-failure", "note": "Already covered by local transactional retained-deduction rollback/retry and live-balance update; no weaker fallback transaction imported." },
     { "commit": "83337a0c6", "scope": "alipay-refund-query-and-invalid-types", "note": "Add stable-request-ID refund queries, pending-audit timestamp/error handling and unsupported fulfillment closeout; retain canonical return URL rejection and add plain host validation." },
     { "commit": "f37b69b77", "scope": "alipay-query-pending-grace", "note": "Query failures remain pending; no-record failure only after10min; legacy trade-number refund IDs require manual verification." },
-    { "commit": "1b92038ea", "scope": "easypay-query-and-settlement", "note": "Mirror query/body, flexible scalar decoding, strict success/order checks and notification validation, URL secret redaction. Preserve fixed-instance service-layer settlement verification; do not add duplicate handler confirmation." }
+    { "commit": "1b92038ea", "scope": "easypay-query-and-settlement", "note": "Mirror query/body, flexible scalar decoding, strict success/order checks and notification validation, URL secret redaction. Preserve fixed-instance service-layer settlement verification; do not add duplicate handler confirmation." },
+    {"commit": "ab71e12ec", "scope": "async-image-download-security", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "9c41b3269", "scope": "nonnegative-gemini-input-usage", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "94c7d6b02", "scope": "anthropic-compat-client-disconnect-drain", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "4355236e0", "scope": "anthropic-compat-terminal-integrity", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "2b1f12938", "scope": "gemini-canceled-stream-partial-usage", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "e068c3d02", "scope": "queued-metadata-preamble", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "c7bfcd93a", "scope": "gemini-tool-schema-node-semantics", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "e0fa4b94f", "scope": "scoped-cloudflare1010-account-penalty-exemption", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "1cdecf4a8", "scope": "grok47-fast-price-card", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "7fcaa32db", "scope": "remember-account-platform-status", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "d6120b5d8", "scope": "vertex-account-quota-end-to-end", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "47cb84b8b", "scope": "gemini-image-group-permission-gate", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "38b72d734", "scope": "model-rate-limit-copy-on-write", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "d5dbb5c36", "scope": "lazy-single-antigravity-probe-with-timeout", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "67dca9687", "scope": "quota-sql-dimension-variants", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"}
   ],
   "preserve_during_future_sync": [
     "Existing 0.15 billing and fixed-price shop-link recharge customizations",
@@ -100,12 +115,25 @@
     "Gemini 3.6 promotion (4426593e9): source constants imported as published; upstream supplies no automatic expiry. No bespoke frozen-price or scheduler mechanism added.",
     "Monitoring platform picker/details refresh and compact filters are already present. Ops account-name/output-TPS UI is implemented with selected frontend regressions; final backend validation is tracked separately.",
     "SheetJS CDN dependency replacement (daa791574) is now pinned0.20.3 with verified SHA512/clean-store frozen installation/export regression; obsolete xlsx audit exemptions removed.",
-    "Final real PostgreSQL schema upgrade/rollback, race/Redis/Docker and cross-batch integration verification remain outstanding; implemented source features are listed in cumulative_sync rather than the historical deferral list."
+    "Final real PostgreSQL schema upgrade/rollback, race/Redis/Docker and cross-batch integration verification remain outstanding; implemented source features are listed in cumulative_sync rather than the historical deferral list.",
+    "53002f677 scheduler snapshot memo: requires shared-map mutator audit and Redis/race verification with local atomic account memo; not imported.",
+    "afbef7c8c duplicate DeepSeek image alias fix: source alias-generation predecessor absent locally; broader input compatibility intentionally not imported."
   ],
   "observed_delta_review": {
-    "from_commit": "1b2243a4f50621508e79aef4b498a2937a6238ee",
-    "to_commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
-    "status": "selective_backport_with_local_equivalents",
-    "evidence": "maintenance/notes/upstream-sync-20261017.md"
+    "from_commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
+    "to_commit": "dba770d56a0ee0ae5bad1b3dc5e11614d323163c",
+    "status": "selective_main_backport_with_explicit_deferrals",
+    "evidence": "maintenance/notes/upstream-sync-20261022.md"
+  },
+  "sync_20261022": {
+    "evidence": "maintenance/notes/upstream-sync-20261022.md",
+    "latest_official_release_unchanged": "v0.2.17",
+    "already_covered": [
+      "89654873f model-mapping signature hot path",
+      "cacc80b86 dependency/toolchain security",
+      "4c940c3cb Go CI version",
+      "59100d324 Go Docker version"
+    ],
+    "migration": "269_enable_gemini_image_generation_groups.sql (source246 renamed append-only)"
   }
 }

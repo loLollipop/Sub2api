@@ -1,23 +1,21 @@
 <template>
-  <div class="card">
-    <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-      <h2 class="text-lg font-medium text-gray-900 dark:text-white">
+  <div class="card profile-notifications">
+    <div class="profile-notifications-heading">
+      <span class="profile-setting-icon"><Icon name="bell" size="sm" /></span>
+      <div class="profile-setting-copy">
+      <h2 id="profile-notify-title" class="text-lg font-medium text-gray-900 dark:text-white">
         {{ t('profile.balanceNotify.title') }}
       </h2>
       <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
         {{ t('profile.balanceNotify.description') }}
       </p>
-    </div>
-    <div class="px-6 py-6 space-y-6">
-      <!-- Enable toggle -->
-      <div class="flex items-center justify-between">
-        <label class="input-label mb-0">{{ t('profile.balanceNotify.enabled') }}</label>
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" v-model="notifyEnabled" @change="handleToggle" class="sr-only peer" />
-          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-primary-600"></div>
-        </label>
       </div>
-
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" :checked="notifyEnabled" :disabled="savingProfile" @change="handleToggle" class="sr-only peer" :aria-label="t('profile.balanceNotify.enabled')" />
+        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-primary-600"></div>
+      </label>
+    </div>
+    <fieldset v-show="notifyEnabled" :disabled="savingProfile" class="profile-notifications-body min-w-0 space-y-5">
       <template v-if="notifyEnabled">
         <!-- Custom threshold with save button -->
         <div>
@@ -53,13 +51,14 @@
           <!-- Saved email entries -->
           <div v-if="emailEntries.length > 0" class="space-y-2 mb-3">
             <div v-for="(entry, idx) in emailEntries" :key="`${entry.primary ? 'primary' : entry.email}-${idx}`"
-              class="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-dark-700 rounded-lg">
+              class="profile-notify-email flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-dark-700 rounded-lg"
+              :class="{ 'is-verifying': verifyingEmail === entry.email }">
               <div class="flex items-center gap-2 min-w-0 flex-1">
                 <label class="relative inline-flex items-center cursor-pointer shrink-0">
-                  <input type="checkbox" :checked="!entry.disabled" @change="handleEmailToggle(entry)" class="sr-only peer" />
+                  <input type="checkbox" :checked="!entry.disabled" @change="handleEmailToggle(entry, $event)" :disabled="savingProfile" class="sr-only peer" :aria-label="entry.email" />
                   <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-gray-500 peer-checked:bg-primary-600"></div>
                 </label>
-                <span class="text-sm text-gray-700 dark:text-gray-300 truncate">{{ entry.email }}</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300 truncate" :title="entry.email">{{ entry.email }}</span>
                 <span v-if="entry.primary" class="text-xs text-primary-600 dark:text-primary-400 shrink-0">{{ t('profile.balanceNotify.primaryEmail') }}</span>
               </div>
               <div class="flex items-center gap-2 shrink-0">
@@ -102,7 +101,7 @@
           <!-- Pending (unverified) emails in verification flow -->
           <div v-if="pendingEmails.length > 0" class="space-y-2 mb-3">
             <div v-for="(pe, idx) in pendingEmails" :key="pe.email"
-              class="flex items-center gap-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              class="profile-notify-pending flex items-center gap-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg border border-yellow-200 dark:border-yellow-800">
               <span class="flex-1 text-sm text-gray-700 dark:text-gray-300">{{ pe.email }}</span>
               <div v-if="!pe.codeSent" class="flex items-center gap-1">
                 <button @click="sendCodeFor(idx)" :disabled="pe.sending" class="text-xs text-primary-600 hover:text-primary-700">
@@ -153,13 +152,14 @@
           </p>
         </div>
       </template>
-    </div>
+    </fieldset>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Icon from '@/components/icons/Icon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { userAPI } from '@/api'
@@ -196,6 +196,8 @@ const emailEntries = ref<NotifyEmailEntry[]>([...props.extraEmails])
 const pendingEmails = ref<PendingEmail[]>([])
 const newEmail = ref('')
 const savingThreshold = ref(false)
+// All writes return profile snapshots; serialize them to avoid stale list/profile updates.
+const savingProfile = ref(false)
 
 // State for verifying saved unverified emails
 const verifyingEmail = ref('')
@@ -230,17 +232,30 @@ onUnmounted(() => {
   if (verifyTimer) clearInterval(verifyTimer)
 })
 
-const handleToggle = async () => {
+const handleToggle = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (savingProfile.value) {
+    input.checked = notifyEnabled.value
+    return
+  }
+  const previous = notifyEnabled.value
+  notifyEnabled.value = input.checked
+  savingProfile.value = true
   try {
     const updated = await userAPI.updateProfile({ balance_notify_enabled: notifyEnabled.value })
     authStore.user = updated
   } catch (err: unknown) {
+    notifyEnabled.value = previous
+    input.checked = previous
     appStore.showError(extractApiErrorMessage(err, t('common.error')))
-    notifyEnabled.value = !notifyEnabled.value
+  } finally {
+    savingProfile.value = false
   }
 }
 
 const handleThresholdUpdate = async () => {
+  if (savingProfile.value) return
+  savingProfile.value = true
   savingThreshold.value = true
   try {
     const threshold = customThreshold.value && customThreshold.value > 0 ? customThreshold.value : 0
@@ -251,17 +266,30 @@ const handleThresholdUpdate = async () => {
     appStore.showError(extractApiErrorMessage(err, t('common.error')))
   } finally {
     savingThreshold.value = false
+    savingProfile.value = false
   }
 }
 
-async function handleEmailToggle(entry: NotifyEmailEntry) {
-  const newDisabled = !entry.disabled
+async function handleEmailToggle(entry: NotifyEmailEntry, event: Event) {
+  const input = event.target as HTMLInputElement
+  if (savingProfile.value) {
+    input.checked = !entry.disabled
+    return
+  }
+  const previous = emailEntries.value
+  const newDisabled = !input.checked
+  emailEntries.value = previous.map(item => item === entry ? { ...item, disabled: newDisabled } : item)
+  savingProfile.value = true
   try {
     const updated = await userAPI.toggleNotifyEmail(entry.email, newDisabled)
     authStore.user = updated
     emailEntries.value = [...updated.balance_notify_extra_emails]
   } catch (err: unknown) {
+    emailEntries.value = previous
+    input.checked = !entry.disabled
     appStore.showError(extractApiErrorMessage(err, t('common.error')))
+  } finally {
+    savingProfile.value = false
   }
 }
 
@@ -305,7 +333,8 @@ async function sendCodeFor(idx: number) {
 
 async function verifyPending(idx: number) {
   const pe = pendingEmails.value[idx]
-  if (!pe || !pe.code || pe.code.length !== 6) return
+  if (savingProfile.value || !pe || !pe.code || pe.code.length !== 6) return
+  savingProfile.value = true
   pe.verifying = true
   try {
     await userAPI.verifyNotifyEmail(pe.email, pe.code)
@@ -319,13 +348,16 @@ async function verifyPending(idx: number) {
     appStore.showError(extractApiErrorMessage(err, t('common.error')))
   } finally {
     pe.verifying = false
+    savingProfile.value = false
   }
 }
 
 const handleRemoveEmail = async (email: string) => {
+  if (savingProfile.value) return
   if (emailEntries.value.some(entry => entry.primary && entry.email.toLowerCase() === email.toLowerCase())) {
     return
   }
+  savingProfile.value = true
   try {
     await userAPI.removeNotifyEmail(email)
     appStore.showSuccess(t('profile.balanceNotify.removeSuccess'))
@@ -334,6 +366,8 @@ const handleRemoveEmail = async (email: string) => {
     emailEntries.value = [...updated.balance_notify_extra_emails]
   } catch (err: unknown) {
     appStore.showError(extractApiErrorMessage(err, t('common.error')))
+  } finally {
+    savingProfile.value = false
   }
 }
 
@@ -363,7 +397,8 @@ async function sendCodeForSaved(email: string) {
 }
 
 async function verifySavedEmail(email: string) {
-  if (!verifyCode.value || verifyCode.value.length !== 6) return
+  if (savingProfile.value || !verifyCode.value || verifyCode.value.length !== 6) return
+  savingProfile.value = true
   verifyingSaved.value = true
   try {
     await userAPI.verifyNotifyEmail(email, verifyCode.value)
@@ -378,6 +413,7 @@ async function verifySavedEmail(email: string) {
     appStore.showError(extractApiErrorMessage(err, t('common.error')))
   } finally {
     verifyingSaved.value = false
+    savingProfile.value = false
   }
 }
 </script>

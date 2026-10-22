@@ -4,6 +4,7 @@ import { defineComponent } from 'vue'
 
 import AccountsView from '../AccountsView.vue'
 import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
+import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 
 const {
   listAccounts,
@@ -208,6 +209,48 @@ describe('admin AccountsView lite account list', () => {
       expect.objectContaining({ lite: '1' }),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
+    wrapper.unmount()
+  })
+
+  it('restores valid platform and status filters on the first request', async () => {
+    localStorage.setItem('account-filter-values', JSON.stringify({ platform: 'gemini', status: 'rate_limited' }))
+    const wrapper = mountView()
+    await flushPromises()
+    expect(listAccounts.mock.calls[0][2]).toMatchObject({ platform: 'gemini', status: 'rate_limited', lite: '1' })
+    wrapper.unmount()
+  })
+
+  it.each(['null', '[]', 'invalid', '{"platform":"mixed","status":"retired"}'])(
+    'ignores malformed or retired persisted filters: %s', async (stored) => {
+      localStorage.setItem('account-filter-values', stored)
+      const wrapper = mountView()
+      await flushPromises()
+      expect(listAccounts.mock.calls[0][2]).toMatchObject({ platform: '', status: '' })
+      wrapper.unmount()
+    }
+  )
+
+  it('persists filter changes and resetting without storing search text', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    const filters = wrapper.findComponent(AccountTableFilters)
+    filters.vm.$emit('update:filters', { ...filters.props('filters'), platform: 'openai', status: 'active', search: 'private-search' })
+    filters.vm.$emit('change')
+    expect(JSON.parse(localStorage.getItem('account-filter-values')!)).toEqual({ platform: 'openai', status: 'active' })
+    filters.vm.$emit('update:filters', { ...filters.props('filters'), platform: '', status: '' })
+    filters.vm.$emit('change')
+    expect(JSON.parse(localStorage.getItem('account-filter-values')!)).toEqual({ platform: '', status: '' })
+    wrapper.unmount()
+  })
+
+  it('keeps filters usable when browser storage is unavailable', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage blocked') })
+    const wrapper = mountView()
+    await flushPromises()
+    const filters = wrapper.findComponent(AccountTableFilters)
+    filters.vm.$emit('update:filters', { ...filters.props('filters'), platform: 'openai', status: 'active' })
+    expect(() => filters.vm.$emit('change')).not.toThrow()
+    expect(filters.props('filters')).toMatchObject({ platform: 'openai', status: 'active' })
     wrapper.unmount()
   })
 

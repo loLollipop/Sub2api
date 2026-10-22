@@ -75,7 +75,7 @@ func TestPurchaseProductsSettingsPartialUpdates(t *testing.T) {
 		service.SettingKeySiteName:                     "Keep site",
 	}}
 	svc := service.NewSettingService(repo, &config.Config{Default: config.DefaultConfig{UserConcurrency: 5}})
-	h := admin.NewSettingHandler(svc, nil, nil, nil, nil, nil, nil)
+	h := admin.NewSettingHandler(svc, nil, nil, nil, nil)
 	rec := purchaseSettingsRequest(t, h.UpdateSettings, http.MethodPut, map[string]any{"purchase_subscription_enabled": false})
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Equal(t, `{"10":"https://shop.example.test/ten"}`, repo.values[service.SettingKeyPurchaseSubscriptionProducts])
@@ -133,7 +133,7 @@ func TestPurchaseProductsSettingsRejectInvalidWithoutWriting(t *testing.T) {
 	} {
 		repo := &purchaseSettingsRepo{values: map[string]string{service.SettingKeyPurchaseSubscriptionProducts: "{}"}}
 		svc := service.NewSettingService(repo, &config.Config{})
-		h := admin.NewSettingHandler(svc, nil, nil, nil, nil, nil, nil)
+		h := admin.NewSettingHandler(svc, nil, nil, nil, nil)
 		rec := purchaseSettingsRequest(t, h.UpdateSettings, http.MethodPut, map[string]any{"purchase_subscription_products": products})
 		require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 		require.Zero(t, repo.writes)
@@ -144,7 +144,7 @@ func TestPurchaseProductsSettingsRejectInvalidWithoutWriting(t *testing.T) {
 func TestPurchaseProductsSettingsDisabledPartialAndCorruptReads(t *testing.T) {
 	repo := &purchaseSettingsRepo{values: map[string]string{}}
 	svc := service.NewSettingService(repo, &config.Config{})
-	h := admin.NewSettingHandler(svc, nil, nil, nil, nil, nil, nil)
+	h := admin.NewSettingHandler(svc, nil, nil, nil, nil)
 	rec := purchaseSettingsRequest(t, h.UpdateSettings, http.MethodPut, map[string]any{"purchase_subscription_products": map[string]string{"20": "https://shop.example.test/twenty", "10": " "}})
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Equal(t, `{"20":"https://shop.example.test/twenty"}`, repo.values[service.SettingKeyPurchaseSubscriptionProducts])

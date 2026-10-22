@@ -5,9 +5,6 @@ import postcss, { type AtRule, type Rule } from 'postcss'
 import { describe, expect, it } from 'vitest'
 
 const stylesheet = postcss.parse(readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf8'))
-const ticketsStylesheet = postcss.parse(
-  readFileSync(resolve(process.cwd(), 'src/styles/tickets.css'), 'utf8')
-)
 
 const normalizeSelector = (selector: string) =>
   selector
@@ -126,18 +123,10 @@ describe('global scrollbar visibility', () => {
     expect(scrollbarUtilities.some((utility) => utility.startsWith('dark:'))).toBe(false)
   })
 
-  it('hides explicitly opted-out and ticket tab scrollbars in both engines', () => {
+  it('hides explicitly opted-out scrollbars in both engines', () => {
     expect(declarationValue(findRule('.scrollbar-hide'), 'scrollbar-width')).toBe('none')
     expect(declarationValue(findRule('.scrollbar-hide::-webkit-scrollbar'), 'display')).toBe('none')
-    expect(
-      declarationValue(findRuleIn(ticketsStylesheet, '.tickets-status-tabs'), 'scrollbar-width')
-    ).toBe('none')
-    expect(
-      declarationValue(
-        findRuleIn(ticketsStylesheet, '.tickets-status-tabs::-webkit-scrollbar'),
-        'display'
-      )
-    ).toBe('none')
+
   })
 
   it('leaves global scrollbar dimensions unchanged', () => {

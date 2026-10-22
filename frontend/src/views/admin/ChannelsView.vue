@@ -147,7 +147,7 @@
     >
       <div class="channel-dialog-body">
         <!-- Tab Bar -->
-        <div class="flex items-center border-b border-gray-200 dark:border-dark-700 flex-shrink-0 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-3 sm:-mt-4">
+        <div class="channel-dialog-tabs flex items-center overflow-x-auto border-b border-gray-200 dark:border-dark-700 flex-shrink-0">
           <!-- Basic Settings Tab -->
           <button
             type="button"
@@ -172,7 +172,7 @@
         </div>
 
         <!-- Tab Content -->
-        <form id="channel-form" @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto pt-4">
+        <form id="channel-form" @submit.prevent="handleSubmit" class="min-h-0 flex-1 overflow-y-auto pt-4">
           <!-- Basic Settings Tab -->
           <div v-show="activeTab === 'basic'" class="space-y-5">
             <!-- Name -->
@@ -1689,8 +1689,18 @@ onUnmounted(() => {
 .channel-dialog-body {
   display: flex;
   flex-direction: column;
-  height: 70vh;
-  min-height: 400px;
+  height: min(70dvh, calc(90dvh - 190px));
+  min-height: 0;
+}
+
+.channel-dialog-tabs {
+  min-height: 44px;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+.channel-dialog-tabs > button {
+  flex-shrink: 0;
 }
 
 .channel-tab {

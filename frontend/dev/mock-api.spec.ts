@@ -7,7 +7,6 @@ import type { UserDashboardStats } from '../src/api/usage'
 import type { MonitorMatrixResponse } from '../src/api/channelMonitorV2'
 import type { UserMonitorListResponse } from '../src/api/channelMonitor'
 import type { UserAvailableChannel } from '../src/api/channels'
-import type { CheckoutInfoResponse, CreateOrderResult, PaymentOrder } from '../src/types/payment'
 
 const date = new Date('2026-09-17T13:00:00Z')
 const query = (value = '') => new URLSearchParams(value)
@@ -174,7 +173,6 @@ describe('local demo API contracts', () => {
       channel_monitor_enabled: true,
       channel_monitor_mode: 'v2',
       available_channels_enabled: true,
-      payment_enabled: true,
       affiliate_enabled: true,
     })
     expect(api.handle('PUT', '/api/v1/settings/public', query(), { channel_monitor_mode: 'v1' })).toMatchObject({ channel_monitor_mode: 'v1' })
@@ -219,42 +217,6 @@ describe('local demo API contracts', () => {
     expect(plaza.groups.length).toBe(6)
     expect(plaza.groups.every(group => group.models.length > 0)).toBe(true)
     expect(plaza.groups.map(group => group.rate_multiplier)).toEqual([1, 0.07, 1, 1, 0.5, 1])
-  })
-
-  it('keeps payment orders local, currency-aware and free of outbound payment URLs', () => {
-    const api = createMockApi(date)
-    const checkout = api.handle('GET', '/api/v1/payment/checkout-info', query()) as CheckoutInfoResponse
-    expect(Object.keys(checkout.methods)).toEqual(['epusdt'])
-    expect(checkout.recharge_center_enabled).toBe(false)
-    expect(checkout.methods.epusdt.currency).toBe('CNY')
-    expect(checkout.plans[0]).toMatchObject({ price: 29, currency: 'USD' })
-    const created = api.handle('POST', '/api/v1/payment/orders', query(), { amount: 20, payment_type: 'epusdt', order_type: 'balance' }) as CreateOrderResult
-    expect(created).toMatchObject({ order_id: 51007, amount: 20, pay_amount: 20, currency: 'CNY', payment_mode: 'qrcode' })
-    expect(created.qr_code).toBe('LOCAL-DEMO-PAYMENT:LOCAL-DEMO-20260917-51007')
-    expect(created.pay_url).toBeUndefined()
-    expect(created.client_secret).toBeUndefined()
-    expect(api.handle('GET', '/api/v1/payment/orders/51007', query())).toMatchObject({ status: 'PENDING', currency: 'CNY' })
-    api.handle('POST', '/api/v1/payment/orders/51007/cancel', query())
-    expect(api.handle('GET', '/api/v1/payment/orders/51007', query())).toMatchObject({ status: 'CANCELLED' })
-
-    const usdt = api.handle('POST', '/api/v1/payment/orders', query(), { amount: 12, payment_type: 'epusdt', order_type: 'balance' }) as CreateOrderResult
-    expect(usdt).toMatchObject({ currency: 'CNY', pay_amount: 12 })
-    const orders = api.handle('GET', '/api/v1/payment/orders/my', query('page=1&page_size=20')) as PaginatedResponse<PaymentOrder>
-    expect(orders.total).toBe(8)
-    expect(orders.items.some(order => order.currency === 'USDT')).toBe(true)
-    api.handle('POST', '/api/v1/payment/orders/51005/refund-request', query(), { reason: '仅测试页面交互' })
-    expect(api.handle('GET', '/api/v1/payment/orders/51005', query())).toMatchObject({ status: 'REFUND_REQUESTED', refund_request_reason: '仅测试页面交互' })
-  })
-
-  it('persists the recharge entry switch in preview settings and checkout without changing providers', () => {
-    const api = createMockApi(date)
-    for (const enabled of [true, false]) {
-      expect(api.handle('PUT', '/api/v1/admin/settings', query(), { payment_recharge_center_enabled: enabled })).toMatchObject({ payment_recharge_center_enabled: enabled })
-      expect(api.handle('GET', '/api/v1/admin/settings', query())).toMatchObject({ payment_recharge_center_enabled: enabled })
-      const checkout = api.handle('GET', '/api/v1/payment/checkout-info', query()) as CheckoutInfoResponse
-      expect(checkout.recharge_center_enabled).toBe(enabled)
-      expect(Object.keys(checkout.methods)).toEqual(['epusdt'])
-    }
   })
 
   it('simulates redeem, affiliate and profile actions only in memory', () => {

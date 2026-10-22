@@ -56,6 +56,7 @@ export async function getById(id: number): Promise<ApiKey> {
  * @param expiresInDays - Optional days until expiry (undefined = never expires)
  * @param rateLimitData - Optional rate limit fields
  * @param anthropicCacheTtlMode - Optional Anthropic cache_control TTL override
+ * @param expiresAt - Optional absolute future expiry, mutually exclusive with expiresInDays
  * @returns Created API key
  */
 export async function create(
@@ -69,9 +70,18 @@ export async function create(
   rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number },
   groupIds?: number[],
   anthropicCacheTtlMode?: 'inherit' | 'off' | '1h' | '5m',
-  options?: { idempotencyKey?: string }
+  options?: { idempotencyKey?: string },
+  expiresAt?: string
 ): Promise<ApiKey> {
   const payload: CreateApiKeyRequest = { name }
+  if (expiresAt !== undefined) {
+    if (expiresInDays !== undefined) throw new Error('expires_at and expires_in_days are mutually exclusive')
+    const expiry = new Date(expiresAt)
+    if (!Number.isFinite(expiry.getTime()) || expiry.getTime() <= Date.now()) {
+      throw new Error('expires_at must be a valid future date')
+    }
+    payload.expires_at = expiry.toISOString()
+  }
   if (groupId !== undefined) {
     payload.group_id = groupId
   }

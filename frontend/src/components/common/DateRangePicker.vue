@@ -1,7 +1,10 @@
 <template>
   <div class="relative" ref="containerRef">
     <button
+      ref="triggerRef"
       type="button"
+      :aria-expanded="isOpen"
+      :aria-controls="isOpen ? panelId : undefined"
       @click="toggle"
       :class="['date-picker-trigger', isOpen && 'date-picker-trigger-open']"
     >
@@ -21,7 +24,7 @@
     </button>
 
     <Transition name="date-picker-dropdown">
-      <div v-if="isOpen" class="date-picker-dropdown">
+      <div v-if="isOpen" :id="panelId" class="date-picker-dropdown" role="group" :aria-label="t('dates.selectDateRange')">
         <!-- Quick presets -->
         <div class="date-picker-presets">
           <button
@@ -80,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 
@@ -108,6 +111,8 @@ const emit = defineEmits<Emits>()
 const { t, locale } = useI18n()
 
 const isOpen = ref(false)
+const panelId = `date-range-${useId()}`
+const triggerRef = ref<HTMLButtonElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
 const normalizeInput = (value: string, end = false): string => {
   if (!props.includeTime || !value) return value
@@ -117,6 +122,9 @@ const normalizeInput = (value: string, end = false): string => {
 const localStartDate = ref(normalizeInput(props.startDate))
 const localEndDate = ref(normalizeInput(props.endDate, true))
 const activePreset = ref<string | null>('last24Hours')
+const appliedStartDate = ref(localStartDate.value)
+const appliedEndDate = ref(localEndDate.value)
+const appliedPreset = ref<string | null>('last24Hours')
 const maximumDate = computed(() => normalizeInput(tomorrow.value, true))
 const validRange = computed(() => {
   const start = new Date(localStartDate.value).getTime()
@@ -232,16 +240,16 @@ const presets: DatePreset[] = [
 ]
 
 const displayValue = computed(() => {
-  if (activePreset.value) {
-    const preset = presets.find((p) => p.value === activePreset.value)
+  if (appliedPreset.value) {
+    const preset = presets.find((p) => p.value === appliedPreset.value)
     if (preset) return t(preset.labelKey)
   }
 
-  if (localStartDate.value && localEndDate.value) {
-    if (localStartDate.value === localEndDate.value) {
-      return formatDate(localStartDate.value)
+  if (appliedStartDate.value && appliedEndDate.value) {
+    if (appliedStartDate.value === appliedEndDate.value) {
+      return formatDate(appliedStartDate.value)
     }
-    return `${formatDate(localStartDate.value)} - ${formatDate(localEndDate.value)}`
+    return `${formatDate(appliedStartDate.value)} - ${formatDate(appliedEndDate.value)}`
   }
 
   return t('dates.selectDateRange')
@@ -270,26 +278,43 @@ const selectPreset = (preset: DatePreset) => {
   activePreset.value = preset.value
 }
 
-const onDateChange = () => {
-  // Check if current dates match any preset
-  activePreset.value = null
-  for (const preset of presets) {
+const findMatchingPreset = (start: string, end: string): string | null => {
+  return presets.find((preset) => {
     const range = preset.getRange()
-    if (normalizeInput(range.start) === localStartDate.value && normalizeInput(range.end, true) === localEndDate.value) {
-      activePreset.value = preset.value
-      break
-    }
-  }
+    return normalizeInput(range.start) === start && normalizeInput(range.end, true) === end
+  })?.value ?? null
+}
+
+const onDateChange = () => {
+  activePreset.value = findMatchingPreset(localStartDate.value, localEndDate.value)
+}
+
+const resetDraft = () => {
+  localStartDate.value = appliedStartDate.value
+  localEndDate.value = appliedEndDate.value
+  activePreset.value = appliedPreset.value
+}
+
+const close = () => {
+  isOpen.value = false
+  resetDraft()
 }
 
 const toggle = () => {
-  isOpen.value = !isOpen.value
+  if (isOpen.value) close()
+  else {
+    resetDraft()
+    isOpen.value = true
+  }
 }
 
 const apply = () => {
   if (!validRange.value) return
   localStartDate.value = normalizeInput(localStartDate.value)
   localEndDate.value = normalizeInput(localEndDate.value, true)
+  appliedStartDate.value = localStartDate.value
+  appliedEndDate.value = localEndDate.value
+  appliedPreset.value = activePreset.value
   emit('update:startDate', localStartDate.value)
   emit('update:endDate', localEndDate.value)
   emit('change', {
@@ -297,7 +322,8 @@ const apply = () => {
     endDate: localEndDate.value,
     preset: activePreset.value
   })
-  isOpen.value = false
+  close()
+  triggerRef.value?.focus()
 }
 
 // refreshActivePreset re-applies the currently active quick preset so an
@@ -305,26 +331,28 @@ const apply = () => {
 // "now". Returns the recomputed range, or null when the user set a custom
 // range — a custom range must stay exactly where the user put it.
 const refreshActivePreset = (): { startDate: string; endDate: string } | null => {
-  if (!activePreset.value) return null
-  const preset = presets.find((p) => p.value === activePreset.value)
+  if (!appliedPreset.value) return null
+  const preset = presets.find((p) => p.value === appliedPreset.value)
   if (!preset) return null
   const range = preset.getRange()
-  localStartDate.value = normalizeInput(range.start)
-  localEndDate.value = normalizeInput(range.end, true)
-  return { startDate: localStartDate.value, endDate: localEndDate.value }
+  appliedStartDate.value = normalizeInput(range.start)
+  appliedEndDate.value = normalizeInput(range.end, true)
+  if (!isOpen.value) resetDraft()
+  return { startDate: appliedStartDate.value, endDate: appliedEndDate.value }
 }
 
 defineExpose({ refreshActivePreset })
 
 const handleClickOutside = (event: MouseEvent) => {
   if (containerRef.value && !containerRef.value.contains(event.target as Node)) {
-    isOpen.value = false
+    close()
   }
 }
 
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && isOpen.value) {
-    isOpen.value = false
+    close()
+    triggerRef.value?.focus()
   }
 }
 
@@ -332,14 +360,15 @@ const handleEscape = (event: KeyboardEvent) => {
 // relative preset's clock may have advanced since selection. External changes
 // still reset/re-detect the preset, and manual input calls onDateChange above.
 watch(
-  () => [props.startDate, props.endDate] as const,
+  () => [props.startDate, props.endDate, props.includeTime] as const,
   ([start, end]) => {
     const normalizedStart = normalizeInput(start)
     const normalizedEnd = normalizeInput(end, true)
-    const unchanged = normalizedStart === localStartDate.value && normalizedEnd === localEndDate.value
-    localStartDate.value = normalizedStart
-    localEndDate.value = normalizedEnd
-    if (!unchanged) onDateChange()
+    const unchanged = normalizedStart === appliedStartDate.value && normalizedEnd === appliedEndDate.value
+    appliedStartDate.value = normalizedStart
+    appliedEndDate.value = normalizedEnd
+    if (!unchanged) appliedPreset.value = findMatchingPreset(normalizedStart, normalizedEnd)
+    if (!unchanged || !isOpen.value) resetDraft()
   }
 )
 
@@ -347,7 +376,8 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleEscape)
   // Initialize active preset detection
-  onDateChange()
+  appliedPreset.value = findMatchingPreset(appliedStartDate.value, appliedEndDate.value)
+  resetDraft()
 })
 
 onUnmounted(() => {

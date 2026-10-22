@@ -56,23 +56,19 @@ type SettingHandler struct {
 	turnstileService         *service.TurnstileService
 	aliyunCaptchaService     *service.AliyunCaptchaService
 	opsService               *service.OpsService
-	paymentConfigService     *service.PaymentConfigService
-	paymentService           *service.PaymentService
 	userAttributeService     *service.UserAttributeService
 	notificationEmailService *service.NotificationEmailService
 	totpService              *service.TotpService
 	userService              *service.UserService
 }
 
-// NewSettingHandler 创建系统设置处理器
-func NewSettingHandler(settingService *service.SettingService, emailService *service.EmailService, turnstileService *service.TurnstileService, opsService *service.OpsService, paymentConfigService *service.PaymentConfigService, paymentService *service.PaymentService, userAttributeService *service.UserAttributeService) *SettingHandler {
+// NewSettingHandler creates the system settings handler.
+func NewSettingHandler(settingService *service.SettingService, emailService *service.EmailService, turnstileService *service.TurnstileService, opsService *service.OpsService, userAttributeService *service.UserAttributeService) *SettingHandler {
 	return &SettingHandler{
 		settingService:       settingService,
 		emailService:         emailService,
 		turnstileService:     turnstileService,
 		opsService:           opsService,
-		paymentConfigService: paymentConfigService,
-		paymentService:       paymentService,
 		userAttributeService: userAttributeService,
 	}
 }
@@ -122,14 +118,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		})
 	}
 
-	// Load payment config
-	var paymentCfg *service.PaymentConfig
-	if h.paymentConfigService != nil {
-		paymentCfg, _ = h.paymentConfigService.GetPaymentConfig(c.Request.Context())
-	}
-	if paymentCfg == nil {
-		paymentCfg = &service.PaymentConfig{}
-	}
 	passkeyConfigured, passkeyRPID, passkeyRPOrigins := h.settingService.PasskeyConfiguration()
 
 	payload := dto.SystemSettings{
@@ -316,10 +304,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		CodexCLIOnlyAllowAppServerClients:                      settings.CodexCLIOnlyAllowAppServerClients,
 		CodexCLIOnlyEngineFingerprintSignals:                   settings.CodexCLIOnlyEngineFingerprintSignals,
 		WebSearchEmulationEnabled:                              settings.WebSearchEmulationEnabled,
-		PaymentVisibleMethodAlipaySource:                       settings.PaymentVisibleMethodAlipaySource,
-		PaymentVisibleMethodWxpaySource:                        settings.PaymentVisibleMethodWxpaySource,
-		PaymentVisibleMethodAlipayEnabled:                      settings.PaymentVisibleMethodAlipayEnabled,
-		PaymentVisibleMethodWxpayEnabled:                       settings.PaymentVisibleMethodWxpayEnabled,
 		OpenAILowUpstreamRatePriorityEnabled:                   settings.OpenAILowUpstreamRatePriorityEnabled,
 		OpenAIOAuthSchedulingRateMultiplier:                    settings.OpenAIOAuthSchedulingRateMultiplier,
 		CodexQuotaOverdraftEnabled:                             settings.CodexQuotaOverdraftEnabled,
@@ -355,30 +339,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		SubscriptionExpiryNotifyEnabled:                        settings.SubscriptionExpiryNotifyEnabled,
 		AccountQuotaNotifyEnabled:                              settings.AccountQuotaNotifyEnabled,
 		AccountQuotaNotifyEmails:                               dto.NotifyEmailEntriesFromService(settings.AccountQuotaNotifyEmails),
-		PaymentEnabled:                                         paymentCfg.Enabled,
-		PaymentRechargeCenterEnabled:                           paymentCfg.RechargeCenterEnabled,
-		PaymentMinAmount:                                       paymentCfg.MinAmount,
-		PaymentMaxAmount:                                       paymentCfg.MaxAmount,
-		PaymentDailyLimit:                                      paymentCfg.DailyLimit,
-		PaymentOrderTimeoutMin:                                 paymentCfg.OrderTimeoutMin,
-		PaymentMaxPendingOrders:                                paymentCfg.MaxPendingOrders,
-		PaymentEnabledTypes:                                    paymentCfg.EnabledTypes,
-		PaymentBalanceDisabled:                                 paymentCfg.BalanceDisabled,
-		PaymentBalanceRechargeMultiplier:                       paymentCfg.BalanceRechargeMultiplier,
-		PaymentSubscriptionUSDToCNYRate:                        paymentCfg.SubscriptionUSDToCNYRate,
-		PaymentRechargeFeeRate:                                 paymentCfg.RechargeFeeRate,
-		PaymentLoadBalanceStrat:                                paymentCfg.LoadBalanceStrategy,
-		PaymentProductNamePrefix:                               paymentCfg.ProductNamePrefix,
-		PaymentProductNameSuffix:                               paymentCfg.ProductNameSuffix,
-		PaymentHelpImageURL:                                    paymentCfg.HelpImageURL,
-		PaymentHelpText:                                        paymentCfg.HelpText,
-		PaymentCancelRateLimitEnabled:                          paymentCfg.CancelRateLimitEnabled,
-		PaymentCancelRateLimitMax:                              paymentCfg.CancelRateLimitMax,
-		PaymentCancelRateLimitWindow:                           paymentCfg.CancelRateLimitWindow,
-		PaymentCancelRateLimitUnit:                             paymentCfg.CancelRateLimitUnit,
-		PaymentCancelRateLimitMode:                             paymentCfg.CancelRateLimitMode,
-		PaymentAlipayForceQRCode:                               paymentCfg.AlipayForceQRCode,
-		PaymentAlipayMobilePrecreateDeepLink:                   paymentCfg.AlipayMobilePrecreateDeepLink,
 
 		ChannelMonitorEnabled:                settings.ChannelMonitorEnabled,
 		ChannelMonitorMode:                   settings.ChannelMonitorMode,

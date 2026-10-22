@@ -81,70 +81,88 @@
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
             <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('admin.usage.requestId') }}</label>
-              <input v-model="errorFilter.request_id" type="text" class="input" :placeholder="t('usage.requestIdPlaceholder')" @change="applyErrorFilters" @keyup.enter="applyErrorFilters" />
+              <label for="usage-error-request-id" class="input-label">{{ t('admin.usage.requestId') }}</label>
+              <input id="usage-error-request-id" v-model="errorFilter.request_id" type="text" class="input" :placeholder="t('usage.requestIdPlaceholder')" @change="applyErrorFilters" @keyup.enter="applyErrorFilters" />
             </div>
             <div class="w-full sm:w-auto sm:min-w-[220px]">
               <label class="input-label">{{ t('usage.errors.keyName') }}</label>
               <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.errors.model') }}</label>
-              <Select
-                v-model="errorFilter.model"
-                :options="errorModelOptions"
-                searchable
-                creatable
-                clearable
-                :placeholder="t('usage.errors.modelPlaceholder')"
-                @change="applyErrorFilters"
-              />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('usage.errors.category') }}</label>
-              <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
-              <label class="input-label">{{ t('usage.errors.status') }}</label>
-              <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
+            <div id="usage-secondary-filters" v-show="isDesktop || secondaryFiltersExpanded" class="flex w-full flex-wrap items-end gap-4 sm:contents">
+              <div class="w-full sm:w-auto sm:min-w-[220px]">
+                <label class="input-label">{{ t('usage.errors.model') }}</label>
+                <Select
+                  v-model="errorFilter.model"
+                  :options="errorModelOptions"
+                  searchable
+                  creatable
+                  clearable
+                  :placeholder="t('usage.errors.modelPlaceholder')"
+                  @change="applyErrorFilters"
+                />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[200px]">
+                <label class="input-label">{{ t('usage.errors.category') }}</label>
+                <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[180px]">
+                <label class="input-label">{{ t('usage.errors.status') }}</label>
+                <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
+              </div>
             </div>
           </div>
           <div v-else class="flex flex-1 flex-wrap items-end gap-4">
             <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('admin.usage.requestId') }}</label>
-              <input v-model="filters.request_id" type="text" class="input" :placeholder="t('usage.requestIdPlaceholder')" @change="applyFilters" @keyup.enter="applyFilters" />
+              <label for="usage-request-id" class="input-label">{{ t('admin.usage.requestId') }}</label>
+              <input id="usage-request-id" v-model="filters.request_id" type="text" class="input" :placeholder="t('usage.requestIdPlaceholder')" @change="applyFilters" @keyup.enter="applyFilters" />
             </div>
             <div class="w-full sm:w-auto sm:min-w-[220px]">
               <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
               <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
-              <label class="input-label">{{ t('usage.model') }}</label>
-              <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.group') }}</label>
-              <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
-              <label class="input-label">{{ t('usage.type') }}</label>
-              <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
-              <label class="input-label">{{ t('usage.compactionFilter') }}</label>
-              <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.billingType') }}</label>
-              <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
-              <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
+            <div id="usage-secondary-filters" v-show="isDesktop || secondaryFiltersExpanded" class="flex w-full flex-wrap items-end gap-4 sm:contents">
+              <div class="w-full sm:w-auto sm:min-w-[220px]">
+                <label class="input-label">{{ t('usage.model') }}</label>
+                <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[200px]">
+                <label class="input-label">{{ t('admin.usage.group') }}</label>
+                <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[180px]">
+                <label class="input-label">{{ t('usage.type') }}</label>
+                <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[180px]">
+                <label class="input-label">{{ t('usage.compactionFilter') }}</label>
+                <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[200px]">
+                <label class="input-label">{{ t('admin.usage.billingType') }}</label>
+                <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
+              </div>
+              <div class="w-full sm:w-auto sm:min-w-[200px]">
+                <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
+                <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
+              </div>
             </div>
           </div>
 
           <div class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+            <button
+              v-if="!isDesktop"
+              ref="secondaryFiltersToggle"
+              type="button"
+              class="btn btn-secondary mr-auto"
+              data-testid="usage-secondary-filters-toggle"
+              :aria-expanded="secondaryFiltersExpanded"
+              aria-controls="usage-secondary-filters"
+              @click="toggleSecondaryFilters"
+            >
+              {{ t(secondaryFiltersExpanded ? 'usage.fewerFilters' : 'usage.moreFilters') }}
+              <span v-if="!secondaryFiltersExpanded">({{ secondaryFilterCount }})</span>
+              <Icon :name="secondaryFiltersExpanded ? 'chevronUp' : 'chevronDown'" size="sm" class="ml-2" />
+            </button>
             <button type="button" @click="refreshData" :disabled="activeTab === 'errors' ? errorLoading : loading" class="btn btn-secondary btn-icon" :title="t('common.refresh')" :aria-label="t('common.refresh')">
               <Icon name="refresh" size="md" :class="{ 'animate-spin': activeTab === 'errors' ? errorLoading : loading }" />
             </button>
@@ -260,7 +278,7 @@
 <script setup lang="ts">
 import '@/styles/console-workspace.css'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { usePreferredReducedMotion } from '@vueuse/core'
+import { useMediaQuery, usePreferredReducedMotion } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
@@ -411,6 +429,22 @@ const filters = ref<UsageQueryParams>({
   billing_type: null,
   billing_mode: null,
 })
+
+const isDesktop = useMediaQuery('(min-width: 640px)')
+const secondaryFiltersExpanded = ref(false)
+const secondaryFiltersToggle = ref<HTMLButtonElement | null>(null)
+const hasFilterValue = (value: unknown) => value !== undefined && value !== null && value !== ''
+const secondaryFilterCount = computed(() => {
+  const values = activeTab.value === 'errors'
+    ? [errorFilter.value.model, errorFilter.value.category, errorFilter.value.status_code]
+    : [filters.value.model, filters.value.group_id, filters.value.request_type,
+      filters.value.native_compaction_v2, filters.value.billing_type, filters.value.billing_mode]
+  return values.filter(hasFilterValue).length
+})
+const toggleSecondaryFilters = () => {
+  secondaryFiltersExpanded.value = !secondaryFiltersExpanded.value
+  secondaryFiltersToggle.value?.focus()
+}
 
 const pagination = reactive({
   page: 1,
@@ -961,6 +995,9 @@ const loadFilterOptions = async () => {
 }
 
 const resetErrorRows = () => {
+  ++errorGeneration
+  errorController?.abort()
+  errorLoading.value = false
   errorPage.value = 1
   if (activeTab.value === 'errors') {
     void loadErrors()
@@ -970,7 +1007,13 @@ const resetErrorRows = () => {
   }
 }
 
+let errorController: AbortController | null = null
+let errorGeneration = 0
 const loadErrors = async () => {
+  const generation = ++errorGeneration
+  errorController?.abort()
+  const controller = new AbortController()
+  errorController = controller
   errorLoading.value = true
   try {
     const resp = await usageAPI.listMyErrorRequests({
@@ -985,14 +1028,16 @@ const loadErrors = async () => {
       request_id: errorFilter.value.request_id.trim() || undefined,
       sort_by: errorSortBy.value,
       sort_order: errorSortOrder.value,
-    })
+    }, { signal: controller.signal })
+    if (controller.signal.aborted || generation !== errorGeneration) return
     errorRows.value = resp.items
     errorTotal.value = resp.total
   } catch (error) {
+    if (controller.signal.aborted || generation !== errorGeneration) return
     console.error('[UsageView] loadErrors failed:', error)
     appStore.showError(t('usage.errors.failedToLoad'))
   } finally {
-    errorLoading.value = false
+    if (generation === errorGeneration) errorLoading.value = false
   }
 }
 
@@ -1028,6 +1073,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  ++errorGeneration
+  errorController?.abort()
   ++logsGeneration
   invalidateInflight()
   abortController?.abort()

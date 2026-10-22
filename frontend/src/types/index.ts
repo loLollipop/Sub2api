@@ -245,7 +245,6 @@ export interface PublicSettings {
   purchase_subscription_enabled?: boolean
   purchase_subscription_url?: string
   purchase_subscription_products?: Record<string, string>
-  payment_enabled: boolean
   risk_control_enabled: boolean
   table_default_page_size: number
   table_page_size_options: number[]
@@ -787,6 +786,7 @@ export interface CreateApiKeyRequest {
   ip_blacklist?: string[]
   quota?: number // Quota limit in USD (0 = unlimited)
   expires_in_days?: number // Days until expiry (null = never expires)
+  expires_at?: string // Absolute future expiry (ISO 8601); mutually exclusive with expires_in_days
   rate_limit_5h?: number
   rate_limit_1d?: number
   rate_limit_7d?: number
@@ -2421,10 +2421,11 @@ export interface TotpEnableResponse {
 export interface TotpDisableRequest {
   email_code?: string
   password?: string
+  totp_code?: string
 }
 
 export interface TotpVerificationMethod {
-  method: 'email' | 'password'
+  method: 'email' | 'password' | 'totp'
 }
 
 export interface TotpLoginResponse {
@@ -2516,8 +2517,6 @@ export interface UpdateScheduledTestPlanRequest {
   quality_config?: ChanshuiQualityConfig
 }
 
-// Payment types
-export type { SubscriptionPlan, PaymentOrder, CheckoutInfoResponse } from './payment'
 
 export type {
   PlatformQuotaItem,

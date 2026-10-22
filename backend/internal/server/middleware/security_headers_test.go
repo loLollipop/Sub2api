@@ -171,7 +171,7 @@ func TestSecurityHeaders(t *testing.T) {
 		assert.Empty(t, GetNonceFromContext(c))
 	})
 
-	t.Run("canvas_allows_same_origin_embed", func(t *testing.T) {
+	t.Run("removed_canvas_uses_standard_frame_policy", func(t *testing.T) {
 		cfg := config.CSPConfig{Enabled: true, Policy: ""}
 		middleware := SecurityHeaders(cfg, nil)
 
@@ -181,10 +181,10 @@ func TestSecurityHeaders(t *testing.T) {
 			c.Request = httptest.NewRequest(http.MethodGet, path, nil)
 			middleware(c)
 
-			assert.Equal(t, "SAMEORIGIN", w.Header().Get("X-Frame-Options"), path)
+			assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"), path)
 			csp := w.Header().Get("Content-Security-Policy")
-			assert.Equal(t, 1, countDirectiveValue(csp, "frame-ancestors", "'self'"), path)
-			assert.Equal(t, 0, countDirectiveValue(csp, "frame-ancestors", "'none'"), path)
+			assert.Equal(t, 0, countDirectiveValue(csp, "frame-ancestors", "'self'"), path)
+			assert.Equal(t, 1, countDirectiveValue(csp, "frame-ancestors", "'none'"), path)
 			assert.Contains(t, csp, "'nonce-", path)
 			assert.Contains(t, csp, "script-src", path)
 		}
@@ -440,34 +440,6 @@ func TestEnhanceCSPPolicy(t *testing.T) {
 		assert.Contains(t, enhanced, "'nonce-existing'")
 	})
 
-	t.Run("adds_airwallex_domains_for_payment_sdk", func(t *testing.T) {
-		policy := "default-src 'self'; script-src 'self' __CSP_NONCE__; style-src 'self'; frame-src 'self'"
-		enhanced := enhanceCSPPolicy(policy)
-
-		assert.Contains(t, enhanced, "script-src 'self' __CSP_NONCE__")
-		assert.Contains(t, enhanced, AirwallexStaticDomain)
-		assert.Contains(t, enhanced, AirwallexCheckoutDomain)
-		assert.Contains(t, enhanced, AirwallexDemoStaticDomain)
-		assert.Contains(t, enhanced, AirwallexDemoCheckoutDomain)
-		assert.Contains(t, enhanced, "style-src 'self'")
-		assert.Contains(t, enhanced, "frame-src 'self'")
-	})
-
-	t.Run("does_not_duplicate_airwallex_domains", func(t *testing.T) {
-		policy := "default-src 'self'; script-src 'self' https://static.airwallex.com https://static-demo.airwallex.com; frame-src https://checkout.airwallex.com https://checkout-demo.airwallex.com"
-		enhanced := enhanceCSPPolicy(policy)
-
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "script-src", AirwallexStaticDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "script-src", AirwallexCheckoutDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "style-src", AirwallexStaticDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "style-src", AirwallexCheckoutDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "frame-src", AirwallexCheckoutDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "script-src", AirwallexDemoStaticDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "script-src", AirwallexDemoCheckoutDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "style-src", AirwallexDemoStaticDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "style-src", AirwallexDemoCheckoutDomain))
-		assert.Equal(t, 1, countDirectiveValue(enhanced, "frame-src", AirwallexDemoCheckoutDomain))
-	})
 }
 
 func countDirectiveValue(policy, directive, value string) int {
@@ -547,19 +519,6 @@ func TestRewriteCSPFrameAncestors(t *testing.T) {
 		assert.Equal(t, 1, countDirectiveValue(got, "frame-ancestors", "'self'"))
 		assert.NotContains(t, got, "evil.example")
 	})
-}
-
-func TestAllowSameOriginEmbedHeaders(t *testing.T) {
-	header := http.Header{}
-	header.Set("X-Frame-Options", "DENY")
-	header.Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'")
-
-	AllowSameOriginEmbedHeaders(header)
-
-	assert.Equal(t, []string{"SAMEORIGIN"}, header.Values("X-Frame-Options"))
-	csp := header.Get("Content-Security-Policy")
-	assert.Equal(t, 1, countDirectiveValue(csp, "frame-ancestors", "'self'"))
-	assert.Equal(t, 0, countDirectiveValue(csp, "frame-ancestors", "'none'"))
 }
 
 // Benchmark tests

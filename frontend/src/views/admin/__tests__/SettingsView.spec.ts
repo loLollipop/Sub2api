@@ -7,6 +7,7 @@ import enSettings from "@/i18n/locales/en/admin/settings";
 import zhCommon from "@/i18n/locales/zh/common";
 import zhSettings from "@/i18n/locales/zh/admin/settings";
 import SettingsView from "../SettingsView.vue";
+import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 
 const {
   getSettings,
@@ -28,14 +29,11 @@ const {
   updateOllamaCloudUsageSettings,
   getGroups,
   listProxies,
-  getProviders,
-  updateProvider,
-  createProvider,
-  deleteProvider,
   fetchPublicSettings,
   adminSettingsFetch,
   showError,
   showSuccess,
+  verifyStepUp,
 } = vi.hoisted(() => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
@@ -69,19 +67,17 @@ const {
   updateOllamaCloudUsageSettings: vi.fn().mockImplementation(async (payload) => payload),
   getGroups: vi.fn(),
   listProxies: vi.fn(),
-  getProviders: vi.fn(),
-  updateProvider: vi.fn(),
-  createProvider: vi.fn(),
-  deleteProvider: vi.fn(),
   fetchPublicSettings: vi.fn(),
   adminSettingsFetch: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
+  verifyStepUp: vi.fn(),
 }));
 
 const localeRef = vi.hoisted(() => ({ value: "zh-CN" }));
 
 vi.mock("@/api", () => ({
+  totpAPI: { stepUp: verifyStepUp },
   adminAPI: {
     settings: {
       getSettings,
@@ -109,12 +105,6 @@ vi.mock("@/api", () => ({
     },
     proxies: {
       list: listProxies,
-    },
-    payment: {
-      getProviders,
-      updateProvider,
-      createProvider,
-      deleteProvider,
     },
   },
 }));
@@ -189,13 +179,6 @@ vi.mock("vue-i18n", async () => {
     "admin.settings.authSourceDefaults.defaultSubscriptionsLabel": "默认订阅",
     "admin.settings.authSourceDefaults.defaultSubscriptionsHint": "仅对当前认证来源生效，未配置时不追加来源专属订阅。",
     "admin.settings.authSourceDefaults.noSourceSubscriptions": "当前来源未配置专属默认订阅。",
-    "admin.settings.paymentVisibleMethods.methodLabel": "{title} 可见方式",
-    "admin.settings.paymentVisibleMethods.methodHint": "控制前台结算页是否展示该方式，以及展示时使用的来源键。",
-    "admin.settings.paymentVisibleMethods.sourceLabel": "支付来源",
-    "admin.settings.paymentVisibleMethods.sourceHint": "启用后必须明确选择一个来源；未配置状态不会对外展示该支付方式。",
-    "admin.settings.paymentVisibleMethods.sourceRequiredError": "{title} 已启用，请先选择支付来源。",
-    "admin.settings.payment.configGuide": "查看支付配置说明",
-    "admin.settings.payment.findProvider": "查看支持的支付方式",
     "admin.settings.openaiExperimentalScheduler.title": "OpenAI 实验调度策略",
     "admin.settings.openaiExperimentalScheduler.description": "默认关闭。开启后仅影响本网关在 OpenAI 账号间的实验性调度选择逻辑，不代表上游 OpenAI 官方能力。",
     "admin.settings.openaiExperimentalScheduler.lowRatePriorityTitle": "低倍率优先",
@@ -476,31 +459,6 @@ const baseSettingsResponse = {
   enable_client_dateline_normalization: true,
   antigravity_user_agent_version: "",
   openai_codex_user_agent: "",
-  payment_enabled: true,
-  payment_min_amount: 1,
-  payment_max_amount: 10000,
-  payment_daily_limit: 50000,
-  payment_order_timeout_minutes: 30,
-  payment_max_pending_orders: 3,
-  payment_enabled_types: [],
-  payment_balance_disabled: false,
-  payment_balance_recharge_multiplier: 1,
-  payment_subscription_usd_to_cny_rate: 0,
-  payment_recharge_fee_rate: 0,
-  payment_load_balance_strategy: "round-robin",
-  payment_product_name_prefix: "",
-  payment_product_name_suffix: "",
-  payment_help_image_url: "",
-  payment_help_text: "",
-  payment_cancel_rate_limit_enabled: false,
-  payment_cancel_rate_limit_max: 10,
-  payment_cancel_rate_limit_window: 1,
-  payment_cancel_rate_limit_unit: "day",
-  payment_cancel_rate_limit_window_mode: "rolling",
-  payment_visible_method_alipay_source: "alipay_direct",
-  payment_visible_method_wxpay_source: "invalid-source",
-  payment_visible_method_alipay_enabled: true,
-  payment_visible_method_wxpay_enabled: true,
   openai_low_upstream_rate_priority_enabled: false,
   openai_oauth_scheduling_rate_multiplier: 1,
   openai_advanced_scheduler_enabled: false,
@@ -552,8 +510,6 @@ function mountView() {
         Toggle: ToggleStub,
         Icon: true,
         ConfirmDialog: true,
-        PaymentProviderList: true,
-        PaymentProviderDialog: true,
         GroupBadge: true,
         GroupOptionItem: true,
         ProxySelector: true,
@@ -564,13 +520,13 @@ function mountView() {
   });
 }
 
-async function openPaymentTab(wrapper: ReturnType<typeof mountView>) {
-  const paymentTabButton = wrapper
+async function openPurchaseTab(wrapper: ReturnType<typeof mountView>) {
+  const purchaseTabButton = wrapper
     .findAll("button")
-    .find((node) => node.text().includes("admin.settings.tabs.payment"));
+    .find((node) => node.text().includes("admin.settings.tabs.purchase"));
 
-  expect(paymentTabButton).toBeDefined();
-  await paymentTabButton?.trigger("click");
+  expect(purchaseTabButton).toBeDefined();
+  await purchaseTabButton?.trigger("click");
   await flushPromises();
 }
 
@@ -626,7 +582,7 @@ describe("admin SettingsView email domain quota copy", () => {
   });
 });
 
-describe("admin SettingsView payment visible method controls", () => {
+describe("admin SettingsView settings controls", () => {
   beforeEach(() => {
     getSettings.mockReset();
     updateSettings.mockReset();
@@ -645,14 +601,12 @@ describe("admin SettingsView payment visible method controls", () => {
     updateOllamaCloudUsageSettings.mockReset();
     getGroups.mockReset();
     listProxies.mockReset();
-    getProviders.mockReset();
-    updateProvider.mockReset();
-    createProvider.mockReset();
-    deleteProvider.mockReset();
     fetchPublicSettings.mockReset();
     adminSettingsFetch.mockReset();
     showError.mockReset();
     showSuccess.mockReset();
+    verifyStepUp.mockReset();
+    verifyStepUp.mockResolvedValue({ verified: true, expires_in: 900 });
     localeRef.value = "zh-CN";
 
     getSettings.mockResolvedValue({ ...baseSettingsResponse });
@@ -713,11 +667,65 @@ describe("admin SettingsView payment visible method controls", () => {
     listProxies.mockResolvedValue({
       items: [],
     });
-    getProviders.mockResolvedValue({
-      data: [],
-    });
     fetchPublicSettings.mockResolvedValue(undefined);
     adminSettingsFetch.mockResolvedValue(undefined);
+  });
+
+  it.each([{ status: 503 }, new Error("Network unavailable")])("preserves web search providers when loading fails (%o)", async (error) => {
+    getWebSearchEmulationConfig.mockRejectedValueOnce(error);
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+    expect(wrapper.get('[data-testid="web-search-load-error"]').text()).toContain("加载失败");
+    expect(wrapper.get('[data-testid="web-search-fields"]').attributes("disabled")).toBeDefined();
+    await wrapper.get("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(updateWebSearchEmulationConfig).not.toHaveBeenCalled();
+    expect(showSuccess).toHaveBeenCalledWith(expect.stringContaining("其他设置已保存"));
+    expect(showSuccess).not.toHaveBeenCalledWith(zhSettings.settingsSaved);
+    wrapper.unmount();
+  });
+
+  it("retries failed web search loading once and preserves subsequent edits", async () => {
+    let resolveConfig!: (config: { enabled: boolean; providers: unknown[] }) => void;
+    getWebSearchEmulationConfig.mockRejectedValueOnce({ status: 503 })
+      .mockReturnValueOnce(new Promise(resolve => { resolveConfig = resolve; }));
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+    const retry = wrapper.get('[data-testid="web-search-retry"]');
+    await retry.trigger("click");
+    await retry.trigger("click");
+    expect(getWebSearchEmulationConfig).toHaveBeenCalledTimes(2);
+    expect(retry.attributes("disabled")).toBeDefined();
+    resolveConfig({ enabled: true, providers: [{ type: "brave", api_key_configured: true, quota_limit: 1000 }] });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="web-search-load-error"]').exists()).toBe(false);
+    const fields = wrapper.get('[data-testid="web-search-fields"]');
+    expect(fields.attributes("disabled")).toBeUndefined();
+    await fields.get('input[type="checkbox"]').setValue(false);
+    await wrapper.get("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateWebSearchEmulationConfig).toHaveBeenCalledWith(expect.objectContaining({
+      enabled: false,
+      providers: [expect.objectContaining({ type: "brave", api_key_configured: true })],
+    }));
+    expect(getWebSearchEmulationConfig).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it("initializes confirmed absent web search settings", async () => {
+    getWebSearchEmulationConfig.mockRejectedValueOnce({ status: 404 });
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+    expect(wrapper.get('[data-testid="web-search-fields"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-testid="web-search-load-error"]').exists()).toBe(false);
+    await wrapper.get("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateWebSearchEmulationConfig).toHaveBeenCalledWith({ enabled: false, providers: [] });
+    wrapper.unmount();
   });
 
   it("starts independent settings requests while bulk hydration is pending", async () => {
@@ -740,6 +748,80 @@ describe("admin SettingsView payment visible method controls", () => {
     await wrapper.get("#settings-tab-gateway").trigger("click");
     await wrapper.get("#settings-tab-security").trigger("click");
     expect(getOverloadCooldownSettings).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+
+  it.each(["totp_enabled", "step_up_enabled"])("saves enabled %s without requesting a code", async (field) => {
+    const wrapper = mountView();
+    await flushPromises();
+    (wrapper.vm as unknown as { form: Record<string, unknown> }).form[field] = true;
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(updateSettings.mock.calls[0]?.[0][field]).toBe(true);
+    expect(verifyStepUp).not.toHaveBeenCalled();
+    expect(wrapper.getComponent(TotpStepUpDialog).find('input[maxlength="1"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it.each(["totp_enabled", "step_up_enabled"])("retries disabling %s only after the current authenticator code is verified", async (field) => {
+    getSettings.mockResolvedValueOnce({ ...baseSettingsResponse, [field]: true });
+    updateSettings.mockRejectedValueOnce({ status: 403, reason: "STEP_UP_REQUIRED", message: "Current TOTP required" });
+    const wrapper = mountView();
+    await flushPromises();
+    (wrapper.vm as unknown as { form: Record<string, unknown> }).form[field] = false;
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    const original = updateSettings.mock.calls[0]?.[0];
+    const dialog = wrapper.getComponent(TotpStepUpDialog);
+    const digits = dialog.findAll('input[maxlength="1"]');
+    expect(digits).toHaveLength(6);
+    for (const [index, digit] of digits.entries()) await digit.setValue(String(index + 1));
+    await flushPromises();
+    expect(verifyStepUp).toHaveBeenCalledWith("123456");
+    expect(updateSettings).toHaveBeenCalledTimes(2);
+    expect(updateSettings).toHaveBeenNthCalledWith(2, original);
+    expect(original[field]).toBe(false);
+    expect(original).not.toHaveProperty("security_server_code");
+    expect(showSuccess).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("does not save or retry when fresh TOTP verification is cancelled", async () => {
+    updateSettings.mockRejectedValueOnce({ status: 403, reason: "STEP_UP_REQUIRED" });
+    const wrapper = mountView();
+    await flushPromises();
+    showError.mockClear();
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    await wrapper.getComponent(TotpStepUpDialog).get('button').trigger("click");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(verifyStepUp).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+    expect(showSuccess).not.toHaveBeenCalled();
+    expect(updateWebSearchEmulationConfig).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("keeps the verification dialog open after an invalid authenticator code", async () => {
+    updateSettings.mockRejectedValueOnce({ status: 403, code: "STEP_UP_REQUIRED" });
+    verifyStepUp.mockRejectedValueOnce({ status: 400, message: "Authenticator code expired" });
+    const wrapper = mountView();
+    await flushPromises();
+    showError.mockClear();
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    const dialog = wrapper.getComponent(TotpStepUpDialog);
+    for (const digit of dialog.findAll('input[maxlength="1"]')) await digit.setValue("1");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(showError).toHaveBeenCalledWith("Authenticator code expired");
+    expect(showSuccess).not.toHaveBeenCalled();
+    expect(dialog.findAll('input[maxlength="1"]')).toHaveLength(6);
+    await dialog.get('button').trigger("click");
+    await flushPromises();
     wrapper.unmount();
   });
 
@@ -802,17 +884,16 @@ describe("admin SettingsView payment visible method controls", () => {
     wrapper.unmount();
   });
 
-  it("loads and saves five independent product links with built-in payments disabled", async () => {
+  it("loads and saves five independent external shop product links", async () => {
     const products = Object.fromEntries([10, 20, 30, 50, 100].map(tier => [String(tier), `https://shop.example.test/item/${tier}`]));
     getSettings.mockResolvedValue({ ...baseSettingsResponse,
-      payment_enabled: false,
       purchase_subscription_enabled: true,
       purchase_subscription_url: "https://shop.example.test/legacy",
       purchase_subscription_products: products,
     });
     const wrapper = mountView();
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPurchaseTab(wrapper);
     expect((wrapper.get('[data-testid="external-shop-toggle"]').element as HTMLInputElement).checked).toBe(true);
     for (const tier of [10, 20, 30, 50, 100]) {
       const input = wrapper.get(`#external-shop-url-${tier}`);
@@ -826,12 +907,14 @@ describe("admin SettingsView payment visible method controls", () => {
     await wrapper.find("form").trigger("submit.prevent");
     await flushPromises();
     expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
-      payment_enabled: false,
       purchase_subscription_enabled: true,
       purchase_subscription_products: Object.fromEntries([10, 20, 30, 50, 100].map(tier => [String(tier), `https://shop.example.test/new/${tier}?source=site#details`])),
       site_name: baseSettingsResponse.site_name,
     }));
     expect(updateSettings.mock.calls[0]?.[0]).not.toHaveProperty("purchase_subscription_url");
+    expect(Object.keys(updateSettings.mock.calls[0]?.[0] || {}).some(key => key.startsWith("payment_"))).toBe(false);
+    expect(wrapper.find("payment-provider-list-stub").exists()).toBe(false);
+    expect(wrapper.find("payment-provider-dialog-stub").exists()).toBe(false);
     await wrapper.get('[data-testid="external-shop-toggle"]').setValue(false);
     for (const tier of [10, 20, 30, 50, 100]) await wrapper.get(`#external-shop-url-${tier}`).setValue("");
     await wrapper.find("form").trigger("submit.prevent");
@@ -843,7 +926,7 @@ describe("admin SettingsView payment visible method controls", () => {
   it("defaults missing products to empty and requires a product before enabling", async () => {
     const wrapper = mountView();
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPurchaseTab(wrapper);
     expect(wrapper.findAll('[data-testid="external-shop-settings"] input[type="url"]')).toHaveLength(5);
     expect((wrapper.get('#external-shop-url-10').element as HTMLInputElement).value).toBe("");
     await wrapper.get('[data-testid="external-shop-toggle"]').setValue(true);
@@ -857,7 +940,7 @@ describe("admin SettingsView payment visible method controls", () => {
   it.each(["javascript:alert(1)", "https://user:secret@shop.example.test", "https://bad..host/item", "https://shop.example.test:99999/item", "https://shop.example.test:0/item", "https://shop.example.test:/item", "https://shop.example.test/\\evil"])("hides unsafe product previews and rejects %s", async url => {
     const wrapper = mountView();
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPurchaseTab(wrapper);
     await wrapper.get('#external-shop-url-10').setValue(url);
     expect(wrapper.find('[data-testid="external-shop-settings"] a').exists()).toBe(false);
     await wrapper.find("form").trigger("submit.prevent");
@@ -925,7 +1008,7 @@ describe("admin SettingsView payment visible method controls", () => {
     const wrapper = mountView();
 
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPurchaseTab(wrapper);
 
     expect(wrapper.text()).not.toContain("可见方式");
     expect(wrapper.text()).not.toContain("支付来源");
@@ -1182,35 +1265,11 @@ describe("admin SettingsView payment visible method controls", () => {
     );
   });
 
-  it("links payment guidance to README sections instead of removed payment docs", async () => {
-    const wrapper = mountView();
-
-    await flushPromises();
-    await openPaymentTab(wrapper);
-
-    const paymentLinks = wrapper
-      .findAll("a")
-      .filter((node) =>
-        ["查看支付配置说明", "查看支持的支付方式"].includes(node.text()),
-      );
-
-    expect(paymentLinks).toHaveLength(2);
-    expect(paymentLinks[0]?.attributes("href")).toBe(
-      "https://github.com/loLollipop/Sub2api/blob/main/docs/PAYMENT_CN.md",
-    );
-    expect(paymentLinks[1]?.attributes("href")).toBe(
-      "https://github.com/loLollipop/Sub2api/blob/main/docs/PAYMENT_CN.md#支持的支付方式",
-    );
-    for (const link of paymentLinks) {
-      expect(link.attributes("href")).toContain("docs/PAYMENT");
-    }
-  });
-
   it("does not submit legacy visible payment method settings", async () => {
     const wrapper = mountView();
 
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPurchaseTab(wrapper);
     await wrapper.find("form").trigger("submit.prevent");
     await flushPromises();
 
@@ -1337,69 +1396,6 @@ describe("admin SettingsView payment visible method controls", () => {
         antigravity_user_agent_version: "1.23.2",
       }),
     );
-  });
-
-  it("updates provider enablement immediately and reloads providers", async () => {
-    const provider = {
-      id: 7,
-      provider_key: "alipay",
-      name: "Official Alipay",
-      config: {},
-      supported_types: ["alipay"],
-      enabled: false,
-      payment_mode: "",
-      refund_enabled: false,
-      allow_user_refund: false,
-      limits: "",
-      sort_order: 0,
-    };
-    getProviders.mockReset();
-    getProviders
-      .mockResolvedValueOnce({ data: [provider] })
-      .mockResolvedValueOnce({ data: [{ ...provider, enabled: true }] });
-    updateProvider.mockResolvedValue({ data: { ...provider, enabled: true } });
-
-    const PaymentProviderListStub = defineComponent({
-      emits: ["toggleField"],
-      setup(_, { emit }) {
-        return () =>
-          h(
-            "button",
-            {
-              class: "provider-toggle-stub",
-              onClick: () => emit("toggleField", provider, "enabled"),
-            },
-            "toggle provider",
-          );
-      },
-    });
-
-    const wrapper = mount(SettingsView, {
-      global: {
-        stubs: {
-          AppLayout: AppLayoutStub,
-          Select: SelectStub,
-          Toggle: ToggleStub,
-          Icon: true,
-          ConfirmDialog: true,
-          PaymentProviderList: PaymentProviderListStub,
-          PaymentProviderDialog: true,
-          GroupBadge: true,
-          GroupOptionItem: true,
-          ProxySelector: true,
-          ImageUpload: ImageUploadStub,
-          BackupSettings: true,
-        },
-      },
-    });
-
-    await flushPromises();
-    await openPaymentTab(wrapper);
-    await wrapper.get(".provider-toggle-stub").trigger("click");
-    await flushPromises();
-
-    expect(updateProvider).toHaveBeenCalledWith(7, { enabled: true });
-    expect(getProviders).toHaveBeenCalledTimes(2);
   });
 
   it("renders advanced scheduler copy as local experimental gateway policy", async () => {
@@ -1618,88 +1614,6 @@ describe("admin SettingsView payment visible method controls", () => {
     );
     expect(weightedModeText).toContain("计费倍率");
   });
-
-  it("passes translated upload and remove labels to the payment help image uploader", async () => {
-    const wrapper = mountView();
-
-    await flushPromises();
-    await openPaymentTab(wrapper);
-
-    const imageUploads = wrapper.findAll(".image-upload-stub");
-    expect(imageUploads.length).toBeGreaterThan(0);
-
-    const paymentHelpImageUpload = imageUploads.find(
-      (node) => node.attributes("data-placeholder") === "admin.settings.payment.helpImagePlaceholder",
-    );
-
-    expect(paymentHelpImageUpload).toBeDefined();
-    expect(paymentHelpImageUpload?.attributes("data-upload-label")).toBe("上传图片");
-    expect(paymentHelpImageUpload?.attributes("data-remove-label")).toBe("移除");
-  });
-
-  it("normalizes null supported_types from API so provider card stays visible", async () => {
-    // Backend returns null for supported_types when the list is empty
-    // (Go nil slice → JSON null). Without normalization, ProviderCard's
-    // isSelected() throws TypeError on null.includes(), causing the card
-    // to vanish from the list.
-    const providerWithNullTypes = {
-      id: 42,
-      provider_key: "easypay",
-      name: "EasyPay",
-      config: {},
-      supported_types: null as unknown as string[],
-      enabled: true,
-      payment_mode: "",
-      refund_enabled: false,
-      allow_user_refund: false,
-      limits: "",
-      sort_order: 0,
-    };
-    getProviders.mockReset();
-    getProviders.mockResolvedValue({ data: [providerWithNullTypes] });
-
-    let receivedProviders: Array<Record<string, unknown>> = [];
-    const PaymentProviderListCapture = defineComponent({
-      props: {
-        providers: {
-          type: Array,
-          default: () => [],
-        },
-      },
-      setup(props) {
-        receivedProviders = props.providers as Array<Record<string, unknown>>;
-        return () => h("div", { class: "provider-list-capture" });
-      },
-    });
-
-    const wrapper = mount(SettingsView, {
-      global: {
-        stubs: {
-          AppLayout: AppLayoutStub,
-          Select: SelectStub,
-          Toggle: ToggleStub,
-          Icon: true,
-          ConfirmDialog: true,
-          PaymentProviderList: PaymentProviderListCapture,
-          PaymentProviderDialog: true,
-          GroupBadge: true,
-          GroupOptionItem: true,
-          ProxySelector: true,
-          ImageUpload: ImageUploadStub,
-          BackupSettings: true,
-        },
-      },
-    });
-
-    await flushPromises();
-    await openPaymentTab(wrapper);
-
-    // The provider should still be in the list
-    expect(receivedProviders.length).toBe(1);
-    // supported_types should be normalized to an empty array, not null
-    expect(Array.isArray(receivedProviders[0].supported_types)).toBe(true);
-    expect(receivedProviders[0].supported_types).toEqual([]);
-  });
 });
 
 describe("admin SettingsView wechat connect controls", () => {
@@ -1717,10 +1631,6 @@ describe("admin SettingsView wechat connect controls", () => {
     getBetaPolicySettings.mockReset();
     getGroups.mockReset();
     listProxies.mockReset();
-    getProviders.mockReset();
-    updateProvider.mockReset();
-    createProvider.mockReset();
-    deleteProvider.mockReset();
     fetchPublicSettings.mockReset();
     adminSettingsFetch.mockReset();
     showError.mockReset();
@@ -1728,11 +1638,9 @@ describe("admin SettingsView wechat connect controls", () => {
 
     getSettings.mockResolvedValue({
       ...baseSettingsResponse,
-      payment_visible_method_wxpay_source: "official_wxpay",
     });
     updateSettings.mockImplementation(async (payload) => ({
       ...baseSettingsResponse,
-      payment_visible_method_wxpay_source: "official_wxpay",
       ...payload,
     }));
     getWebSearchEmulationConfig.mockResolvedValue({
@@ -1776,9 +1684,6 @@ describe("admin SettingsView wechat connect controls", () => {
     getGroups.mockResolvedValue([]);
     listProxies.mockResolvedValue({
       items: [],
-    });
-    getProviders.mockResolvedValue({
-      data: [],
     });
     fetchPublicSettings.mockResolvedValue(undefined);
     adminSettingsFetch.mockResolvedValue(undefined);
@@ -1963,10 +1868,6 @@ describe("admin SettingsView platform quota matrix", () => {
     getBetaPolicySettings.mockReset();
     getGroups.mockReset();
     listProxies.mockReset();
-    getProviders.mockReset();
-    updateProvider.mockReset();
-    createProvider.mockReset();
-    deleteProvider.mockReset();
     fetchPublicSettings.mockReset();
     adminSettingsFetch.mockReset();
     showError.mockReset();
@@ -1989,7 +1890,6 @@ describe("admin SettingsView platform quota matrix", () => {
     getBetaPolicySettings.mockResolvedValue({});
     getGroups.mockResolvedValue([]);
     listProxies.mockResolvedValue({ items: [] });
-    getProviders.mockResolvedValue({ data: [] });
   });
 
   it("从 baseSettings 加载默认平台配额数据并在 Users tab 渲染 5 平台行", async () => {

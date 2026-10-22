@@ -340,11 +340,6 @@ function localText(zh: string, en: string): string {
 }
 
 const eventDisplayMeta: Record<string, EventDisplayMeta> = {
-  "ticket.reply": {
-    label: "工单回复通知",
-    timing: "客服回复成功后发送给工单所属用户，包含截至该回复的完整对话记录。",
-    categoryLabel: "工单",
-  },
   "auth.verify_code": {
     label: "邮箱验证码",
     timing: "注册、绑定邮箱、OAuth 补全邮箱或 TOTP 邮箱校验时发送。",
@@ -360,11 +355,6 @@ const eventDisplayMeta: Record<string, EventDisplayMeta> = {
     timing: "用户添加并验证额外通知邮箱时发送。",
     categoryLabel: "认证安全",
   },
-  "subscription.purchase_success": {
-    label: "订阅开通成功",
-    timing: "订阅订单完成支付并成功开通或续期后发送。",
-    categoryLabel: "订阅",
-  },
   "subscription.expiry_reminder": {
     label: "订阅到期提醒",
     timing: "后台任务在订阅仍有效且距离到期剩余 7 天、3 天、1 天时各发送一次，可通过邮件设置中的开关关闭。",
@@ -373,11 +363,6 @@ const eventDisplayMeta: Record<string, EventDisplayMeta> = {
   "balance.low": {
     label: "余额不足提醒",
     timing: "用户余额低于全局或个人配置的提醒阈值时发送。",
-    categoryLabel: "计费",
-  },
-  "balance.recharge_success": {
-    label: "余额充值成功",
-    timing: "余额充值订单支付完成并入账后发送。",
     categoryLabel: "计费",
   },
   "account.quota_alert": {
@@ -408,11 +393,6 @@ const eventDisplayMeta: Record<string, EventDisplayMeta> = {
 };
 
 const eventDisplayMetaEn: Record<string, EventDisplayMeta> = {
-  "ticket.reply": {
-    label: "Ticket Reply",
-    timing: "Sent to the ticket owner after a support reply, including the complete conversation up to that reply.",
-    categoryLabel: "Support",
-  },
   "auth.verify_code": {
     label: "Email Verification Code",
     timing: "Sent for registration, email binding, OAuth pending email completion, or TOTP email verification.",
@@ -428,11 +408,6 @@ const eventDisplayMetaEn: Record<string, EventDisplayMeta> = {
     timing: "Sent when a user adds and verifies an extra notification email address.",
     categoryLabel: "Auth",
   },
-  "subscription.purchase_success": {
-    label: "Subscription Activated",
-    timing: "Sent after a subscription order is paid and the subscription is activated or extended.",
-    categoryLabel: "Subscription",
-  },
   "subscription.expiry_reminder": {
     label: "Subscription Expiry Reminder",
     timing: "Sent by the background job when an active subscription has 7, 3, or 1 day remaining. It can be disabled in Email settings.",
@@ -441,11 +416,6 @@ const eventDisplayMetaEn: Record<string, EventDisplayMeta> = {
   "balance.low": {
     label: "Low Balance Alert",
     timing: "Sent when a user's balance drops below the global or personal reminder threshold.",
-    categoryLabel: "Billing",
-  },
-  "balance.recharge_success": {
-    label: "Balance Recharge Success",
-    timing: "Sent after a balance recharge order is paid and credited.",
     categoryLabel: "Billing",
   },
   "account.quota_alert": {

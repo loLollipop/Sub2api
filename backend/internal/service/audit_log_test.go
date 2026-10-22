@@ -126,13 +126,6 @@ func TestAuditSensitiveKeys_CoverCredentialTable(t *testing.T) {
 			t.Fatalf("credential key %q is not covered by audit redaction", k)
 		}
 	}
-	for provider, fields := range providerSensitiveConfigFields {
-		for k := range fields {
-			if !isAuditSensitiveBodyKey(k) {
-				t.Fatalf("payment provider %q sensitive field %q is not covered by audit redaction", provider, k)
-			}
-		}
-	}
 }
 
 func TestRedactAuditBody_NonJSONOmitted(t *testing.T) {

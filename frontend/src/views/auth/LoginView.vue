@@ -2,16 +2,73 @@
   <AuthLayout>
     <div class="space-y-6">
       <!-- Title -->
-      <div class="text-center">
+      <div class="auth-heading">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-          {{ t('auth.welcomeBack') }}
+          {{ t('auth.signIn') }}
         </h2>
-        <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
-          {{ t('auth.signInToAccount') }}
+        <p v-if="!backendModeEnabled && publicSettingsLoaded && registrationEnabled" class="mt-2 text-sm text-gray-500 dark:text-dark-400">
+          {{ t('auth.dontHaveAccount') }}
+          <router-link to="/register" class="auth-inline-link">{{ t('auth.signUp') }}</router-link>
         </p>
+        <p v-else class="mt-2 text-sm text-gray-500 dark:text-dark-400">{{ t('auth.signInToAccount') }}</p>
       </div>
       <!-- Login Form -->
       <form @submit.prevent="handleLogin" class="space-y-5">
+        <div v-if="showPasskeyLogin || showOAuthLogin" class="auth-social space-y-3">
+          <div class="flex items-center gap-3">
+            <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
+            <span class="text-xs text-gray-500 dark:text-dark-400">
+              {{ t('auth.oauthOrContinue') }}
+            </span>
+            <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
+          </div>
+
+          <button
+            v-if="showPasskeyLogin"
+            type="button"
+            class="btn btn-secondary w-full"
+            :disabled="authActionDisabled"
+            @click="handlePasskeyLogin"
+          >
+            <Icon name="key" size="md" class="mr-2" />
+            {{ passkeyLoading ? t('auth.passkeySigningIn') : t('auth.passkeySignIn') }}
+          </button>
+
+          <EmailOAuthButtons
+            :disabled="authActionDisabled"
+            :github-enabled="githubOAuthEnabled"
+            :google-enabled="googleOAuthEnabled"
+            :show-divider="false"
+            stacked
+            @start="handleOAuthStart"
+          />
+
+          <LinuxDoOAuthSection
+            v-if="linuxdoOAuthEnabled"
+            :disabled="authActionDisabled"
+            :show-divider="false"
+            @start="handleOAuthStart"
+          />
+          <DingTalkOAuthSection
+            v-if="dingtalkOAuthEnabled"
+            :disabled="authActionDisabled"
+            :show-divider="false"
+            @start="handleOAuthStart"
+          />
+          <WechatOAuthSection
+            v-if="wechatOAuthEnabled"
+            :disabled="authActionDisabled"
+            :show-divider="false"
+            @start="handleOAuthStart"
+          />
+          <OidcOAuthSection
+            v-if="oidcOAuthEnabled"
+            :disabled="authActionDisabled"
+            :provider-name="oidcOAuthProviderName"
+            :show-divider="false"
+            @start="handleOAuthStart"
+          />
+        </div>
         <!-- Email Input -->
         <div>
           <label for="email" class="input-label">
@@ -38,9 +95,10 @@
 
         <!-- Password Input -->
         <div>
-          <label for="password" class="input-label">
-            {{ t('auth.passwordLabel') }}
-          </label>
+          <div class="auth-password-label">
+            <label for="password" class="input-label">{{ t('auth.passwordLabel') }}</label>
+            <router-link v-if="passwordResetEnabled && !backendModeEnabled" to="/forgot-password" class="auth-inline-link">{{ t('auth.forgotPassword') }}</router-link>
+          </div>
           <div class="relative">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
               <Icon name="lock" size="md" class="text-gray-400 dark:text-dark-500" />
@@ -59,23 +117,17 @@
             <button
               type="button"
               @click="showPassword = !showPassword"
+              :aria-label="t(showPassword ? 'auth.hidePassword' : 'auth.showPassword')"
+              :aria-pressed="showPassword"
+              aria-controls="password"
               :disabled="authActionDisabled"
-              class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
+              class="password-toggle absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
             >
               <Icon v-if="showPassword" name="eyeOff" size="md" />
               <Icon v-else name="eye" size="md" />
             </button>
           </div>
-          <div class="mt-1 flex items-center justify-between">
-            <span></span>
-            <router-link
-              v-if="passwordResetEnabled && !backendModeEnabled"
-              to="/forgot-password"
-              class="text-sm font-medium text-primary-600 transition-colors hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
-            >
-              {{ t('auth.forgotPassword') }}
-            </router-link>
-          </div>
+
         </div>
 
         <!-- Turnstile Widget -->
@@ -139,75 +191,10 @@
           @open="showAgreementModal = true"
         />
 
-        <div v-if="showPasskeyLogin || showOAuthLogin" class="space-y-3 pt-1">
-          <div class="flex items-center gap-3">
-            <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
-            <span class="text-xs text-gray-500 dark:text-dark-400">
-              {{ t('auth.oauthOrContinue') }}
-            </span>
-            <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
-          </div>
 
-          <button
-            v-if="showPasskeyLogin"
-            type="button"
-            class="btn btn-secondary w-full"
-            :disabled="authActionDisabled"
-            @click="handlePasskeyLogin"
-          >
-            <Icon name="key" size="md" class="mr-2" />
-            {{ passkeyLoading ? t('auth.passkeySigningIn') : t('auth.passkeySignIn') }}
-          </button>
-
-          <EmailOAuthButtons
-            :disabled="authActionDisabled"
-            :github-enabled="githubOAuthEnabled"
-            :google-enabled="googleOAuthEnabled"
-            :show-divider="false"
-            @start="handleOAuthStart"
-          />
-
-          <LinuxDoOAuthSection
-            v-if="linuxdoOAuthEnabled"
-            :disabled="authActionDisabled"
-            :show-divider="false"
-            @start="handleOAuthStart"
-          />
-          <DingTalkOAuthSection
-            v-if="dingtalkOAuthEnabled"
-            :disabled="authActionDisabled"
-            :show-divider="false"
-            @start="handleOAuthStart"
-          />
-          <WechatOAuthSection
-            v-if="wechatOAuthEnabled"
-            :disabled="authActionDisabled"
-            :show-divider="false"
-            @start="handleOAuthStart"
-          />
-          <OidcOAuthSection
-            v-if="oidcOAuthEnabled"
-            :disabled="authActionDisabled"
-            :provider-name="oidcOAuthProviderName"
-            :show-divider="false"
-            @start="handleOAuthStart"
-          />
-        </div>
       </form>
     </div>
 
-    <!-- Footer -->
-    <template v-if="!backendModeEnabled && publicSettingsLoaded && registrationEnabled" #footer>
-      <p class="text-gray-500 dark:text-dark-400">
-        {{ t('auth.dontHaveAccount') }}
-        <router-link
-          to="/register"
-          class="font-medium text-primary-600 transition-colors hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
-        >
-          {{ t('auth.signUp') }}
-        </router-link>
-      </p>
-    </template>
   </AuthLayout>
 
   <!-- 2FA Modal -->

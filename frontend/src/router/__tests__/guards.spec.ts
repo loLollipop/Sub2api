@@ -84,13 +84,14 @@ function simulateGuard(
       return authState.isAdmin ? '/admin/dashboard' : '/dashboard'
     }
     if (authState.backendModeEnabled && !authState.isAuthenticated) {
-      const allowed = ['/login', '/key-usage', '/setup', '/payment/result']
+      const allowed = ['/login', '/key-usage', '/setup', '/legal']
       const callbackPaths = [
         '/auth/callback',
         '/auth/linuxdo/callback',
+        '/auth/dingtalk/callback',
+        '/auth/dingtalk/email-completion',
         '/auth/oidc/callback',
         '/auth/wechat/callback',
-        '/auth/wechat/payment/callback',
       ]
       const pendingAuthPaths = ['/register', '/email-verify']
       const isAllowed =
@@ -132,13 +133,14 @@ function simulateGuard(
     if (authState.isAuthenticated && authState.isAdmin) {
       return null
     }
-    const allowed = ['/login', '/key-usage', '/setup', '/payment/result']
+    const allowed = ['/login', '/key-usage', '/setup', '/legal']
     const callbackPaths = [
       '/auth/callback',
       '/auth/linuxdo/callback',
+      '/auth/dingtalk/callback',
+      '/auth/dingtalk/email-completion',
       '/auth/oidc/callback',
       '/auth/wechat/callback',
-      '/auth/wechat/payment/callback',
     ]
     const pendingAuthPaths = ['/register', '/email-verify']
     const isAllowed =
@@ -481,7 +483,7 @@ describe('路由守卫逻辑', () => {
       expect(redirect).toBeNull()
     })
 
-    it('unauthenticated: WeChat payment callback route is allowed', () => {
+    it('unauthenticated: /legal/privacy is allowed', () => {
       const authState: MockAuthState = {
         isAuthenticated: false,
         isAdmin: false,
@@ -489,19 +491,7 @@ describe('路由守卫逻辑', () => {
         backendModeEnabled: true,
         hasPendingAuthSession: false,
       }
-      const redirect = simulateGuard('/auth/wechat/payment/callback', { requiresAuth: false }, authState)
-      expect(redirect).toBeNull()
-    })
-
-    it('unauthenticated: /payment/result is allowed', () => {
-      const authState: MockAuthState = {
-        isAuthenticated: false,
-        isAdmin: false,
-        isSimpleMode: false,
-        backendModeEnabled: true,
-        hasPendingAuthSession: false,
-      }
-      const redirect = simulateGuard('/payment/result', { requiresAuth: false }, authState)
+      const redirect = simulateGuard('/legal/privacy', { requiresAuth: false }, authState)
       expect(redirect).toBeNull()
     })
 

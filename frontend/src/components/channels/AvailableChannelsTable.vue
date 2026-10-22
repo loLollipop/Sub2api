@@ -27,6 +27,7 @@
           <td colspan="5" class="py-12 text-center">
             <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-gray-400" />
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ emptyLabel }}</p>
+            <slot name="empty-action" />
           </td>
         </tr>
       </tbody>
@@ -179,6 +180,7 @@
       <div v-else-if="rows.length === 0" data-testid="mobile-empty" class="py-12 text-center">
         <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-gray-400" />
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ emptyLabel }}</p>
+        <slot name="empty-action" />
       </div>
       <section
         v-else

@@ -12,6 +12,7 @@ const {
   uploadPlugin,
   enablePlugin,
   savePluginConfig,
+  getPluginConfig,
   createUISession,
   stepUpRun,
 } = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const {
   uploadPlugin: vi.fn(),
   enablePlugin: vi.fn(),
   savePluginConfig: vi.fn(),
+  getPluginConfig: vi.fn(),
   createUISession: vi.fn(),
   stepUpRun: vi.fn((action: () => Promise<unknown>) => action()),
 }))
@@ -31,7 +33,7 @@ vi.mock('@/api/admin', () => ({
       enable: enablePlugin,
       disable: vi.fn(),
       remove: vi.fn(),
-      getConfig: vi.fn().mockResolvedValue({}),
+      getConfig: getPluginConfig,
       saveConfig: savePluginConfig,
       test: vi.fn().mockResolvedValue({ success: true, message: 'ok', latency_ms: 1 }),
       createUISession,
@@ -126,6 +128,31 @@ function mountView() {
   })
 }
 
+function documentBridge(frame: HTMLIFrameElement, source = { postMessage: vi.fn() }) {
+  Object.defineProperty(frame, 'contentWindow', { value: source, configurable: true })
+  const port = {
+    onmessage: null as ((event: MessageEvent) => void) | null,
+    postMessage: vi.fn(), start: vi.fn(), close: vi.fn(),
+  }
+  function send(data: Record<string, unknown>, echo = true) {
+    const message = { source: 'sub2api-plugin-ui', bridge_token: 'bridge', ...data }
+    window.dispatchEvent(new MessageEvent('message', {
+      source: source as unknown as Window, origin: 'null', data: message,
+    }))
+    const relay = port.postMessage.mock.calls.at(-1)?.[0]
+    if (echo && relay?.type === 'sub2api.plugin.relay') {
+      port.onmessage?.(new MessageEvent('message', { data: { type: 'sub2api.plugin.request', message: relay.message } }))
+    }
+  }
+  window.dispatchEvent(new MessageEvent('message', {
+    source: source as unknown as Window, origin: 'null',
+    data: { source: 'sub2api-plugin-ui', bridge_token: 'bridge', type: 'sub2api.plugin.connect' },
+    ports: [port as unknown as MessagePort],
+  }))
+  port.postMessage.mockClear()
+  return { source, port, send }
+}
+
 describe('管理员插件页二次验证', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -134,6 +161,7 @@ describe('管理员插件页二次验证', () => {
     uploadPlugin.mockResolvedValue(plugin)
     enablePlugin.mockResolvedValue(plugin)
     savePluginConfig.mockResolvedValue({ enabled: true })
+    getPluginConfig.mockResolvedValue({})
     createUISession.mockResolvedValue({
       url: '/api/v1/plugin-ui/token/index.html#bridge_token=bridge',
       bridge_token: 'bridge',
@@ -223,5 +251,168 @@ describe('管理员插件页二次验证', () => {
 
     expect(stepUpRun).toHaveBeenCalledTimes(1)
     expect(uploadPlugin).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['switch', 'reload'])('never delivers an old config response after iframe %s with a reused request id', async (change) => {
+    let resolveOld!: (config: Record<string, unknown>) => void
+    let resolveNew!: (config: Record<string, unknown>) => void
+    savePluginConfig
+      .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve }))
+      .mockReturnValueOnce(new Promise(resolve => { resolveNew = resolve }))
+    listPlugins.mockResolvedValue([plugin, { ...plugin, id: 8, name: 'Other Transport' }])
+    const wrapper = mountView()
+    await flushPromises()
+    const buttons = wrapper.findAll('button').filter(item => item.text() === 'admin.plugins.configure')
+    await buttons[0].trigger('click')
+    await flushPromises()
+    const old = documentBridge(wrapper.get('iframe').element)
+    await wrapper.get('iframe').trigger('load')
+    const request = { type: 'config.save', request_id: 'same-id', config: { enabled: true } }
+    old.send(request)
+    await flushPromises()
+    if (change === 'switch') {
+      wrapper.getComponent(BaseDialog).vm.$emit('close')
+      await buttons[1].trigger('click')
+      await flushPromises()
+    } else {
+      await wrapper.get('iframe').trigger('load')
+      await flushPromises()
+    }
+    const current = documentBridge(wrapper.get('iframe').element, change === 'reload' ? old.source : undefined)
+    await wrapper.get('iframe').trigger('load')
+    current.send(request)
+    await flushPromises()
+    current.port.postMessage.mockClear()
+    resolveOld({ oldSecret: 'must-not-cross' })
+    await flushPromises()
+    expect(current.port.postMessage).not.toHaveBeenCalled()
+    resolveNew({ current: true })
+    await flushPromises()
+    expect(current.port.postMessage).toHaveBeenCalledTimes(1)
+    expect(current.port.postMessage).toHaveBeenCalledWith(expect.objectContaining({ config: { current: true } }))
+    expect(old.port.close).toHaveBeenCalled()
+    expect(current.source.postMessage).not.toHaveBeenCalled()
+    expect(savePluginConfig.mock.calls.map(call => call[0])).toEqual([7, change === 'switch' ? 8 : 7])
+  })
+
+  it('does not run a deferred step-up write after its configuration document is closed', async () => {
+    let deferredAction!: () => Promise<unknown>
+    stepUpRun.mockImplementationOnce((action: () => Promise<unknown>) => {
+      deferredAction = action
+      return new Promise(() => {})
+    })
+    listPlugins.mockResolvedValue([plugin, { ...plugin, id: 8, name: 'Other Transport' }])
+    const wrapper = mountView()
+    await flushPromises()
+    const buttons = wrapper.findAll('button').filter(item => item.text() === 'admin.plugins.configure')
+    await buttons[0].trigger('click')
+    await flushPromises()
+    const bridge = documentBridge(wrapper.get('iframe').element)
+    bridge.send({ type: 'config.save', request_id: 'deferred', config: { enabled: true } })
+    wrapper.getComponent(BaseDialog).vm.$emit('close')
+    await buttons[1].trigger('click')
+    await flushPromises()
+    await deferredAction()
+    expect(savePluginConfig).not.toHaveBeenCalled()
+  })
+
+  it('requires an echo from the owning document before executing a legacy request', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(item => item.text() === 'admin.plugins.configure')!.trigger('click')
+    await flushPromises()
+    const bridge = documentBridge(wrapper.get('iframe').element)
+    bridge.send({ type: 'config.save', request_id: 'verify-document', config: { enabled: true } }, false)
+    await flushPromises()
+    expect(savePluginConfig).not.toHaveBeenCalled()
+    const relay = bridge.port.postMessage.mock.calls.at(-1)![0]
+    bridge.port.onmessage!(new MessageEvent('message', { data: { type: 'sub2api.plugin.request', message: relay.message } }))
+    await flushPromises()
+    expect(savePluginConfig).toHaveBeenCalledWith(7, { enabled: true })
+  })
+
+  it('keeps an in-flight config reply on the original document port before navigation load', async () => {
+    let resolveConfig!: (config: Record<string, unknown>) => void
+    getPluginConfig.mockReturnValueOnce(new Promise(resolve => { resolveConfig = resolve }))
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(item => item.text() === 'admin.plugins.configure')!.trigger('click')
+    await flushPromises()
+    const original = documentBridge(wrapper.get('iframe').element)
+    await wrapper.get('iframe').trigger('load')
+    original.send({ type: 'config.load', request_id: 'old-document' })
+    await flushPromises()
+    original.port.postMessage.mockClear()
+    // WindowProxy identity survives navigation. A replacement document cannot
+    // take over the private port even before its load event has fired.
+    const replacement = documentBridge(wrapper.get('iframe').element, original.source)
+    expect(replacement.port.close).toHaveBeenCalledOnce()
+    resolveConfig({ secret: 'original-document-only' })
+    await flushPromises()
+    expect(original.port.postMessage).toHaveBeenCalledWith(expect.objectContaining({ config: { secret: 'original-document-only' } }))
+    expect(replacement.port.postMessage).not.toHaveBeenCalled()
+    expect(original.source.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('ignores configuration requests with no document channel', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(item => item.text() === 'admin.plugins.configure')!.trigger('click')
+    await flushPromises()
+    const source = { postMessage: vi.fn() }
+    Object.defineProperty(wrapper.get('iframe').element, 'contentWindow', { value: source })
+    for (const type of ['config.load', 'config.save', 'config.test']) {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: source as unknown as Window, origin: 'null',
+        data: { source: 'sub2api-plugin-ui', bridge_token: 'bridge', type, request_id: type, config: {} },
+      }))
+    }
+    await flushPromises()
+    expect(getPluginConfig).not.toHaveBeenCalled()
+    expect(savePluginConfig).not.toHaveBeenCalled()
+    expect(source.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('invalidates a pending step-up on document pagehide before load and refuses a replacement channel', async () => {
+    let deferredAction!: () => Promise<unknown>
+    stepUpRun.mockImplementationOnce((action: () => Promise<unknown>) => {
+      deferredAction = action
+      return new Promise(() => {})
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(item => item.text() === 'admin.plugins.configure')!.trigger('click')
+    await flushPromises()
+    const original = documentBridge(wrapper.get('iframe').element)
+    await wrapper.get('iframe').trigger('load')
+    original.send({ type: 'config.save', request_id: 'awaiting-step-up', config: { enabled: true } })
+    original.port.onmessage!(new MessageEvent('message', { data: { type: 'sub2api.plugin.disconnect' } }))
+    const replacement = documentBridge(wrapper.get('iframe').element, original.source)
+    expect(original.port.close).toHaveBeenCalledOnce()
+    expect(replacement.port.close).toHaveBeenCalledOnce()
+    await deferredAction()
+    expect(savePluginConfig).not.toHaveBeenCalled()
+  })
+
+  it('recreates a session when its first document disconnects before the initial load', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(item => item.text() === 'admin.plugins.configure')!.trigger('click')
+    await flushPromises()
+    const oldFrame = wrapper.get('iframe')
+    const original = documentBridge(oldFrame.element)
+    let resolveSession!: (session: PluginUISession) => void
+    createUISession.mockReturnValueOnce(new Promise<PluginUISession>(resolve => { resolveSession = resolve }))
+    original.port.onmessage!(new MessageEvent('message', { data: { type: 'sub2api.plugin.disconnect' } }))
+    // A queued load from the retired frame must not mark the replacement loaded.
+    await oldFrame.trigger('load')
+    resolveSession({ url: '/fresh-session', bridge_token: 'bridge', ui_bridge_version: 1, expires_at: '' })
+    await flushPromises()
+    const current = documentBridge(wrapper.get('iframe').element)
+    await wrapper.get('iframe').trigger('load')
+    current.send({ type: 'config.load', request_id: 'restored' })
+    await flushPromises()
+    expect(createUISession).toHaveBeenCalledTimes(2)
+    expect(current.port.postMessage).toHaveBeenCalledWith(expect.objectContaining({ request_id: 'restored', ok: true }))
   })
 })

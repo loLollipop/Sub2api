@@ -587,5 +587,8 @@ onUnmounted(() => {
   font-family: inherit;
 }
 .copy-btn:hover { background: rgba(255, 255, 255, 0.25); }
-pre:hover .copy-btn { opacity: 1; }
+pre:hover .copy-btn,
+pre:focus-within .copy-btn { opacity: 1; }
+.copy-btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+@media (hover: none) { .copy-btn { opacity: 1; } }
 </style>

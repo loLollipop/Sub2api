@@ -200,6 +200,36 @@ describe('RedeemView refresh after redemption', () => {
     wrapper.unmount()
   })
 
+  it('keeps each history type, its signed value, timestamp and full note in its own row', async () => {
+    const note = 'This adjustment has a long explanation that must remain visible in the activity list.'
+    const usedAt = '2026-10-22T08:00:00Z'
+    const base = { status: 'used', used_at: usedAt, created_at: usedAt, code: 'SHORT' }
+    getHistory.mockResolvedValue({ items: [
+      { ...base, id: 1, type: 'balance', value: 25 },
+      { ...base, id: 2, type: 'admin_balance', value: -3.5, notes: note },
+      { ...base, id: 3, type: 'concurrency', value: 2 },
+      { ...base, id: 4, type: 'admin_concurrency', value: -1 },
+      { ...base, id: 5, type: 'subscription', value: 30, validity_days: 30, group: { id: 7, name: 'Long subscription group name' } },
+    ], total: 5 })
+    const wrapper = mount(RedeemView, {
+      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Icon: true } },
+    })
+    await flushPromises()
+    const rows = wrapper.findAll('.redeem-history-row')
+    expect(rows).toHaveLength(5)
+    expect(rows[0].text()).toContain('+$25.00')
+    expect(rows[0].text()).toContain('SHORT')
+    expect(rows[0].text()).not.toContain('SHORT...')
+    expect(rows[1].text()).toContain('-$3.50')
+    expect(rows[1].text()).toContain(note)
+    expect(rows[1].text()).not.toContain('SHORT')
+    expect(rows[2].text()).toContain('+2 redeem.requests')
+    expect(rows[3].text()).toContain('-1 redeem.requests')
+    expect(rows[4].text()).toContain('30redeem.days - Long subscription group name')
+    for (const row of rows) expect(row.get('time').attributes('datetime')).toBe(usedAt)
+    wrapper.unmount()
+  })
+
   it('finishes normally without a warning when profile refresh succeeds', async () => {
     const wrapper = await submitCode()
 

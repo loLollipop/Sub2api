@@ -123,20 +123,7 @@ export type AuthSourceDefaultsState = Record<
   AuthSourceType,
   AuthSourceDefaultsValue
 >;
-export type PaymentVisibleMethod = "alipay" | "wxpay";
-export type PaymentVisibleMethodSource =
-  | ""
-  | "official_alipay"
-  | "easypay_alipay"
-  | "official_wxpay"
-  | "easypay_wxpay";
 export type WeChatConnectMode = "open" | "mp" | "mobile";
-
-export interface PaymentVisibleMethodSourceOption {
-  value: PaymentVisibleMethodSource;
-  labelZh: string;
-  labelEn: string;
-}
 
 export interface WeChatConnectModeOption {
   value: WeChatConnectMode;
@@ -155,59 +142,6 @@ const AUTH_SOURCE_TYPES: AuthSourceType[] = [
 ];
 const AUTH_SOURCE_DEFAULT_BALANCE = 0;
 const AUTH_SOURCE_DEFAULT_CONCURRENCY = 5;
-const PAYMENT_VISIBLE_METHOD_SOURCE_OPTIONS: Record<
-  PaymentVisibleMethod,
-  PaymentVisibleMethodSourceOption[]
-> = {
-  alipay: [
-    { value: "", labelZh: "未配置", labelEn: "Not configured" },
-    {
-      value: "official_alipay",
-      labelZh: "支付宝官方",
-      labelEn: "Official Alipay",
-    },
-    {
-      value: "easypay_alipay",
-      labelZh: "易支付支付宝",
-      labelEn: "EasyPay Alipay",
-    },
-  ],
-  wxpay: [
-    { value: "", labelZh: "未配置", labelEn: "Not configured" },
-    {
-      value: "official_wxpay",
-      labelZh: "微信官方",
-      labelEn: "Official WeChat Pay",
-    },
-    {
-      value: "easypay_wxpay",
-      labelZh: "易支付微信",
-      labelEn: "EasyPay WeChat Pay",
-    },
-  ],
-};
-const PAYMENT_VISIBLE_METHOD_SOURCE_ALIASES: Record<
-  PaymentVisibleMethod,
-  Record<string, PaymentVisibleMethodSource>
-> = {
-  alipay: {
-    official_alipay: "official_alipay",
-    alipay: "official_alipay",
-    alipay_direct: "official_alipay",
-    official: "official_alipay",
-    easypay_alipay: "easypay_alipay",
-    easypay: "easypay_alipay",
-  },
-  wxpay: {
-    official_wxpay: "official_wxpay",
-    wxpay: "official_wxpay",
-    wxpay_direct: "official_wxpay",
-    wechat: "official_wxpay",
-    official: "official_wxpay",
-    easypay_wxpay: "easypay_wxpay",
-    easypay: "easypay_wxpay",
-  },
-};
 const WECHAT_CONNECT_MODE_OPTIONS: WeChatConnectModeOption[] = [
   { value: "open", labelZh: "PC 应用", labelEn: "PC App" },
   {
@@ -311,24 +245,6 @@ export function appendAuthSourceDefaultsToUpdateRequest(
   }
 
   return payload;
-}
-
-export function getPaymentVisibleMethodSourceOptions(
-  method: PaymentVisibleMethod,
-): PaymentVisibleMethodSourceOption[] {
-  return PAYMENT_VISIBLE_METHOD_SOURCE_OPTIONS[method];
-}
-
-export function normalizePaymentVisibleMethodSource(
-  method: PaymentVisibleMethod,
-  source: unknown,
-): PaymentVisibleMethodSource {
-  if (typeof source !== "string") return "";
-
-  const normalized = source.trim().toLowerCase();
-  if (!normalized) return "";
-
-  return PAYMENT_VISIBLE_METHOD_SOURCE_ALIASES[method][normalized] ?? "";
 }
 
 export function getWeChatConnectModeOptions(): WeChatConnectModeOption[] {
@@ -655,44 +571,16 @@ export interface SystemSettings {
   codex_cli_only_engine_fingerprint_signals: string;
   web_search_emulation_enabled?: boolean;
 
-  // Payment configuration
+  // External shop configuration
   purchase_subscription_enabled: boolean;
   purchase_subscription_url: string;
   purchase_subscription_products: Record<string, string>;
-  payment_enabled: boolean;
-  payment_recharge_center_enabled?: boolean;
   risk_control_enabled: boolean;
 
   // Cyber session block
   cyber_session_block_enabled: boolean;
   cyber_session_block_ttl_seconds: number;
 
-  payment_min_amount: number;
-  payment_max_amount: number;
-  payment_daily_limit: number;
-  payment_order_timeout_minutes: number;
-  payment_max_pending_orders: number;
-  payment_enabled_types: string[];
-  payment_balance_disabled: boolean;
-  payment_balance_recharge_multiplier: number;
-  payment_subscription_usd_to_cny_rate: number;
-  payment_recharge_fee_rate: number;
-  payment_load_balance_strategy: string;
-  payment_product_name_prefix: string;
-  payment_product_name_suffix: string;
-  payment_help_image_url: string;
-  payment_help_text: string;
-  payment_cancel_rate_limit_enabled: boolean;
-  payment_cancel_rate_limit_max: number;
-  payment_cancel_rate_limit_window: number;
-  payment_cancel_rate_limit_unit: string;
-  payment_cancel_rate_limit_window_mode: string;
-  payment_alipay_force_qrcode?: boolean;
-  payment_alipay_mobile_precreate_deep_link?: boolean;
-  payment_visible_method_alipay_source?: string;
-  payment_visible_method_wxpay_source?: string;
-  payment_visible_method_alipay_enabled?: boolean;
-  payment_visible_method_wxpay_enabled?: boolean;
   openai_low_upstream_rate_priority_enabled?: boolean;
   openai_oauth_scheduling_rate_multiplier?: number;
   codex_quota_overdraft_enabled?: boolean;
@@ -979,44 +867,16 @@ export interface UpdateSettingsRequest {
   codex_cli_only_whitelist?: string;
   codex_cli_only_allow_app_server_clients?: boolean;
   codex_cli_only_engine_fingerprint_signals?: string;
-  // Payment configuration
+  // External shop configuration
   purchase_subscription_enabled?: boolean;
   purchase_subscription_url?: string;
   purchase_subscription_products?: Record<string, string>;
-  payment_enabled?: boolean;
-  payment_recharge_center_enabled?: boolean;
   risk_control_enabled?: boolean;
 
   // Cyber session block
   cyber_session_block_enabled?: boolean;
   cyber_session_block_ttl_seconds?: number;
 
-  payment_min_amount?: number;
-  payment_max_amount?: number;
-  payment_daily_limit?: number;
-  payment_order_timeout_minutes?: number;
-  payment_max_pending_orders?: number;
-  payment_enabled_types?: string[];
-  payment_balance_disabled?: boolean;
-  payment_balance_recharge_multiplier?: number;
-  payment_subscription_usd_to_cny_rate?: number;
-  payment_recharge_fee_rate?: number;
-  payment_load_balance_strategy?: string;
-  payment_product_name_prefix?: string;
-  payment_product_name_suffix?: string;
-  payment_help_image_url?: string;
-  payment_help_text?: string;
-  payment_cancel_rate_limit_enabled?: boolean;
-  payment_cancel_rate_limit_max?: number;
-  payment_cancel_rate_limit_window?: number;
-  payment_cancel_rate_limit_unit?: string;
-  payment_cancel_rate_limit_window_mode?: string;
-  payment_alipay_force_qrcode?: boolean;
-  payment_alipay_mobile_precreate_deep_link?: boolean;
-  payment_visible_method_alipay_source?: string;
-  payment_visible_method_wxpay_source?: string;
-  payment_visible_method_alipay_enabled?: boolean;
-  payment_visible_method_wxpay_enabled?: boolean;
   openai_low_upstream_rate_priority_enabled?: boolean;
   openai_oauth_scheduling_rate_multiplier?: number;
   codex_quota_overdraft_enabled?: boolean;

@@ -18,17 +18,20 @@ vi.mock('@/stores', () => ({
   useAppStore: () => appStore,
   useOnboardingStore: () => onboardingStore,
 }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...await importOriginal<typeof import('vue-i18n')>(),
+  useI18n: () => ({ t: (key: string) => key, locale: { value: 'en' } }),
+}))
 
 const wrappers: VueWrapper[] = []
-async function mountMenu(props: { showBalance?: boolean; showOnboarding?: boolean } = {}) {
+async function mountMenu(props: { showOnboarding?: boolean; compact?: boolean; utilities?: boolean } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: ['/', '/profile', '/keys', '/login'].map((path) => ({ path, component: { template: '<div />' } })),
   })
   await router.push('/')
   await router.isReady()
-  const wrapper = mount(AccountMenu, { props, attachTo: document.body, global: { plugins: [router], stubs: { transition: true } } })
+  const wrapper = mount(AccountMenu, { props, attachTo: document.body, global: { plugins: [router], stubs: { transition: true, ConsoleNavigationSearch: true, SubscriptionProgressMini: true, LocaleSwitcher: true } } })
   wrappers.push(wrapper)
   return { wrapper, router }
 }
@@ -47,6 +50,24 @@ afterEach(() => {
 })
 
 describe('shared account menu', () => {
+  it('uses only the avatar in the compact header and shows the three account balance amounts inside its menu', async () => {
+    const { wrapper } = await mountMenu({ compact: true, utilities: true })
+    expect(wrapper.find('.header-identity').exists()).toBe(false)
+    expect(wrapper.get('.header-user-button').classes()).toContain('avatar-only')
+    expect(wrapper.get('.header-user-button').text()).toBe('LO')
+    await wrapper.get('.header-user-button').trigger('click')
+    expect(wrapper.get('.account-balance').findAll('dt').map((label) => label.text())).toEqual([
+      'common.availableBalance', 'common.frozenBalance', 'common.totalBalance',
+    ])
+    expect(wrapper.get('.account-balance').findAll('dd').map((amount) => amount.text())).toEqual([
+      '$12.50', '$2.00', '$14.50',
+    ])
+    expect(wrapper.find('console-navigation-search-stub').exists()).toBe(false)
+    expect(wrapper.find('subscription-progress-mini-stub').exists()).toBe(false)
+    expect(wrapper.find('locale-switcher-stub').exists()).toBe(false)
+    expect(wrapper.find('a[href="/admin/tickets"], a[href="/tickets"]').exists()).toBe(false)
+  })
+
   it('shows console identity, avatar fallback and role with an accessible disclosure', async () => {
     const { wrapper } = await mountMenu()
     const button = wrapper.get('button.header-user-button')
@@ -57,8 +78,8 @@ describe('shared account menu', () => {
     await button.trigger('click')
     expect(button.attributes('aria-controls')).toBe(wrapper.get('.dropdown').attributes('id'))
     expect(wrapper.get('.dropdown').text()).toContain('lol@example.test')
-    expect(wrapper.get('.dropdown').text()).toContain('$12.50')
-    expect(wrapper.get('.dropdown').text()).toContain('$2.00')
+    expect(wrapper.get('.dropdown').text()).not.toContain('$12.50')
+    expect(wrapper.get('.dropdown').text()).not.toContain('$2.00')
     expect(wrapper.find('a[href="https://github.com/loLollipop/Sub2api"]').exists()).toBe(true)
   })
 
@@ -99,8 +120,8 @@ describe('shared account menu', () => {
     expect(wrapper.find('.dropdown').exists()).toBe(false)
   })
 
-  it('omits mobile balance and console-only guide on Home', async () => {
-    const { wrapper } = await mountMenu({ showBalance: false, showOnboarding: false })
+  it('omits the console-only guide on Home', async () => {
+    const { wrapper } = await mountMenu({ showOnboarding: false })
     await wrapper.get('.header-user-button').trigger('click')
     expect(wrapper.text()).not.toContain('onboarding.restartTour')
     expect(wrapper.text()).not.toContain('$12.50')

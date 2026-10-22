@@ -5,60 +5,57 @@
         <span class="signal-account-index">REDEEM</span>
         <h1>{{ t('redeem.title') }}</h1>
       </header>
-      <div class="signal-balance-strip">
-        <div>
-          <p class="signal-account-label">{{ t('redeem.currentBalance') }}</p>
-          <p class="signal-account-balance">
-            ${{ user?.balance?.toFixed(2) || '0.00' }}
-          </p>
+      <section class="redeem-wallet">
+        <div class="signal-balance-strip">
+          <div>
+            <p class="signal-account-label">{{ t('redeem.currentBalance') }}</p>
+            <p class="signal-account-balance">
+              ${{ user?.balance?.toFixed(2) || '0.00' }}
+            </p>
+          </div>
+          <div>
+            <p class="signal-account-label">{{ t('redeem.concurrency') }}</p>
+            <p class="signal-account-number">
+              {{ user?.concurrency || 0 }} <span>{{ t('redeem.requests') }}</span>
+            </p>
+          </div>
         </div>
-        <div>
-          <p class="signal-account-label">{{ t('redeem.concurrency') }}</p>
-          <p class="signal-account-number">
-            {{ user?.concurrency || 0 }} <span>{{ t('redeem.requests') }}</span>
-          </p>
-        </div>
-      </div>
 
-      <!-- Redeem Form -->
-      <div class="signal-account-section">
-        <div>
-          <form @submit.prevent="handleRedeem" class="space-y-5">
-            <div>
-              <label for="code" class="input-label">
-                {{ t('redeem.redeemCodeLabel') }}
-              </label>
-              <div class="relative mt-1">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                  <Icon name="gift" size="md" class="text-gray-400 dark:text-dark-500" />
-                </div>
-                <input
-                  id="code"
-                  v-model="redeemCode"
-                  type="text"
-                  required
-                  :placeholder="t('redeem.redeemCodePlaceholder')"
-                  :disabled="submitting"
-                  class="input py-3 pl-12 text-lg"
-                />
+        <form class="redeem-form" @submit.prevent="handleRedeem">
+          <label for="code" class="input-label">
+            {{ t('redeem.redeemCodeLabel') }}
+          </label>
+          <div class="redeem-code-entry">
+            <div class="relative">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                <Icon name="gift" size="md" class="text-gray-400 dark:text-dark-500" />
               </div>
-              <p class="input-hint">
-                {{ t('redeem.redeemCodeHint') }}
-              </p>
+              <input
+                id="code"
+                v-model="redeemCode"
+                type="text"
+                required
+                :placeholder="t('redeem.redeemCodePlaceholder')"
+                :disabled="submitting"
+                class="input pl-12"
+                aria-describedby="redeem-code-hint"
+              />
             </div>
-
             <button
               type="submit"
               :disabled="!redeemCode || submitting"
-              class="btn btn-primary w-full py-3"
+              class="btn btn-primary"
             >
               <Icon v-if="submitting" name="refresh" size="md" class="mr-2 animate-spin" />
               <Icon v-else name="checkCircle" size="md" class="mr-2" />
               {{ submitting ? t('redeem.redeeming') : t('redeem.redeemButton') }}
             </button>
-          </form>
-        </div>
-      </div>
+          </div>
+          <p id="redeem-code-hint" class="input-hint">
+            {{ t('redeem.redeemCodeHint') }}
+          </p>
+        </form>
+      </section>
 
       <!-- Success Message -->
       <transition name="fade">
@@ -143,50 +140,39 @@
         </div>
       </transition>
 
-      <!-- Information Card -->
-      <div
-        class="card border-primary-200 bg-primary-50 dark:border-primary-800/50 dark:bg-primary-900/20"
-      >
-        <div class="p-6">
-          <div class="flex items-start gap-4">
-            <div
-              class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/30"
+      <!-- Supplementary instructions stay available without competing with the form. -->
+      <details class="workflow-guide">
+        <summary>
+          <Icon name="infoCircle" size="sm" />
+          <span>{{ t('redeem.aboutCodes') }}</span>
+          <Icon name="chevronDown" size="sm" class="workflow-guide-chevron" />
+        </summary>
+        <ul
+          class="workflow-guide-body list-disc space-y-1"
+        >
+          <li>{{ t('redeem.codeRule1') }}</li>
+          <li>{{ t('redeem.codeRule2') }}</li>
+          <li>
+            {{ t('redeem.codeRule3') }}
+            <span
+              v-if="contactInfo"
+              class="ml-1.5 inline-flex items-center rounded-md bg-primary-200/50 px-2 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-800/40 dark:text-primary-200"
             >
-              <Icon name="infoCircle" size="md" class="text-primary-600 dark:text-primary-400" />
-            </div>
-            <div class="flex-1">
-              <h2 class="text-sm font-semibold text-primary-800 dark:text-primary-300">
-                {{ t('redeem.aboutCodes') }}
-              </h2>
-              <ul
-                class="mt-2 list-inside list-disc space-y-1 text-sm text-primary-700 dark:text-primary-400"
-              >
-                <li>{{ t('redeem.codeRule1') }}</li>
-                <li>{{ t('redeem.codeRule2') }}</li>
-                <li>
-                  {{ t('redeem.codeRule3') }}
-                  <span
-                    v-if="contactInfo"
-                    class="ml-1.5 inline-flex items-center rounded-md bg-primary-200/50 px-2 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-800/40 dark:text-primary-200"
-                  >
-                    {{ contactInfo }}
-                  </span>
-                </li>
-                <li>{{ t('redeem.codeRule4') }}</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
+              {{ contactInfo }}
+            </span>
+          </li>
+          <li>{{ t('redeem.codeRule4') }}</li>
+        </ul>
+      </details>
 
       <!-- Recent Activity -->
-      <div class="card">
-        <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+      <section class="card redeem-history" aria-labelledby="redeem-history-title">
+        <header class="redeem-history-header">
+          <h2 id="redeem-history-title" class="text-sm font-semibold text-gray-900 dark:text-white">
             {{ t('redeem.recentActivity') }}
           </h2>
-        </div>
-        <div class="p-6">
+        </header>
+        <div class="redeem-history-body" :aria-busy="loadingHistory">
           <!-- Loading State -->
           <div v-if="loadingHistory" class="flex items-center justify-center py-8">
             <svg class="h-6 w-6 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
@@ -207,16 +193,16 @@
           </div>
 
           <!-- History List -->
-          <div v-else-if="history.length > 0" class="space-y-3">
-            <div
+          <ul v-else-if="history.length > 0" class="redeem-history-list">
+            <li
               v-for="item in history"
               :key="item.id"
-              class="flex items-center justify-between rounded-xl bg-gray-50 p-4 dark:bg-dark-800"
+              class="redeem-history-row"
             >
-              <div class="flex items-center gap-4">
+              <div class="redeem-history-identity">
                 <div
                   :class="[
-                    'flex h-10 w-10 items-center justify-center rounded-xl',
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
                     isBalanceType(item.type)
                       ? item.value >= 0
                         ? 'bg-emerald-100 dark:bg-emerald-900/30'
@@ -258,16 +244,16 @@
                     "
                   />
                 </div>
-                <div>
+                <div class="min-w-0">
                   <p class="text-sm font-medium text-gray-900 dark:text-white">
                     {{ getHistoryItemTitle(item) }}
                   </p>
-                  <p class="text-xs text-gray-500 dark:text-dark-400">
+                  <time :datetime="item.used_at" class="block text-xs text-gray-500 dark:text-dark-400">
                     {{ formatDateTime(item.used_at) }}
-                  </p>
+                  </time>
                 </div>
               </div>
-              <div class="text-right">
+              <div class="redeem-history-value">
                 <p
                   :class="[
                     'text-sm font-semibold',
@@ -288,7 +274,7 @@
                   v-if="!isAdminAdjustment(item.type)"
                   class="font-mono text-xs text-gray-400 dark:text-dark-500"
                 >
-                  {{ item.code.slice(0, 8) }}...
+                  {{ item.code.length > 8 ? `${item.code.slice(0, 8)}...` : item.code }}
                 </p>
                 <p v-else class="text-xs text-gray-400 dark:text-dark-500">
                   {{ t('redeem.adminAdjustment') }}
@@ -296,14 +282,14 @@
                 <!-- Display notes for admin adjustments -->
                 <p
                   v-if="item.notes"
-                  class="mt-1 text-xs text-gray-500 dark:text-dark-400 italic max-w-[200px] truncate"
+                  class="mt-1 text-xs text-gray-500 dark:text-dark-400 italic break-words"
                   :title="item.notes"
                 >
                   {{ item.notes }}
                 </p>
               </div>
-            </div>
-          </div>
+            </li>
+          </ul>
 
           <!-- Empty State -->
           <div v-else class="empty-state py-8">
@@ -316,9 +302,9 @@
               {{ t('redeem.historyWillAppear') }}
             </p>
           </div>
-          <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div class="redeem-history-pagination">
             <span>{{ t('common.total') }}: {{ historyTotal }} {{ t('pagination.results') }}</span>
-            <label>
+            <label class="redeem-history-page-size">
               {{ t('pagination.perPage') }}
               <select
                 v-model="historyPageSize"
@@ -329,19 +315,21 @@
                 <option v-for="size in [20, 50, 100]" :key="size" :value="size">{{ size }}</option>
               </select>
             </label>
-            <button
-              class="btn btn-secondary"
-              :disabled="loadingHistory || submitting || historyPage <= 1"
-              @click="fetchHistory(historyPage - 1)"
-            >{{ t('pagination.previous') }}</button>
-            <button
-              class="btn btn-secondary"
-              :disabled="loadingHistory || submitting || historyPage * historyPageSize >= historyTotal"
-              @click="fetchHistory(historyPage + 1)"
-            >{{ t('pagination.next') }}</button>
+            <div class="redeem-history-page-actions">
+              <button
+                class="btn btn-secondary"
+                :disabled="loadingHistory || submitting || historyPage <= 1"
+                @click="fetchHistory(historyPage - 1)"
+              >{{ t('pagination.previous') }}</button>
+              <button
+                class="btn btn-secondary"
+                :disabled="loadingHistory || submitting || historyPage * historyPageSize >= historyTotal"
+                @click="fetchHistory(historyPage + 1)"
+              >{{ t('pagination.next') }}</button>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   </AppLayout>
 </template>
@@ -411,8 +399,8 @@ const getHistoryItemTitle = (item: RedeemHistoryItem) => {
 
 const formatHistoryValue = (item: RedeemHistoryItem) => {
   if (isBalanceType(item.type)) {
-    const sign = item.value >= 0 ? '+' : ''
-    return `${sign}$${item.value.toFixed(2)}`
+    const sign = item.value < 0 ? '-' : '+'
+    return `${sign}$${Math.abs(item.value).toFixed(2)}`
   } else if (isSubscriptionType(item.type)) {
     // 订阅类型显示有效天数和分组名称
     const days = item.validity_days || Math.round(item.value)

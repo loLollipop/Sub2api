@@ -104,6 +104,10 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	// 2. Model mapping
 	billingModel := resolveOpenAIForwardModel(account, normalizedModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if geminiImageGenerationDenied(c, nil, originalModel, normalizedModel, billingModel, upstreamModel) {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", ImageGenerationPermissionMessage())
+		return nil, errGeminiImageGenerationDenied
+	}
 	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
 		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err

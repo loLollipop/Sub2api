@@ -512,8 +512,8 @@ describe('EditAccountModal', () => {
     const input = wrapper.get<HTMLInputElement>('input[type="datetime-local"]')
 
     for (const [label, expected] of [
-      ['payment.oneMonth', '2028-03-29T12:34'],
-      ['payment.oneYear', '2029-02-28T12:34'],
+      ['common.oneMonth', '2028-03-29T12:34'],
+      ['common.oneYear', '2029-02-28T12:34'],
     ]) {
       const button = wrapper.findAll('button').find((candidate) => candidate.text() === label)!
       expect(button.attributes('type')).toBe('button')
@@ -532,7 +532,7 @@ describe('EditAccountModal', () => {
     updateAccountMock.mockReset().mockResolvedValue(account)
     checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
     const wrapper = mountModal(account)
-    const button = wrapper.findAll('button').find((candidate) => candidate.text() === 'payment.oneYear')!
+    const button = wrapper.findAll('button').find((candidate) => candidate.text() === 'common.oneYear')!
     await button.trigger('click')
     const input = wrapper.get<HTMLInputElement>('input[type="datetime-local"]')
     expect(input.element.value).not.toBe('')
@@ -1675,6 +1675,26 @@ describe('EditAccountModal', () => {
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows quota limit card for Vertex SA account and keeps quota limits on save', async () => {
+    const account = buildVertexAccount()
+    account.extra = { quota_limit: 200, quota_daily_limit: 20, quota_used: 35.5 }
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+    expect(wrapper.findComponent({ name: 'QuotaLimitCard' }).exists()).toBe(true)
+
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const extra = updateAccountMock.mock.calls[0]?.[1]?.extra
+    expect(extra?.quota_limit).toBe(200)
+    expect(extra?.quota_daily_limit).toBe(20)
+    expect(extra?.quota_weekly_limit).toBeUndefined()
   })
 
   it('blocks Vertex SA save when neither credentials_status nor legacy json indicates existence', async () => {

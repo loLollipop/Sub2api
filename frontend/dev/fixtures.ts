@@ -29,12 +29,6 @@ import type {
 import type { UserMonitorDetail, UserMonitorView } from '../src/api/channelMonitor'
 import type { UserAvailableChannel } from '../src/api/channels'
 import type { RedeemHistoryItem } from '../src/api/redeem'
-import type {
-  CheckoutInfoResponse,
-  PaymentConfig,
-  PaymentOrder,
-  SubscriptionPlan,
-} from '../src/types/payment'
 
 export const PREVIEW_LABEL = '本地预览 · 演示数据'
 export const DEMO_TOKEN = 'local-console-demo-not-a-real-token'
@@ -556,52 +550,6 @@ function createPageFixtures(now: Date, user: User, groups: Group[]) {
     })),
   }
 
-  const paymentPlans: SubscriptionPlan[] = [
-    { id: 8101, group_id: groups[0].id, group_platform: groups[0].platform, group_name: groups[0].name, rate_multiplier: 1, daily_limit_usd: 12, weekly_limit_usd: 60, monthly_limit_usd: 180, name: 'Claude 月度演示套餐', description: '本地预览套餐，不会产生真实扣款。', price: 29, original_price: 39, currency: 'USD', validity_days: 30, validity_unit: 'day', features: ['每日 $12 演示额度', '到期自动失效', '仅本地预览'], for_sale: true, sort_order: 1 },
-    { id: 8102, group_id: groups[1].id, group_platform: groups[1].platform, group_name: groups[1].name, rate_multiplier: 1, daily_limit_usd: 16, weekly_limit_usd: 80, monthly_limit_usd: 240, name: 'GPT 季度演示套餐', description: '包含额度与有效期展示。', price: 79, original_price: 99, currency: 'USD', validity_days: 90, validity_unit: 'day', features: ['每日 $16 演示额度', '90 天有效', '仅本地预览'], for_sale: true, sort_order: 2 },
-  ]
-  const checkoutInfo: CheckoutInfoResponse = {
-    recharge_center_enabled: false,
-    methods: {
-      epusdt: { currency: 'CNY', daily_limit: 2000, daily_used: 45, daily_remaining: 1955, single_min: 5, single_max: 500, fee_rate: 0, available: true, recharge_fee_rate: 0, balance_recharge_multiplier: 1 },
-    },
-    global_min: 5,
-    global_max: 500,
-    plans: paymentPlans,
-    balance_disabled: false,
-    balance_recharge_multiplier: 1,
-    subscription_usd_to_cny_rate: 7.2,
-    recharge_fee_rate: 0,
-    help_text: `**${PREVIEW_LABEL}**：所有订单只保存在当前预览进程，不会跳转第三方或真实扣款。`,
-    help_image_url: '',
-    stripe_publishable_key: '',
-    alipay_force_qrcode: true,
-  }
-  const paymentConfig: PaymentConfig = {
-    enabled: true,
-    recharge_center_enabled: true,
-    min_amount: checkoutInfo.global_min,
-    max_amount: checkoutInfo.global_max,
-    daily_limit: 5000,
-    max_pending_orders: 5,
-    order_timeout_minutes: 30,
-    balance_disabled: false,
-    balance_recharge_multiplier: 1,
-    subscription_usd_to_cny_rate: 7.2,
-    enabled_payment_types: ['epusdt'],
-    help_image_url: '',
-    help_text: checkoutInfo.help_text,
-    stripe_publishable_key: '',
-  }
-  const paymentOrders: PaymentOrder[] = [
-    { id: 51006, user_id: user.id, amount: 50, pay_amount: 50, currency: 'CNY', fee_rate: 0, payment_type: 'alipay', out_trade_no: 'LOCAL-DEMO-20260918-006', status: 'PENDING', order_type: 'balance', created_at: at(-8 * 60_000), expires_at: at(22 * 60_000), refund_amount: 0, provider_instance_id: 'local-demo-alipay' },
-    { id: 51005, user_id: user.id, amount: 100, pay_amount: 100.6, currency: 'CNY', fee_rate: 0.6, payment_type: 'wxpay', out_trade_no: 'LOCAL-DEMO-20260918-005', status: 'COMPLETED', order_type: 'balance', created_at: at(-2 * DAY), expires_at: at(-2 * DAY + 30 * 60_000), paid_at: at(-2 * DAY + 3 * 60_000), completed_at: at(-2 * DAY + 4 * 60_000), refund_amount: 0, provider_instance_id: 'local-demo-wxpay' },
-    { id: 51004, user_id: user.id, amount: 30, pay_amount: 30, currency: 'USDT', fee_rate: 0, payment_type: 'epusdt', out_trade_no: 'LOCAL-DEMO-20260918-004', status: 'COMPLETED', order_type: 'balance', created_at: at(-5 * DAY), expires_at: at(-5 * DAY + 30 * 60_000), paid_at: at(-5 * DAY + 6 * 60_000), completed_at: at(-5 * DAY + 7 * 60_000), refund_amount: 0, provider_instance_id: 'local-demo-epusdt' },
-    { id: 51003, user_id: user.id, amount: 29, pay_amount: 208.8, currency: 'CNY', fee_rate: 0, payment_type: 'alipay', out_trade_no: 'LOCAL-DEMO-20260918-003', status: 'COMPLETED', order_type: 'subscription', plan_id: 8101, created_at: at(-12 * DAY), expires_at: at(-12 * DAY + 30 * 60_000), paid_at: at(-12 * DAY + 2 * 60_000), completed_at: at(-12 * DAY + 3 * 60_000), refund_amount: 0, provider_instance_id: 'local-demo-alipay' },
-    { id: 51002, user_id: user.id, amount: 20, pay_amount: 20, currency: 'CNY', fee_rate: 0, payment_type: 'alipay', out_trade_no: 'LOCAL-DEMO-20260918-002', status: 'FAILED', order_type: 'balance', created_at: at(-18 * DAY), expires_at: at(-18 * DAY + 30 * 60_000), refund_amount: 0, provider_instance_id: 'local-demo-alipay' },
-    { id: 51001, user_id: user.id, amount: 10, pay_amount: 10, currency: 'CNY', fee_rate: 0, payment_type: 'alipay', out_trade_no: 'LOCAL-DEMO-20260918-001', status: 'REFUNDED', order_type: 'balance', created_at: at(-26 * DAY), expires_at: at(-26 * DAY + 30 * 60_000), paid_at: at(-26 * DAY + 2 * 60_000), completed_at: at(-26 * DAY + 3 * 60_000), refund_amount: 10, refund_reason: '本地演示退款', provider_instance_id: 'local-demo-alipay' },
-  ]
-
   const subscriptions: UserSubscription[] = [
     { id: 6101, user_id: user.id, group_id: groups[0].id, status: 'active', starts_at: at(-12 * DAY), daily_usage_usd: 4.86, weekly_usage_usd: 28.4, monthly_usage_usd: 72.16, daily_window_start: at(-8 * 60 * 60_000), weekly_window_start: at(-3 * DAY), monthly_window_start: at(-12 * DAY), created_at: at(-12 * DAY), updated_at: at(-20 * 60_000), expires_at: at(18 * DAY), group: groups[0] },
     { id: 6102, user_id: user.id, group_id: groups[1].id, status: 'active', starts_at: at(-38 * DAY), daily_usage_usd: 13.7, weekly_usage_usd: 41.2, monthly_usage_usd: 166.8, daily_window_start: at(-21 * 60 * 60_000), weekly_window_start: at(-5 * DAY), monthly_window_start: at(-8 * DAY), created_at: at(-38 * DAY), updated_at: at(-35 * 60_000), expires_at: at(52 * DAY), group: groups[1] },
@@ -656,10 +604,6 @@ function createPageFixtures(now: Date, user: User, groups: Group[]) {
     monitorDetails,
     availableChannels,
     modelPlaza,
-    paymentPlans,
-    checkoutInfo,
-    paymentConfig,
-    paymentOrders,
     subscriptions,
     subscriptionProgress,
     redeemHistory,
@@ -673,8 +617,9 @@ export const settings: PublicSettings = {
   invitation_code_enabled: false, turnstile_enabled: false, turnstile_site_key: '',
   site_name: 'example.com', site_logo: '', site_subtitle: PREVIEW_LABEL, api_base_url: '',
   contact_info: '', doc_url: '', home_content: '', compact_home_enabled: true,
-  hide_ccs_import_button: true, payment_enabled: true, risk_control_enabled: false,
+  hide_ccs_import_button: true, risk_control_enabled: false,
   table_default_page_size: 10, table_page_size_options: [10, 20, 50, 100],
+  purchase_subscription_enabled: true, purchase_subscription_url: '', purchase_subscription_products: { '10': 'https://shop.example.test/item/10', '20': 'https://shop.example.test/item/20', '30': 'https://shop.example.test/item/30', '50': 'https://shop.example.test/item/50', '100': 'https://shop.example.test/item/100' },
   custom_menu_items: [], custom_endpoints: [], linuxdo_oauth_enabled: false,
   wechat_oauth_enabled: false, oidc_oauth_enabled: false, oidc_oauth_provider_name: '',
   github_oauth_enabled: false, google_oauth_enabled: false, backend_mode_enabled: false,

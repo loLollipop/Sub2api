@@ -62,7 +62,7 @@ var (
 	// regenerated on every process start, so the persisted ciphertext becomes
 	// undecryptable after a restart/upgrade ("cipher: message authentication
 	// failed"), silently breaking S3 backup/image storage (#4524). Mirrors the
-	// existing guards for payments (payment.ProvideEncryptionKey) and TOTP
+	// existing guards for TOTP
 	// enablement, which likewise refuse to depend on an auto-generated key.
 	ErrSecretEncryptionKeyNotConfigured = infraerrors.BadRequest(
 		"SECRET_ENCRYPTION_KEY_NOT_CONFIGURED",

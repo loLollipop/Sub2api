@@ -1,213 +1,128 @@
 <template>
-  <div class="space-y-6">
-    <section
-      data-testid="profile-overview-hero"
-      class="card overflow-hidden border border-primary-100/80 bg-gradient-to-br from-primary-50 via-white to-amber-50/70 dark:border-primary-900/40 dark:from-primary-950/40 dark:via-dark-900 dark:to-dark-950"
-    >
-      <div class="px-6 py-6 md:px-8">
-        <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
-          <div
-            class="profile-identity-avatar flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary-500 to-primary-600 text-2xl font-bold text-white shadow-lg shadow-primary-500/20"
-          >
-            <img
-              v-if="avatarUrl"
-              :src="avatarUrl"
-              :alt="displayName"
-              class="h-full w-full object-cover"
-            >
-            <span v-else>{{ avatarInitial }}</span>
-          </div>
-
-          <div class="min-w-0 flex-1 space-y-5">
-            <div class="space-y-3">
-              <div class="flex flex-wrap items-center gap-2">
-                <h2 class="truncate text-2xl font-semibold text-gray-900 dark:text-white">
-                  {{ displayName }}
-                </h2>
-                <span :class="['badge', user?.role === 'admin' ? 'badge-primary' : 'badge-gray']">
-                  {{ user?.role === 'admin' ? t('profile.administrator') : t('profile.user') }}
-                </span>
-                <span
-                  :class="['badge', user?.status === 'active' ? 'badge-success' : 'badge-danger']"
-                >
-                  {{
-                    user?.status === 'active'
-                      ? t('common.active')
-                      : t('common.disabled')
-                  }}
-                </span>
-              </div>
-
-              <div class="space-y-1">
-                <p class="truncate text-sm text-gray-600 dark:text-gray-300">
-                  {{ primaryEmailDisplay }}
-                </p>
-                <div
-                  v-if="sourceHints.length"
-                  class="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400"
-                >
-                  <span
-                    v-for="hint in sourceHints"
-                    :key="hint.key"
-                    class="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 ring-1 ring-primary-100 dark:bg-dark-900/70 dark:ring-primary-900/40"
-                  >
-                    <Icon name="link" size="sm" />
-                    {{ hint.text }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="profile-identity-metrics grid gap-3 sm:grid-cols-3">
-              <div
-                data-testid="profile-overview-metric-balance"
-                class="rounded-2xl bg-white/85 px-4 py-3 shadow-sm ring-1 ring-white/70 dark:bg-dark-900/60 dark:ring-dark-700"
-              >
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
-                  {{ t('profile.accountBalance') }}
-                </p>
-                <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ formatCurrency(user?.balance || 0) }}
-                </p>
-              </div>
-              <div
-                data-testid="profile-overview-metric-concurrency"
-                class="rounded-2xl bg-white/85 px-4 py-3 shadow-sm ring-1 ring-white/70 dark:bg-dark-900/60 dark:ring-dark-700"
-              >
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
-                  {{ t('profile.concurrencyLimit') }}
-                </p>
-                <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ user?.concurrency || 0 }}
-                </p>
-              </div>
-              <div
-                data-testid="profile-overview-metric-member-since"
-                class="rounded-2xl bg-white/85 px-4 py-3 shadow-sm ring-1 ring-white/70 dark:bg-dark-900/60 dark:ring-dark-700"
-              >
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
-                  {{ t('profile.memberSince') }}
-                </p>
-                <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ memberSinceLabel }}
-                </p>
-              </div>
-            </div>
-          </div>
+  <section data-testid="profile-overview-hero" class="card profile-overview">
+    <div class="profile-identity">
+      <button
+        type="button"
+        class="profile-avatar-trigger"
+        data-testid="profile-avatar-open"
+        :aria-label="t('profile.avatar.open')"
+        :title="t('profile.avatar.open')"
+        aria-haspopup="dialog"
+        :disabled="!user"
+        @click="avatarOpen = true"
+      >
+        <span class="profile-identity-avatar">
+          <img v-if="avatarUrl" :src="avatarUrl" :alt="displayName" class="h-full w-full object-cover">
+          <span v-else>{{ avatarInitial }}</span>
+        </span>
+        <span class="profile-avatar-edit" aria-hidden="true"><Icon name="editSimple" size="sm" /></span>
+      </button>
+      <div class="profile-identity-copy">
+        <h1 class="profile-eyebrow">{{ t('profile.title') }}</h1>
+        <div class="profile-name-line">
+          <h2>{{ displayName }}</h2>
+          <button
+            type="button"
+            class="profile-name-edit"
+            data-testid="profile-username-open"
+            :aria-label="t('profile.editUsername')"
+            :title="t('profile.editUsername')"
+            aria-haspopup="dialog"
+            :disabled="!user"
+            @click="usernameOpen = true"
+          ><Icon name="editSimple" size="sm" /></button>
+          <span :class="['badge', user?.role === 'admin' ? 'badge-primary' : 'badge-gray']">
+            {{ user?.role === 'admin' ? t('profile.administrator') : t('profile.user') }}
+          </span>
+          <span :class="['badge', user?.status === 'active' ? 'badge-success' : 'badge-danger']">
+            {{ user?.status === 'active' ? t('common.active') : t('common.disabled') }}
+          </span>
+        </div>
+        <div class="profile-identity-meta">
+          <span v-if="primaryEmailDisplay">{{ primaryEmailDisplay }}</span>
+          <span v-if="user">{{ t('profile.accountId', { id: user.id }) }}</span>
+        </div>
+        <div v-if="sourceHints.length" class="profile-source-hints">
+          <span v-for="hint in sourceHints" :key="hint.key"><Icon name="link" size="sm" />{{ hint.text }}</span>
         </div>
       </div>
-    </section>
-
-    <div class="space-y-6">
-      <div data-testid="profile-main-column" class="space-y-6">
-        <section
-          data-testid="profile-basics-panel"
-          class="card border border-gray-100 bg-white/90 p-6 dark:border-dark-700 dark:bg-dark-900/50"
-        >
-          <div class="mb-5 flex items-start justify-between gap-4">
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {{ t('profile.basicsTitle') }}
-              </h3>
-              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {{ t('profile.basicsDescription') }}
-              </p>
-            </div>
-          </div>
-
-          <div class="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
-            <div class="rounded-3xl border border-gray-100 bg-gray-50/80 p-5 dark:border-dark-700 dark:bg-dark-900/30">
-              <ProfileAvatarCard
-                :user="user"
-                embedded
-              />
-            </div>
-
-            <div class="rounded-3xl border border-gray-100 bg-gray-50/80 p-5 dark:border-dark-700 dark:bg-dark-900/30">
-              <ProfileEditForm
-                :initial-username="user?.username || ''"
-                embedded
-              />
-            </div>
-          </div>
-        </section>
-
-        <section
-          data-testid="profile-auth-bindings-panel"
-          class="card border border-gray-100 bg-white/90 p-6 dark:border-dark-700 dark:bg-dark-900/50"
-        >
-          <ProfileIdentityBindingsSection
-            :user="user"
-            :linuxdo-enabled="linuxdoEnabled"
-            :dingtalk-enabled="dingtalkEnabled"
-            :oidc-enabled="oidcEnabled"
-            :oidc-provider-name="oidcProviderName"
-            :wechat-enabled="wechatEnabled"
-            :wechat-open-enabled="wechatOpenEnabled"
-            :wechat-mp-enabled="wechatMpEnabled"
-            embedded
-            compact
-          />
-        </section>
-      </div>
-
-      <div data-testid="profile-side-column" class="space-y-6">
-        <section
-          v-if="sourceHints.length"
-          class="card border border-gray-100 bg-white/90 p-6 dark:border-dark-700 dark:bg-dark-900/50"
-        >
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-            {{ t('profile.linkedProfileSources') }}
-          </h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {{ t('profile.linkedProfileSourcesDescription') }}
-          </p>
-
-          <div class="mt-5 grid gap-3">
-            <div
-              v-for="hint in sourceHints"
-              :key="hint.key"
-              class="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 px-4 py-3 text-sm text-gray-600 dark:border-dark-700 dark:bg-dark-900/30 dark:text-gray-300"
-            >
-              <Icon name="link" size="sm" class="mt-0.5 text-gray-400 dark:text-gray-500" />
-              <span>{{ hint.text }}</span>
-            </div>
-          </div>
-        </section>
-      </div>
     </div>
-  </div>
-</template>
+    <dl class="profile-identity-metrics">
+      <div data-testid="profile-overview-metric-balance">
+        <dt>{{ t('profile.accountBalance') }}</dt><dd>{{ formatCurrency(user?.balance || 0) }}</dd>
+      </div>
+      <div data-testid="profile-overview-metric-concurrency">
+        <dt>{{ t('profile.concurrencyLimit') }}</dt><dd>{{ user?.concurrency || 0 }}</dd>
+      </div>
+      <div data-testid="profile-overview-metric-member-since">
+        <dt>{{ t('profile.memberSince') }}</dt><dd>{{ memberSinceLabel }}</dd>
+      </div>
+    </dl>
+  </section>
 
+  <BaseDialog
+    :show="avatarOpen"
+    :title="t('profile.avatar.open')"
+    width="narrow"
+    :close-on-escape="!avatarBusy"
+    :show-close-button="!avatarBusy"
+    @close="closeAvatar"
+  >
+    <div class="profile-dialog-form">
+      <ProfileAvatarCard
+        v-if="avatarOpen" :user="user"
+        embedded in-dialog
+        @busy="avatarBusy = $event"
+        @saved="avatarOpen = false"
+        @cancel="closeAvatar"
+      />
+    </div>
+  </BaseDialog>
+  <BaseDialog
+    :show="usernameOpen"
+    :title="t('profile.editUsername')"
+    width="narrow"
+    :close-on-escape="!usernameBusy"
+    :show-close-button="!usernameBusy"
+    @close="closeUsername"
+  >
+    <div class="profile-dialog-form" @keydown.esc="handleUsernameEscape">
+      <ProfileEditForm
+        v-if="usernameOpen" :initial-username="user?.username || ''"
+        embedded in-dialog
+        @busy="usernameBusy = $event"
+        @saved="usernameOpen = false"
+        @cancel="closeUsername"
+      />
+    </div>
+  </BaseDialog>
+</template>
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import ProfileAvatarCard from '@/components/user/profile/ProfileAvatarCard.vue'
 import ProfileEditForm from '@/components/user/profile/ProfileEditForm.vue'
-import ProfileIdentityBindingsSection from '@/components/user/profile/ProfileIdentityBindingsSection.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import type { User, UserAuthBindingStatus, UserAuthProvider, UserProfileSourceContext } from '@/types'
 
 const props = withDefaults(defineProps<{
   user: User | null
-  linuxdoEnabled?: boolean
-  dingtalkEnabled?: boolean
-  oidcEnabled?: boolean
   oidcProviderName?: string
-  wechatEnabled?: boolean
-  wechatOpenEnabled?: boolean
-  wechatMpEnabled?: boolean
 }>(), {
-  linuxdoEnabled: false,
-  dingtalkEnabled: false,
-  oidcEnabled: false,
   oidcProviderName: 'OIDC',
-  wechatEnabled: false,
-  wechatOpenEnabled: undefined,
-  wechatMpEnabled: undefined,
 })
 
 const { t } = useI18n()
+const avatarOpen = ref(false)
+const avatarBusy = ref(false)
+const usernameOpen = ref(false)
+const usernameBusy = ref(false)
+function closeAvatar() { if (!avatarBusy.value) avatarOpen.value = false }
+function closeUsername() { if (!usernameBusy.value) usernameOpen.value = false }
+function handleUsernameEscape(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) event.stopPropagation()
+}
 
 function normalizeBindingStatus(binding: boolean | UserAuthBindingStatus | undefined): boolean | null {
   if (typeof binding === 'boolean') {

@@ -1,191 +1,71 @@
 <template>
-  <header
-    class="glass sticky top-0 z-30 border-b border-gray-200/50 dark:border-dark-700/50"
-    :class="{ 'signal-header': isConsoleSignal, 'consumer-header': !authStore.isAdmin }"
-  >
-    <div class="header-inner flex h-16 items-center justify-between gap-2 px-2 sm:px-4 md:px-6">
-      <!-- Left: Mobile Menu Toggle + Page Title -->
-      <div class="header-location flex shrink-0 items-center gap-2 sm:gap-4">
-        <button
-          @click="toggleMobileSidebar"
-          class="btn-ghost btn-icon lg:hidden"
-          :aria-label="t('common.toggleMenu')"
-        >
-          <Icon name="menu" size="md" />
-        </button>
-
-        <nav v-if="isConsoleSignal" class="signal-breadcrumb" :aria-label="pageTitle">
-          <router-link :to="authStore.isAdmin ? '/admin/dashboard' : '/dashboard'" class="signal-breadcrumb-home" :title="appStore.siteName">
-            {{ appStore.siteName }}
+  <div class="top-header-spacer">
+    <header class="top-header" :class="{ 'is-compact': compact, 'is-scrolled': scrolled && !browse }">
+      <div class="top-header-primary">
+        <div class="top-brand-area">
+          <button v-if="!browse || !isDesktop" id="mobile-navigation-trigger" type="button" class="top-sidebar-toggle btn-ghost btn-icon" :aria-label="isDesktop ? (appStore.sidebarCollapsed ? t('nav.expand') : t('nav.collapse')) : t('common.toggleMenu')" :aria-expanded="isDesktop ? !appStore.sidebarCollapsed : appStore.mobileOpen" aria-controls="mobile-console-navigation" @click="isDesktop ? appStore.toggleSidebar() : appStore.toggleMobileSidebar()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16m-3-9h.01M6 14h.01" /></svg>
+          </button>
+          <router-link to="/" class="top-brand" :title="appStore.siteName">
+            <img :src="siteLogo || '/logo.svg'" alt="" class="top-brand-logo" />
+            <span>{{ appStore.siteName }}</span>
           </router-link>
-          <Icon name="chevronRight" size="xs" aria-hidden="true" />
-          <h1 v-if="isAdminSignal" class="signal-admin-title" :title="pageTitle">{{ pageTitle }}</h1>
-          <span v-else aria-current="page" :title="pageTitle">{{ pageTitle }}</span>
-        </nav>
-        <div v-else class="hidden lg:block">
-          <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
-            {{ pageTitle }}
-          </h1>
-          <p v-if="pageDescription" class="text-xs text-gray-500 dark:text-dark-400">
-            {{ pageDescription }}
-          </p>
+        </div>
+        <UserTopNav />
+        <div class="top-account-area">
+          <ConsoleNavigationSearch expanded />
+          <SubscriptionProgressMini class="header-subscriptions" />
+          <ThemeControls />
+          <AnnouncementBell class="top-announcements" />
+          <LocaleSwitcher compact class="top-locale" />
+          <AccountMenu compact utilities />
         </div>
       </div>
-
-      <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
-      <div class="header-actions flex min-w-0 items-center gap-1 sm:gap-3">
-        <ConsoleNavigationSearch v-if="isConsoleSignal" />
-        <!-- Announcement Bell -->
-        <AnnouncementBell v-if="user" />
-        <router-link
-          v-if="user"
-          :to="authStore.isAdmin ? '/admin/tickets' : '/tickets'"
-          class="header-shortcut inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 dark:text-dark-400 dark:hover:bg-dark-800"
-          :title="t('tickets.support')"
-          :aria-label="t('tickets.support')"
-        >
-          <Icon name="chat" size="md" />
-        </router-link>
-
-        <!-- Docs Link -->
-        <a
-          v-if="docUrl"
-          :href="docUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="header-shortcut inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
-          :title="t('nav.docs')" :aria-label="t('nav.docs')"
-        >
-          <Icon name="book" size="sm" />
-          <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
-        </a>
-
-        <!-- Model Plaza Entry -->
-        <router-link
-          v-if="user && modelPlazaEnabled"
-          :to="{ path: '/model-plaza', query: { embedded: '1' } }"
-          class="header-shortcut inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
-          :title="t('nav.modelPlaza')" :aria-label="t('nav.modelPlaza')"
-        >
-          <Icon name="grid" size="sm" />
-          <span class="hidden sm:inline">{{ t('nav.modelPlaza') }}</span>
-        </router-link>
-
-        <!-- Language Switcher -->
-        <LocaleSwitcher class="header-locale" />
-
-        <!-- Subscription Progress (for users with active subscriptions) -->
-        <SubscriptionProgressMini v-if="user" class="header-subscriptions" />
-
-        <!-- Balance Display -->
-        <div
-          v-if="user"
-          class="header-balance group relative hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
-          :tabindex="isConsoleSignal ? 0 : undefined"
-          :aria-label="isConsoleSignal ? `${balanceAvailableText} ${formatHeaderMoney(availableBalance)}` : undefined"
-        >
-          <Icon name="banknotes" size="none" class="h-4 w-4 text-primary-600 dark:text-primary-400" :stroke-width="1.5" />
-          <span class="header-balance-value text-sm font-semibold text-primary-700 dark:text-primary-300">
-            {{ formatHeaderMoney(availableBalance) }}
-          </span>
-          <span
-            v-if="frozenBalance > 0"
-            class="header-balance-frozen rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-          >
-            {{ balanceFrozenLabel }}
-          </span>
-          <div
-            class="header-balance-detail pointer-events-none absolute right-0 top-full mt-2 hidden w-56 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block dark:border-dark-700 dark:bg-dark-800"
-          >
-            <div class="flex items-center justify-between">
-              <span class="text-gray-500 dark:text-dark-400">{{ balanceAvailableText }}</span>
-              <span class="font-medium text-gray-900 dark:text-white">{{ formatHeaderMoney(availableBalance) }}</span>
-            </div>
-            <div class="mt-2 flex items-center justify-between">
-              <span class="text-gray-500 dark:text-dark-400">{{ balanceFrozenText }}</span>
-              <span class="font-medium text-amber-700 dark:text-amber-200">{{ formatHeaderMoney(frozenBalance) }}</span>
-            </div>
-            <div class="mt-2 border-t border-gray-100 pt-2 dark:border-dark-700">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500 dark:text-dark-400">{{ balanceTotalText }}</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ formatHeaderMoney(totalBalance) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <AccountMenu />
-      </div>
-    </div>
-    <UserTopNav v-if="!authStore.isAdmin" />
-  </header>
+    </header>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAppStore, useAuthStore } from '@/stores'
-import { useAdminSettingsStore } from '@/stores/adminSettings'
+import { useAppStore } from '@/stores'
+import { useMediaQuery } from '@vueuse/core'
+import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
-import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
-import Icon from '@/components/icons/Icon.vue'
-import { sanitizeUrl } from '@/utils/url'
-import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
-import { useConsoleSignal } from '@/composables/useConsoleSignal'
 import ConsoleNavigationSearch from './ConsoleNavigationSearch.vue'
+import ThemeControls from './ThemeControls.vue'
+import { sanitizeUrl } from '@/utils/url'
 import AccountMenu from './AccountMenu.vue'
 import UserTopNav from './UserTopNav.vue'
 
-const route = useRoute()
-const { isConsoleSignal, isAdminSignal } = useConsoleSignal()
+const props = defineProps<{ browse?: boolean }>()
 const { t } = useI18n()
 const appStore = useAppStore()
-const authStore = useAuthStore()
-const adminSettingsStore = useAdminSettingsStore()
-
-const user = computed(() => authStore.user)
-const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
-const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
-const availableBalance = computed(() => Number(user.value?.balance || 0))
-const frozenBalance = computed(() => Number(user.value?.frozen_balance || 0))
-const totalBalance = computed(() => availableBalance.value + frozenBalance.value)
-const balanceAvailableText = computed(() => t('common.availableBalance') === 'common.availableBalance' ? '可用余额' : t('common.availableBalance'))
-const balanceFrozenText = computed(() => t('common.frozenBalance') === 'common.frozenBalance' ? '冻结金额' : t('common.frozenBalance'))
-const balanceTotalText = computed(() => t('common.totalBalance') === 'common.totalBalance' ? '总余额' : t('common.totalBalance'))
-const balanceFrozenLabel = computed(() => `${balanceFrozenText.value} ${formatHeaderMoney(frozenBalance.value)}`)
-
-const pageTitle = computed(() => {
-  // For custom pages, use the menu item's label instead of generic "自定义页面"
-  if (route.name === 'CustomPage') {
-    const id = route.params.id as string
-    const publicItems = appStore.cachedPublicSettings?.custom_menu_items ?? []
-    const menuItem = publicItems.find((item) => item.id === id)
-      ?? (authStore.isAdmin ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
-    if (menuItem?.label) return menuItem.label
-  }
-  const titleKey = route.meta.titleKey as string
-  if (titleKey) {
-    return t(titleKey)
-  }
-  return (route.meta.title as string) || ''
-})
-
-const pageDescription = computed(() => {
-  const descKey = route.meta.descriptionKey as string
-  if (descKey) {
-    return t(descKey)
-  }
-  return (route.meta.description as string) || ''
-})
-
-function toggleMobileSidebar() {
-  appStore.toggleMobileSidebar()
+const isDesktop = useMediaQuery('(min-width: 1024px)')
+const compact = ref(false)
+const scrolled = ref(false)
+const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
+let scrollFrame = 0
+function updateScrollState() {
+  scrolled.value = window.scrollY > 8
+  // Separate entry/exit thresholds prevent flicker near the transition.
+  compact.value = Boolean(props.browse) && window.scrollY >= (compact.value ? 40 : 88)
 }
-
-function formatHeaderMoney(value: number) {
-  if (!Number.isFinite(value)) return '$0.00'
-  return `$${value.toFixed(2)}`
+function updateScroll() {
+  if (scrollFrame) return
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0
+    updateScrollState()
+  })
 }
+watch(() => props.browse, updateScrollState)
+onMounted(() => {
+  updateScrollState()
+  window.addEventListener('scroll', updateScroll, { passive: true })
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', updateScroll)
+  cancelAnimationFrame(scrollFrame)
+})
 </script>

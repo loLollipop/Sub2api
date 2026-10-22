@@ -14,7 +14,7 @@ async function render(role: 'user' | 'admin', simpleMode = false) {
   auth.user = { id: 900001, role } as NonNullable<typeof auth.user>
   vi.spyOn(auth, 'isSimpleMode', 'get').mockReturnValue(simpleMode)
   const app = useAppStore()
-  app.cachedPublicSettings = { payment_enabled: false, channel_monitor_enabled: false } as NonNullable<typeof app.cachedPublicSettings>
+  app.cachedPublicSettings = { purchase_subscription_enabled: false, channel_monitor_enabled: false } as NonNullable<typeof app.cachedPublicSettings>
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }] })
   await router.push('/dashboard')
   const push = vi.spyOn(router, 'push')
@@ -61,6 +61,32 @@ describe('console navigation search', () => {
     await wrapper.get('input').trigger('keydown.enter')
     expect(wrapper.find('input').exists()).toBe(true)
     expect(push).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it.each([
+    { isComposing: true },
+    { keyCode: 229 },
+  ])('leaves IME confirmation Enter to the input method (%j)', async (composition) => {
+    const { wrapper, push } = await render('admin')
+    await wrapper.get('input').setValue('/admin/accounts')
+    const input = wrapper.get('input').element
+    const composingEnter = new KeyboardEvent('keydown', {
+      key: 'Enter', bubbles: true, cancelable: true, ...composition,
+    })
+    input.dispatchEvent(composingEnter)
+    await flushPromises()
+    expect(composingEnter.defaultPrevented).toBe(false)
+    expect(push).not.toHaveBeenCalled()
+    expect(wrapper.find('input').exists()).toBe(true)
+
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    input.dispatchEvent(enter)
+    await flushPromises()
+    expect(enter.defaultPrevented).toBe(true)
+    expect(push).toHaveBeenCalledOnce()
+    expect(push).toHaveBeenCalledWith('/admin/accounts')
+    expect(wrapper.find('input').exists()).toBe(false)
     wrapper.unmount()
   })
 })

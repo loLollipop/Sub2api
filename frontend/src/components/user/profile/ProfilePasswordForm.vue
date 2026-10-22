@@ -10,7 +10,7 @@
     </div>
     <div :class="props.embedded ? '' : 'px-6 py-6'">
       <form @submit.prevent="handleChangePassword" class="space-y-4">
-        <div v-if="props.embedded">
+        <div v-if="props.embedded && !props.inDialog">
           <p class="text-sm font-semibold text-gray-900 dark:text-white">
             {{ t('profile.changePassword') }}
           </p>
@@ -60,7 +60,10 @@
           />
         </div>
 
-        <div class="flex justify-end pt-4">
+        <div class="flex justify-end gap-2 pt-4">
+          <button v-if="props.inDialog" type="button" class="btn btn-secondary" :disabled="loading" @click="emit('cancel')">
+            {{ t('common.cancel') }}
+          </button>
           <button type="submit" :disabled="loading" class="btn btn-primary">
             {{ loading ? t('profile.changingPassword') : t('profile.changePasswordButton') }}
           </button>
@@ -71,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { userAPI } from '@/api'
@@ -81,11 +84,15 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const props = withDefaults(defineProps<{
   embedded?: boolean
+  inDialog?: boolean
 }>(), {
   embedded: false,
+  inDialog: false,
 })
+const emit = defineEmits<{ busy: [value: boolean]; saved: []; cancel: [] }>()
 
 const loading = ref(false)
+watch(loading, (value) => emit('busy', value), { flush: 'sync' })
 const form = ref({
   old_password: '',
   new_password: '',
@@ -93,6 +100,7 @@ const form = ref({
 })
 
 const handleChangePassword = async () => {
+  if (loading.value) return
   if (form.value.new_password !== form.value.confirm_password) {
     appStore.showError(t('profile.passwordsNotMatch'))
     return
@@ -108,6 +116,7 @@ const handleChangePassword = async () => {
     await userAPI.changePassword(form.value.old_password, form.value.new_password)
     form.value = { old_password: '', new_password: '', confirm_password: '' }
     appStore.showSuccess(t('profile.passwordChangeSuccess'))
+    emit('saved')
   } catch (error: unknown) {
     appStore.showError(extractApiErrorMessage(error, t('profile.passwordChangeFailed')))
   } finally {

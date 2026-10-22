@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 
 import RedeemView from '../RedeemView.vue'
+
+enableAutoUnmount(afterEach)
 
 const { listRedeemCodes, generateRedeemCodes, batchUpdateRedeemCodes, getAllGroups, showSuccess, showError, showInfo } =
   vi.hoisted(() => ({
@@ -49,7 +51,8 @@ vi.mock('vue-i18n', async () => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key
+      t: (key: string, params?: { count?: number }) =>
+        key === 'admin.redeem.codesCreated' ? `${key}:${params?.count}` : key
     })
   }
 })
@@ -99,6 +102,26 @@ const SelectStub = {
     </select>
   `
 }
+
+const mountDialogs = () => mount(RedeemView, {
+  attachTo: document.body,
+  global: {
+    stubs: {
+      AppLayout: { template: '<div><slot /></div>' },
+      TablePageLayout: {
+        template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+      },
+      DataTable: DataTableStub,
+      Pagination: true,
+      ConfirmDialog: true,
+      Select: SelectStub,
+      GroupBadge: true,
+      GroupOptionItem: true,
+      Icon: true,
+      Teleport: true
+    }
+  }
+})
 
 describe('admin RedeemView batch update', () => {
   beforeEach(() => {
@@ -208,7 +231,7 @@ describe('admin RedeemView batch update', () => {
     await wrapper.get('[data-test="batch-status-select"]').setValue('disabled')
     await wrapper.get('[data-test="batch-field-notes"]').setValue(true)
     await wrapper.get('[data-test="batch-notes-input"]').setValue('maintenance')
-    await wrapper.get('[data-test="batch-update-form"]').trigger('submit')
+    await wrapper.get('[data-test="batch-update-submit"]').trigger('click')
     await flushPromises()
 
     expect(batchUpdateRedeemCodes).toHaveBeenCalledWith([1], {
@@ -245,7 +268,7 @@ describe('admin RedeemView batch update', () => {
     expect(countInput.attributes('max')).toBe('1000')
 
     await countInput.setValue(1000)
-    await wrapper.get('[data-test="generate-form"]').trigger('submit')
+    await wrapper.get('[data-test="generate-submit"]').trigger('click')
     await flushPromises()
 
     expect(generateRedeemCodes).toHaveBeenCalledWith(
@@ -256,5 +279,87 @@ describe('admin RedeemView batch update', () => {
       undefined,
       undefined
     )
+  })
+
+  it.each(['', 0, 1001])('keeps native count validation when submitting %s from the footer', async (count) => {
+    const wrapper = mountDialogs()
+    await flushPromises()
+    await wrapper.get('[data-test="generate-open"]').trigger('click')
+    await wrapper.get('[data-test="generate-count"]').setValue(count)
+
+    const form = wrapper.get<HTMLFormElement>('[data-test="generate-form"]')
+    const submit = wrapper.get<HTMLButtonElement>('[data-test="generate-submit"]')
+    expect(submit.element.form).toBe(form.element)
+    expect(form.element.contains(submit.element)).toBe(false)
+    expect(form.element.checkValidity()).toBe(false)
+    await submit.trigger('click')
+    await flushPromises()
+
+    expect(generateRedeemCodes).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="generate-form"]').exists()).toBe(true)
+  })
+
+  it.each([
+    ['generate', 'cancel'],
+    ['generate', 'close'],
+    ['generate', 'escape'],
+    ['batch-update', 'cancel'],
+    ['batch-update', 'close'],
+    ['batch-update', 'escape']
+  ])('closes %s using %s without submitting', async (dialog, action) => {
+    const wrapper = mountDialogs()
+    await flushPromises()
+    if (dialog === 'batch-update') {
+      await wrapper.findAll('[data-test="select-code"]')[0].setValue(true)
+    }
+    await wrapper.get(`[data-test="${dialog}-open"]`).trigger('click')
+    await flushPromises()
+    expect(document.body.classList.contains('modal-open')).toBe(true)
+
+    if (action === 'escape') {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    } else if (action === 'close') {
+      await wrapper.get('[aria-label="Close modal"]').trigger('click')
+    } else {
+      await wrapper.get('.modal-footer button[type="button"]').trigger('click')
+    }
+    await flushPromises()
+
+    expect(wrapper.find(`[data-test="${dialog}-form"]`).exists()).toBe(false)
+    expect(document.body.classList.contains('modal-open')).toBe(false)
+    expect(generateRedeemCodes).not.toHaveBeenCalled()
+    expect(batchUpdateRedeemCodes).not.toHaveBeenCalled()
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('keeps every generated code and its count in the result dialog, then releases the scroll lock on Escape', async () => {
+    const response = await listRedeemCodes()
+    const generated = Array.from({ length: 1000 }, (_, index) => ({
+      ...response.items[0],
+      id: index + 1,
+      code: `GENERATED-${index + 1}`
+    }))
+    generateRedeemCodes.mockResolvedValue(generated)
+    const wrapper = mountDialogs()
+    await flushPromises()
+    await wrapper.get('[data-test="generate-open"]').trigger('click')
+    await wrapper.get('[data-test="generate-count"]').setValue(1000)
+    await wrapper.get('[data-test="generate-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('admin.redeem.codesCreated:1000')
+    expect(wrapper.get<HTMLTextAreaElement>('textarea[readonly]').element.value).toBe(
+      generated.map((code) => code.code).join('\n')
+    )
+    expect(wrapper.get('.modal-footer').text()).toContain('admin.redeem.copyAll')
+    expect(wrapper.get('.modal-footer').text()).toContain('admin.redeem.download')
+    expect(document.body.classList.contains('modal-open')).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(document.body.classList.contains('modal-open')).toBe(false)
+    expect(generateRedeemCodes).toHaveBeenCalledTimes(1)
+    expect(batchUpdateRedeemCodes).not.toHaveBeenCalled()
   })
 })

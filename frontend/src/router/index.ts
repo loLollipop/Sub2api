@@ -102,16 +102,6 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/auth/wechat/payment/callback',
-    name: 'WeChatPaymentOAuthCallback',
-    component: () => import('@/views/auth/WechatPaymentCallbackView.vue'),
-    meta: {
-      requiresAuth: false,
-      title: 'WeChat Payment Callback',
-      titleKey: 'auth.wechatPaymentCallbackPageTitle'
-    }
-  },
-  {
     path: '/auth/dingtalk/callback',
     name: 'DingTalkOAuthCallback',
     component: () => import('@/views/auth/DingTalkCallbackView.vue'),
@@ -235,18 +225,6 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/infinite-canvas',
-    name: 'InfiniteCanvas',
-    component: () => import('@/views/user/InfiniteCanvasView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: false,
-      title: 'Infinite Canvas',
-      titleKey: 'infiniteCanvas.title',
-      descriptionKey: 'infiniteCanvas.description'
-    }
-  },
-  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),
@@ -295,20 +273,6 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/tickets/:id(\\d+)?',
-    name: 'UserTickets',
-    component: () => import('@/views/TicketsView.vue'),
-    props: { admin: false },
-    meta: { requiresAuth: true, requiresAdmin: false, title: 'My tickets', titleKey: 'tickets.title' }
-  },
-  {
-    path: '/admin/tickets/:id(\\d+)?',
-    name: 'AdminTickets',
-    component: () => import('@/views/TicketsView.vue'),
-    props: { admin: true },
-    meta: { requiresAuth: true, requiresAdmin: true, title: 'Support inbox', titleKey: 'tickets.adminTitle' }
-  },
-  {
     path: '/profile',
     name: 'Profile',
     component: () => import('@/views/user/ProfileView.vue'),
@@ -343,77 +307,6 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'nav.buySubscription',
       descriptionKey: 'purchase.description',
       requiresPurchase: true
-    }
-  },
-  {
-    path: '/orders',
-    name: 'OrderList',
-    component: () => import('@/views/user/UserOrdersView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: false,
-      title: 'My Orders',
-      titleKey: 'nav.myOrders',
-      requiresPayment: true
-    }
-  },
-  {
-    path: '/payment/qrcode',
-    name: 'PaymentQRCode',
-    component: () => import('@/views/user/PaymentQRCodeView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: false,
-      title: 'Payment',
-      titleKey: 'payment.qr.scanToPay',
-      requiresPayment: true
-    }
-  },
-  {
-    path: '/payment/result',
-    name: 'PaymentResult',
-    component: () => import('@/views/user/PaymentResultView.vue'),
-    meta: {
-      requiresAuth: false,
-      requiresAdmin: false,
-      title: 'Payment Result',
-      titleKey: 'payment.result.success',
-      requiresPayment: false
-    }
-  },
-  {
-    path: '/payment/stripe',
-    name: 'StripePayment',
-    component: () => import('@/views/user/StripePaymentView.vue'),
-    meta: {
-      requiresAuth: false,
-      requiresAdmin: false,
-      title: 'Stripe Payment',
-      titleKey: 'payment.stripePay',
-      requiresPayment: false
-    }
-  },
-  {
-    path: '/payment/airwallex',
-    name: 'AirwallexPayment',
-    component: () => import('@/views/user/AirwallexPaymentView.vue'),
-    meta: {
-      requiresAuth: false,
-      requiresAdmin: false,
-      title: 'Airwallex Payment',
-      titleKey: 'payment.airwallexPay',
-      requiresPayment: false
-    }
-  },
-  {
-    path: '/payment/stripe-popup',
-    name: 'StripePopup',
-    component: () => import('@/views/user/StripePopupView.vue'),
-    meta: {
-      requiresAuth: false,
-      requiresAdmin: false,
-      title: 'Payment',
-      requiresPayment: false
     }
   },
   {
@@ -708,43 +601,6 @@ const routes: RouteRecordRaw[] = [
   },
 
 
-  // ==================== Payment Admin Routes ====================
-  {
-    path: '/admin/orders/dashboard',
-    name: 'AdminPaymentDashboard',
-    component: () => import('@/views/admin/orders/AdminPaymentDashboardView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true,
-      title: 'Payment Dashboard',
-      titleKey: 'nav.paymentDashboard',
-      requiresPayment: true
-    }
-  },
-  {
-    path: '/admin/orders',
-    name: 'AdminOrders',
-    component: () => import('@/views/admin/orders/AdminOrdersView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true,
-      title: 'Order Management',
-      titleKey: 'nav.orderManagement',
-      requiresPayment: true
-    }
-  },
-  {
-    path: '/admin/orders/plans',
-    name: 'AdminPaymentPlans',
-    component: () => import('@/views/admin/orders/AdminPaymentPlansView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true,
-      title: 'Subscription Plans',
-      titleKey: 'nav.paymentPlans',
-      requiresPayment: true
-    }
-  },
 
   // ==================== 404 Not Found ====================
   {
@@ -782,7 +638,7 @@ let authInitialized = false
 const navigationLoading = useNavigationLoadingState()
 // 延迟初始化预加载，传入 router 实例
 let routePrefetch: ReturnType<typeof useRoutePrefetch> | null = null
-const BACKEND_MODE_ALLOWED_PATHS = ['/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal']
+const BACKEND_MODE_ALLOWED_PATHS = ['/login', '/key-usage', '/setup', '/legal']
 const BACKEND_MODE_CALLBACK_PATHS = [
   '/auth/callback',
   '/auth/linuxdo/callback',
@@ -790,7 +646,6 @@ const BACKEND_MODE_CALLBACK_PATHS = [
   '/auth/dingtalk/email-completion',
   '/auth/oidc/callback',
   '/auth/wechat/callback',
-  '/auth/wechat/payment/callback',
 ]
 const BACKEND_MODE_PENDING_AUTH_PATHS = ['/register', '/email-verify']
 
@@ -937,9 +792,9 @@ router.beforeEach(async (to, _from, next) => {
 
 
   // 公共设置可能尚未加载（App.vue 的 onMounted 异步拉取晚于首次导航，且纯静态部署
-  // 无 __APP_CONFIG__ 注入）。此时 cachedPublicSettings 为空会把 payment/risk_control
+  // 无 __APP_CONFIG__ 注入）。此时 cachedPublicSettings 为空会把 purchase/risk_control
   // 误判为“未启用”而错误拦截，故这里先确保设置加载完成。
-  if ((to.meta.requiresPurchase || to.meta.requiresPayment || to.meta.requiresRiskControl) && !appStore.publicSettingsLoaded) {
+  if ((to.meta.requiresPurchase || to.meta.requiresRiskControl) && !appStore.publicSettingsLoaded) {
     try {
       await appStore.fetchPublicSettings()
     } catch (error) {
@@ -948,17 +803,6 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (to.meta.requiresPurchase && appStore.publicSettingsLoaded && !isPurchaseEnabled()) {
-    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
-    return
-  }
-
-  // Only an explicit value from successfully loaded settings can disable a route.
-  // A transient settings failure is unknown state, not a confirmed feature toggle.
-  if (
-    to.meta.requiresPayment &&
-    appStore.publicSettingsLoaded &&
-    appStore.cachedPublicSettings?.payment_enabled === false
-  ) {
     next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
     return
   }

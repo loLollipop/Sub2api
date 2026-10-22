@@ -21,9 +21,9 @@
     </filter>
   </defs>
 
-  <rect x="16" y="16" width="480" height="480" rx="120" fill="url(#s2a-bg)"/>
-  <rect x="16" y="16" width="480" height="480" rx="120" fill="url(#s2a-ambient)"/>
-  <rect x="16.75" y="16.75" width="478.5" height="478.5" rx="119.25" fill="none" stroke="#A5BFFF" stroke-opacity=".16" stroke-width="1.5"/>
+  <circle cx="256" cy="256" r="256" fill="url(#s2a-bg)"/>
+  <circle cx="256" cy="256" r="256" fill="url(#s2a-ambient)"/>
+  <circle cx="256" cy="256" r="255.25" fill="none" stroke="#A5BFFF" stroke-opacity=".16" stroke-width="1.5"/>
 
   <g transform="translate(52 52) scale(17)" fill="none" stroke="url(#s2a-brand)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.7" filter="url(#s2a-shadow)">
     <path d="m19.25 7.65-2.55-3.2a1.33 1.33 0 0 0-1.03-.5H8.58c-.34 0-.67.13-.91.37L4.15 7.65c-.93.88-.6 1.52.65 2.3l9.55 5.97"/>

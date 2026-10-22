@@ -215,3 +215,121 @@ describe('DateRangePicker refreshActivePreset', () => {
     wrapper.unmount()
   })
 })
+
+describe('DateRangePicker applied range and editing draft', () => {
+  afterEach(() => vi.useRealTimers())
+
+  let cleanup: (() => void) | undefined
+  afterEach(() => { cleanup?.(); cleanup = undefined })
+
+  const mountAppliedRange = async (custom = false) => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 18, 10, 44, 0))
+    const wrapper = mount(DateRangePicker, {
+      attachTo: document.body,
+      props: {
+        startDate: custom ? '2026-10-01T02:03:04' : '2026-10-17T10:44:00',
+        endDate: custom ? '2026-10-02T05:06:07' : '2026-10-18T10:44:00',
+        includeTime: true,
+      },
+      global: { stubs: { Icon: true, Transition: true } },
+    })
+    cleanup = () => wrapper.unmount()
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it.each(['Escape', 'outside', 'trigger'])('discards a preset draft on %s close', async (method) => {
+    const wrapper = await mountAppliedRange()
+    await wrapper.get('.date-picker-trigger').trigger('click')
+    await wrapper.findAll('.date-picker-preset').find(node => node.text() === 'Yesterday')!.trigger('click')
+    expect(wrapper.get('.date-picker-value').text()).toBe('Last 24 Hours')
+
+    if (method === 'Escape') document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    else if (method === 'outside') document.body.click()
+    else await wrapper.get('.date-picker-trigger').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.date-picker-dropdown').exists()).toBe(false)
+    expect(wrapper.get('.date-picker-value').text()).toBe('Last 24 Hours')
+    expect(wrapper.emitted('change')).toBeUndefined()
+    vi.setSystemTime(new Date(2026, 9, 18, 10, 50, 0))
+    expect(wrapper.vm.refreshActivePreset()).toEqual({
+      startDate: '2026-10-17T10:50:00', endDate: '2026-10-18T10:50:00',
+    })
+    await wrapper.get('.date-picker-trigger').trigger('click')
+    expect(wrapper.get('.date-picker-preset-active').text()).toBe('Last 24 Hours')
+    expect(wrapper.findAll('input').map(input => input.element.value.slice(0, 19))).toEqual([
+      '2026-10-17T10:50', '2026-10-18T10:50',
+    ])
+    wrapper.unmount()
+  })
+
+  it('keeps a custom applied range when a preset draft is cancelled', async () => {
+    const wrapper = await mountAppliedRange(true)
+    const display = wrapper.get('.date-picker-value').text()
+    await wrapper.get('.date-picker-trigger').trigger('click')
+    await wrapper.findAll('.date-picker-preset').find(node => node.text() === 'Today')!.trigger('click')
+    await wrapper.get('.date-picker-trigger').trigger('click')
+    expect(wrapper.get('.date-picker-value').text()).toBe(display)
+    expect(wrapper.vm.refreshActivePreset()).toBeNull()
+    await wrapper.get('.date-picker-trigger').trigger('click')
+    expect(wrapper.findAll('input').map(input => input.element.value.slice(0, 19))).toEqual([
+      '2026-10-01T02:03:04', '2026-10-02T05:06:07',
+    ])
+    wrapper.unmount()
+  })
+
+  it('refreshes the applied preset while open without committing or overwriting a custom draft', async () => {
+    const wrapper = await mountAppliedRange()
+    await wrapper.get('.date-picker-trigger').trigger('click')
+    await wrapper.findAll('input')[0].setValue('2026-10-01T02:03:04')
+    await wrapper.findAll('input')[1].setValue('2026-10-02T05:06:07')
+    expect(wrapper.get('.date-picker-value').text()).toBe('Last 24 Hours')
+
+    vi.setSystemTime(new Date(2026, 9, 18, 11, 0, 0))
+    const refreshed = wrapper.vm.refreshActivePreset()!
+    expect(refreshed).toEqual({ startDate: '2026-10-17T11:00:00', endDate: '2026-10-18T11:00:00' })
+    await wrapper.setProps(refreshed)
+    expect(wrapper.findAll('input').map(input => input.element.value.slice(0, 19))).toEqual([
+      '2026-10-01T02:03:04', '2026-10-02T05:06:07',
+    ])
+    expect(wrapper.emitted('change')).toBeUndefined()
+
+    await wrapper.get('.date-picker-apply').trigger('click')
+    expect(wrapper.emitted('change')).toEqual([[{
+      startDate: '2026-10-01T02:03:04', endDate: '2026-10-02T05:06:07', preset: null,
+    }]])
+    expect(wrapper.get('.date-picker-value').text()).toContain('02:03:04')
+    expect(wrapper.vm.refreshActivePreset()).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('refreshes the applied custom range as null even with an open preset draft, then commits on Apply', async () => {
+    const wrapper = await mountAppliedRange(true)
+    await wrapper.get('.date-picker-trigger').trigger('click')
+    await wrapper.findAll('.date-picker-preset').find(node => node.text() === 'Last 24 Hours')!.trigger('click')
+    expect(wrapper.vm.refreshActivePreset()).toBeNull()
+    await wrapper.get('.date-picker-apply').trigger('click')
+    expect(wrapper.get('.date-picker-value').text()).toBe('Last 24 Hours')
+    vi.setSystemTime(new Date(2026, 9, 18, 11, 0, 0))
+    expect(wrapper.vm.refreshActivePreset()).toEqual({
+      startDate: '2026-10-17T11:00:00', endDate: '2026-10-18T11:00:00',
+    })
+    wrapper.unmount()
+  })
+
+  it('synchronizes external parent changes with both the applied range and an open draft', async () => {
+    const wrapper = await mountAppliedRange()
+    await wrapper.get('.date-picker-trigger').trigger('click')
+    await wrapper.findAll('.date-picker-preset').find(node => node.text() === 'Yesterday')!.trigger('click')
+    await wrapper.setProps({ startDate: '2026-10-04T01:02:03', endDate: '2026-10-05T04:05:06' })
+    expect(wrapper.get('.date-picker-value').text()).toContain('01:02:03')
+    expect(wrapper.findAll('input').map(input => input.element.value.slice(0, 19))).toEqual([
+      '2026-10-04T01:02:03', '2026-10-05T04:05:06',
+    ])
+    expect(wrapper.find('.date-picker-preset-active').exists()).toBe(false)
+    expect(wrapper.vm.refreshActivePreset()).toBeNull()
+    wrapper.unmount()
+  })
+})

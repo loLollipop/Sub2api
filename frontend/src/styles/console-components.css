@@ -1,0 +1,190 @@
+/* Component surfaces for the accepted console shell. Business/status colors stay local. */
+:is(.console-signal.top-layout, body:has(.console-signal.top-layout) > .modal-overlay, body:has(.console-signal.top-layout) > .dialog-overlay) {
+  --console-panel: color-mix(in srgb, var(--signal-surface) 92%, transparent);
+  --console-inset: color-mix(in srgb, var(--signal-surface) 48%, var(--signal-raised));
+  --console-edge: color-mix(in srgb, var(--signal-line) 82%, transparent);
+  --console-panel-shadow: 0 1px 2px #18233404;
+}
+.dark :is(.console-signal.top-layout, body:has(.console-signal.top-layout) > .modal-overlay, body:has(.console-signal.top-layout) > .dialog-overlay) {
+  --console-panel-shadow: 0 1px 2px #0000000d;
+}
+
+/* Embedded charts retain their component-specific surfaces. */
+.console-signal.top-layout .signal-main :is(.card, .glass-card, .card-glass, .stat-card):not(:where(.signal-trend .card)) {
+  border: 1px solid var(--console-edge);
+  border-radius: 12px;
+  background: var(--console-panel);
+  box-shadow: var(--console-panel-shadow);
+  backdrop-filter: none;
+}
+.console-signal.top-layout .signal-main .card-hover:hover {
+  transform: none;
+  border-color: var(--signal-control-line);
+  box-shadow: var(--console-panel-shadow);
+}
+.console-signal.top-layout .signal-main :is(.card-header, .card-footer) {
+  padding: 14px 18px;
+  border-color: var(--console-edge);
+}
+.console-signal.top-layout .signal-main .card-header { border-radius: 12px 12px 0 0; }
+.console-signal.top-layout .signal-main .card-footer { border-radius: 0 0 12px 12px; background: var(--console-inset); }
+.console-signal.top-layout .signal-main .card-body { padding: 18px; }
+.console-signal.top-layout .signal-main .card :is(h2, h3) { font-size: 14px; line-height: 22px; font-weight: 600; }
+.console-signal.top-layout .signal-main :is(.signal-dashboard, .signal-admin-dashboard, .signal-usage, .admin-usage-workbench) :is(h2, h3) { font-size: 13px; line-height: 20px; }
+.console-signal.top-layout .signal-main .page-title { font-size: 20px; line-height: 28px; font-weight: 600; }
+.console-signal.top-layout .signal-main .page-description { font-size: 13px; line-height: 21px; }
+.console-signal.top-layout .signal-main .stat-card { padding: 16px; gap: 12px; }
+.console-signal.top-layout .signal-main .stat-icon { width: 36px; height: 36px; flex-shrink: 0; border-radius: 9px; }
+.console-signal.top-layout .signal-main .stat-icon > svg { width: 18px; height: 18px; }
+.console-signal.top-layout .signal-main .stat-value { font-size: 22px; line-height: 30px; font-weight: 600; }
+.console-signal.top-layout .signal-main .stat-label { font-size: 12px; line-height: 18px; }
+
+/* Workspace controls use a single scale, without changing header tools or status buttons. */
+.console-signal.top-layout .signal-main :is(.btn:where(:not(.btn-sm, .btn-md, .btn-lg, .btn-icon)), .select-trigger, .date-picker-trigger) {
+  min-height: 36px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.console-signal.top-layout .signal-main .btn:where(:not(.btn-sm, .btn-md, .btn-lg, .btn-icon)) { padding-block: 7px; }
+.console-signal.top-layout .signal-main :is(.input:not(textarea), .select-trigger) { min-height: 36px; }
+.console-signal.top-layout .signal-main .input { font-size: 13px; line-height: 20px; border-radius: 8px; }
+.console-signal.top-layout .signal-main :is(.input-label, .input-hint) { font-size: 12px; line-height: 19px; }
+.console-signal.top-layout .signal-main .btn-secondary { border-color: var(--signal-line); }
+.console-signal.top-layout .signal-main .select-trigger:not(.select-trigger-open):not(.select-trigger-error):not(:focus),
+.console-signal.top-layout .signal-main .date-picker-trigger:not(.date-picker-trigger-open):not(:focus) { border-color: var(--signal-line); }
+.console-signal.top-layout .signal-main .input:not(.input-error):not(:focus) { border-color: var(--signal-line); }
+.console-signal.top-layout .signal-main .select-trigger-error { border-color: #d34040; }
+
+/* Named toolbars retain their own grids, wrapping rules and filter visibility. */
+.console-signal.top-layout .signal-main :is(.users-command-bar, .groups-command-bar, .accounts-command-bar, .signal-log-filters) {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--console-edge);
+  border-radius: 12px;
+  background: var(--console-panel);
+  box-shadow: var(--console-panel-shadow);
+}
+.console-signal.top-layout .signal-main .layout-filters > .flex {
+  padding: 12px;
+  border: 1px solid var(--console-edge);
+  border-radius: 12px;
+  background: var(--console-panel);
+}
+.console-signal.top-layout .signal-main .table-page-layout { gap: 14px; }
+.console-signal.top-layout .signal-main .users-filter-row:empty { display: none; }
+.console-signal.top-layout .signal-main .users-context-actions { border-top: 0; padding-top: 0; }
+.console-signal.top-layout .signal-main .users-command-bar .users-action-zone { gap: 10px; }
+.console-signal.top-layout .signal-main :is(.signal-usage-chart-grid, .usage-chart-grid) { gap: 16px; }
+
+/* Table density, row selection and mobile cards are shared across both roles. */
+.console-signal.top-layout .signal-main .table-page-layout .table-scroll-container {
+  border: 1px solid var(--console-edge);
+  border-radius: 12px;
+  background: var(--signal-surface);
+  box-shadow: none;
+}
+.console-signal.top-layout .signal-main .table-wrapper { border: 1px solid var(--console-edge); border-radius: 12px; background: var(--signal-surface); }
+.console-signal.top-layout .signal-main :is(.table-scroll-container, .accounts-table-stage) .table-wrapper { border: 0; border-radius: 0; }
+.console-signal.top-layout .signal-main .table-wrapper :is(th, td) { padding-block: 11px; font-size: 13px; }
+.console-signal.top-layout .signal-main .table-wrapper .table-header :is(th, .sticky-header-cell) {
+  background: var(--signal-inset);
+  color: var(--signal-muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.console-signal.top-layout .signal-main .table-wrapper .table-body td { border-color: var(--signal-divider); }
+.console-signal.top-layout .signal-main .data-table-card { border-color: var(--console-edge); border-radius: 12px; background: var(--signal-surface); box-shadow: none; }
+.console-signal.top-layout .signal-main .data-table-card:has(input[data-test='select-row']:checked) { border-color: var(--signal-accent); background: var(--signal-accent-soft); }
+.console-signal.top-layout .signal-main .data-table-card [data-field] > span { font-size: 11px; letter-spacing: 0; color: var(--signal-muted); }
+.console-signal.top-layout .signal-main .table-pagination { border-top: 0; padding-top: 10px; font-size: 12px; }
+.console-signal.top-layout .signal-main .table-pagination :is(p, span) { font-size: 12px; }
+.console-signal.top-layout .signal-main .table-pagination button:not(.btn) { min-height: 32px; min-width: 32px; border-radius: 7px; font-size: 12px; }
+.console-signal.top-layout .signal-main .table-pagination button[aria-current='page'] { border-color: var(--signal-line); background: var(--signal-accent-soft); box-shadow: none; }
+.console-signal.top-layout .signal-main .layout-pagination:last-child { border-top: 0; }
+
+/* Segmented tabs stay distinguishable by fill as well as text color. */
+.console-signal.top-layout .signal-main :is(.tabs, .console-tabs) {
+  width: fit-content;
+  max-width: 100%;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--console-edge);
+  border-radius: 10px;
+  background: var(--console-inset);
+}
+.console-signal.top-layout .signal-main :is(.tab, .console-tabs button) { min-height: 30px; padding: 5px 12px; border: 1px solid transparent; border-radius: 7px; font-size: 12px; font-weight: 500; }
+.console-signal.top-layout .signal-main :is(.tab-active, .console-tabs button[aria-selected='true']) { border-color: var(--console-edge); background: var(--signal-surface); color: var(--signal-text); box-shadow: 0 1px 2px #00000008; }
+.console-signal.top-layout .signal-main .empty-state { padding-block: 40px; }
+.console-signal.top-layout .signal-main .empty-state-emblem { width: 48px; height: 48px; margin-bottom: 14px; border: 1px solid var(--console-edge); border-radius: 12px; background: var(--console-inset); }
+.console-signal.top-layout .signal-main .empty-state-icon { width: 24px; height: 24px; margin-bottom: 0; color: var(--signal-muted); }
+.console-signal.top-layout .signal-main .empty-state-title { font-size: 14px; line-height: 22px; }
+.console-signal.top-layout .signal-main .empty-state-description { font-size: 12px; line-height: 20px; }
+
+/* Profile and wallet sections become calm cards instead of nested heavy decoration. */
+.console-signal.top-layout .signal-main .signal-account-section {
+  padding: 18px;
+  border: 1px solid var(--console-edge);
+  border-radius: 12px;
+  background: var(--console-panel);
+  box-shadow: var(--console-panel-shadow);
+}
+.console-signal.top-layout .signal-main .signal-affiliate .affiliate-copy-field { border-color: var(--console-edge); border-radius: 8px; background: var(--console-inset); }
+.console-signal.top-layout .signal-main :is(.signal-balance-strip, .signal-affiliate-metrics) { gap: 12px; border: 0; background: transparent; }
+.console-signal.top-layout .signal-main .signal-balance-strip > div { padding: 16px 18px; border: 1px solid var(--console-edge); border-radius: 12px; background: var(--console-panel); }
+.console-signal.top-layout .signal-main .signal-affiliate-metrics > .card { padding: 16px; border: 1px solid var(--console-edge); border-radius: 12px; background: var(--console-panel); }
+.console-signal.top-layout .signal-main :is(.signal-account-balance, .signal-account-number, .signal-affiliate-metrics .text-2xl) { font-size: 24px; line-height: 32px; }
+.console-signal.top-layout .signal-main .signal-redeem > .card { padding: 16px 18px; border: 1px solid var(--console-edge); border-radius: 12px; }
+.console-signal.top-layout .signal-main .signal-redeem > .card > .p-6 { padding: 0; }
+.console-signal.top-layout .signal-main .signal-redeem > .border-emerald-200 { border-left: 3px solid #059669; background: color-mix(in srgb, #10b981 6%, var(--signal-surface)); }
+.console-signal.top-layout .signal-main .signal-redeem > .border-red-200 { border-left: 3px solid #dc2626; background: color-mix(in srgb, #ef4444 6%, var(--signal-surface)); }
+.console-signal.top-layout .signal-main .signal-redeem > .border-primary-200 { border-left: 3px solid var(--signal-accent); background: var(--signal-accent-soft); }
+
+/* Subscription cards keep platform colors and progress states. */
+.console-signal.top-layout .signal-main .signal-subscription-card { border-radius: 12px; box-shadow: var(--console-panel-shadow); }
+.console-signal.top-layout .signal-main .signal-subscription-card__header { background: color-mix(in srgb, var(--signal-surface) 65%, var(--signal-raised)); border-bottom-color: var(--console-edge); }
+.console-signal.top-layout .signal-main .signal-subscription-card__header h3 { font-size: 13px; }
+.console-signal.top-layout .signal-main .signal-subscription-status { border-radius: 6px; font-size: 11px; }
+.console-signal.top-layout .signal-main .signal-subscription-renew { border-color: var(--signal-line); border-radius: 7px; }
+
+/* Settings retain horizontal tab scrolling and sticky placement below both header sizes. */
+.console-signal.top-layout .signal-main .console-settings .settings-tabs-shell { top: calc(var(--shell-height) + 8px); margin-inline: 0; padding: 4px; border: 1px solid var(--console-edge); border-radius: 12px; background: var(--signal-surface); backdrop-filter: none; box-shadow: 0 2px 6px #00000006; }
+.console-signal.top-layout .signal-main .settings-tab { height: 34px; min-height: 34px; border-radius: 8px; color: var(--signal-muted); font-size: 12px; }
+.console-signal.top-layout .signal-main .settings-tab::before,
+.console-signal.top-layout .signal-main .settings-tab-active::after { display: none; }
+.console-signal.top-layout .signal-main .settings-tab-active { border-color: var(--console-edge); background: var(--console-inset); color: var(--signal-text); box-shadow: none; }
+.console-signal.top-layout .signal-main .settings-tab-icon { width: 20px; height: 20px; background: transparent; color: inherit; }
+.console-signal.top-layout .signal-main .settings-tab:hover { background: var(--signal-hover); color: var(--signal-text); }
+.console-signal.top-layout .signal-main .console-settings .card > :is(.border-b, .card-header) { padding: 16px 18px; border-color: var(--console-edge); }
+.console-signal.top-layout .signal-main .console-settings .card > .p-6 { padding: 18px; }
+.console-signal.top-layout .signal-main .console-settings .card :is(h2, h3) { font-size: 14px; line-height: 22px; }
+.console-signal.top-layout .signal-main .console-settings .card :is(.text-sm, label) { font-size: 13px; line-height: 21px; }
+.console-signal.top-layout .signal-main .channel-signal-card__metric { border-color: var(--console-edge); border-radius: 8px; background: var(--console-inset); }
+
+/* Body-level dialogs and selects use the same proportions without changing their positioning. */
+body:has(.console-signal.top-layout) > :is(.modal-overlay, .dialog-overlay) :is(.modal-content, .dialog-container) { border-radius: 14px; backdrop-filter: none; box-shadow: var(--signal-popover-shadow); }
+body:has(.console-signal.top-layout) > .modal-overlay :is(.modal-header, .modal-footer) { padding: 16px 20px; }
+body:has(.console-signal.top-layout) > .modal-overlay .modal-header { border-bottom: 1px solid var(--console-edge); }
+body:has(.console-signal.top-layout) > .modal-overlay .modal-footer { border-top: 1px solid var(--console-edge); background: var(--console-inset); }
+body:has(.console-signal.top-layout) > .modal-overlay .modal-header::after,
+body:has(.console-signal.top-layout) > .modal-overlay .modal-footer::before { display: none; }
+body:has(.console-signal.top-layout) > .modal-overlay .modal-title { font-size: 15px; line-height: 24px; }
+body:has(.console-signal.top-layout) > .modal-overlay .modal-body { padding: 18px 20px; }
+body:has(.console-signal.top-layout) > .modal-overlay .input { font-size: 13px; border-radius: 8px; }
+body:has(.console-signal.top-layout) > .select-dropdown-portal { padding: 4px; border-radius: 10px; box-shadow: var(--signal-popover-shadow); }
+body:has(.console-signal.top-layout) > .select-dropdown-portal .select-option { border-radius: 6px; font-size: 13px; }
+
+@media (max-width: 1023px) {
+  .console-signal.top-layout .signal-main .table-page-layout.mobile-mode .table-scroll-container { border: 0; background: transparent; overflow: visible; }
+  .console-signal.top-layout .signal-main :is(.users-command-bar, .groups-command-bar, .accounts-command-bar, .signal-log-filters) { padding: 12px; }
+  .console-signal.top-layout .signal-main :is(.input:not(textarea), .select-trigger) { min-height: 40px; }
+}
+@media (max-width: 639px) {
+  .console-signal.top-layout .signal-main .table-pagination button:not(.btn) { min-height: 44px; min-width: 44px; }
+  .console-signal.top-layout .signal-main .signal-account-section { padding: 14px; }
+  .console-signal.top-layout .signal-main :is(.signal-account-balance, .signal-account-number, .signal-affiliate-metrics .text-2xl) { font-size: 22px; }
+  .console-signal.top-layout .signal-main .signal-balance-strip > div { padding: 14px 12px; }
+  body:has(.console-signal.top-layout) > .modal-overlay :is(.modal-header, .modal-footer) { padding: 14px 16px; }
+  body:has(.console-signal.top-layout) > .modal-overlay .modal-body { padding: 16px; }
+}

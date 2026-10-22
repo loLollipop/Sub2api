@@ -44,6 +44,7 @@ const props = withDefaults(defineProps<{
   githubEnabled?: boolean
   googleEnabled?: boolean
   showDivider?: boolean
+  stacked?: boolean
 }>(), {
   showDivider: true
 })
@@ -67,12 +68,12 @@ const providerGridClass = computed(() => [
   'grid',
   'grid-cols-1',
   'gap-3',
-  hasMultipleProviders.value ? 'sm:grid-cols-2' : ''
+  hasMultipleProviders.value && !props.stacked ? 'sm:grid-cols-2' : ''
 ])
 
 function providerLabel(provider: EmailOAuthProvider): string {
   const name = provider === 'github' ? 'GitHub' : 'Google'
-  return hasMultipleProviders.value ? name : t('auth.emailOAuth.signIn', { providerName: name })
+  return hasMultipleProviders.value && !props.stacked ? name : t('auth.emailOAuth.signIn', { providerName: name })
 }
 
 function startLogin(provider: EmailOAuthProvider): void {

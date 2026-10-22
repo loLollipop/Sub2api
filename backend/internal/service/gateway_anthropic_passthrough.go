@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -721,6 +722,15 @@ func anthropicStreamErrorSemantics(payload string) (status int, errType, message
 	if message == "" {
 		message = strings.TrimSpace(gjson.Get(payload, "message").String())
 	}
+	for _, path := range []string{"error.status_code", "status_code", "error.status", "status"} {
+		value := gjson.Get(payload, path)
+		if value.Type != gjson.Number && value.Type != gjson.String {
+			continue
+		}
+		if explicit, err := strconv.Atoi(strings.TrimSpace(value.String())); err == nil && explicit >= 400 && explicit <= 599 {
+			return explicit, errType, message
+		}
+	}
 	switch errType {
 	case "overloaded_error":
 		status = 529
@@ -734,6 +744,8 @@ func anthropicStreamErrorSemantics(payload string) (status int, errType, message
 		status = http.StatusUnauthorized
 	case "permission_error":
 		status = http.StatusForbidden
+	case "api_error", "server_error":
+		status = http.StatusInternalServerError
 	default:
 		status = http.StatusBadGateway
 	}

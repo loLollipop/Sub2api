@@ -12,21 +12,21 @@ import (
 
 func TestAdminFulfillmentBypassesLimitAndKeepsRedeemAffiliate(t *testing.T) {
 	ctx := context.Background()
-	client := newPaymentConfigServiceTestClient(t)
+	client := newRedeemFixtureClient(t)
 	userID := int64(42)
 	inviterID := int64(9001)
 	code := &RedeemCode{
 		ID: 102, Code: "ADMIN-SUCCESS", Type: RedeemTypeBalance, Value: 20, Status: StatusUnused,
 	}
-	redeemRepo := &paymentFulfillmentRedeemRepo{
-		paymentOrderLifecycleRedeemRepo: paymentOrderLifecycleRedeemRepo{
+	redeemRepo := &redeemFixtureRepo{
+		redeemFixtureCodeRepo: redeemFixtureCodeRepo{
 			codesByCode: map[string]*RedeemCode{code.Code: code},
 		},
 	}
 	userRepo := &mockUserRepo{getByIDUser: &User{ID: userID}}
 	userRepo.updateBalanceFn = func(context.Context, int64, float64) error { return nil }
-	cache := &paymentFulfillmentRedeemCacheStub{count: redeemMaxFailedAttempts}
-	affiliateRepo := &paymentFulfillmentAffiliateRepoStub{
+	cache := &redeemFixtureCache{count: redeemMaxFailedAttempts}
+	affiliateRepo := &affiliateFixtureRepo{
 		inviteeSummary: &AffiliateSummary{
 			UserID: userID, AffCode: "INVITEE", InviterID: &inviterID, CreatedAt: time.Now().Add(-time.Hour),
 		},
@@ -34,7 +34,7 @@ func TestAdminFulfillmentBypassesLimitAndKeepsRedeemAffiliate(t *testing.T) {
 			UserID: inviterID, AffCode: "INVITER", CreatedAt: time.Now().Add(-2 * time.Hour),
 		},
 	}
-	settingSvc := NewSettingService(&paymentFulfillmentSettingRepoStub{values: map[string]string{
+	settingSvc := NewSettingService(&redeemFixtureSettings{values: map[string]string{
 		SettingKeyAffiliateEnabled:           "true",
 		SettingKeyAffiliateRebateRate:        "10",
 		SettingKeyAffiliateRebateFreezeHours: "0",

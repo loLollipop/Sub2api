@@ -35,7 +35,7 @@
         <section class="shop-account" :aria-label="t('purchase.balanceUsd')">
           <div class="shop-account__identity">
             <span class="shop-account__icon" aria-hidden="true"><Icon name="userCircle" size="lg" /></span>
-            <div class="shop-account__name"><p class="shop-kicker">{{ t('payment.rechargeAccount') }}</p><strong>{{ username }}</strong></div>
+            <div class="shop-account__name"><p class="shop-kicker">{{ t('purchase.rechargeAccount') }}</p><strong>{{ username }}</strong></div>
           </div>
           <div class="shop-balance"><span>{{ t('purchase.balanceUsd') }}</span><strong>${{ balance.toFixed(2) }}<small aria-hidden="true">USD</small></strong></div>
           <p class="shop-purchase-hint"><Icon name="infoCircle" size="sm" aria-hidden="true" />{{ t('purchase.redemptionRequired') }}</p>

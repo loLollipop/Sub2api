@@ -5,17 +5,17 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const dir = dirname(fileURLToPath(import.meta.url))
-const headerSource = readFileSync(resolve(dir, '../AppHeader.vue'), 'utf8')
+const topNavSource = readFileSync(resolve(dir, '../UserTopNav.vue'), 'utf8')
 const homeViewSource = readFileSync(resolve(dir, '../../../views/HomeView.vue'), 'utf8')
 const keyUsageViewSource = readFileSync(resolve(dir, '../../../views/KeyUsageView.vue'), 'utf8')
 
 describe('doc_url sanitization', () => {
-  it('AppHeader imports sanitizeUrl', () => {
-    expect(headerSource).toContain("import { sanitizeUrl } from '@/utils/url'")
+  it('UserTopNav imports sanitizeUrl', () => {
+    expect(topNavSource).toContain("import { sanitizeUrl } from '@/utils/url'")
   })
 
-  it('AppHeader applies sanitizeUrl to docUrl', () => {
-    expect(headerSource).toContain('sanitizeUrl(appStore.docUrl)')
+  it('UserTopNav applies sanitizeUrl to docUrl', () => {
+    expect(topNavSource).toContain('sanitizeUrl(app.docUrl)')
   })
 
   it('HomeView imports sanitizeUrl', () => {

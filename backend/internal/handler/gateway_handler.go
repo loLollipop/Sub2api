@@ -261,6 +261,11 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 
+	if geminiImageGenerationRejected(c, apiKey, nil, clientRequestedModel(c, reqModel), reqModel, channelMapping.MappedModel) {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", service.ImageGenerationPermissionMessage())
+		return
+	}
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolAnthropicMessages, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.anthropicSecurityAuditError(c, decision)
 		return
@@ -402,10 +407,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 		// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 		// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-		if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID) {
-			ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
-			c.Request = c.Request.WithContext(ctx)
-		}
+		c.Request = c.Request.WithContext(h.gatewayService.WithSingleAntigravityAccountGroupProbe(c.Request.Context(), apiKey.GroupID))
 
 		for {
 			selection, routedKey, err := h.gatewayService.SelectAccountAlongKeyRoutes(c.Request.Context(), apiKey, sessionKey, reqModel, fs.FailedAccountIDs, "", int64(0), service.PlatformGemini) // Gemini 不使用会话限制
@@ -568,6 +570,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
 			writerSizeBeforeForward := service.OpenAICompactKeepaliveAdjustedWrittenSize(c)
 			if account.IsGeminiOpenAIProtocol() {
+				upstreamModel := account.GetMappedModel(gjson.GetBytes(body, "model").String())
+				if geminiImageGenerationRejected(c, apiKey, nil, clientRequestedModel(c, reqModel), reqModel, upstreamModel) {
+					if accountReleaseFunc != nil {
+						accountReleaseFunc()
+					}
+					h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", service.ImageGenerationPermissionMessage(), streamStarted)
+					return
+				}
 				if h.openAIGatewayService == nil {
 					h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", "OpenAI gateway is not configured", streamStarted)
 					if accountReleaseFunc != nil {
@@ -729,10 +739,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), currentAPIKey.GroupID) {
-		ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
-		c.Request = c.Request.WithContext(ctx)
-	}
+	c.Request = c.Request.WithContext(h.gatewayService.WithSingleAntigravityAccountGroupProbe(c.Request.Context(), currentAPIKey.GroupID))
 
 	// 会话槽失败释放：failover 链上每个选中的 Anthropic OAuth 账号都注册过同一会话
 	// （checkAndRegisterSession）。若请求最终失败（转发失败/客户端中断/换号耗尽），
@@ -2238,7 +2245,9 @@ func (h *GatewayHandler) handleStreamingAwareErrorWithCode(c *gin.Context, statu
 		// 响应状态码已固化为 200（ping/部分数据已 flush），错误只能就地以 SSE 帧回传。
 		// 标记本次流内错误，供 ops_error_logger 补记——否则该中间件按 status>=400 采集，
 		// 这类挂在 200 流上的失败（如并发限流回退）不会进错误看板。
-		service.MarkOpsStreamError(c, errType, message, status)
+		service.MarkOpsStreamErrorValue(c, service.OpsStreamError{
+			ErrType: errType, Code: code, Message: message, IntendedStatus: status,
+		})
 
 		// /v1/responses 的严格 SDK（Codex CLI）要求终止事件必须属于
 		// response.completed/failed/incomplete/cancelled 集合。

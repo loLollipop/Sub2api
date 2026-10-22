@@ -66,6 +66,35 @@ func TestPlazaGroupPricing_SamePublicModelHasIndependentPricesAndReferences(t *t
 	}
 }
 
+func TestPlazaGroupPricing_TokenMetadataFollowsSelectedBillingCard(t *testing.T) {
+	for _, source := range []string{BillingModelSourceChannelMapped, BillingModelSourceRequested} {
+		for _, groupCard := range []bool{false, true} {
+			t.Run(source+map[bool]string{false: "/channel", true: "/group"}[groupCard], func(t *testing.T) {
+				requested := ChannelModelPricing{Platform: PlatformOpenAI, Models: []string{"public-model"}, BillingMode: BillingModeToken, InputPrice: testPtrFloat64(1e-6), MaxReasoningEffortMultiplier: testPtrFloat64(3), ImageInputPrice: testPtrFloat64(0.01)}
+				mapped := ChannelModelPricing{Platform: PlatformOpenAI, Models: []string{"gpt-5.4"}, BillingMode: BillingModeToken, InputPrice: testPtrFloat64(2e-6), MaxReasoningEffortMultiplier: testPtrFloat64(7), ImageInputPrice: testPtrFloat64(0.02)}
+				channel := Channel{ID: 1, Name: "aliases", Status: StatusActive, GroupIDs: []int64{10}, BillingModelSource: source,
+					ModelMapping: map[string]map[string]string{PlatformOpenAI: {"public-model": "gpt-5.4"}}, ModelPricing: []ChannelModelPricing{requested, mapped}}
+				group := Group{ID: 10, Name: "Test", Platform: PlatformOpenAI, RateMultiplier: 1}
+				if groupCard {
+					requested.MaxReasoningEffortMultiplier = testPtrFloat64(4)
+					mapped.MaxReasoningEffortMultiplier = testPtrFloat64(8)
+					group.ModelPricing = []ChannelModelPricing{requested, mapped}
+				}
+				svc := newPlazaServiceWithBilling([]Channel{channel}, []Group{group}, map[int64]string{10: PlatformOpenAI}, nil)
+				out, err := svc.ListGroups(context.Background())
+				require.NoError(t, err)
+				model := plazaModelsByName(out[0].Models)["public-model"]
+				selected := requested
+				if source == BillingModelSourceChannelMapped {
+					selected = mapped
+				}
+				require.Equal(t, selected.MaxReasoningEffortMultiplier, model.Pricing.MaxReasoningEffortMultiplier)
+				require.Equal(t, selected.ImageInputPrice, model.Pricing.ImageInputPrice)
+			})
+		}
+	}
+}
+
 func TestPlazaGroupPricing_NonTokenAliasesRespectBillingSourceAndGroupCards(t *testing.T) {
 	for _, mode := range []BillingMode{BillingModePerRequest, BillingModeImage} {
 		for _, source := range []string{BillingModelSourceChannelMapped, BillingModelSourceRequested} {

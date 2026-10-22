@@ -247,8 +247,15 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 			if err != nil {
 				continue
 			}
+			resolved := s.resolver.Resolve(WithResolvedTargetPlatform(ctx, m.Platform), PricingInput{Model: model, Group: g, GroupID: plazaGroupID(g)})
 			if sched != nil && len(sched.Tiers) > 0 {
-				m.Pricing = withDefaultMaxReasoningEffortMultiplier(plazaPricingFromSchedule(m.Pricing, sched), model)
+				// Auxiliary fields must come from the selected billing card too;
+				// the catalog's raw card may belong to another mapped model.
+				var raw *ChannelModelPricing
+				if resolved != nil {
+					raw = resolved.channelPricing
+				}
+				m.Pricing = withDefaultMaxReasoningEffortMultiplier(plazaPricingFromSchedule(raw, sched), model)
 				if len(sched.Tiers) > 1 {
 					m.LongContextBasis = sched.Basis
 				}
@@ -258,7 +265,6 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 			// Non-token prices must follow the same selected billing identity too;
 			// SupportedModels' raw price may belong to the mapping target even when
 			// the channel explicitly bills the requested model instead.
-			resolved := s.resolver.Resolve(WithResolvedTargetPlatform(ctx, m.Platform), PricingInput{Model: model, Group: g, GroupID: plazaGroupID(g)})
 			if resolved != nil && resolved.channelPricing != nil {
 				pricing := resolved.channelPricing.Clone()
 				display := &pricing

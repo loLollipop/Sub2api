@@ -100,7 +100,8 @@ func TestUpstreamAffinityLocalImageGateDoesNotPenalizeAccount(t *testing.T) {
 		(&GatewayService{cache: cache}).InvalidateUpstreamAffinity(ctx, nil, "current", &Account{ID: 1}, err)
 		(&OpenAIGatewayService{cache: cache}).InvalidateUpstreamAffinity(ctx, nil, "current", &Account{ID: 1}, err)
 		require.Empty(t, cache.invalidated)
-		state := ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts)
+		state, ok := ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts)
+		require.True(t, ok)
 		require.Empty(t, state.failed)
 	}
 }

@@ -13,7 +13,7 @@ import (
 const geminiImageModalityEnum = 2
 
 // This local denial must not poison upstream/session affinity.
-var errGeminiImageGenerationDenied = errors.New(imageGenerationPermissionMessage)
+var errGeminiImageGenerationDenied = errors.New("gemini image generation denied by group policy")
 
 // GeminiImageGenerationDenied 判断 Gemini 系请求是否因分组关闭生图而必须拒绝。
 // 门禁只作用于后台展示该开关的 Gemini 系分组（gemini / antigravity / composite）；

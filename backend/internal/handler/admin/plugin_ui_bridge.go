@@ -32,11 +32,12 @@ scan:
 	}
 	var output bytes.Buffer
 	output.Grow(len(data) + len(pluginUIBridgeScript) + 32)
-	output.Write(data[:insertion])
-	output.WriteString("<script>\n")
-	output.Write(pluginUIBridgeScript)
-	output.WriteString("\n</script>")
-	output.Write(data[insertion:])
+	// bytes.Buffer writes only to memory and always return a nil error.
+	_, _ = output.Write(data[:insertion])
+	_, _ = output.WriteString("<script>\n")
+	_, _ = output.Write(pluginUIBridgeScript)
+	_, _ = output.WriteString("\n</script>")
+	_, _ = output.Write(data[insertion:])
 	return output.Bytes()
 }
 
@@ -65,17 +66,17 @@ func injectPluginXHTMLBridge(data []byte) ([]byte, error) {
 				for nameEnd < end && !bytes.ContainsRune([]byte(" \t\r\n/>"), rune(data[nameEnd])) {
 					nameEnd++
 				}
-				output.Write(data[:end-2])
-				output.WriteByte('>')
-				output.Write(pluginXHTMLBridgeElement())
-				output.WriteString("</")
-				output.Write(data[start+1 : nameEnd])
-				output.WriteByte('>')
+				_, _ = output.Write(data[:end-2])
+				_ = output.WriteByte('>')
+				_, _ = output.Write(pluginXHTMLBridgeElement())
+				_, _ = output.WriteString("</")
+				_, _ = output.Write(data[start+1 : nameEnd])
+				_ = output.WriteByte('>')
 			} else {
-				output.Write(data[:end])
-				output.Write(pluginXHTMLBridgeElement())
+				_, _ = output.Write(data[:end])
+				_, _ = output.Write(pluginXHTMLBridgeElement())
 			}
-			output.Write(data[end:])
+			_, _ = output.Write(data[end:])
 			return output.Bytes(), nil
 		case xml.EndElement:
 			depth--

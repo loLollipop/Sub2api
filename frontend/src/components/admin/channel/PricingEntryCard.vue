@@ -277,7 +277,7 @@ import TimePricingSection from './TimePricingSection.vue'
 import type { PricingFormEntry, IntervalFormEntry } from './types'
 import { perTokenToMTok, getPlatformTagClass } from './types'
 import type { BillingMode } from '@/api/admin/channels'
-import channelsAPI from '@/api/admin/channels'
+import groupsAPI from '@/api/admin/groups'
 
 const { t } = useI18n()
 
@@ -403,7 +403,7 @@ async function onModelsUpdate(newModels: string[]) {
 
   // 查询第一个新增模型的默认价格
   try {
-    const result = await channelsAPI.getModelDefaultPricing(addedModels[0])
+    const result = await groupsAPI.getModelDefaultPricing(addedModels[0])
     if (requestId !== defaultPriceRequestId) return
     const currentSnapshot = JSON.stringify(props.entry)
     if (currentSnapshot !== initialSnapshot && currentSnapshot !== expectedSnapshot) return

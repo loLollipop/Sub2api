@@ -107,16 +107,7 @@
               <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
             </router-link>
           </template>
-        </div>
-
-        <!-- Personal tools stay inside the admin workspace. -->
-        <div class="sidebar-section">
-          <div class="sidebar-section-title" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
-            <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">
-              {{ t('nav.myAccount') }}
-            </span>
-          </div>
-
+          <!-- Personal tools stay inside the admin workspace. -->
           <router-link
             v-for="item in personalNavItems"
             :key="item.path"
@@ -172,7 +163,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
@@ -181,8 +171,6 @@ import { useConsoleNavigation } from '@/composables/useConsoleNavigation'
 import { useMediaQuery } from '@vueuse/core'
 import { useConsoleSignal } from '@/composables/useConsoleSignal'
 import { useConsoleWorkspace } from '@/composables/useConsoleWorkspace'
-
-const { t } = useI18n()
 
 const route = useRoute()
 const { isConsoleSignal } = useConsoleSignal()
@@ -335,7 +323,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sidebar-drawer { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 200ms ease, opacity 160ms ease; }
+.sidebar-drawer { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 260ms cubic-bezier(.22, 1, .36, 1), opacity 260ms cubic-bezier(.22, 1, .36, 1); }
 .sidebar-drawer-open { grid-template-rows: 1fr; opacity: 1; }
 .sidebar-drawer-clip { min-height: 0; overflow: hidden; }
 .sidebar-children { display: grid; gap: 2px; margin: 0 0 6px 23px; padding: 3px; border-radius: 8px; background: var(--signal-hover); }

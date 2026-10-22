@@ -207,7 +207,6 @@ export default {
     buySubscription: 'Recharge Center',
     docs: 'Docs',
     channelManagement: 'Channels',
-    channelPricing: 'Channel Pricing',
     channelMonitor: 'Channel Monitor',
     channelStatus: 'Channel Status',
     riskControl: 'Risk Control',

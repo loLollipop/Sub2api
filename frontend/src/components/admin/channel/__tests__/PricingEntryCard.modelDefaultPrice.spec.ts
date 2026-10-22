@@ -2,9 +2,9 @@ import { enableAutoUnmount, flushPromises, shallowMount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PricingEntryCard from '../PricingEntryCard.vue'
 import type { PricingFormEntry } from '../types'
-import channelsAPI from '@/api/admin/channels'
+import groupsAPI from '@/api/admin/groups'
 
-vi.mock('@/api/admin/channels', () => ({
+vi.mock('@/api/admin/groups', () => ({
   default: { getModelDefaultPricing: vi.fn() },
 }))
 
@@ -13,7 +13,7 @@ vi.mock('vue-i18n', async importOriginal => ({
   useI18n: () => ({ t: (key: string) => key }),
 }))
 
-const getModelDefaultPricing = vi.mocked(channelsAPI.getModelDefaultPricing)
+const getModelDefaultPricing = vi.mocked(groupsAPI.getModelDefaultPricing)
 enableAutoUnmount(afterEach)
 
 function createEntry(models: string[] = []): PricingFormEntry {

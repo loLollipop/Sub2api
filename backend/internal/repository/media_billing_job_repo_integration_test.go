@@ -232,16 +232,48 @@ func TestMediaBillingJobIntegration_ApplyFailureKeepsReadyAndHold(t *testing.T) 
 	_, err = fixture.repo.PrepareMediaBillingIntent(ctx, job.ID, intent)
 	require.NoError(t, err)
 
-	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET deleted_at = NOW() WHERE id = $1`, fixture.account.ID)
+	// A deleted upstream account no longer cancels settlement. Inject a real
+	// quota write failure after balance capture to verify the entire rollback.
+	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET extra = jsonb_build_object('quota_used', 'invalid-numeric') WHERE id = $1`, fixture.account.ID)
 	require.NoError(t, err)
 	_, err = fixture.repo.ApplyMediaBillingJob(ctx, job.ID)
-	require.ErrorIs(t, err, service.ErrAccountNotFound)
+	require.ErrorContains(t, err, "invalid input syntax for type numeric")
 
 	persisted, err := fixture.repo.GetMediaBillingJobByID(ctx, job.ID)
 	require.NoError(t, err)
 	require.Equal(t, service.MediaBillingReady, persisted.Status)
 	assertMediaBillingWallet(t, ctx, fixture.user.ID, 8, 2)
 	assertMediaBillingOutboxDeltas(t, ctx, fixture.user.ID, []float64{-2})
+}
+
+func TestMediaBillingJobIntegration_DeletedAccountStillCapturesHold(t *testing.T) {
+	ctx := context.Background()
+	fixture := newMediaBillingIntegrationFixture(t, 10)
+	job := fixture.videoJob("media-deleted-account-"+fmt.Sprint(time.Now().UnixNano()), 2)
+	_, err := fixture.repo.CreateMediaBillingJob(ctx, job)
+	require.NoError(t, err)
+	require.NoError(t, fixture.repo.SubmitMediaBillingJob(ctx, job.ID, "upstream-"+job.ID, []byte(`{"route":"grok"}`)))
+	intent := fixture.intent("media-apply:"+job.ID, 1)
+	intent.Command.AccountQuotaCost = 1
+	_, err = fixture.repo.PrepareMediaBillingIntent(ctx, job.ID, intent)
+	require.NoError(t, err)
+	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET deleted_at = NOW() WHERE id = $1`, fixture.account.ID)
+	require.NoError(t, err)
+
+	result, err := fixture.repo.ApplyMediaBillingJob(ctx, job.ID)
+	require.NoError(t, err)
+	require.True(t, result.Applied)
+	persisted, err := fixture.repo.GetMediaBillingJobByID(ctx, job.ID)
+	require.NoError(t, err)
+	require.Equal(t, service.MediaBillingBilled, persisted.Status)
+	assertMediaBillingWallet(t, ctx, fixture.user.ID, 9, 0)
+	assertMediaBillingOutboxDeltas(t, ctx, fixture.user.ID, []float64{-2, 1})
+
+	duplicate, err := fixture.repo.ApplyMediaBillingJob(ctx, job.ID)
+	require.NoError(t, err)
+	require.False(t, duplicate.Applied)
+	assertMediaBillingWallet(t, ctx, fixture.user.ID, 9, 0)
+	assertMediaBillingOutboxDeltas(t, ctx, fixture.user.ID, []float64{-2, 1})
 }
 
 func assertMediaBillingWallet(t *testing.T, ctx context.Context, userID int64, wantBalance, wantFrozen float64) {

@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="plugins-workspace space-y-5">
       <section
         class="flex flex-col gap-4 border-b border-gray-200 pb-5 dark:border-dark-700 sm:flex-row sm:items-end sm:justify-between"
       >
@@ -23,7 +23,7 @@
           </div>
         </div>
 
-        <div class="flex flex-shrink-0 items-center gap-2">
+        <div class="plugins-heading-actions flex flex-wrap items-center gap-2">
           <input
             ref="fileInput"
             class="hidden"
@@ -58,7 +58,7 @@
       </p>
 
       <div
-        class="border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
+        class="plugins-notice rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
       >
         <p>{{ t("admin.plugins.runtimeNotice") }}</p>
         <p class="mt-1">{{ t("admin.plugins.menuNotice") }}</p>
@@ -73,7 +73,7 @@
 
       <div
         v-else-if="plugins.length === 0"
-        class="flex min-h-56 flex-col items-center justify-center border border-dashed border-gray-300 px-6 text-center dark:border-dark-600"
+        class="flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 px-6 text-center dark:border-dark-600"
       >
         <Icon name="cube" size="xl" class="text-gray-400" />
         <p class="mt-3 font-medium text-gray-800 dark:text-gray-200">
@@ -314,6 +314,7 @@
           </div>
           <iframe
             v-if="uiSession"
+            :key="uiSession.url"
             ref="pluginFrame"
             :src="uiSession.url"
             sandbox="allow-scripts"
@@ -379,7 +380,21 @@ const uiLoading = ref(false);
 const uiError = ref("");
 const iframeHeight = ref(640);
 const pluginFrameLoaded = ref(false);
-const pendingBridgeRequests = new Map<string, number>();
+interface PendingBridgeRequest {
+  timeout: number;
+  version: number;
+  pluginID: number;
+  frame: Window;
+  token: string;
+  connection: PluginDocumentConnection;
+}
+interface PluginDocumentConnection {
+  port: MessagePort;
+  version: number;
+}
+let documentConnection: PluginDocumentConnection | null = null;
+let documentConnectionAccepted = false;
+const pendingBridgeRequests = new Map<string, PendingBridgeRequest>();
 let uiSessionVersion = 0;
 
 function errorMessage(error: unknown): string {
@@ -528,6 +543,8 @@ async function openConfiguration(plugin: PluginInstallation): Promise<void> {
   configPlugin.value = plugin;
   uiSession.value = null;
   pluginFrameLoaded.value = false;
+  closeDocumentConnection();
+  documentConnectionAccepted = false;
   clearPendingBridgeRequests();
   uiLoading.value = true;
   uiError.value = "";
@@ -545,6 +562,7 @@ async function openConfiguration(plugin: PluginInstallation): Promise<void> {
 
 function closeConfiguration(): void {
   uiSessionVersion++;
+  closeDocumentConnection();
   clearPendingBridgeRequests();
   pluginFrameLoaded.value = false;
   configPlugin.value = null;
@@ -554,47 +572,92 @@ function closeConfiguration(): void {
 }
 
 function clearPendingBridgeRequests(): void {
-  for (const timeout of pendingBridgeRequests.values()) window.clearTimeout(timeout);
+  for (const request of pendingBridgeRequests.values()) window.clearTimeout(request.timeout);
   pendingBridgeRequests.clear();
 }
 
-function handlePluginFrameLoad(): void {
-  // A load can also be caused by a plugin navigating its iframe. Drop all
-  // outstanding responses so a late config response is never sent to the new document.
-  if (pluginFrameLoaded.value) clearPendingBridgeRequests();
+function handlePluginFrameLoad(event: Event): void {
+  if (!uiSession.value || event.target !== pluginFrame.value) return;
+  // A navigation gets a fresh URL/token and document port. Until load completes,
+  // replies remain confined to the previous document's now detached port.
+  if (pluginFrameLoaded.value && configPlugin.value) {
+    void openConfiguration(configPlugin.value);
+    return;
+  }
   pluginFrameLoaded.value = true;
   uiLoading.value = false;
 }
 
-function registerBridgeRequest(requestID: string): void {
-  const timeout = window.setTimeout(() => {
-    pendingBridgeRequests.delete(requestID);
-  }, 30_000);
-  pendingBridgeRequests.set(requestID, timeout);
+function closeDocumentConnection(): void {
+  if (!documentConnection) return;
+  documentConnection.port.onmessage = null;
+  documentConnection.port.close();
+  documentConnection = null;
+}
+
+function connectDocument(port: MessagePort): void {
+  if (documentConnectionAccepted) {
+    port.close();
+    return;
+  }
+  const connection: PluginDocumentConnection = { port, version: uiSessionVersion };
+  documentConnectionAccepted = true;
+  documentConnection = connection;
+  port.onmessage = (event: MessageEvent) => {
+    if (documentConnection !== connection || connection.version !== uiSessionVersion) return;
+    if (event.data?.type === "sub2api.plugin.disconnect") {
+      closeDocumentConnection();
+      clearPendingBridgeRequests();
+      if (configPlugin.value) void openConfiguration(configPlugin.value);
+    } else if (event.data?.type === "sub2api.plugin.request") {
+      void handleDocumentRequest(event.data.message, connection);
+    }
+  };
+  port.start();
+  port.postMessage({ type: "sub2api.plugin.connected", origin: window.location.origin });
+}
+
+function registerBridgeRequest(requestID: string, connection: PluginDocumentConnection): PendingBridgeRequest {
+  const request: PendingBridgeRequest = {
+    timeout: window.setTimeout(() => {
+      if (pendingBridgeRequests.get(requestID) === request) pendingBridgeRequests.delete(requestID);
+    }, 30_000),
+    version: uiSessionVersion,
+    pluginID: configPlugin.value!.id,
+    frame: pluginFrame.value!.contentWindow!,
+    token: uiSession.value!.bridge_token,
+    connection,
+  };
+  pendingBridgeRequests.set(requestID, request);
+  return request;
+}
+
+function isCurrentBridgeRequest(requestID: string, pending?: PendingBridgeRequest): pending is PendingBridgeRequest {
+  return !!pending && pendingBridgeRequests.get(requestID) === pending &&
+    pending.version === uiSessionVersion && pending.pluginID === configPlugin.value?.id &&
+    pending.frame === pluginFrame.value?.contentWindow && pending.token === uiSession.value?.bridge_token &&
+    pending.connection === documentConnection;
 }
 
 function postBridgeResult(
   request: PluginBridgeMessage,
   payload: Record<string, unknown>,
-): void {
-  if (!pluginFrame.value?.contentWindow || !uiSession.value) return;
+  pending?: PendingBridgeRequest,
+): boolean {
   const requestID = typeof request.request_id === "string" ? request.request_id.trim() : "";
-  const timeout = pendingBridgeRequests.get(requestID);
-  if (!requestID || timeout === undefined) return;
-  window.clearTimeout(timeout);
+  if (!isCurrentBridgeRequest(requestID, pending)) return false;
+  window.clearTimeout(pending.timeout);
   pendingBridgeRequests.delete(requestID);
-  pluginFrame.value.contentWindow.postMessage(
+  pending.connection.port.postMessage(
     {
       source: "sub2api-plugin-host",
-      bridge_token: uiSession.value.bridge_token,
+      bridge_token: pending.token,
       type: `${request.type}.result`,
       request_id: requestID,
       ...payload,
     },
-    // The sandboxed iframe has an opaque origin, so no fixed target origin exists.
-    // Pending request tracking plus load invalidation prevents cross-navigation leaks.
-    "*",
   );
+  return true;
 }
 
 async function handleBridgeMessage(event: MessageEvent): Promise<void> {
@@ -603,25 +666,43 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
     !configPlugin.value ||
     event.source !== pluginFrame.value?.contentWindow ||
     event.origin !== "null"
-  )
+  ) {
+    for (const port of event.ports) port.close();
     return;
+  }
   const message = event.data as PluginBridgeMessage;
   if (
     !message ||
     message.source !== "sub2api-plugin-ui" ||
     message.bridge_token !== uiSession.value.bridge_token
-  )
+  ) {
+    for (const port of event.ports) port.close();
     return;
+  }
+
+  if (message.type === "sub2api.plugin.connect") {
+    if (event.ports.length === 1) connectDocument(event.ports[0]);
+    else for (const port of event.ports) port.close();
+    return;
+  }
+  // Legacy v1 requests must be echoed through the original document's private
+  // port before running an API call. Never send secrets to a WindowProxy.
+  documentConnection?.port.postMessage({ type: "sub2api.plugin.relay", message });
+}
+
+async function handleDocumentRequest(message: PluginBridgeMessage, connection: PluginDocumentConnection): Promise<void> {
+  if (connection !== documentConnection || !uiSession.value || !configPlugin.value ||
+      !message || message.source !== "sub2api-plugin-ui" || message.bridge_token !== uiSession.value.bridge_token) return;
 
   const requestID = typeof message.request_id === "string" ? message.request_id.trim() : "";
   const expectsResponse =
     message.type === "config.load" ||
     message.type === "config.save" ||
     message.type === "config.test";
-  if (expectsResponse) {
-    if (!requestID || pendingBridgeRequests.has(requestID)) return;
-    registerBridgeRequest(requestID);
-  }
+  if (expectsResponse && (!requestID || pendingBridgeRequests.has(requestID))) return;
+  const pending = expectsResponse ? registerBridgeRequest(requestID, connection) : undefined;
+  // Step-up may defer execution until after a different plugin has been opened.
+  const pluginID = configPlugin.value.id;
 
   try {
     switch (message.type) {
@@ -629,8 +710,8 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
         uiLoading.value = false;
         break;
       case "config.load": {
-        const config = await adminAPI.plugins.getConfig(configPlugin.value.id);
-        postBridgeResult(message, { ok: true, config });
+        const config = await adminAPI.plugins.getConfig(pluginID);
+        postBridgeResult(message, { ok: true, config }, pending);
         break;
       }
       case "config.save": {
@@ -641,21 +722,23 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
         ) {
           throw new Error(t("admin.plugins.bridgeRejected"));
         }
-        const config = await pluginStepUp.run(() =>
-          adminAPI.plugins.saveConfig(
-            configPlugin.value!.id,
+        const config = await pluginStepUp.run(async () => {
+          if (!isCurrentBridgeRequest(requestID, pending)) return;
+          return adminAPI.plugins.saveConfig(
+            pluginID,
             message.config as Record<string, unknown>,
-          ),
-        );
-        postBridgeResult(message, { ok: true, config });
-        appStore.showSuccess(t("common.saved"));
+          );
+        });
+        if (postBridgeResult(message, { ok: true, config }, pending)) appStore.showSuccess(t("common.saved"));
         break;
       }
       case "config.test": {
-        const result = await pluginStepUp.run(() =>
-          adminAPI.plugins.test(configPlugin.value!.id),
-        );
-        postBridgeResult(message, { ok: result.success, result });
+        const result = await pluginStepUp.run(async () => {
+          if (!isCurrentBridgeRequest(requestID, pending)) return;
+          return adminAPI.plugins.test(pluginID);
+        });
+        if (!result) break;
+        if (!postBridgeResult(message, { ok: result.success, result }, pending)) break;
         if (result.success)
           appStore.showSuccess(
             result.message || t("admin.plugins.testSuccess"),
@@ -682,11 +765,11 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
       }
     }
   } catch (error: unknown) {
-    if (isStepUpBlocked(error)) reportSensitiveActionError(error);
+    if (isCurrentBridgeRequest(requestID, pending) && isStepUpBlocked(error)) reportSensitiveActionError(error);
     postBridgeResult(message, {
       ok: false,
       error: isStepUpCancelled(error) ? t("common.cancel") : errorMessage(error),
-    });
+    }, pending);
   }
 }
 

@@ -1,24 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { FeatureFlags, isFeatureFlagEnabled, isPurchaseEnabled, makeSidebarFlag } from '../featureFlags'
-
-const appStore = vi.hoisted(() => ({ cachedPublicSettings: null as null | {
-  payment_enabled?: boolean
-  purchase_subscription_enabled?: boolean
-} }))
+import { isPurchaseEnabled } from '../featureFlags'
+const appStore = vi.hoisted(() => ({ cachedPublicSettings: null as null | { purchase_subscription_enabled?: boolean } }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => appStore }))
 beforeEach(() => { appStore.cachedPublicSettings = null })
-
-describe('purchase feature flags', () => {
-  it.each([
-    [true, false, true], [false, true, true], [true, true, true], [false, false, false],
-  ])('combines internal %s and external %s to %s for purchases', (payment, external, expected) => {
-    appStore.cachedPublicSettings = { payment_enabled: payment, purchase_subscription_enabled: external }
-    expect(isPurchaseEnabled()).toBe(expected)
-    expect(makeSidebarFlag(FeatureFlags.payment)()).toBe(payment)
+describe('external shop feature flag', () => {
+  it.each([true, false])('uses the external shop setting %s', enabled => {
+    appStore.cachedPublicSettings = { purchase_subscription_enabled: enabled }
+    expect(isPurchaseEnabled()).toBe(enabled)
   })
-
-  it('preserves the internal payment opt-out fallback when settings are unknown', () => {
-    expect(isPurchaseEnabled()).toBe(true)
-    expect(isFeatureFlagEnabled(FeatureFlags.payment)).toBe(true)
+  it('hides purchase until the external shop is explicitly enabled', () => {
+    expect(isPurchaseEnabled()).toBe(false)
+    appStore.cachedPublicSettings = {}
+    expect(isPurchaseEnabled()).toBe(false)
   })
 })

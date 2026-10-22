@@ -138,7 +138,7 @@ func isUserUIRequest(c *gin.Context) bool {
 }
 
 // isUserTimingPath reports whether the path is a user-facing web API that may
-// emit Server-Timing for authenticated callers (excluding public payment routes).
+// emit Server-Timing for authenticated callers.
 func isUserTimingPath(path string) bool {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -178,12 +178,6 @@ func isUserTimingPath(path string) bool {
 	case rest == "/subscriptions", strings.HasPrefix(rest, "/subscriptions/"):
 		return true
 	case rest == "/channel-monitors", strings.HasPrefix(rest, "/channel-monitors/"):
-		return true
-	case strings.HasPrefix(rest, "/payment/"):
-		// Exclude public and webhook payment surfaces.
-		if strings.HasPrefix(rest, "/payment/public") || strings.HasPrefix(rest, "/payment/webhook") {
-			return false
-		}
 		return true
 	default:
 		return false

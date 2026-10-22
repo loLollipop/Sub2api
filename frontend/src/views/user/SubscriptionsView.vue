@@ -18,6 +18,16 @@
         ></div>
       </div>
 
+      <div v-else-if="loadError" class="signal-subscriptions-empty" role="alert">
+        <div class="signal-subscriptions-empty__icon">
+          <Icon name="exclamationCircle" size="lg" />
+        </div>
+        <h3 class="mb-4 text-sm font-medium">{{ loadError }}</h3>
+        <button type="button" class="btn btn-secondary" @click="loadSubscriptions">
+          <Icon name="refresh" size="sm" class="mr-2" />{{ t('common.tryAgain') }}
+        </button>
+      </div>
+
       <!-- Empty State -->
       <div v-else-if="subscriptions.length === 0" class="signal-subscriptions-empty">
         <div
@@ -60,9 +70,9 @@
                   {{ subscription.group.description }}
                 </p>
                 <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400 dark:text-gray-500">
-                  <span>{{ t('payment.planCard.rate') }}: ×{{ subscription.group?.rate_multiplier ?? 1 }}</span>
+                  <span>{{ t('userSubscriptions.rate') }}: ×{{ subscription.group?.rate_multiplier ?? 1 }}</span>
                   <span v-if="subscriptionHasPeakRate(subscription)" class="text-amber-700 dark:text-amber-300">
-                    {{ t('payment.planCard.peakRate') }}: {{ subscriptionPeakRateLabel(subscription) }}
+                    {{ t('userSubscriptions.peakRate') }}: {{ subscriptionPeakRateLabel(subscription) }}
                   </span>
                 </div>
               </div>
@@ -81,12 +91,12 @@
                 {{ t(`userSubscriptions.status.${subscription.status}`) }}
               </span>
               <button
-                v-if="subscription.status === 'active'"
+                v-if="subscription.status === 'active' && isPurchaseEnabled()"
                 :class="['signal-subscription-renew', platformButtonClass(subscription.group?.platform || '')]"
-                @click="router.push({ path: '/purchase', query: { tab: 'subscription', group: String(subscription.group_id) } })"
+                @click="router.push('/purchase')"
               >
                 <Icon name="refresh" size="xs" />
-                {{ t('payment.renewNow') }}
+                {{ t('userSubscriptions.renewNow') }}
               </button>
             </div>
           </div>
@@ -261,6 +271,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { isPurchaseEnabled } from '@/utils/featureFlags'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import subscriptionsAPI from '@/api/subscriptions'
@@ -293,6 +304,7 @@ const appStore = useAppStore()
 
 const subscriptions = ref<UserSubscription[]>([])
 const loading = ref(true)
+const loadError = ref('')
 
 function subscriptionHasPeakRate(subscription: UserSubscription): boolean {
   return hasPeakRate(subscription.group)
@@ -306,9 +318,9 @@ async function loadSubscriptions() {
   try {
     loading.value = true
     subscriptions.value = await subscriptionsAPI.getMySubscriptions()
-  } catch (error) {
-    console.error('Failed to load subscriptions:', error)
-    appStore.showError(t('userSubscriptions.failedToLoad'))
+    loadError.value = ''
+  } catch {
+    loadError.value = t('userSubscriptions.failedToLoad')
   } finally {
     loading.value = false
   }
@@ -473,7 +485,8 @@ onMounted(() => {
 .signal-subscription-card {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--subscriptions-line);
+  border-width: 1px;
+  border-style: solid;
   border-radius: 8px;
   background: var(--subscriptions-surface);
 }

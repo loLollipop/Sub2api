@@ -517,9 +517,7 @@ func shouldBypassEmbeddedFrontend(path string) bool {
 		strings.HasPrefix(trimmed, "/embeddings") ||
 		strings.HasPrefix(trimmed, "/images/") ||
 		trimmed == "/videos" ||
-		strings.HasPrefix(trimmed, "/videos/") ||
-		trimmed == "/canvas" ||
-		strings.HasPrefix(trimmed, "/canvas/")
+		strings.HasPrefix(trimmed, "/videos/")
 }
 
 func serveIndexHTML(c *gin.Context, fsys fs.FS) {

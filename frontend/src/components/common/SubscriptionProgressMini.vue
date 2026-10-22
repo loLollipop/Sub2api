@@ -1,10 +1,15 @@
 <template>
-  <div v-if="hasActiveSubscriptions" class="relative" ref="containerRef">
+  <div v-if="hasActiveSubscriptions" class="relative" ref="containerRef" @keydown.esc.stop.prevent="dismissTooltip">
     <!-- Mini Progress Display -->
     <button
+      ref="triggerRef"
+      type="button"
       @click="toggleTooltip"
       class="flex cursor-pointer items-center gap-2 rounded-xl bg-purple-50 px-3 py-1.5 transition-colors hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30"
       :title="t('subscriptionProgress.viewDetails')"
+      :aria-label="t('subscriptionProgress.viewDetails')"
+      :aria-expanded="tooltipOpen"
+      :aria-controls="tooltipOpen ? tooltipId : undefined"
     >
       <Icon name="creditCard" size="sm" class="text-purple-600 dark:text-purple-400" />
       <div class="flex items-center gap-1.5">
@@ -27,6 +32,9 @@
     <transition name="dropdown">
       <div
         v-if="tooltipOpen"
+        :id="tooltipId"
+        role="region"
+        :aria-label="t('subscriptionProgress.title')"
         class="absolute right-0 z-50 mt-2 w-[340px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-dark-700 dark:bg-dark-800"
       >
         <div class="border-b border-gray-100 p-3 dark:border-dark-700">
@@ -178,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { useSubscriptionStore } from '@/stores'
@@ -190,6 +198,8 @@ const subscriptionStore = useSubscriptionStore()
 
 const containerRef = ref<HTMLElement | null>(null)
 const tooltipOpen = ref(false)
+const tooltipId = useId()
+const triggerRef = ref<HTMLButtonElement | null>(null)
 
 // Use store data instead of local state
 const activeSubscriptions = computed(() => subscriptionStore.activeSubscriptions)
@@ -284,6 +294,11 @@ function toggleTooltip() {
 
 function closeTooltip() {
   tooltipOpen.value = false
+}
+
+function dismissTooltip() {
+  closeTooltip()
+  triggerRef.value?.focus()
 }
 
 function handleClickOutside(event: MouseEvent) {

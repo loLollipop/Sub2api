@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { h, nextTick } from 'vue'
 import ProxySelector from '../ProxySelector.vue'
+import BaseDialog from '../BaseDialog.vue'
 import type { Proxy } from '@/types'
 
 const testProxy = vi.hoisted(() => vi.fn())
@@ -21,6 +23,31 @@ async function openSelector() {
 }
 
 describe('proxy connection tests', () => {
+  it('dismisses the proxy picker before its enclosing account dialog', async () => {
+    const wrapper = mount(BaseDialog, {
+      attachTo: document.body,
+      props: { show: true, title: 'Account' },
+      slots: { default: () => h(ProxySelector, { modelValue: null, proxies: [] }) },
+      global: { stubs: { Transition: true } },
+    })
+    await nextTick()
+    const selector = wrapper.findComponent(ProxySelector)
+    await selector.get('.select-trigger').trigger('click')
+    await nextTick()
+    const search = selector.get('input')
+    expect(document.activeElement).toBe(search.element)
+    await search.trigger('keydown', { key: 'Escape', isComposing: true })
+    expect(selector.find('.select-dropdown').exists()).toBe(true)
+    expect(wrapper.emitted('close')).toBeUndefined()
+
+    await search.trigger('keydown', { key: 'Escape' })
+    expect(selector.find('.select-dropdown').exists()).toBe(false)
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(document.activeElement).toBe(selector.get('.select-trigger').element)
+    await selector.get('.select-trigger').trigger('keydown', { key: 'Escape' })
+    expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
   it('does not restart an individual test when a batch is started', async () => {
     let finish!: (result: object) => void
     testProxy.mockImplementation((id: number) => id === 1

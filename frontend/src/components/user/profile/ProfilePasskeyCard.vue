@@ -1,18 +1,19 @@
 <template>
-  <div class="card">
-    <div class="flex items-start justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-      <div>
+  <div :class="embedded ? 'profile-passkey-setting' : 'card'">
+    <div :class="embedded ? 'profile-security-row' : 'flex items-start justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700'">
+      <span v-if="embedded" class="profile-setting-icon"><Icon name="key" size="sm" /></span>
+      <div :class="{ 'profile-setting-copy': embedded }">
         <h2 class="text-lg font-medium text-gray-900 dark:text-white">
           {{ t('profile.passkey.title') }}
         </h2>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('profile.passkey.description') }}
+          {{ !enabled ? t('profile.passkey.featureDisabled') : !supported ? t('profile.passkey.unsupported') : t('profile.passkey.description') }}
         </p>
       </div>
       <button
         v-if="enabled && supported && !showAddForm"
         type="button"
-        class="btn btn-primary"
+        :class="['btn', embedded ? 'btn-secondary btn-sm' : 'btn-primary']"
         :disabled="busy"
         @click="showAddForm = true"
       >
@@ -20,13 +21,7 @@
       </button>
     </div>
 
-    <div class="px-6 py-6">
-      <div v-if="!enabled" class="mb-5 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('profile.passkey.featureDisabled') }}
-      </div>
-      <div v-if="enabled && !supported" class="mb-5 text-sm text-amber-600 dark:text-amber-400">
-        {{ t('profile.passkey.unsupported') }}
-      </div>
+    <div v-if="enabled" :class="embedded ? 'profile-passkey-details' : 'px-6 py-6'">
       <div>
         <form
           v-if="enabled && supported && showAddForm"
@@ -74,8 +69,8 @@
         </div>
 
         <div
-          v-else-if="credentials.length === 0"
-          class="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400"
+          v-else-if="credentials.length === 0 && !showAddForm"
+          :class="embedded ? 'text-xs text-gray-500 dark:text-gray-400' : 'rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400'"
         >
           {{ t('profile.passkey.empty') }}
         </div>
@@ -183,7 +178,7 @@ import { passkeyAPI, type PasskeyCredentialSummary } from '@/api'
 import { Icon } from '@/components/icons'
 import { useAppStore } from '@/stores/app'
 
-const props = defineProps<{ enabled: boolean }>()
+const props = withDefaults(defineProps<{ enabled: boolean; embedded?: boolean }>(), { embedded: false })
 
 const { t } = useI18n()
 const appStore = useAppStore()

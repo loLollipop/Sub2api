@@ -51,7 +51,8 @@ func invalidateUpstreamAffinity(ctx context.Context, cache GatewayCache, groupID
 	}
 	// Local policy and a canceled client are not an upstream failure.
 	var policyErr *BetaBlockedError
-	if errors.As(err, &policyErr) || (errors.Is(err, context.Canceled) && ctx.Err() != nil) {
+	if errors.As(err, &policyErr) || errors.Is(err, errGeminiImageGenerationDenied) ||
+		(errors.Is(err, context.Canceled) && ctx.Err() != nil) {
 		return
 	}
 	if state, ok := ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts); ok {

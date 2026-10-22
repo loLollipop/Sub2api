@@ -36,15 +36,6 @@ const (
 	bypassRedeemRateLimit
 )
 
-type ctxKeySkipRedeemAffiliate struct{}
-
-// ContextSkipRedeemAffiliate returns a context that suppresses the redeem-level
-// affiliate rebate. Used by payment fulfillment which handles rebate separately
-// via applyAffiliateRebateForOrder (with audit-log deduplication).
-func ContextSkipRedeemAffiliate(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxKeySkipRedeemAffiliate{}, true)
-}
-
 // RedeemCache defines cache operations for redeem service
 type RedeemCache interface {
 	GetRedeemAttemptCount(ctx context.Context, userID int64) (int, error)
@@ -395,18 +386,9 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	return s.redeem(ctx, userID, code, enforceRedeemRateLimit)
 }
 
-// redeemForPaymentFulfillment is restricted to trusted payment fulfillment.
-// Payment retries must not be blocked by, or contribute to, a user's public
-// redeem failure counter. All code validation and transactional updates remain
-// identical to the public redemption path.
-func (s *RedeemService) redeemForPaymentFulfillment(ctx context.Context, userID int64, code string) (*RedeemCode, error) {
-	return s.redeem(ContextSkipRedeemAffiliate(ctx), userID, code, bypassRedeemRateLimit)
-}
-
 // RedeemForAdminFulfillment is restricted to trusted admin fulfillment.
 // Admin retries must not be blocked by, or contribute to, a user's public
-// redeem failure counter. Unlike payment fulfillment, the normal redeem-level
-// affiliate rebate remains enabled.
+// redeem failure counter. The normal redeem-level affiliate rebate remains enabled.
 func (s *RedeemService) RedeemForAdminFulfillment(ctx context.Context, userID int64, code string) (*RedeemCode, error) {
 	return s.redeem(ctx, userID, code, bypassRedeemRateLimit)
 }
@@ -604,9 +586,6 @@ func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64
 }
 
 func (s *RedeemService) tryAccrueAffiliateRebateForRedeem(ctx context.Context, userID int64, amount float64) {
-	if ctx.Value(ctxKeySkipRedeemAffiliate{}) != nil {
-		return
-	}
 	if s.affiliateService == nil {
 		return
 	}

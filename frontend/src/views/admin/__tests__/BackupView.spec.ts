@@ -10,6 +10,8 @@ const {
   listBackups,
   getDownloadURL,
   getBackup,
+  restoreBackup,
+  deleteBackup,
   showError,
   showSuccess,
   showWarning,
@@ -20,6 +22,8 @@ const {
   listBackups: vi.fn(),
   getDownloadURL: vi.fn(),
   getBackup: vi.fn(),
+  restoreBackup: vi.fn(),
+  deleteBackup: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
   showWarning: vi.fn(),
@@ -39,9 +43,9 @@ vi.mock('@/api', () => ({
       createBackup: vi.fn(),
       listBackups,
       getBackup,
-      deleteBackup: vi.fn(),
+      deleteBackup,
       getDownloadURL,
-      restoreBackup: vi.fn(),
+      restoreBackup,
     },
   },
 }))
@@ -99,6 +103,7 @@ describe('admin BackupView 分卷备份', () => {
     getImageStorageConfig.mockResolvedValue({ config: {}, secret_configured: false })
     getSchedule.mockResolvedValue({ enabled: false, cron_expr: '', retain_days: 14, retain_count: 10 })
     getDownloadURL.mockReset()
+    getBackup.mockReset()
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
   })
 
@@ -230,4 +235,100 @@ describe('admin BackupView 分卷备份', () => {
     expect(wrapper.find('tbody tr td:nth-child(5)').text()).toBe('-')
     expect(wrapper.findAll('button').some(button => button.text() === 'common.delete')).toBe(false)
   })
+  it('persists failed restore status and its error after loading the list', async () => {
+    listBackups.mockResolvedValue({ items: [{ ...baseRecord('failed-restore'), restore_status: 'failed', restore_error: 'database unavailable' }] })
+    const wrapper = mountBackupView()
+    await flushPromises()
+    const status = wrapper.get('tbody tr td:nth-child(2)')
+    expect(status.text()).toContain('admin.backup.status.completed')
+    expect(status.text()).toContain('admin.backup.actions.restore: admin.backup.status.failed')
+    expect(status.text()).toContain('database unavailable')
+    expect(wrapper.findAll('button').find(button => button.text() === 'admin.backup.actions.restore')!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('resumes restore polling on refresh and blocks deletion and conflicting restores', async () => {
+    vi.useFakeTimers()
+    listBackups.mockResolvedValueOnce({ items: [baseRecord('active'), baseRecord('other')] })
+      .mockResolvedValue({ items: [{ ...baseRecord('active'), restore_status: 'running' }, baseRecord('other')] })
+    getBackup.mockResolvedValue({ ...baseRecord('active'), restore_status: 'running' })
+    const wrapper = mountBackupView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.refresh')!.trigger('click')
+    await flushPromises()
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows[0]!.get('[role="status"]').text()).toContain('admin.backup.status.running')
+    const deleteButton = rows[0]!.findAll('button').find(button => button.text() === 'common.delete')!
+    expect(deleteButton.attributes('disabled')).toBeDefined()
+    await deleteButton.trigger('click')
+    const restoreButton = rows[1]!.findAll('button').find(button => button.text() === 'admin.backup.actions.restore')!
+    expect(restoreButton.attributes('disabled')).toBeDefined()
+    await restoreButton.trigger('click')
+    expect(deleteBackup).not.toHaveBeenCalled()
+    expect(restoreBackup).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(getBackup).toHaveBeenCalledWith('active')
+    getBackup.mockResolvedValue({ ...baseRecord('active'), restore_status: 'failed', restore_error: 'restore failed' })
+    listBackups.mockResolvedValue({ items: [{ ...baseRecord('active'), restore_status: 'failed', restore_error: 'restore failed' }, baseRecord('other')] })
+    await vi.advanceTimersByTimeAsync(2000)
+    await flushPromises()
+    expect(rows[0]!.text()).toContain('restore failed')
+    expect(showError).toHaveBeenCalledWith('restore failed')
+    expect(vi.getTimerCount()).toBe(0)
+    expect(restoreButton.attributes('disabled')).toBeUndefined()
+  })
+
+  it.each(['backup', 'restore'])('resumes %s polling when the visibility refresh fails', async operation => {
+    vi.useFakeTimers()
+    const record = { ...baseRecord('active'), status: operation === 'backup' ? 'running' : 'completed', restore_status: operation === 'restore' ? 'running' : undefined }
+    listBackups.mockResolvedValueOnce({ items: [record] }).mockRejectedValueOnce(new Error('temporary list failure'))
+    getBackup.mockResolvedValue(record)
+    mountBackupView()
+    await flushPromises()
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(vi.getTimerCount()).toBe(0)
+    hidden.mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(getBackup).toHaveBeenCalledWith('active')
+    expect(vi.getTimerCount()).toBe(1)
+  })
+
+  it('ignores an obsolete list response after a newer visibility refresh', async () => {
+    vi.useFakeTimers()
+    let finishOld!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve }))
+      .mockResolvedValueOnce({ items: [{ ...baseRecord('current'), restore_status: 'running' }] })
+    const wrapper = mountBackupView()
+    await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    finishOld({ items: [baseRecord('obsolete')] })
+    await flushPromises()
+    expect(wrapper.get('tbody').text()).toContain('current.sql.gz')
+    expect(wrapper.get('tbody').text()).not.toContain('obsolete.sql.gz')
+    expect(wrapper.get('[role="status"]').text()).toContain('admin.backup.status.running')
+  })
+
+  it('clears the restore lock when visibility refresh finds the operation has finished', async () => {
+    vi.useFakeTimers()
+    listBackups.mockResolvedValueOnce({ items: [{ ...baseRecord('active'), restore_status: 'running' }] })
+      .mockResolvedValue({ items: [{ ...baseRecord('active'), restore_status: 'completed', restored_at: '2026-10-01T12:00:00Z' }] })
+    const wrapper = mountBackupView()
+    await flushPromises()
+    expect(vi.getTimerCount()).toBe(1)
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(vi.getTimerCount()).toBe(0)
+    hidden.mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    const restore = wrapper.findAll('button').find(button => button.text() === 'admin.backup.actions.restore')!
+    expect(restore.attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[role="status"]').text()).toContain('admin.backup.status.completed')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
 })

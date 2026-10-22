@@ -1,0 +1,109 @@
+/* Page-specific refinements for the accepted compact console. */
+.console-signal.top-layout .signal-main .signal-subscriptions-empty { border-color: var(--console-edge); border-radius: 12px; background: var(--console-panel); }
+.console-signal.top-layout .signal-main .signal-subscriptions-empty h3 { font-size: 14px; }
+.console-signal.top-layout .signal-main .redeem-wallet {
+  overflow: hidden;
+  border: 1px solid var(--console-edge);
+  border-radius: 12px;
+  background: var(--console-panel);
+  box-shadow: var(--console-panel-shadow);
+}
+.console-signal.top-layout .signal-main .redeem-wallet .signal-balance-strip {
+  gap: 0;
+  background: transparent;
+}
+.console-signal.top-layout .signal-main .redeem-wallet .signal-balance-strip > div {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.console-signal.top-layout .signal-main .redeem-wallet .signal-balance-strip > div + div {
+  border-left: 1px solid var(--console-edge);
+}
+.redeem-form { padding: 18px; border-top: 1px solid var(--console-edge); }
+.redeem-code-entry { display: flex; align-items: stretch; gap: 10px; margin-top: 6px; }
+.redeem-code-entry > div { flex: 1; min-width: 0; }
+.redeem-code-entry > button { flex-shrink: 0; }
+.console-signal.top-layout .signal-main .redeem-code-entry .input { min-height: 40px; }
+
+.console-signal.top-layout .signal-main .workflow-guide {
+  border: 1px solid var(--console-edge);
+  border-radius: 10px;
+  background: var(--console-inset);
+  color: var(--signal-muted);
+  font-size: 12px;
+  line-height: 21px;
+}
+.workflow-guide > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 14px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--signal-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.workflow-guide > summary::-webkit-details-marker { display: none; }
+.workflow-guide > summary:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 3px; border-radius: 8px; }
+.workflow-guide > summary > svg { flex-shrink: 0; color: var(--signal-muted); }
+.workflow-guide-chevron { margin-left: auto; }
+.workflow-guide[open] .workflow-guide-chevron { transform: rotate(180deg); }
+.workflow-guide-body { margin: 0; padding: 0 18px 14px 38px; overflow-wrap: anywhere; }
+
+.console-signal.top-layout .signal-main .signal-redeem > .redeem-history { padding: 0; }
+.console-signal.top-layout .signal-main .redeem-history-header { padding: 14px 18px; border-bottom: 1px solid var(--console-edge); }
+.console-signal.top-layout .signal-main .redeem-history-body { padding: 0 18px 16px; }
+.redeem-history-list { margin: 0; padding: 0; list-style: none; }
+.redeem-history-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(100px, .7fr); align-items: start; gap: 12px; padding-block: 14px; }
+.redeem-history-row + .redeem-history-row { border-top: 1px solid var(--console-edge); }
+.redeem-history-identity { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.redeem-history-identity :is(p, time) { overflow-wrap: anywhere; }
+.redeem-history-value { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.redeem-history-value > p:first-child { font-variant-numeric: tabular-nums; }
+.redeem-history-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 14px; border-top: 1px solid var(--console-edge); color: var(--signal-muted); font-size: 12px; }
+.redeem-history-page-size { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.redeem-history-page-actions { display: flex; gap: 8px; }
+
+.affiliate-links { margin-bottom: 16px; }
+.affiliate-workspace .affiliate-transfer { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--console-edge); }
+.console-signal.top-layout .signal-main .signal-affiliate-metrics > .card { min-width: 0; }
+.signal-affiliate-metrics p { overflow-wrap: anywhere; }
+
+.console-signal.top-layout .signal-main .audit-filters { padding: 16px; }
+.audit-filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.audit-filter-grid > div { min-width: 0; }
+.audit-filter-actions { border-top: 1px solid var(--console-edge); padding-top: 12px; }
+.console-signal.top-layout .signal-main .audit-clear-action { margin-left: auto; color: #b42318; }
+.dark .console-signal.top-layout .signal-main .audit-clear-action { color: #fda29b; }
+.console-signal.top-layout .signal-main .backup-workspace > .card { padding: 18px; }
+.console-signal.top-layout .signal-main .backup-workspace p.text-sm { font-size: 12px; line-height: 20px; }
+.console-signal.top-layout .signal-main .plugins-workspace h2 { font-size: 20px; line-height: 28px; }
+.console-signal.top-layout .signal-main .plugins-workspace .plugins-notice { font-size: 12px; line-height: 20px; }
+
+@media (max-width: 1023px) {
+  .audit-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 639px) {
+  .console-signal.top-layout .signal-main .signal-affiliate-metrics { gap: 10px; }
+  .console-signal.top-layout .signal-main .signal-affiliate-metrics > .card { padding: 13px 12px; }
+  .console-signal.top-layout .signal-main .signal-affiliate-metrics .text-2xl { font-size: 20px; line-height: 28px; }
+  .signal-affiliate-metrics > .card p:first-child { font-size: 12px; }
+  .redeem-form { padding: 14px; }
+  .console-signal.top-layout .signal-main .redeem-wallet .signal-balance-strip > div { padding: 14px; }
+  .redeem-history-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .redeem-history-value { padding-left: 42px; text-align: left; }
+  .redeem-history-value > p { display: block; }
+  .audit-filter-query, .audit-filter-actor { grid-column: 1 / -1; }
+  .audit-filter-actions > button { flex: 1 1 auto; }
+  .console-signal.top-layout .signal-main .audit-clear-action { margin-left: 0; }
+  .console-signal.top-layout .signal-main .backup-workspace > .card { padding: 14px; }
+  .plugins-heading-actions { width: 100%; }
+  .plugins-heading-actions > .btn-primary { flex: 1; }
+}
+@media (max-width: 479px) {
+  .redeem-code-entry { flex-direction: column; }
+  .redeem-history-page-actions { justify-content: space-between; width: 100%; }
+  .console-signal.top-layout .signal-main .redeem-history-body { padding-inline: 14px; }
+}

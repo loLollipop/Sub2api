@@ -1,5 +1,5 @@
 <template>
-    <div class="space-y-6">
+    <div class="backup-workspace space-y-4">
       <!-- S3 Storage Config -->
       <div class="card p-6">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -183,7 +183,7 @@
               <label class="text-xs text-gray-600 dark:text-gray-400">{{ t('admin.backup.operations.expireDays') }}</label>
               <input v-model.number="manualExpireDays" type="number" min="0" class="input w-20 text-xs" />
             </div>
-            <button type="button" class="btn btn-primary btn-sm" :disabled="creatingBackup" @click="createBackup">
+            <button type="button" class="btn btn-primary btn-sm" :disabled="creatingBackup || restoreBusy" @click="createBackup">
               {{ creatingBackup ? t('admin.backup.operations.backing') : t('admin.backup.operations.createBackup') }}
             </button>
             <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingBackups" @click="loadBackups">
@@ -219,6 +219,13 @@
                       ? t(`admin.backup.progress.${record.progress}`)
                       : t(`admin.backup.status.${record.status}`) }}
                   </span>
+                  <div v-if="record.restore_status" class="mt-2 space-y-1" role="status">
+                    <span class="inline-block rounded px-2 py-0.5 text-xs" :class="statusClass(record.restore_status)">
+                      {{ t('admin.backup.actions.restore') }}: {{ t(`admin.backup.status.${record.restore_status}`) }}
+                    </span>
+                    <p v-if="record.restore_error" class="max-w-xs whitespace-normal break-words text-xs text-red-600 dark:text-red-400">{{ record.restore_error }}</p>
+                    <p v-if="record.restored_at" class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(record.restored_at) }}</p>
+                  </div>
                 </td>
                 <td class="py-3 pr-4 text-xs">{{ record.file_name }}</td>
                 <td class="py-3 pr-4 text-xs">{{ formatSize(record.size_bytes) }}</td>
@@ -244,7 +251,7 @@
                       v-if="record.status === 'completed'"
                       type="button"
                       class="btn btn-secondary btn-xs"
-                      :disabled="restoringId === record.id"
+                      :disabled="restoreBusy || creatingBackup"
                       @click="restoreBackup(record.id)"
                     >
                       {{ restoringId === record.id ? t('common.loading') : t('admin.backup.actions.restore') }}
@@ -253,6 +260,7 @@
                       v-if="record.status !== 'running'"
                       type="button"
                       class="btn btn-danger btn-xs"
+                      :disabled="record.restore_status === 'running' || restoringId === record.id"
                       @click="removeBackup(record.id)"
                     >
                       {{ t('common.delete') }}
@@ -478,6 +486,7 @@ const backups = ref<BackupRecord[]>([])
 const loadingBackups = ref(false)
 const creatingBackup = ref(false)
 const restoringId = ref('')
+const restoreBusy = computed(() => Boolean(restoringId.value) || backups.value.some(record => record.restore_status === 'running'))
 const manualExpireDays = ref(14)
 const downloadParts = ref<BackupDownloadPart[]>([])
 const downloadPartsModalOpen = ref(false)
@@ -487,6 +496,9 @@ const pollingTimer = shallowRef<ReturnType<typeof setInterval> | null>(null)
 const restoringPollingTimer = shallowRef<ReturnType<typeof setInterval> | null>(null)
 const MAX_POLL_COUNT = 900
 let disposed = false
+let backupsRequest = 0
+let creatingRequestPending = false
+let restoringRequestPending = false
 
 function updateRecordInList(updated: BackupRecord) {
   const idx = backups.value.findIndex(r => r.id === updated.id)
@@ -580,20 +592,8 @@ function handleVisibilityChange() {
     stopPolling()
     stopRestorePolling()
   } else {
-    // 标签页恢复时刷新列表，检查是否仍有活跃操作
-    loadBackups().then(() => {
-      if (disposed) return
-      const running = backups.value.find(r => r.status === 'running')
-      if (running) {
-        creatingBackup.value = true
-        startPolling(running.id)
-      }
-      const restoring = backups.value.find(r => r.restore_status === 'running')
-      if (restoring) {
-        restoringId.value = restoring.id
-        startRestorePolling(restoring.id)
-      }
-    })
+    // Refreshing also resumes any active operations discovered in the list.
+    loadBackups()
   }
 }
 
@@ -736,23 +736,50 @@ async function saveSchedule() {
 
 async function loadBackups() {
   if (disposed) return
+  const request = ++backupsRequest
   loadingBackups.value = true
   try {
     const result = await adminAPI.backup.listBackups()
-    if (disposed) return
+    if (disposed || request !== backupsRequest) return
     backups.value = result.items || []
+    if (!document.hidden) {
+      const running = backups.value.find(record => record.status === 'running')
+      if (running) {
+        creatingBackup.value = true
+        if (!pollingTimer.value) startPolling(running.id)
+      } else if (!creatingRequestPending && !pollingTimer.value) {
+        creatingBackup.value = false
+      }
+      const restoring = backups.value.find(record => record.restore_status === 'running')
+      if (restoring) {
+        restoringId.value = restoring.id
+        if (!restoringPollingTimer.value) startRestorePolling(restoring.id)
+      } else if (!restoringRequestPending && !restoringPollingTimer.value) {
+        restoringId.value = ''
+      }
+    }
   } catch (error) {
-    if (disposed) return
+    if (disposed || request !== backupsRequest) return
     appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
+    // A temporary list failure after tab activation must not strand an active operation.
+    if (!document.hidden) {
+      const running = backups.value.find(record => record.status === 'running')
+      if (running && !pollingTimer.value) startPolling(running.id)
+      const restoring = restoringId.value || backups.value.find(record => record.restore_status === 'running')?.id
+      if (restoring && !restoringPollingTimer.value) startRestorePolling(restoring)
+    }
   } finally {
-    if (!disposed) loadingBackups.value = false
+    if (!disposed && request === backupsRequest) loadingBackups.value = false
   }
 }
 
 async function createBackup() {
+  if (disposed || creatingBackup.value || restoreBusy.value) return
   creatingBackup.value = true
+  creatingRequestPending = true
   try {
     const record = await backupStepUp.run(() => adminAPI.backup.createBackup({ expire_days: manualExpireDays.value }))
+    if (disposed) return
     // 插入到列表顶部
     backups.value.unshift(record)
     startPolling(record.id)
@@ -771,6 +798,8 @@ async function createBackup() {
       appStore.showError(error?.message || t('errors.networkError'))
     }
     creatingBackup.value = false
+  } finally {
+    creatingRequestPending = false
   }
 }
 
@@ -804,12 +833,15 @@ function closeDownloadParts() {
 }
 
 async function restoreBackup(id: string) {
+  if (disposed || restoreBusy.value || creatingBackup.value) return
   if (!window.confirm(t('admin.backup.actions.restoreConfirm'))) return
   const password = window.prompt(t('admin.backup.actions.restorePasswordPrompt'))
   if (!password) return
   restoringId.value = id
+  restoringRequestPending = true
   try {
     const record = await backupStepUp.run(() => adminAPI.backup.restoreBackup(id, password))
+    if (disposed) return
     updateRecordInList(record)
     startRestorePolling(id)
   } catch (error: any) {
@@ -822,10 +854,14 @@ async function restoreBackup(id: string) {
     } else {
       appStore.showError(error?.message || t('errors.networkError'))
     }
+  } finally {
+    restoringRequestPending = false
   }
 }
 
 async function removeBackup(id: string) {
+  const record = backups.value.find(record => record.id === id)
+  if (disposed || record?.status === 'running' || record?.restore_status === 'running' || restoringId.value === id) return
   if (!window.confirm(t('admin.backup.actions.deleteConfirm'))) return
   try {
     await adminAPI.backup.deleteBackup(id)
@@ -866,19 +902,6 @@ function formatDate(value?: string): string {
 onMounted(async () => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
   await Promise.all([loadS3Config(), loadImageStorageConfig(), loadSchedule(), loadBackups()])
-  if (disposed) return
-
-  // 如果有正在 running 的备份，恢复轮询
-  const runningBackup = backups.value.find(r => r.status === 'running')
-  if (runningBackup) {
-    creatingBackup.value = true
-    startPolling(runningBackup.id)
-  }
-  const restoringBackup = backups.value.find(r => r.restore_status === 'running')
-  if (restoringBackup) {
-    restoringId.value = restoringBackup.id
-    startRestorePolling(restoringBackup.id)
-  }
 })
 
 onBeforeUnmount(() => {

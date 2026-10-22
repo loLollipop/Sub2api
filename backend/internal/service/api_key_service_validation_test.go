@@ -3,8 +3,10 @@
 package service
 
 import (
+	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -43,4 +45,40 @@ func TestValidateUpdateAPIKeyRequestNumericLimits(t *testing.T) {
 	} {
 		require.Error(t, validateUpdateAPIKeyRequest(req))
 	}
+}
+
+func TestAPIKeyServiceCreateAbsoluteExpiry(t *testing.T) {
+	expiry := time.Now().Add(30 * time.Minute).Truncate(time.Millisecond)
+	repo, cache := newCreateLimitStubs()
+	svc := newCreateLimitService(repo, cache, 0, 0)
+	key, err := svc.Create(context.Background(), 7, CreateAPIKeyRequest{Name: "short lived", ExpiresAt: &expiry})
+	require.NoError(t, err)
+	require.Equal(t, expiry, *key.ExpiresAt)
+	require.Equal(t, expiry, *repo.created[0].ExpiresAt)
+}
+
+func TestAPIKeyServiceCreateRejectsInvalidAbsoluteExpiryBeforeWrite(t *testing.T) {
+	future := time.Now().Add(30 * time.Minute)
+	past := time.Now().Add(-time.Minute)
+	zero := time.Time{}
+	days := 1
+	for _, req := range []CreateAPIKeyRequest{
+		{ExpiresAt: &past}, {ExpiresAt: &zero}, {ExpiresAt: &future, ExpiresInDays: &days},
+	} {
+		repo, cache := newCreateLimitStubs()
+		svc := newCreateLimitService(repo, cache, 0, 0)
+		_, err := svc.Create(context.Background(), 7, req)
+		require.Error(t, err)
+		require.Empty(t, repo.created)
+	}
+}
+
+func TestAPIKeyServiceCreateRetainsRelativeExpiry(t *testing.T) {
+	repo, cache := newCreateLimitStubs()
+	svc := newCreateLimitService(repo, cache, 0, 0)
+	days := 7
+	before := time.Now().AddDate(0, 0, days)
+	key, err := svc.Create(context.Background(), 7, CreateAPIKeyRequest{Name: "legacy", ExpiresInDays: &days})
+	require.NoError(t, err)
+	require.WithinDuration(t, before, *key.ExpiresAt, time.Second)
 }

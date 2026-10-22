@@ -2,7 +2,6 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string
-  readonly VITE_INFINITE_CANVAS_URL?: string
   readonly BASE_URL: string
 }
 

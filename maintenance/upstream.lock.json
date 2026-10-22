@@ -2,27 +2,27 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.13",
-  "imported_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
+  "imported_version": "2.2.18",
+  "imported_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
   "personal_baseline_commit": "6e2e5b5da8c4ac9d07c11dcb5e33f92141a5eeb0",
-  "latest_observed_version": "2.2.13",
-  "latest_observed_release_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
-  "latest_observed_main_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
+  "latest_observed_version": "2.2.18",
+  "latest_observed_release_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
+  "latest_observed_main_commit": "450ca5b9ea2e2ecacfd5daf8fa9e760805f870e6",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.13",
-  "reviewed_release_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
+  "reviewed_release_tag": "v2.2.18",
+  "reviewed_release_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
   "observed_delta_review": {
-    "from_commit": "6c6a9efc96573c879b049265bc57a2d42509bda1",
-    "to_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
-    "status": "selective_formal_v2213_backport",
-    "scope": "Review official v2.2.12-v2.2.13: stream error status classification and durable Grok refusal admission/settlement for Responses WebSocket. Preserve actual HTTP status provenance, atomic accounting, explicit zero price, full refused history, established terminal error policy and unrelated deferrals. Exclude permanent conversation bans for infrastructure IP failures.",
-    "evidence": "maintenance/notes/upstream-sync-20261021-v2213.md"
+    "from_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
+    "to_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
+    "status": "selective_formal_v2218_backport",
+    "scope": "Administrator TOTP identity and atomic state protection; Anthropic stream status and Ops terminal fidelity. Preserve local billing, no-replay and error terminal contracts. Exclude infrastructure-IP/embedded-status refusal billing and the optional recovery CLI with non-atomic refresh revocation.",
+    "evidence": "maintenance/notes/upstream-sync-20261022.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
-  "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes and explicit deferrals are recorded below; release/deployment approval is enforced separately by final CI, review and rollout gates.",
+  "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "6c624219955f467114edb5ae91dc1e3904c1c878",
+    "source_head": "b60f6160135f90c708f58a4cf5d9228d6eced218",
     "implemented_with_local_regression": [
       "Formal v2.2.12-v2.2.13 stream error status classification and local durable Responses WebSocket refusal adaptation; see dated sync note for verification and exclusions",
       "Formal v2.2.8-v2.2.11 bounded wallet preload before statistics, four additive Claude aliases, stale modal-load isolation, bulk allowlist parsing and non-failover Grok safety-check classification; preserve authoritative empty catalogs (see dated sync note)",
@@ -69,7 +69,11 @@
     "a20741493",
     "7435eebdd",
     "91db72e40",
-    "b6251ba03"
+    "b6251ba03",
+    "58338b4da",
+    "0bec57406",
+    "6ce8f3c6f",
+    "b60f61601"
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
@@ -248,5 +252,15 @@
     "status": "http_released_v2127_websocket_locally_verified_pending_release_ci",
     "evidence": "maintenance/notes/grok-refusal-adaptation-20261021.md",
     "scope": "Three text HTTP protocols released in v2.1.27 with real PostgreSQL/Redis integration, race tests, migration267 and production acceptance. v2.2.12-v2.2.13 extends Responses WebSocket using the same durable accounting and block repository; reject infrastructure-IP permanent bans and unproven embedded/error-string HTTP statuses. New adaptation validation recorded in the dated v2.2.13 sync note. No paid upstream calls."
+  },
+  "sync_20261022": {
+    "evidence": "maintenance/notes/upstream-sync-20261022.md",
+    "secondary_tag": "v2.2.18",
+    "preserved": "Local shadcn shell; ticket/canvas/native-payment removals; atomic Grok billing and explicit zero prices.",
+    "excluded_subfeatures": [
+      "a308f2586 infrastructure IP and embedded HTTP200 refusal billing/bans",
+      "0bec57406 optional recovery CLI: refresh rotation can outlive token-set cleanup"
+    ],
+    "migration": "269 belongs to selected original Gemini image permission adaptation; existing migrations unchanged."
   }
 }

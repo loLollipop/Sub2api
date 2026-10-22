@@ -23,7 +23,7 @@
 相对上游，这里按线上站点在跑的能力维护：
 
 - **API Key 智能路由**：一把钥匙可按顺序绑定多个分组；协议对不上的账号（例如 Anthropic 路径上的 OpenAI 号）会跳过，而不是硬打。
-- **内置充值**：EasyPay（含相对 `payurl`/`qrcode`）、渠道手续费和倍率、实例充值说明。见 [docs/PAYMENT_CN.md](docs/PAYMENT_CN.md)。
+- **链动小铺充值**：按固定档位前往小铺购买兑换码，返回站内兑换。见 [docs/PAYMENT_CN.md](docs/PAYMENT_CN.md)。
 - **用量看板**：近 30 天；有小时汇总就走 rollup，没有再回 `usage_logs`。
 - **网关可靠性**：客户端正常关 WS 不计账号故障；过大透传可走 HTTP bridge；Spark 429 只限该模型；转发失败立刻释放会话槽。
 - **升级纪律**：线上主进程 `DATABASE_MIGRATION_MODE=validate`，迁移单独做。版本号只写在 `backend/cmd/server/VERSION`。GitHub Release 只在推 `v*` 标签时触发。

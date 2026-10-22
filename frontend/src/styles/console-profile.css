@@ -1,0 +1,136 @@
+/* Profile uses one identity surface and divided settings rows. */
+.console-signal.top-layout .signal-main .signal-profile {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  display: grid;
+  gap: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.console-signal.top-layout .signal-main .signal-profile .profile-overview {
+  padding: 0;
+  overflow: hidden;
+}
+.console-signal.top-layout .signal-main .signal-profile .profile-overview > .profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+}
+.profile-avatar-trigger { position: relative; flex-shrink: 0; border-radius: 50%; }
+.console-signal.top-layout .signal-main .signal-profile .profile-identity-avatar {
+  display: flex;
+  width: 64px;
+  height: 64px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--console-edge);
+  border-radius: 50%;
+  background: var(--signal-accent-soft);
+  color: var(--signal-accent);
+  font-size: 24px;
+  font-weight: 600;
+}
+.profile-avatar-edit { position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--console-edge); border-radius: 50%; background: var(--signal-surface); color: var(--signal-muted); }
+.profile-avatar-edit svg { width: 12px; height: 12px; }
+.profile-identity-copy { min-width: 0; flex: 1; }
+.profile-eyebrow { margin: 0 0 3px; color: var(--signal-muted); font-size: 11px; font-weight: 400; }
+.profile-name-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.console-signal.top-layout .signal-main .signal-profile .profile-name-line h2 { max-width: 100%; overflow-wrap: anywhere; font-size: 20px; line-height: 28px; font-weight: 600; }
+.profile-name-edit { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 7px; color: var(--signal-muted); transition: background-color .15s, color .15s; }
+.profile-name-edit:hover, .profile-avatar-trigger:hover .profile-avatar-edit { background: var(--signal-accent-soft); color: var(--signal-accent); }
+.profile-name-edit:focus-visible, .profile-avatar-trigger:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 4px; }
+.profile-identity-meta { display: flex; flex-wrap: wrap; gap: 2px 16px; margin-top: 4px; color: var(--signal-muted); font-size: 12px; overflow-wrap: anywhere; }
+.profile-source-hints { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; color: var(--signal-muted); font-size: 11px; }
+.profile-source-hints > span { display: inline-flex; align-items: center; gap: 4px; }
+.profile-source-hints svg { width: 12px; height: 12px; flex-shrink: 0; }
+.console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--console-edge);
+  background: var(--console-inset);
+}
+.console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div { min-width: 0; padding: 16px 24px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div + div { border-left: 1px solid var(--console-edge); }
+.profile-identity-metrics dt { color: var(--signal-muted); font-size: 12px; }
+.profile-identity-metrics dd { margin-top: 4px; color: var(--signal-text); font-size: 20px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.profile-settings-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: 20px; }
+.console-signal.top-layout .signal-main .signal-profile .profile-settings-panel { padding: 20px; }
+.profile-section-heading { padding-bottom: 16px; }
+.profile-section-heading p { margin-top: 3px; color: var(--signal-muted); font-size: 12px; line-height: 20px; }
+.console-signal.top-layout .signal-main .signal-profile .profile-bindings-list > div { margin-top: 0; }
+.console-signal.top-layout .signal-main .signal-profile .profile-bindings-list .profile-binding-row { margin: 0; border-top: 1px solid var(--console-edge); }
+.profile-bindings-list .profile-binding-row:last-child { padding-bottom: 0; }
+.profile-bindings-list .profile-binding-row > div { gap: 12px; }
+.profile-bindings-list .profile-binding-layout { flex-direction: row; }
+.profile-bindings-list .profile-binding-row:has(.profile-email-form) .profile-binding-layout { flex-direction: column; }
+.profile-bindings-list .profile-binding-row:has(.profile-email-form) .profile-binding-layout > div:first-child { width: 100%; }
+.profile-bindings-list .profile-binding-row > div > div:first-child { gap: 12px; }
+.profile-bindings-list .profile-binding-icon { width: 32px; height: 32px; border-radius: 8px; font-size: 11px; }
+.profile-bindings-list .profile-binding-row .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 5px; }
+.profile-bindings-list .profile-binding-row p { font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
+.profile-bindings-list .profile-binding-row .grid.text-sm { font-size: 11px; line-height: 18px; }
+.profile-security-row { display: flex; align-items: center; gap: 12px; padding-block: 16px; border-top: 1px solid var(--console-edge); }
+.profile-setting-icon { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: var(--console-inset); color: var(--signal-muted); }
+.profile-setting-copy { min-width: 0; flex: 1; }
+.console-signal.top-layout .signal-main .signal-profile .profile-setting-copy :is(h2, h3) { font-size: 13px; line-height: 20px; }
+.profile-setting-copy p { margin-top: 3px; color: var(--signal-muted); font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
+.profile-security-row > .btn { flex-shrink: 0; }
+.profile-passkey-details { padding: 0 0 2px 44px; }
+.profile-passkey-details:has(form) { padding-left: 0; }
+.profile-passkey-details form { background: var(--console-inset); border-color: var(--console-edge); }
+.profile-passkey-details .flex.items-center.justify-between { flex-wrap: wrap; }
+.console-signal.top-layout .signal-main .signal-profile .profile-notifications { padding: 20px; grid-column: 1 / -1; }
+.profile-notifications-heading { display: flex; align-items: center; gap: 12px; }
+.profile-notifications-body { padding-top: 20px; margin-top: 16px; border-top: 1px solid var(--console-edge); }
+.profile-notifications-body > div { min-width: 0; }
+.console-signal.top-layout .signal-main .signal-profile .profile-notify-email { background: var(--console-inset); }
+.profile-notifications-body .text-yellow-600 { color: var(--signal-muted); }
+.profile-support { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; color: var(--signal-muted); font-size: 12px; padding-inline: 2px; }
+.profile-support > svg { align-self: center; width: 15px; height: 15px; }
+.profile-support p { color: var(--signal-text); overflow-wrap: anywhere; }
+
+/* These forms are teleported outside the shell by BaseDialog. */
+.profile-dialog-form { color: var(--signal-text); font-size: 13px; }
+.profile-dialog-form .btn { min-height: 36px; border-radius: 8px; font-size: 13px; }
+.profile-dialog-form .input-label, .profile-dialog-form .input-hint { font-size: 12px; }
+.profile-dialog-form .profile-avatar-editor > div { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.profile-dialog-form .profile-avatar-preview { width: 168px; height: 168px; margin: 0; border-radius: 12px; background: var(--console-inset); color: var(--signal-accent); font-size: 42px; box-shadow: none; }
+.profile-dialog-form .profile-avatar-preview img { object-fit: contain; }
+.profile-dialog-form .profile-avatar-editor > div > div:last-child { width: 100%; margin: 0; }
+.profile-dialog-form .profile-avatar-editor p { font-size: 12px; line-height: 20px; color: var(--signal-muted); }
+.profile-dialog-form label:has(input[type='file']:focus-visible) { outline: 2px solid var(--signal-accent); outline-offset: 3px; }
+.profile-dialog-form label:has(input[type='file']:disabled) { pointer-events: none; opacity: .5; }
+
+@media (min-width: 960px) {
+  .profile-notifications-body { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 28px; }
+  .profile-notifications-body.space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
+}
+@media (max-width: 959px) {
+  .profile-settings-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+@media (max-width: 639px) {
+  .console-signal.top-layout .signal-main .signal-profile { gap: 16px; }
+  .console-signal.top-layout .signal-main .signal-profile .profile-overview > .profile-identity { gap: 14px; padding: 18px 16px; align-items: flex-start; }
+  .console-signal.top-layout .signal-main .signal-profile .profile-identity-avatar { width: 52px; height: 52px; font-size: 20px; }
+  .console-signal.top-layout .signal-main .signal-profile .profile-name-line h2 { font-size: 18px; line-height: 26px; }
+  .profile-name-line { gap: 5px; }
+  .console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div { padding: 14px 12px; }
+  .profile-identity-metrics dt { font-size: 11px; }
+  .profile-identity-metrics dd { font-size: 16px; line-height: 24px; }
+  .console-signal.top-layout .signal-main .signal-profile :is(.profile-settings-panel, .profile-notifications) { padding: 16px; }
+  .profile-security-row { flex-wrap: wrap; gap: 10px; }
+  .profile-setting-copy { flex-basis: calc(100% - 46px); }
+  .profile-security-row > .btn { margin-left: 42px; }
+  .profile-notifications-heading .profile-setting-copy { flex-basis: auto; }
+  .profile-passkey-details { padding-left: 0; }
+  .profile-notifications-body .flex > .input { min-width: 0; }
+  .profile-notify-pending, .profile-notify-email.is-verifying { flex-wrap: wrap; gap: 8px; }
+  .profile-notify-pending > span, .profile-notify-email.is-verifying > div:first-child { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+  .profile-notify-pending > div, .profile-notify-email.is-verifying > div:last-child { flex-wrap: wrap; gap: 8px; }
+}

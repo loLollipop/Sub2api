@@ -173,12 +173,12 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
   it('keeps all destinations and the batch-image permission gate', async () => {
     const wrapper = mount(Actions)
     expect(refreshBatchImageAccess).toHaveBeenCalledOnce()
-    expect(wrapper.findAll('button')).toHaveLength(4)
+    expect(wrapper.findAll('button')).toHaveLength(3)
     for (const button of wrapper.findAll('button')) await button.trigger('click')
-    expect(push.mock.calls.map(call => call[0])).toEqual(['/keys', '/infinite-canvas', '/usage', '/redeem'])
+    expect(push.mock.calls.map(call => call[0])).toEqual(['/keys', '/usage', '/redeem'])
     canUseBatchImage.value = true
     await flushPromises()
-    await wrapper.findAll('button')[3].trigger('click')
+    await wrapper.findAll('button')[2].trigger('click')
     expect(push).toHaveBeenLastCalledWith('/batch-image')
     wrapper.unmount()
   })

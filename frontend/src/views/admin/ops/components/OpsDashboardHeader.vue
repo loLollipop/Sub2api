@@ -431,6 +431,8 @@ const isSystemIdle = computed(() => {
   return (qps ?? 0) === 0 && errorRate === 0
 })
 
+const showDiagnosis = ref(false)
+
 const healthScoreValue = computed<number | null>(() => {
   const v = overview.value?.health_score
   return typeof v === 'number' && Number.isFinite(v) ? v : null
@@ -859,7 +861,7 @@ function handleToolbarRefresh() {
 </script>
 
 <template>
-  <div :class="['flex flex-col gap-4 rounded-3xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-dark-800 dark:ring-dark-700', props.fullscreen ? 'p-8' : 'p-6']">
+  <div :class="['flex flex-col gap-4 card', props.fullscreen ? 'p-6' : 'p-4 sm:p-5']">
     <!-- Top Toolbar -->
     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4 dark:border-dark-700">
       <div>
@@ -982,18 +984,9 @@ function handleToolbarRefresh() {
         <div class="grid h-full grid-cols-1 gap-6 md:grid-cols-[200px_1fr] md:items-center">
           <!-- 1) Health Score -->
           <div
-            class="group relative flex cursor-pointer flex-col items-center justify-center rounded-xl py-2 transition-all hover:bg-white/60 dark:hover:bg-dark-800/60 md:border-r md:border-gray-200 md:pr-6 dark:md:border-dark-700"
+            class="relative flex flex-col items-center justify-center rounded-xl py-2 transition-all hover:bg-white/60 dark:hover:bg-dark-800/60 md:border-r md:border-gray-200 md:pr-6 dark:md:border-dark-700"
           >
-            <!-- Diagnosis Popover (hover) -->
-            <div
-              class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 md:left-full md:top-0 md:ml-2 md:mt-0 md:translate-x-0"
-            >
-              <div class="rounded-xl bg-white p-4 shadow-xl ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10">
-                <h4 class="mb-3 border-b border-gray-100 pb-2 text-sm font-bold text-gray-900 dark:border-dark-700 dark:text-white flex items-center gap-2">
-                  <Icon name="brain" size="sm" class="text-blue-500" />
-                  {{ t('admin.ops.diagnosis.title') }}
-                </h4>
-
+            <BaseDialog :show="showDiagnosis" :title="t('admin.ops.diagnosis.title')" width="normal" @close="showDiagnosis = false">
                 <div class="space-y-3">
                   <div v-for="(item, idx) in diagnosisReport" :key="idx" class="flex gap-3">
                     <div class="mt-0.5 shrink-0">
@@ -1015,10 +1008,15 @@ function handleToolbarRefresh() {
                 <div class="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400 dark:border-dark-700">
                   {{ t('admin.ops.diagnosis.footer') }}
                 </div>
-              </div>
-            </div>
+            </BaseDialog>
 
-            <div class="relative flex items-center justify-center">
+            <button
+              type="button"
+              class="relative flex items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-500"
+              :aria-label="t('admin.ops.diagnosis.title')"
+              aria-haspopup="dialog"
+              @click="showDiagnosis = true"
+            >
               <svg :width="circleSize" :height="circleSize" class="-rotate-90 transform">
                 <circle
                   :cx="circleSize / 2"
@@ -1049,7 +1047,7 @@ function handleToolbarRefresh() {
                 </span>
                 <span :class="[props.fullscreen ? 'text-xs' : 'text-[10px]', 'font-bold uppercase tracking-wider text-gray-400']">{{ t('admin.ops.health') }}</span>
               </div>
-            </div>
+            </button>
 
             <div class="mt-4 text-center" v-if="!props.fullscreen">
               <div class="flex items-center justify-center gap-1 text-xs font-medium text-gray-500">

@@ -3,7 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { useAppStore, useAuthStore } from '@/stores'
+import { useAdminSettingsStore, useAppStore, useAuthStore } from '@/stores'
 import AppSidebar from '../AppSidebar.vue'
 import UserTopNav from '../UserTopNav.vue'
 
@@ -14,13 +14,14 @@ vi.mock('@/composables/useBatchImageAccess', async () => {
 })
 
 let wrapper: VueWrapper | undefined
-async function render(simple = false, enabled = true) {
+async function render(simple = false, enabled = true, role: 'user' | 'admin' = 'user') {
   const pinia = createPinia()
   setActivePinia(pinia)
   const app = useAppStore()
   app.cachedPublicSettings = {
+    model_plaza_enabled: true,
     available_channels_enabled: enabled, channel_monitor_enabled: enabled,
-    payment_enabled: enabled, affiliate_enabled: enabled,
+    purchase_subscription_enabled: enabled, affiliate_enabled: enabled,
     custom_menu_items: [
       { id: 'extra', label: 'Custom workspace', visibility: 'user', sort_order: 1, icon_svg: '<svg><path fill="red" d="M0 0h8v8H0z" /></svg>' },
       { id: 'admin-only', label: 'Admin only', visibility: 'admin', sort_order: 0, icon_svg: '' },
@@ -28,8 +29,9 @@ async function render(simple = false, enabled = true) {
     ],
   } as NonNullable<typeof app.cachedPublicSettings>
   const auth = useAuthStore()
-  auth.user = { id: 12, role: 'user' } as NonNullable<typeof auth.user>
+  auth.user = { id: 12, role } as NonNullable<typeof auth.user>
   vi.spyOn(auth, 'isSimpleMode', 'get').mockReturnValue(simple)
+  useAdminSettingsStore().fetch = vi.fn().mockResolvedValue(undefined)
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }] })
   await router.push('/dashboard')
   await router.isReady()
@@ -42,15 +44,17 @@ async function render(simple = false, enabled = true) {
   })
   return { app, auth, router }
 }
-const primary = () => wrapper!.findAll('.consumer-nav > a').map(item => item.attributes('href'))
-const secondary = () => wrapper!.findAll('.consumer-more-menu a').map(item => item.attributes('href'))
-const drawer = () => wrapper!.findAll('.sidebar-nav a').map(item => item.attributes('href'))
-const openMenu = () => wrapper!.get('.consumer-more-trigger').trigger('click')
+const primary = () => wrapper!.findAll('.top-browse-nav > a').map(item => item.attributes('href'))
+const sidebarLinks = () => wrapper!.findAll('.sidebar-nav a').map(item => item.attributes('href'))
 
 beforeEach(() => {
   document.documentElement.classList.remove('dark')
   localStorage.setItem('theme', 'light')
   batchAccess.allowed = true
+  vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+    matches: query === '(min-width: 1024px)', media: query, onchange: null,
+    addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+  }))
 })
 
 afterEach(() => {
@@ -61,108 +65,71 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('user top navigation', () => {
-  it('preserves every drawer destination and places the main five in the capsule', async () => {
+describe('browse navigation and sidebar operations', () => {
+  it('keeps top links flat and places frequent operations into two sidebar sections', async () => {
     await render()
-    await openMenu()
-    expect(primary()).toEqual(['/dashboard', '/keys', '/usage', '/available-channels', '/monitor'])
-    expect(secondary()).toEqual(['/infinite-canvas', '/batch-image', '/purchase', '/orders', '/redeem', '/affiliate', '/tickets', '/profile', '/custom/extra'])
-    expect([...primary(), ...secondary()].sort()).toEqual(drawer().sort())
+    expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1', '/available-channels', '/monitor'])
+    expect(wrapper!.find('.top-browse-nav button').exists()).toBe(false)
+    expect(wrapper!.find('.consumer-more-menu').exists()).toBe(false)
+    const sections = wrapper!.findAll('.sidebar-nav .sidebar-section')
+    expect(sections[0].findAll('a').map(link => link.attributes('href'))).toEqual(['/dashboard', '/keys', '/batch-image', '/usage', '/custom/extra'])
+    expect(sections[1].findAll('a').map(link => link.attributes('href'))).toEqual(['/purchase', '/redeem', '/affiliate', '/profile'])
     expect(wrapper!.text()).not.toContain('Admin only')
     expect(wrapper!.text()).not.toContain('Embedded recharge')
-    expect(wrapper!.get('.consumer-custom-icon path').attributes('fill')).toBe('red')
-    expect(wrapper!.find('.consumer-custom-icon script').exists()).toBe(false)
+    expect(wrapper!.get('.sidebar-svg-icon path').attributes('fill')).toBe('red')
+    expect(wrapper!.findAll('[data-tour="sidebar-my-keys"]')).toHaveLength(1)
   })
 
-  it('uses the same feature gates and reacts when settings change', async () => {
+  it('reacts to shared feature gates for browse links and wallet tools', async () => {
     const { app } = await render(false, false)
-    await openMenu()
-    expect(primary()).toEqual(['/dashboard', '/keys', '/usage'])
-    expect(secondary()).not.toContain('/purchase')
-    expect(secondary()).not.toContain('/orders')
-    expect(secondary()).not.toContain('/affiliate')
+    expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1'])
+    expect(sidebarLinks()).not.toContain('/purchase')
+    expect(sidebarLinks()).not.toContain('/orders')
+    expect(sidebarLinks()).not.toContain('/affiliate')
     app.cachedPublicSettings!.available_channels_enabled = true
     app.cachedPublicSettings!.channel_monitor_enabled = true
     app.cachedPublicSettings!.purchase_subscription_enabled = true
     await flushPromises()
     expect(primary()).toContain('/available-channels')
     expect(primary()).toContain('/monitor')
-    expect(secondary()).toContain('/purchase')
-    expect(secondary()).not.toContain('/orders')
-    expect([...primary(), ...secondary()].sort()).toEqual(drawer().sort())
+    expect(sidebarLinks()).toContain('/purchase')
+    expect(sidebarLinks()).not.toContain('/orders')
   })
 
-  it('keeps simple mode and backend mode restrictions in both navigation surfaces', async () => {
+  it('preserves simple and backend mode restrictions', async () => {
     const { app } = await render(true)
-    await openMenu()
-    expect(primary()).toEqual(['/dashboard', '/keys', '/monitor'])
-    expect(secondary()).toEqual(['/infinite-canvas', '/tickets', '/profile', '/custom/extra'])
-    expect([...primary(), ...secondary()].sort()).toEqual(drawer().sort())
+    expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1', '/monitor'])
+    expect(sidebarLinks()).toEqual(['/dashboard', '/keys', '/custom/extra', '/profile'])
     app.cachedPublicSettings!.backend_mode_enabled = true
     await flushPromises()
-    expect(primary()).toEqual([])
-    expect(secondary()).toEqual([])
-    expect(drawer()).toEqual([])
+    expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1'])
+    expect(sidebarLinks()).toEqual([])
   })
 
-  it('does not expose batch image tools without eligible key access', async () => {
+  it('hides batch image without eligible key access', async () => {
     batchAccess.allowed = false
     await render()
-    await openMenu()
-    expect(secondary()).not.toContain('/batch-image')
-    expect(drawer()).not.toContain('/batch-image')
-    expect(secondary()).toContain('/infinite-canvas')
+    expect(sidebarLinks()).not.toContain('/batch-image')
+    expect(sidebarLinks()).not.toContain('/infinite-canvas')
   })
 
-  it('supports arrow keys, Home, End and Escape with focus returned to the trigger', async () => {
-    await render()
-    await wrapper!.get('.consumer-more-trigger').trigger('keydown', { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(wrapper!.get('.consumer-more-menu a').element)
-    await wrapper!.get('.consumer-more-menu').trigger('keydown', { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(wrapper!.findAll('.consumer-more-menu a')[1].element)
-    await wrapper!.get('.consumer-more-menu').trigger('keydown', { key: 'End' })
-    expect(document.activeElement).toBe(wrapper!.get('.consumer-theme-toggle').element)
-    await wrapper!.get('.consumer-more-menu').trigger('keydown', { key: 'Home' })
-    expect(document.activeElement).toBe(wrapper!.get('.consumer-more-menu a').element)
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  it('sanitizes custom SVG and external documentation links', async () => {
+    const { app } = await render()
+    app.docUrl = 'javascript:alert(1)'
+    app.cachedPublicSettings!.custom_menu_items![0].icon_svg = '<svg><script>alert(1)</script><path onload="alert(1)" fill="red" /></svg>'
     await flushPromises()
-    expect(wrapper!.find('.consumer-more-menu').exists()).toBe(false)
-    expect(document.activeElement).toBe(wrapper!.get('.consumer-more-trigger').element)
-    await wrapper!.get('.consumer-more-trigger').trigger('keydown', { key: 'ArrowUp' })
-    expect(document.activeElement).toBe(wrapper!.get('.consumer-theme-toggle').element)
+    expect(wrapper!.find('.top-browse-nav a[target="_blank"]').exists()).toBe(false)
+    expect(wrapper!.find('.sidebar-svg-icon script').exists()).toBe(false)
+    expect(wrapper!.get('.sidebar-svg-icon path').attributes('onload')).toBeUndefined()
+    app.docUrl = 'https://docs.example.test/guide'
+    await flushPromises()
+    expect(wrapper!.get('.top-browse-nav a[target="_blank"]').attributes()).toMatchObject({ href: 'https://docs.example.test/guide', rel: 'noopener noreferrer' })
   })
 
-  it('closes on outside pointer, focus leaving, link selection and route changes', async () => {
-    const { router } = await render()
-    await openMenu()
-    wrapper!.get('#outside').element.dispatchEvent(new Event('pointerdown', { bubbles: true }))
-    await flushPromises()
-    expect(wrapper!.find('.consumer-more-menu').exists()).toBe(false)
-    await openMenu()
-    await wrapper!.get('.consumer-navigation').trigger('focusout', { relatedTarget: wrapper!.get('#outside').element })
-    expect(wrapper!.find('.consumer-more-menu').exists()).toBe(false)
-    await openMenu()
-    await wrapper!.get('.consumer-more-menu a[href="/infinite-canvas"]').trigger('click')
-    await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/infinite-canvas')
-    expect(wrapper!.find('.consumer-more-menu').exists()).toBe(false)
-    expect(wrapper!.get('.consumer-more-trigger').classes()).toContain('consumer-nav-link-active')
-    await openMenu()
-    await router.push('/keys?tab=all')
-    await flushPromises()
-    expect(wrapper!.find('.consumer-more-menu').exists()).toBe(false)
-  })
-
-  it('offers a desktop theme toggle and keeps the drawer toggle in sync', async () => {
-    await render()
-    await openMenu()
-    await wrapper!.get('.consumer-theme-toggle').trigger('click')
-    await flushPromises()
-    expect(document.documentElement.classList.contains('dark')).toBe(true)
-    expect(localStorage.getItem('theme')).toBe('dark')
-    expect(wrapper!.get('[data-test="theme-toggle"]').text()).toContain('nav.lightMode')
-    await wrapper!.get('[data-test="theme-toggle"]').trigger('click')
-    await flushPromises()
-    expect(wrapper!.get('.consumer-theme-toggle').text()).toContain('nav.darkMode')
+  it('keeps browse links available for administrators and uses their dashboard', async () => {
+    await render(false, true, 'admin')
+    expect(primary()).toEqual(['/', '/admin/dashboard', '/model-plaza?embedded=1', '/available-channels', '/monitor'])
+    expect(sidebarLinks()).toContain('/admin/accounts')
+    expect(sidebarLinks()).toContain('/keys')
   })
 })

@@ -179,7 +179,7 @@ export function consolePreviewConfig(): InlineConfig {
     plugins: [consolePreviewPlugin(), vue()],
     resolve: { alias: { '@': resolve(root, 'src'), 'vue-i18n': 'vue-i18n/dist/vue-i18n.runtime.esm-bundler.js' } },
     define: { __INTLIFY_JIT_COMPILATION__: true, 'import.meta.env.VITE_API_BASE_URL': JSON.stringify('/api/v1'),
-      'import.meta.env.VITE_WS_BASE_URL': 'undefined', 'import.meta.env.VITE_INFINITE_CANVAS_URL': 'undefined' },
+      'import.meta.env.VITE_WS_BASE_URL': 'undefined' },
     server: { host: '127.0.0.1', port: 4317, strictPort: true, cors: false,
       fs: { strict: true, allow: [root] } },
   }

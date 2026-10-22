@@ -27,7 +27,7 @@
  *
  *   - **`opt-out`** (default enabled) — menu visible when settings unloaded,
  *     hidden only when the backend explicitly sends `false`. Use for features
- *     that ship enabled by default (Channel Monitor, Payment).
+ *     that ship enabled by default (Channel Monitor).
  *   - **`opt-in`**  (default disabled) — menu hidden when settings unloaded,
  *     visible only when the backend explicitly sends `true`. Use for features
  *     that ship disabled (Available Channels).
@@ -114,11 +114,6 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Plugin Management',
   }),
-  payment: defineFlag({
-    key: 'payment_enabled',
-    mode: 'opt-out',
-    label: 'Payment',
-  }),
   riskControl: defineFlag({
     key: 'risk_control_enabled',
     mode: 'opt-in',
@@ -131,10 +126,9 @@ export const FeatureFlags = {
   }),
 } as const
 
-/** Purchase is available through either built-in payments or the external shop. */
+/** Purchase is available when the external shop is enabled. */
 export function isPurchaseEnabled(): boolean {
-  return isFeatureFlagEnabled(FeatureFlags.payment)
-    || useAppStore().cachedPublicSettings?.purchase_subscription_enabled === true
+  return useAppStore().cachedPublicSettings?.purchase_subscription_enabled === true
 }
 
 export type RegisteredFeatureFlag = keyof typeof FeatureFlags

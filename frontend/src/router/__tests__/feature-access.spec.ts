@@ -8,6 +8,7 @@ type NavigationGuard = (
 
 const routerHarness = vi.hoisted(() => ({
   guard: null as NavigationGuard | null,
+  paths: [] as string[],
 }))
 
 const authStore = vi.hoisted(() => ({
@@ -24,7 +25,6 @@ const appStore = vi.hoisted(() => ({
   publicSettingsLoaded: false,
   cachedPublicSettings: null as null | {
     purchase_subscription_enabled?: boolean
-    payment_enabled?: boolean
     risk_control_enabled?: boolean
     custom_menu_items?: []
   },
@@ -33,13 +33,15 @@ const appStore = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({
   createWebHistory: vi.fn(() => ({})),
-  createRouter: vi.fn(() => ({
+  createRouter: vi.fn((config: { routes: { path: string }[] }) => {
+    routerHarness.paths = config.routes.map(route => route.path)
+    return ({
     beforeEach: vi.fn((guard: NavigationGuard) => {
       routerHarness.guard = guard
     }),
     afterEach: vi.fn(),
     onError: vi.fn(),
-  })),
+  })}),
 }))
 
 vi.mock('@/stores/auth', () => ({
@@ -120,8 +122,13 @@ describe('feature route guard', () => {
     appStore.fetchPublicSettings.mockReset()
   })
 
+  it('removes native checkout routes while retaining shop, redemption, subscriptions and WeChat login', () => {
+    expect(routerHarness.paths).toEqual(expect.arrayContaining(['/purchase', '/redeem', '/subscriptions', '/auth/wechat/callback']))
+    expect(routerHarness.paths.some(path => path.startsWith('/payment/') || path.startsWith('/admin/orders') || path === '/orders' || path === '/auth/wechat/payment/callback')).toBe(false)
+  })
+
   it('waits for the first public-settings request before deciding payment access', async () => {
-    const deferred = createDeferred<{ payment_enabled: boolean }>()
+    const deferred = createDeferred<{ purchase_subscription_enabled: boolean }>()
     appStore.fetchPublicSettings.mockImplementation(async () => {
       const settings = await deferred.promise
       appStore.cachedPublicSettings = settings
@@ -134,7 +141,7 @@ describe('feature route guard', () => {
     await vi.waitFor(() => expect(appStore.fetchPublicSettings).toHaveBeenCalledTimes(1))
     expect(next).not.toHaveBeenCalled()
 
-    deferred.resolve({ payment_enabled: true })
+    deferred.resolve({ purchase_subscription_enabled: true })
     await navigation
     expect(next).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith()
@@ -156,8 +163,7 @@ describe('feature route guard', () => {
   })
 
   it.each([
-    ['purchase', { requiresPurchase: true }, { payment_enabled: false }, '/dashboard'],
-    ['payment', { requiresPayment: true }, { payment_enabled: false }, '/dashboard'],
+    ['purchase', { requiresPurchase: true }, { purchase_subscription_enabled: false }, '/dashboard'],
     [
       'risk control',
       { requiresRiskControl: true },
@@ -177,15 +183,11 @@ describe('feature route guard', () => {
     expect(next).toHaveBeenCalledWith(target)
   })
 
-  it('allows external purchases while orders retain the internal payment gate', async () => {
+  it('allows purchases when the external shop is enabled', async () => {
     appStore.publicSettingsLoaded = true
-    appStore.cachedPublicSettings = { payment_enabled: false, purchase_subscription_enabled: true }
+    appStore.cachedPublicSettings = { purchase_subscription_enabled: true }
     const purchase = runGuard({ requiresPurchase: true }, '/purchase')
     await purchase.navigation
     expect(purchase.next).toHaveBeenCalledWith()
-    const orders = runGuard({ requiresPayment: true }, '/orders')
-    await orders.navigation
-    expect(orders.next).toHaveBeenCalledWith('/dashboard')
   })
-
 })

@@ -1,7 +1,7 @@
 <template>
-  <div v-if="!isDesktopViewport" class="space-y-3">
+  <div v-if="!isDesktopViewport" class="data-table-mobile space-y-3">
     <template v-if="loading">
-      <div v-for="i in 5" :key="i" class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900">
+      <div v-for="i in 5" :key="i" class="data-table-card rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900">
         <div class="space-y-3">
           <div v-for="column in dataColumns" :key="column.key" class="flex justify-between">
             <div class="h-4 w-20 animate-pulse rounded bg-gray-200 dark:bg-dark-700"></div>
@@ -15,7 +15,7 @@
     </template>
 
     <template v-else-if="!data || data.length === 0">
-      <div class="rounded-lg border border-gray-200 bg-white p-12 text-center dark:border-dark-700 dark:bg-dark-900">
+      <div class="data-table-card rounded-lg border border-gray-200 bg-white p-12 text-center dark:border-dark-700 dark:bg-dark-900">
         <slot name="empty">
           <div class="flex flex-col items-center">
             <Icon
@@ -89,12 +89,15 @@
       <div
         v-for="(row, index) in sortedData"
         :key="resolveRowKey(row, index)"
-        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900"
+        class="data-table-card rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900"
         :class="{
           'cursor-pointer': clickableRows,
+          'clickable-table-row': clickableRows,
           'border-primary-300 bg-primary-50/40 dark:border-primary-700 dark:bg-primary-900/10': selectable && isRowSelected(row, index)
         }"
+        :tabindex="clickableRows ? 0 : undefined"
         @click="clickableRows && emit('rowClick', row)"
+        @keydown="onRowKeydown($event, row)"
       >
         <div class="space-y-3">
           <div v-if="selectable" class="flex justify-end">
@@ -245,9 +248,12 @@
             class="hover:bg-gray-50 dark:hover:bg-dark-800"
             :class="{
               'cursor-pointer': clickableRows,
+              'clickable-table-row': clickableRows,
               'bg-primary-50/40 dark:bg-primary-900/10': selectable && isRowSelected(item.row, item.index)
             }"
+            :tabindex="clickableRows ? 0 : undefined"
             @click="clickableRows && emit('rowClick', item.row)"
+            @keydown="onRowKeydown($event, item.row)"
           >
             <td v-if="selectable" class="w-11 min-w-11 px-3 py-4 text-center">
               <input
@@ -312,6 +318,14 @@ const emit = defineEmits<{
   'update:selectedKeys': [keys: Array<string | number>]
   selectionChange: [keys: Array<string | number>]
 }>()
+
+function onRowKeydown(event: KeyboardEvent, row: Record<string, unknown>) {
+  if (!props.clickableRows || event.target !== event.currentTarget || event.defaultPrevented ||
+      event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  if (!event.repeat) emit('rowClick', row)
+}
 
 // 表格容器引用
 const tableWrapperRef = ref<HTMLElement | null>(null)
@@ -1001,6 +1015,11 @@ defineExpose({
 </script>
 
 <style scoped>
+.clickable-table-row:focus-visible {
+  outline: 2px solid rgb(14 165 233);
+  outline-offset: -2px;
+}
+
 /* 表格横向滚动 */
 .table-wrapper {
   --select-col-width: 52px;

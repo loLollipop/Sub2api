@@ -92,31 +92,6 @@ const BatchImageIcon = {
     )
 }
 
-const InfiniteCanvasIcon = {
-  render: () =>
-    h(
-      'svg',
-      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
-      [
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M3.75 4.5A.75.75 0 014.5 3.75h15a.75.75 0 01.75.75v15a.75.75 0 01-.75.75h-15a.75.75 0 01-.75-.75v-15z'
-        }),
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M8.25 8.25h7.5v7.5h-7.5z'
-        }),
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M12 10.5v3m-1.5-1.5h3'
-        })
-      ]
-    )
-}
-
 const ChartIcon = {
   render: () =>
     h(
@@ -391,20 +366,6 @@ const OrderIcon = {
     )
 }
 
-const OrderListIcon = {
-  render: () =>
-    h(
-      'svg',
-      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
-      [
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z'
-        })
-      ]
-    )
-}
 
 export const ChevronDoubleRightIcon = {
   render: () =>
@@ -500,16 +461,14 @@ export function useConsoleNavigation() {
   // which handles the opt-in vs opt-out fallback when settings haven't loaded
   // yet. Admin-only flags (not in public settings) stay inline below.
   const flagChannelMonitor = makeSidebarFlag(FeatureFlags.channelMonitor)
-  const flagPayment = makeSidebarFlag(FeatureFlags.payment)
   const flagAvailableChannels = makeSidebarFlag(FeatureFlags.availableChannels)
   const flagAffiliate = makeSidebarFlag(FeatureFlags.affiliate)
   const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
   const flagPluginManagement = makeSidebarFlag(FeatureFlags.pluginManagement)
   const flagOpsMonitoring = () => adminSettingsStore.opsMonitoringEnabled
-  const flagAdminPayment = () => adminSettingsStore.paymentEnabled
   const flagBatchImageAccess = () => canUseBatchImage.value
 
-  // This custom menu is embedded into /purchase and should not appear as a second sidebar entry.
+  // Ignore the retired embedded recharge menu.
   const RECHARGE_CENTER_MENU_ID = '322273f5aaa4d036'
 
   // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
@@ -524,16 +483,13 @@ export function useConsoleNavigation() {
     }
     items.push(
       { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-      { path: '/infinite-canvas', label: t('nav.infiniteCanvas'), icon: InfiniteCanvasIcon },
       { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
       { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
       { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
       { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
       { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: isPurchaseEnabled },
-      { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
       { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
       { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
-      { path: '/tickets', label: t('tickets.title'), icon: { render: () => h(Icon, { name: 'chat' }) } },
       { path: '/profile', label: t('nav.profile'), icon: UserIcon },
       ...customMenuItemsForUser.value.map((item): NavItem => ({
         path: `/custom/${item.id}`,
@@ -595,7 +551,6 @@ export function useConsoleNavigation() {
       { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
       { path: '/admin/plugins', label: t('nav.plugins'), icon: PluginIcon, featureFlag: flagPluginManagement },
       { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
-      { path: '/admin/tickets', label: t('tickets.adminTitle'), icon: { render: () => h(Icon, { name: 'chat' }) } },
       { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
       {
         path: '/admin/security-audit',
@@ -621,19 +576,6 @@ export function useConsoleNavigation() {
           { path: '/admin/affiliates/invites', label: t('nav.affiliateInviteRecords'), icon: UsersIcon },
           { path: '/admin/affiliates/rebates', label: t('nav.affiliateRebateRecords'), icon: OrderIcon },
           { path: '/admin/affiliates/transfers', label: t('nav.affiliateTransferRecords'), icon: CreditCardIcon },
-        ],
-      },
-      {
-        path: '/admin/orders',
-        label: t('nav.orderManagement'),
-        icon: OrderIcon,
-        hideInSimpleMode: true,
-        expandOnly: true,
-        featureFlag: flagAdminPayment,
-        children: [
-          { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
-          { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
-          { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
         ],
       },
       { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },

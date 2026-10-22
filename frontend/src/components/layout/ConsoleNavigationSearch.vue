@@ -1,12 +1,13 @@
 <template>
-  <button type="button" class="console-search-trigger btn btn-secondary btn-icon" :title="t('common.search')" :aria-label="t('common.search')" @click="open = true">
+  <button type="button" class="console-search-trigger btn btn-secondary" :class="expanded ? 'console-search-expanded' : 'btn-icon'" :title="t('common.search')" :aria-label="t('common.search')" aria-haspopup="dialog" @click="open = true">
     <Icon name="search" size="sm" />
+    <span v-if="expanded" class="console-search-hint">{{ t('common.search') }}</span>
   </button>
   <BaseDialog :show="open" :title="t('common.search')" width="normal" :close-on-click-outside="true" @close="open = false">
     <div class="console-navigation-search">
       <div class="relative">
         <Icon name="search" size="md" class="pointer-events-none absolute left-3 top-3 text-gray-400" />
-        <input ref="searchInput" v-model="query" class="input pl-10" :aria-label="t('common.search')" :placeholder="t('common.search')" autocomplete="off" @keydown.enter.prevent="navigate(results[0]?.path)" />
+        <input ref="searchInput" v-model="query" class="input pl-10" :aria-label="t('common.search')" :placeholder="t('common.search')" autocomplete="off" @keydown.enter="handleEnter" />
       </div>
       <nav v-if="results.length" class="console-search-results" :aria-label="t('common.search')">
         <button v-for="item in results" :key="item.path" type="button" class="console-search-result" @click="navigate(item.path)">
@@ -31,6 +32,8 @@ import { useConsoleNavigation, type NavItem } from '@/composables/useConsoleNavi
 import { sanitizeSvg } from '@/utils/sanitize'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+
+withDefaults(defineProps<{ expanded?: boolean }>(), { expanded: false })
 
 const { t } = useI18n()
 const router = useRouter()
@@ -68,6 +71,12 @@ function navigate(path?: string) {
   if (!path) return
   open.value = false
   void router.push(path)
+}
+
+function handleEnter(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  navigate(results.value[0]?.path)
 }
 </script>
 

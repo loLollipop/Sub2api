@@ -4,6 +4,8 @@ import { nextTick } from 'vue'
 
 import type { ApiKey } from '@/types'
 import KeysView from '../KeysView.vue'
+import SearchInput from '@/components/common/SearchInput.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 
 const {
   listKeys,
@@ -113,6 +115,7 @@ vi.mock('vue-i18n', async () => {
     ...actual,
     useI18n: () => ({
       t: (key: string) => messages[key] ?? key,
+      locale: { value: 'en' },
     }),
   }
 })
@@ -229,7 +232,7 @@ const IconStub = {
   template: '<span data-test="icon">{{ name }}</span>',
 }
 
-const mountView = async (renderSelectSlots = false) => {
+const mountView = async (renderSelectSlots = false, realSearch = false) => {
   const wrapper = mount(KeysView, {
     global: {
       stubs: {
@@ -247,7 +250,7 @@ const mountView = async (renderSelectSlots = false) => {
           ...SelectStub,
           template: '<div><slot name="selected" :option="options?.find(option => option.value === modelValue)" /><slot v-for="option in options" name="option" :option="option" :selected="option.value === modelValue" /></div>',
         } : SelectStub,
-        SearchInput: SearchInputStub,
+        SearchInput: realSearch ? false : SearchInputStub,
         Icon: IconStub,
         UseKeyModal: true,
         EndpointPopover: true,
@@ -307,6 +310,90 @@ describe('user KeysView column settings', () => {
     isCurrentStep.mockReturnValue(false)
   })
 
+
+  it('distinguishes an empty library from filtered results and resets every filter including group zero', async () => {
+    listKeys.mockResolvedValue({ items: [], total: 0, pages: 0 })
+    const wrapper = await mountView()
+    const empty = () => wrapper.findComponent(EmptyState)
+    expect(empty().props('title')).toBe('keys.noKeysYet')
+    empty().vm.$emit('action')
+    await nextTick()
+    expect((wrapper.vm as unknown as { showCreateModal: boolean }).showCreateModal).toBe(true)
+    await wrapper.findComponent(SearchInput).vm.$emit('update:modelValue', 'missing')
+    await wrapper.findAllComponents({ name: 'Select' })[0].vm.$emit('update:modelValue', 0)
+    await wrapper.findAllComponents({ name: 'Select' })[1].vm.$emit('update:modelValue', 'inactive')
+    await flushPromises()
+    expect(empty().props('title')).toBe('keys.noMatchingKeys')
+    expect(empty().props('actionText')).toBe('keys.clearFilters')
+    expect(wrapper.find('[data-testid="keys-clear-filters"]').exists()).toBe(true)
+    listKeys.mockClear()
+    empty().vm.$emit('action')
+    await flushPromises()
+    expect(listKeys).toHaveBeenCalledTimes(1)
+    expect(listKeys.mock.calls[0][0]).toBe(1)
+    expect(listKeys.mock.calls[0][2]).toEqual({ sort_by: 'created_at', sort_order: 'desc' })
+    expect(empty().props('title')).toBe('keys.noKeysYet')
+    expect(wrapper.find('[data-testid="keys-clear-filters"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('ignores queued debounced search after clearing without duplicate reloads', async () => {
+    const wrapper = await mountView(false, true)
+    vi.useFakeTimers()
+    try {
+      await wrapper.findComponent(SearchInput).get('input').setValue('stale word')
+      listKeys.mockClear()
+      await wrapper.get('[data-testid="keys-clear-filters"]').trigger('click')
+      await flushPromises()
+      expect(listKeys).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(350)
+      await flushPromises()
+      expect(listKeys).toHaveBeenCalledTimes(1)
+      expect(listKeys.mock.calls[0][2].search).toBeUndefined()
+      // Returning to an empty input can also leave an empty search queued.
+      await wrapper.findComponent(SearchInput).get('input').setValue('new word')
+      await wrapper.findComponent(SearchInput).get('input').setValue('')
+      await wrapper.findAllComponents({ name: 'Select' })[1].vm.$emit('update:modelValue', 'active')
+      await flushPromises()
+      listKeys.mockClear()
+      await wrapper.get('[data-testid="keys-clear-filters"]').trigger('click')
+      await vi.advanceTimersByTimeAsync(350)
+      await flushPromises()
+      expect(listKeys).toHaveBeenCalledTimes(1)
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('resets a pending search to page one even if pagination loads it before debounce finishes', async () => {
+    listKeys.mockImplementation((page: number, _pageSize: number, filters: { search?: string }) =>
+      Promise.resolve({
+        items: filters.search && page > 1 ? [] : [createApiKey()],
+        total: filters.search ? 1 : 60,
+        page,
+        page_size: 20,
+        pages: filters.search ? 1 : 3,
+      }))
+    const wrapper = await mountView(false, true)
+    vi.useFakeTimers()
+    try {
+      await wrapper.findComponent(SearchInput).get('input').setValue('target')
+      await wrapper.findComponent({ name: 'Pagination' }).vm.$emit('update:page', 3)
+      await flushPromises()
+      expect(listKeys.mock.lastCall?.[0]).toBe(3)
+      await vi.advanceTimersByTimeAsync(350)
+      await flushPromises()
+      expect(listKeys.mock.lastCall?.[0]).toBe(1)
+      expect(listKeys.mock.lastCall?.[2].search).toBe('target')
+      expect(wrapper.findComponent({ name: 'Pagination' }).props('page')).toBe(1)
+      expect(wrapper.findComponent({ name: 'DataTable' }).props('data')).toHaveLength(1)
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps named icon tools and the key count in the workspace heading', async () => {
     const wrapper = await mountView()
     expect(wrapper.get('h1').text()).toContain('API Keys')
@@ -351,7 +438,54 @@ describe('user KeysView column settings', () => {
     await wrapper.get('#key-form').trigger('submit')
     await flushPromises()
     expect(createKey).toHaveBeenCalledWith('Provider key', 3, undefined, [], [], 0, undefined,
-      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit')
+      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }, undefined, 'inherit', undefined, undefined)
+    wrapper.unmount()
+  })
+
+  it('creates a key with the selected half-hour expiration without rounding to days', async () => {
+    getAvailableGroups.mockResolvedValue([{ id: 1, name: 'Claude', platform: 'anthropic' }])
+    const wrapper = await mountView()
+    await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+    await wrapper.get('[data-tour="key-form-name"]').setValue('Short lived')
+    wrapper.getComponent('[data-tour="key-form-group"]').vm.$emit('update:modelValue', 1)
+    await wrapper.get('[data-testid="key-expiration-toggle"]').trigger('click')
+    const expiry = new Date(Date.now() + 30 * 60 * 1000)
+    expiry.setSeconds(0, 0)
+    const localDate = `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, '0')}-${String(expiry.getDate()).padStart(2, '0')}T${String(expiry.getHours()).padStart(2, '0')}:${String(expiry.getMinutes()).padStart(2, '0')}`
+    await wrapper.get('input[type="datetime-local"]').setValue(localDate)
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+    expect(createKey).toHaveBeenCalledTimes(1)
+    expect(createKey.mock.calls[0][6]).toBeUndefined()
+    expect(createKey.mock.calls[0][11]).toBe(expiry.toISOString())
+    expect(updateKey).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it.each(['2000-01-01T00:00', ''])('rejects a past or missing create expiration (%s)', async (date) => {
+    getAvailableGroups.mockResolvedValue([{ id: 1, name: 'Claude', platform: 'anthropic' }])
+    const wrapper = await mountView()
+    await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+    wrapper.getComponent('[data-tour="key-form-group"]').vm.$emit('update:modelValue', 1)
+    await wrapper.get('[data-testid="key-expiration-toggle"]').trigger('click')
+    await wrapper.get('input[type="datetime-local"]').setValue(date)
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+    expect(createKey).not.toHaveBeenCalled()
+    expect(showError).toHaveBeenCalledWith('Choose a valid future expiration time.')
+    wrapper.unmount()
+  })
+
+  it.each([false, true])('preserves existing expired-key update semantics (clear=%s)', async (clear) => {
+    const key = { ...createApiKey(), group_id: 1, expires_at: '2000-01-01T00:00:00Z' }
+    listKeys.mockResolvedValue({ items: [key], total: 1 })
+    const wrapper = await mountView()
+    await getButtonByText(wrapper, 'common.edit').trigger('click')
+    if (clear) await wrapper.get('[data-testid="key-expiration-toggle"]').trigger('click')
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+    expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({ expires_at: clear ? '' : key.expires_at.replace('Z', '.000Z') }))
+    expect(showError).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 

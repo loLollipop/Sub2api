@@ -56,3 +56,22 @@ func TestIsUpstreamWAFBody(t *testing.T) {
 	require.False(t, IsUpstreamWAFBody([]byte(`{"error":{"message":"invalid api key"}}`)))
 	require.False(t, IsUpstreamWAFBody([]byte(`{"error":{"message":"invalid api key"},"prompt":"just a moment"}`)))
 }
+
+func TestIsUpstreamWAFBodyStructuredSignalsStayInErrorEnvelope(t *testing.T) {
+	for _, body := range []string{
+		`{"cloudflare_error":true,"error_code":1010}`,
+		`{"error":{"cloudflare_error":true,"code":"1010"}}`,
+		`{"response":{"error":{"error_name":"browser_signature_banned"}}}`,
+	} {
+		require.True(t, IsUpstreamWAFBody([]byte(body)), body)
+	}
+	for _, body := range []string{
+		`{"error":{"message":"invalid api key"},"request":{"error_name":"browser_signature_banned"}}`,
+		`{"error":{"message":"invalid api key","request":{"cloudflare_error":true,"code":1010}}}`,
+		`{"error":{"code":1010,"message":"invalid api key"}}`,
+		`{"cloudflare_error":false,"error_code":1010}`,
+		`{"cloudflare_error":true,"error_code":1010.5}`,
+	} {
+		require.False(t, IsUpstreamWAFBody([]byte(body)), body)
+	}
+}

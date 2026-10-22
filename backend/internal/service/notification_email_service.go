@@ -23,17 +23,14 @@ const (
 	NotificationEmailEventAuthVerifyCode              = "auth.verify_code"
 	NotificationEmailEventAuthPasswordReset           = "auth.password_reset"
 	NotificationEmailEventNotificationEmailVerifyCode = "notification_email.verify_code"
-	NotificationEmailEventSubscriptionPurchaseSuccess = "subscription.purchase_success"
 	NotificationEmailEventSubscriptionExpiryReminder  = "subscription.expiry_reminder"
 	NotificationEmailEventBalanceLow                  = "balance.low"
-	NotificationEmailEventBalanceRechargeSuccess      = "balance.recharge_success"
 	NotificationEmailEventAccountQuotaAlert           = "account.quota_alert"
 	NotificationEmailEventContentModerationViolation  = "content_moderation.violation_notice"
 	NotificationEmailEventContentModerationDisabled   = "content_moderation.account_disabled"
 	NotificationEmailEventCyberPolicyNotice           = "content_moderation.cyber_policy_notice"
 	NotificationEmailEventOpsAlert                    = "ops.alert"
 	NotificationEmailEventOpsScheduledReport          = "ops.scheduled_report"
-	NotificationEmailEventTicketReply                 = "ticket.reply"
 
 	notificationEmailTemplateKeyPrefix    = "notification_email_template:"
 	notificationEmailPreferenceKeyPrefix  = "notification_email_preference:"
@@ -395,11 +392,6 @@ func (s *NotificationEmailService) PreviewTemplate(ctx context.Context, input No
 		variables[key] = value
 	}
 	var rawHTML map[string]string
-	if normalizedEvent == NotificationEmailEventTicketReply {
-		if _, customConversation := input.Variables["conversation_html"]; !customConversation {
-			rawHTML = map[string]string{"conversation_html": ticketEmailPreviewConversation(normalizedLocale == notificationEmailLocaleChinese)}
-		}
-	}
 	return renderNotificationEmail(normalizedEvent, subject, htmlBody, variables, rawHTML)
 }
 
@@ -557,12 +549,6 @@ func (s *NotificationEmailService) sampleVariables(ctx context.Context, event, l
 
 func (s *NotificationEmailService) runtimeVariables(ctx context.Context, event, locale string, input NotificationEmailSendInput) map[string]string {
 	variables := s.sampleVariables(ctx, event, locale)
-	if event == NotificationEmailEventTicketReply {
-		for _, key := range []string{"ticket_id", "ticket_subject", "ticket_url", "conversation_html"} {
-			variables[key] = ""
-		}
-		variables["ticket_link_display"] = "none"
-	}
 	for key, value := range input.Variables {
 		variables[key] = value
 	}
@@ -801,8 +787,7 @@ func renderNotificationEmailString(event, raw string, variables map[string]strin
 }
 
 func notificationEmailRawHTMLAllowed(event, placeholder string) bool {
-	return (event == NotificationEmailEventOpsScheduledReport && placeholder == "report_html") ||
-		(event == NotificationEmailEventTicketReply && placeholder == "conversation_html")
+	return event == NotificationEmailEventOpsScheduledReport && placeholder == "report_html"
 }
 
 func notificationEmailAllowedPlaceholderSet(event string) map[string]struct{} {
@@ -936,7 +921,6 @@ func isSafeNotificationEmailURL(raw string) bool {
 func notificationEmailSampleVariables(locale string) map[string]string {
 	if normalizeNotificationLocale(locale) == notificationEmailLocaleChinese {
 		variables := map[string]string{
-			"ticket_id": "1024", "ticket_subject": "API 请求问题", "ticket_url": "https://example.com/tickets/1024", "ticket_link_display": "table", "conversation_html": "用户与客服的完整对话记录",
 			"site_name":           defaultSiteName,
 			"recipient_name":      "张三",
 			"recipient_email":     "user@example.com",
@@ -985,7 +969,6 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 		return variables
 	}
 	variables := map[string]string{
-		"ticket_id": "1024", "ticket_subject": "Help with an API request", "ticket_url": "https://example.com/tickets/1024", "ticket_link_display": "table", "conversation_html": "Complete conversation between you and support",
 		"site_name":           defaultSiteName,
 		"recipient_name":      "Alex",
 		"recipient_email":     "user@example.com",
@@ -1061,14 +1044,11 @@ func addNotificationEmailOpsSummarySampleVariables(variables map[string]string) 
 }
 
 var notificationEmailEventOrder = []string{
-	NotificationEmailEventTicketReply,
 	NotificationEmailEventAuthVerifyCode,
 	NotificationEmailEventAuthPasswordReset,
 	NotificationEmailEventNotificationEmailVerifyCode,
-	NotificationEmailEventSubscriptionPurchaseSuccess,
 	NotificationEmailEventSubscriptionExpiryReminder,
 	NotificationEmailEventBalanceLow,
-	NotificationEmailEventBalanceRechargeSuccess,
 	NotificationEmailEventAccountQuotaAlert,
 	NotificationEmailEventContentModerationViolation,
 	NotificationEmailEventContentModerationDisabled,
@@ -1078,14 +1058,6 @@ var notificationEmailEventOrder = []string{
 }
 
 var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
-	NotificationEmailEventTicketReply: {
-		Event:        NotificationEmailEventTicketReply,
-		Label:        "工单回复通知",
-		Description:  "客服回复后通知工单所属用户，包含截至本次回复的完整对话记录。",
-		Category:     "support",
-		Optional:     false,
-		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "ticket_id", "ticket_subject", "ticket_url", "ticket_link_display", "conversation_html"),
-	},
 	NotificationEmailEventAuthVerifyCode: {
 		Event:        NotificationEmailEventAuthVerifyCode,
 		Label:        "Email verification code",
@@ -1110,14 +1082,6 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Optional:     false,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "verification_code", "expires_in_minutes"),
 	},
-	NotificationEmailEventSubscriptionPurchaseSuccess: {
-		Event:        NotificationEmailEventSubscriptionPurchaseSuccess,
-		Label:        "Subscription purchase success",
-		Description:  "Sent after a subscription purchase is fulfilled.",
-		Category:     "subscription",
-		Optional:     false,
-		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "subscription_group", "subscription_days", "expiry_time", "order_id"),
-	},
 	NotificationEmailEventSubscriptionExpiryReminder: {
 		Event:        NotificationEmailEventSubscriptionExpiryReminder,
 		Label:        "Subscription expiry reminder",
@@ -1133,14 +1097,6 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Category:     "billing",
 		Optional:     true,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "current_balance", "threshold", "recharge_url", "unsubscribe_url"),
-	},
-	NotificationEmailEventBalanceRechargeSuccess: {
-		Event:        NotificationEmailEventBalanceRechargeSuccess,
-		Label:        "Balance recharge success",
-		Description:  "Sent after a balance recharge order is fulfilled.",
-		Category:     "billing",
-		Optional:     false,
-		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "recharge_amount", "current_balance", "order_id"),
 	},
 	NotificationEmailEventAccountQuotaAlert: {
 		Event:       NotificationEmailEventAccountQuotaAlert,
@@ -1204,10 +1160,6 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 }
 
 var notificationEmailOfficialTemplates = map[string]map[string]notificationEmailOfficialTemplate{
-	NotificationEmailEventTicketReply: {
-		notificationEmailDefaultLocale: {Subject: "[{{site_name}}] New reply to ticket #{{ticket_id}} · {{ticket_subject}}", HTML: ticketReplyEmailTemplate(false)},
-		notificationEmailLocaleChinese: {Subject: "[{{site_name}}] 您的工单已有新的回复 · #{{ticket_id}} {{ticket_subject}}", HTML: ticketReplyEmailTemplate(true)},
-	},
 	NotificationEmailEventAuthVerifyCode: {
 		notificationEmailDefaultLocale: {
 			Subject: "[{{site_name}}] Email verification code",
@@ -1271,24 +1223,6 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p>如果不是您本人操作，请忽略此邮件。</p>`),
 		},
 	},
-	NotificationEmailEventSubscriptionPurchaseSuccess: {
-		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Subscription purchase successful",
-			HTML: notificationEmailCard("#2563eb", "Subscription activated", `
-<p>Hello {{recipient_name}},</p>
-<p>Your subscription for <strong>{{subscription_group}}</strong> has been activated for <strong>{{subscription_days}}</strong> days.</p>
-<p>Expiry time: <strong>{{expiry_time}}</strong></p>
-<p>Order ID: {{order_id}}</p>`),
-		},
-		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 订阅购买成功",
-			HTML: notificationEmailCard("#2563eb", "订阅已开通", `
-<p>{{recipient_name}}，您好：</p>
-<p>您的 <strong>{{subscription_group}}</strong> 订阅已成功开通，有效期 <strong>{{subscription_days}}</strong> 天。</p>
-<p>到期时间：<strong>{{expiry_time}}</strong></p>
-<p>订单号：{{order_id}}</p>`),
-		},
-	},
 	NotificationEmailEventSubscriptionExpiryReminder: {
 		notificationEmailDefaultLocale: {
 			Subject: "[{{site_name}}] Subscription expires in {{days_remaining}} day(s)",
@@ -1325,24 +1259,6 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p>请及时充值以免服务中断。</p>
 <p><a class="button" href="{{recharge_url}}">立即充值</a></p>
 <p class="muted"><a href="{{unsubscribe_url}}">退订此类余额提醒</a></p>`),
-		},
-	},
-	NotificationEmailEventBalanceRechargeSuccess: {
-		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Balance recharge successful",
-			HTML: notificationEmailCard("#16a34a", "Recharge successful", `
-<p>Hello {{recipient_name}},</p>
-<p>Your balance recharge of <strong>${{recharge_amount}}</strong> has been completed.</p>
-<p>Current balance: <strong>${{current_balance}}</strong></p>
-<p>Order ID: {{order_id}}</p>`),
-		},
-		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 余额充值成功",
-			HTML: notificationEmailCard("#16a34a", "余额充值成功", `
-<p>{{recipient_name}}，您好：</p>
-<p>您的余额充值 <strong>${{recharge_amount}}</strong> 已完成。</p>
-<p>当前余额：<strong>${{current_balance}}</strong></p>
-			<p>订单号：{{order_id}}</p>`),
 		},
 	},
 	NotificationEmailEventAccountQuotaAlert: {

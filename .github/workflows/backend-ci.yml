@@ -91,6 +91,9 @@ jobs:
         # Legacy compatibility cases mutate Gin's global mode. Serialize test
         # cases while retaining race detection for each case's goroutines.
         run: go test -race -p 1 -parallel 1 -tags=unit ./internal/service ./internal/handler ./internal/config -run 'Test(V226|.*Cyber|ExtractContentModerationLastUserTurn|OpenAIForwardMayFailover|ForwardAsAnthropic|OpenAIStream|OpenAICompactSSEKeepalive|ContentModeration)' -count=1
+      - name: Upstream security and compatibility concurrency regression
+        working-directory: backend
+        run: go test -race -p 1 -parallel 1 -tags=unit ./internal/service ./internal/handler ./internal/handler/admin ./internal/repository ./internal/server/middleware ./internal/integration -run 'Test(.*Totp|.*TOTP|AdminService_UpdateUser_Demotion|AnthropicCompat|ForwardAsCompat|HandleCCStreamingFromAnthropic|HandleResponsesStreamingResponse|GatewayHandlers_.*(Image|Gemini)|GeminiImage|GeminiForward.*Image|GeminiCompatForward.*Image|AntigravityForwards_Image|ImageResultUploader|UpstreamAffinityLocalImage|.*ModelRateLimit.*Snapshot)' -count=1
 
   frontend:
     runs-on: ubuntu-latest

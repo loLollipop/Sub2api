@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, nextTick } from 'vue'
+import { onMounted, onUnmounted, nextTick, toValue, type MaybeRefOrGetter } from 'vue'
 import { driver, type Driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { useAuthStore as useUserStore } from '@/stores/auth'
@@ -8,7 +8,7 @@ import { getAdminSteps, getUserSteps } from '@/components/Guide/steps'
 
 export interface OnboardingOptions {
   storageKey?: string
-  autoStart?: boolean
+  autoStart?: MaybeRefOrGetter<boolean>
 }
 
 export function useOnboardingTour(options: OnboardingOptions) {
@@ -56,6 +56,15 @@ export function useOnboardingTour(options: OnboardingOptions) {
   } | null = null
   let autoStartTimer: ReturnType<typeof setTimeout> | null = null
   let globalKeyboardHandler: ((e: KeyboardEvent) => void) | null = null
+  let unmounted = false
+  let startRequest = 0
+
+  const cancelAutoStart = () => {
+    if (autoStartTimer) {
+      clearTimeout(autoStartTimer)
+      autoStartTimer = null
+    }
+  }
 
   const getStorageKey = () => {
     const baseKey = options.storageKey ?? 'onboarding_tour'
@@ -92,6 +101,8 @@ export function useOnboardingTour(options: OnboardingOptions) {
   }
 
   const startTour = async (startIndex = 0) => {
+    cancelAutoStart()
+    const request = ++startRequest
     // 动态获取当前用户角色和步骤
     const isAdmin = userStore.user?.role === 'admin'
     const isSimpleMode = userStore.isSimpleMode
@@ -99,12 +110,14 @@ export function useOnboardingTour(options: OnboardingOptions) {
 
     // 确保 DOM 就绪
     await nextTick()
+    if (unmounted || request !== startRequest) return
 
     // 如果指定了起始步骤，确保元素可见
     const currentStep = steps[startIndex]
     if (currentStep?.element && typeof currentStep.element === 'string') {
       await ensureElement(currentStep.element, TIMING.ELEMENT_TIMEOUT_MS)
     }
+    if (unmounted || request !== startRequest) return
 
     if (driverInstance) {
       driverInstance.destroy()
@@ -542,17 +555,16 @@ export function useOnboardingTour(options: OnboardingOptions) {
       return
     }
 
-    if (!options.autoStart || hasSeen()) return
+    if (!toValue(options.autoStart) || hasSeen()) return
     autoStartTimer = setTimeout(() => {
-      void startTour()
+      autoStartTimer = null
+      if (toValue(options.autoStart)) void startTour()
     }, TIMING.AUTO_START_DELAY_MS)
   })
 
   onUnmounted(() => {
-    if (autoStartTimer) {
-      clearTimeout(autoStartTimer)
-      autoStartTimer = null
-    }
+    unmounted = true
+    cancelAutoStart()
     // 关键修复：不再此处清理 globalKeyboardHandler，交由 driver.onDestroyed 管理
     onboardingStore.clearControlMethods()
   })

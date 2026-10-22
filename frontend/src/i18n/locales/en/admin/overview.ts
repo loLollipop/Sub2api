@@ -389,6 +389,21 @@ export default {
     },
 
     affiliates: {
+      orderStatus: {
+      pending: 'Pending',
+      paid: 'Paid',
+      recharging: 'Recharging',
+      completed: 'Completed',
+      expired: 'Expired',
+      cancelled: 'Cancelled',
+      failed: 'Failed',
+      refund_requested: 'Refund Requested',
+      refunding: 'Refunding',
+      refund_pending: 'Refund Pending',
+      refunded: 'Refunded',
+      partially_refunded: 'Partially Refunded',
+      refund_failed: 'Refund Failed',
+    },
       invitesDescription: 'View site-wide inviter and invitee relationships',
       rebatesDescription: 'View recharge orders that generated affiliate rebates',
       transfersDescription: 'View affiliate quota transfers into account balance',

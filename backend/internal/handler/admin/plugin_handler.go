@@ -228,6 +228,15 @@ func (h *PluginHandler) ServeUIAsset(c *gin.Context) {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
+	if strings.HasPrefix(contentType, "text/html") {
+		data = injectPluginUIBridge(data)
+	} else if strings.HasPrefix(contentType, "application/xhtml+xml") {
+		data, err = injectPluginXHTMLBridge(data)
+		if err != nil {
+			c.Status(http.StatusUnprocessableEntity)
+			return
+		}
+	}
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("Referrer-Policy", "no-referrer")
 	c.Header("X-Content-Type-Options", "nosniff")

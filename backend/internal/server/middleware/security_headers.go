@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
-	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -38,16 +37,6 @@ const (
 	TencentCaptchaRceDomain = "https://rce.tencentrio.com"
 	// TencentCaptchaWorkerSource 是天御国际站创建验证码 Web Worker 时使用的来源。
 	TencentCaptchaWorkerSource = "blob:"
-	// StripeDomain is the domain for Stripe.js SDK
-	StripeDomain = "https://*.stripe.com"
-	// AirwallexStaticDomain 是 Airwallex 生产环境 SDK 脚本域名。
-	AirwallexStaticDomain = "https://static.airwallex.com"
-	// AirwallexCheckoutDomain 是 Airwallex 生产环境收银台元素和 iframe 域名。
-	AirwallexCheckoutDomain = "https://checkout.airwallex.com"
-	// AirwallexDemoStaticDomain 是 Airwallex 沙箱环境 SDK 脚本域名。
-	AirwallexDemoStaticDomain = "https://static-demo.airwallex.com"
-	// AirwallexDemoCheckoutDomain 是 Airwallex 沙箱环境收银台元素和 iframe 域名。
-	AirwallexDemoCheckoutDomain = "https://checkout-demo.airwallex.com"
 )
 
 var requiredCSPDirectiveValues = []struct {
@@ -72,18 +61,6 @@ var requiredCSPDirectiveValues = []struct {
 	{"frame-src", TencentCaptchaGlobalDomain},
 	{"frame-src", TencentCaptchaPrehandleDomain},
 	{"worker-src", TencentCaptchaWorkerSource},
-	{"script-src", StripeDomain},
-	{"frame-src", StripeDomain},
-	{"script-src", AirwallexStaticDomain},
-	{"script-src", AirwallexCheckoutDomain},
-	{"style-src", AirwallexStaticDomain},
-	{"style-src", AirwallexCheckoutDomain},
-	{"frame-src", AirwallexCheckoutDomain},
-	{"script-src", AirwallexDemoStaticDomain},
-	{"script-src", AirwallexDemoCheckoutDomain},
-	{"style-src", AirwallexDemoStaticDomain},
-	{"style-src", AirwallexDemoCheckoutDomain},
-	{"frame-src", AirwallexDemoCheckoutDomain},
 }
 
 // GenerateNonce generates a cryptographically secure random nonce.
@@ -130,12 +107,7 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		if isSameOriginEmbedPath(c) {
-			// 无限画布页用同源 iframe 嵌 /canvas；XFO/CSP 必须在被嵌目标上放开。
-			c.Header("X-Frame-Options", "SAMEORIGIN")
-		} else {
-			c.Header("X-Frame-Options", "DENY")
-		}
+		c.Header("X-Frame-Options", "DENY")
 		if isAPIRoutePath(c) {
 			c.Next()
 			return
@@ -153,37 +125,9 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 				c.Set(CSPNonceKey, nonce)
 				csp = strings.ReplaceAll(finalPolicy, NonceTemplate, "'nonce-"+nonce+"'")
 			}
-			if isSameOriginEmbedPath(c) {
-				csp = rewriteCSPFrameAncestors(csp, "'self'")
-			}
 			c.Header("Content-Security-Policy", csp)
 		}
 		c.Next()
-	}
-}
-
-func isSameOriginEmbedPath(c *gin.Context) bool {
-	if c == nil || c.Request == nil || c.Request.URL == nil {
-		return false
-	}
-	path := c.Request.URL.Path
-	return path == "/canvas" || strings.HasPrefix(path, "/canvas/")
-}
-
-// AllowSameOriginEmbedHeaders lets the same origin iframe this response.
-// Other pages keep DENY / frame-ancestors 'none'; only rewrite existing CSP.
-func AllowSameOriginEmbedHeaders(header http.Header) {
-	if header == nil {
-		return
-	}
-	header.Set("X-Frame-Options", "SAMEORIGIN")
-	values := header.Values("Content-Security-Policy")
-	if len(values) == 0 {
-		return
-	}
-	header.Del("Content-Security-Policy")
-	for _, csp := range values {
-		header.Add("Content-Security-Policy", rewriteCSPFrameAncestors(csp, "'self'"))
 	}
 }
 

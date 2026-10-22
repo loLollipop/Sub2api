@@ -17,8 +17,12 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({ locale: { value: 'zh' } }) }))
 
 const reload = vi.fn()
 
-const mountSwitcher = () =>
-  mount(LocaleSwitcher, { global: { stubs: { Icon: true, transition: false } } })
+const wrappers: ReturnType<typeof mount>[] = []
+const mountSwitcher = (compact = false) => {
+  const wrapper = mount(LocaleSwitcher, { props: { compact }, attachTo: document.body, global: { stubs: { Icon: true, transition: false } } })
+  wrappers.push(wrapper)
+  return wrapper
+}
 
 const choose = async (wrapper: ReturnType<typeof mountSwitcher>, name: string) => {
   await wrapper.get('button').trigger('click')
@@ -35,6 +39,7 @@ describe('LocaleSwitcher', () => {
   })
 
   afterEach(() => {
+    wrappers.splice(0).forEach(wrapper => wrapper.unmount())
     vi.unstubAllGlobals()
   })
 
@@ -56,5 +61,39 @@ describe('LocaleSwitcher', () => {
 
     expect(setLocale).not.toHaveBeenCalled()
     expect(reload).not.toHaveBeenCalled()
+  })
+
+  it('opens the compact header control with the keyboard and restores focus on Escape', async () => {
+    const wrapper = mountSwitcher(true)
+    const trigger = wrapper.get<HTMLButtonElement>('button')
+    expect(trigger.attributes('aria-label')).toBe('切换语言')
+    expect(trigger.find('svg').exists()).toBe(true)
+    expect(trigger.text()).toBe('')
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    await trigger.trigger('keydown', { key: 'ArrowDown' })
+    await flushPromises()
+    const options = wrapper.findAll('.locale-option')
+    expect(trigger.attributes('aria-controls')).toBe(wrapper.get('.locale-options').attributes('id'))
+    expect(document.activeElement).toBe(options[0].element)
+    expect(options[1].attributes('aria-pressed')).toBe('true')
+    await options[0].trigger('keydown', { key: 'End' })
+    expect(document.activeElement).toBe(options[1].element)
+    await options[1].trigger('keydown', { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(options[0].element)
+    await options[0].trigger('keydown', { key: 'Escape' })
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(trigger.element)
+  })
+
+  it('dismisses the header options when clicking outside or tabbing away', async () => {
+    const wrapper = mountSwitcher(true)
+    const trigger = wrapper.get('button')
+    await trigger.trigger('click')
+    document.body.click()
+    await flushPromises()
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    await trigger.trigger('click')
+    await wrapper.trigger('focusout', { relatedTarget: document.body })
+    expect(trigger.attributes('aria-expanded')).toBe('false')
   })
 })

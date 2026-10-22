@@ -1,5 +1,7 @@
 export default {
   common: {
+    oneMonth: '1 Month',
+    oneYear: '1 Year',
     loading: 'Loading...',
     submitting: 'Submitting...',
     justNow: 'just now',
@@ -38,6 +40,7 @@ export default {
     all: 'All',
     none: 'None',
     selectAll: 'Select all',
+    select: 'Select',
     noData: 'No data',
     expand: 'Expand',
     collapse: 'Collapse',
@@ -170,7 +173,6 @@ export default {
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
-    infiniteCanvas: 'Infinite Canvas',
     batchImage: 'Batch Images',
     usage: 'Usage',
     redeem: 'Redeem',
@@ -203,11 +205,6 @@ export default {
     mySubscriptions: 'My Subscriptions',
     buySubscription: 'Recharge Center',
     docs: 'Docs',
-    myOrders: 'My Orders',
-    orderManagement: 'Orders',
-    paymentDashboard: 'Payment Dashboard',
-    paymentConfig: 'Payment Config',
-    paymentPlans: 'Plans',
     channelManagement: 'Channels',
     channelPricing: 'Channel Pricing',
     channelMonitor: 'Channel Monitor',
@@ -241,6 +238,8 @@ export default {
     emailLabel: 'Email',
     emailPlaceholder: 'Enter your email',
     passwordLabel: 'Password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     passwordPlaceholder: 'Enter your password',
     createPasswordPlaceholder: 'Create a strong password',
     passwordHint: 'At least 6 characters',
@@ -405,13 +404,6 @@ export default {
     oauthCallbackPageTitle: 'OAuth Callback',
     wechatProviderName: 'WeChat',
     wechatCallbackPageTitle: 'WeChat Sign-In Callback',
-    wechatPaymentCallbackPageTitle: 'WeChat Payment Callback',
-    wechatPayment: {
-      callbackTitle: 'Resuming WeChat payment',
-      callbackProcessing: 'Resuming WeChat payment...',
-      backToPayment: 'Back to payment',
-      callbackMissingResumeToken: 'The WeChat payment callback is missing the resume token.'
-    },
     oauth: {
       callbackTitle: 'OAuth Callback',
       callbackHint: 'Copy the code and state back to the admin authorization flow when needed.',

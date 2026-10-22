@@ -20,7 +20,7 @@
           >
             <Icon :name="isDark ? 'sun' : 'moon'" size="md" aria-hidden="true" />
           </button>
-          <AccountMenu v-if="isAuthenticated" :show-balance="false" :show-onboarding="false" data-testid="home-account-menu" />
+          <AccountMenu v-if="isAuthenticated" :show-onboarding="false" data-testid="home-account-menu" />
           <router-link v-else to="/login" class="landing-login" data-testid="home-account-entry">
             <span>{{ t('home.login') }}</span>
             <Icon name="arrowUpRight" size="sm" aria-hidden="true" />
@@ -154,7 +154,7 @@ const features = [
 .landing-header { position: relative; z-index: 10; }
 .landing-nav { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 24px; }
 .landing-brand { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.035em; }
-.landing-brand img { flex-shrink: 0; border-radius: 8px; object-fit: contain; }
+.landing-brand img { flex-shrink: 0; border-radius: 50%; object-fit: contain; }
 .landing-brand span { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .landing-nav__links { display: flex; align-items: center; gap: 27px; color: var(--home-muted); font-size: 13px; }
 .landing-nav__links a { display: inline-flex; align-items: center; min-height: 40px; }

@@ -1,5 +1,5 @@
 <template>
-  <div :class="props.embedded ? 'space-y-4' : 'card overflow-hidden'">
+  <div :class="[props.embedded ? 'space-y-4' : 'card overflow-hidden', { 'profile-bindings-list': props.compact }]">
     <div
       v-if="!props.embedded"
       class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
@@ -13,10 +13,10 @@
     </div>
 
     <div :class="props.embedded ? 'space-y-4' : 'divide-y divide-gray-100 dark:divide-dark-700'">
-      <div v-if="props.embedded">
-        <p class="text-sm font-semibold text-gray-900 dark:text-white">
+      <div v-if="props.embedded" class="profile-section-heading">
+        <h2 class="text-sm font-semibold text-gray-900 dark:text-white">
           {{ t('profile.authBindings.title') }}
-        </p>
+        </h2>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {{ t('profile.authBindings.description') }}
         </p>
@@ -25,13 +25,13 @@
       <div
         v-for="item in providerItems"
         :key="item.provider"
-        :class="rowClass"
+        :class="[rowClass, { 'profile-binding-row': props.compact }]"
       >
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="profile-binding-layout flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div class="flex min-w-0 flex-1 items-start gap-4">
             <div
               :class="providerIconClass(item.provider)"
-              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold"
+              class="profile-binding-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold"
             >
               <Icon
                 v-if="item.provider === 'email'"
@@ -90,7 +90,7 @@
               <div
                 v-if="item.provider === 'email' && showEmailForm"
                 data-testid="profile-binding-email-form"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1.4fr)_auto]"
+                class="profile-email-form grid gap-2 sm:grid-cols-[minmax(0,1.4fr)_auto]"
               >
                 <input
                   v-model.trim="emailBindingForm.email"
@@ -169,7 +169,7 @@
               v-if="item.canBind"
               :data-testid="`profile-binding-${item.provider}-action`"
               type="button"
-              class="btn btn-primary btn-sm"
+              :class="['btn btn-sm', compact ? 'btn-secondary' : 'btn-primary']"
               @click="startBinding(item.provider)"
             >
               {{ t('profile.authBindings.bindAction', { providerName: item.label }) }}
@@ -294,7 +294,7 @@ const compact = computed(() => props.compact)
 const rowClass = computed(() =>
   props.embedded
     ? compact.value
-      ? 'rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-900/40'
+      ? 'py-4'
       : 'rounded-2xl border border-gray-100 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-900/30'
     : 'px-6 py-5'
 )

@@ -85,6 +85,7 @@
           <template #header-select>
             <input
               type="checkbox"
+              :aria-label="t('common.selectAll')"
               class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               :checked="allVisibleSelected"
               :indeterminate="someVisibleSelected"
@@ -95,6 +96,7 @@
           <template #cell-select="{ row }">
             <input
               type="checkbox"
+              :aria-label="`${t('common.select')}: ${row.task_name || row.id}`"
               class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               :checked="selectedJobIds.has(row.id)"
               @change="toggleJobSelection(row.id, ($event.target as HTMLInputElement).checked)"
@@ -207,7 +209,11 @@
                   class="batch-row-action flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:hover:bg-dark-700 dark:hover:text-white"
                   :class="{ 'bg-gray-100 text-gray-900 dark:bg-dark-700 dark:text-white': openMoreJobId === row.id }"
                   :title="t('batchImage.actions.moreActions')"
+                  aria-haspopup="menu"
+                  :aria-expanded="openMoreJobId === row.id"
+                  :aria-controls="openMoreJobId === row.id ? 'batch-job-actions-menu' : undefined"
                   @click.stop="toggleMoreMenu(row, $event)"
+                  @keydown.down.prevent.stop="toggleMoreMenu(row, $event)"
                 >
                   <Icon name="more" size="sm" />
                   <span class="text-xs">{{ t('common.more') }}</span>
@@ -281,15 +287,21 @@
     <Teleport to="body">
       <div
         v-if="openMoreJobId"
+        id="batch-job-actions-menu"
+        ref="moreMenuRef"
+        role="menu"
+        :aria-label="t('batchImage.actions.moreActions')"
         class="fixed z-[9999] w-44 overflow-hidden rounded-xl bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10"
         :style="moreMenuStyle"
         @click.stop
+        @keydown="handleMoreMenuKeydown"
       >
         <template v-for="job in batchJobs" :key="job.id">
           <template v-if="job.id === openMoreJobId">
             <button
               v-if="canRetry(job)"
               type="button"
+              role="menuitem"
               class="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-60 dark:text-gray-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
               :disabled="retryingBatchId === job.id"
               @click="retryFailedJob(job)"
@@ -300,6 +312,7 @@
             <button
               v-if="canDeleteRecord(job)"
               type="button"
+              role="menuitem"
               class="flex w-full items-center gap-2 px-3 py-2 text-left text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-900/20"
               :disabled="deletingBatchId === job.id"
               @click="deleteJob(job)"
@@ -315,10 +328,17 @@
     <Teleport to="body">
       <div
         v-if="promptPopover.visible"
+        id="batch-prompt-popover"
+        ref="promptPopoverRef"
+        role="dialog"
+        :aria-label="t('batchImage.promptPopover.title')"
         class="batch-prompt-popover fixed z-[9999] rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-800 shadow-xl ring-1 ring-black/5 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-100 dark:ring-white/10"
         :style="promptPopover.style"
         @mouseenter="cancelPromptPopoverClose"
         @mouseleave="schedulePromptPopoverClose"
+        @focusin="cancelPromptPopoverClose"
+        @focusout="schedulePromptPopoverClose"
+        @keydown.esc.prevent.stop="dismissPromptPopover"
       >
         <div class="mb-2 flex items-center justify-between gap-3">
           <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('batchImage.promptPopover.title') }}</span>
@@ -415,6 +435,8 @@
                   <div
                     class="batch-prompt-trigger cursor-default truncate rounded px-1 text-sm leading-6 focus:outline-none"
                     tabindex="0"
+                    aria-haspopup="dialog"
+                    :aria-controls="promptPopover.visible ? 'batch-prompt-popover' : undefined"
                     @pointerenter="schedulePromptPopoverOpen($event, item.prompt_preview || '-')"
                     @pointerleave="schedulePromptPopoverClose"
                     @mouseenter="schedulePromptPopoverOpen($event, item.prompt_preview || '-')"
@@ -423,6 +445,8 @@
                     @focus="showPromptPopover($event, item.prompt_preview || '-')"
                     @focusin="showPromptPopover($event, item.prompt_preview || '-')"
                     @blur="schedulePromptPopoverClose"
+                    @keydown.down.prevent.stop="focusPromptPopover"
+                    @keydown.esc.prevent.stop="closePromptPopover"
                   >
                     {{ item.prompt_preview || '-' }}
                   </div>
@@ -541,8 +565,9 @@
       <form class="space-y-5" @submit.prevent="submitJob">
         <div class="grid gap-4 md:grid-cols-2">
           <div class="md:col-span-2">
-            <label class="input-label">{{ t('batchImage.create.taskName') }}</label>
+            <label for="batch-task-name" class="input-label">{{ t('batchImage.create.taskName') }}</label>
             <input
+              id="batch-task-name"
               v-model="form.taskName"
               type="text"
               maxlength="255"
@@ -552,8 +577,8 @@
           </div>
 
           <div class="md:col-span-2">
-            <label class="input-label">API Key</label>
-            <select v-model.number="form.apiKeyId" class="input" :disabled="loadingKeys">
+            <label for="batch-api-key" class="input-label">API Key</label>
+            <select id="batch-api-key" v-model.number="form.apiKeyId" class="input" :disabled="loadingKeys">
               <option :value="0">{{ loadingKeys ? t('batchImage.create.loadingKeys') : t('batchImage.create.selectKeyPlaceholder') }}</option>
               <option v-for="key in geminiApiKeys" :key="key.id" :value="key.id">
                 {{ key.name }} · {{ key.group?.name || 'Gemini' }}
@@ -565,8 +590,8 @@
           </div>
 
           <div>
-            <label class="input-label">{{ t('batchImage.create.model') }}</label>
-            <select v-model="form.model" class="input" :disabled="loadingModels || availableBatchImageModels.length === 0">
+            <label for="batch-model" class="input-label">{{ t('batchImage.create.model') }}</label>
+            <select id="batch-model" v-model="form.model" class="input" :disabled="loadingModels || availableBatchImageModels.length === 0">
               <option v-if="loadingModels" value="">{{ batchImageText('loadingModels') }}</option>
               <option v-else-if="availableBatchImageModels.length === 0" value="">{{ batchImageText('noModels') }}</option>
               <option v-for="model in availableBatchImageModels" :key="model.value" :value="model.value">
@@ -590,8 +615,8 @@
           </div>
 
           <div>
-            <label class="input-label">{{ t('batchImage.create.outputFormat') }}</label>
-            <select v-model="form.responseMimeType" class="input">
+            <label for="batch-output-format" class="input-label">{{ t('batchImage.create.outputFormat') }}</label>
+            <select id="batch-output-format" v-model="form.responseMimeType" class="input">
               <option value="image/png">PNG</option>
               <option value="image/jpeg">JPEG</option>
               <option value="image/webp">WebP</option>
@@ -608,11 +633,12 @@
 
         <div class="space-y-3">
           <div class="flex items-center justify-between gap-3">
-            <label class="input-label mb-0">Prompt</label>
+            <label for="batch-prompt-draft" class="input-label mb-0">Prompt</label>
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchImage.create.promptAdded', { count: promptRows.length }) }}</span>
           </div>
           <div class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
             <textarea
+              id="batch-prompt-draft"
               v-model="promptDraft"
               rows="3"
               class="h-[76px] w-full resize-y rounded-md border border-gray-300 px-3 py-2 text-sm leading-5 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-dark-600 dark:bg-dark-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/40"
@@ -621,6 +647,7 @@
             <div class="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_112px_132px_112px] md:items-center">
               <input
                 v-model="customIdDraft"
+                :aria-label="t('batchImage.create.customIdPlaceholder')"
                 type="text"
                 maxlength="255"
                 class="input h-9 text-sm"
@@ -752,7 +779,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -925,6 +952,9 @@ const availableBatchImageModels = ref<Array<{ value: string; label: string }>>([
 const modelLoadError = ref('')
 const openMoreJobId = ref('')
 const moreMenuStyle = ref<Record<string, string>>({})
+const moreMenuRef = ref<HTMLElement | null>(null)
+const promptPopoverRef = ref<HTMLElement | null>(null)
+let moreMenuTrigger: HTMLElement | null = null
 const promptPopover = reactive({
   visible: false,
   text: '',
@@ -1397,7 +1427,7 @@ function closeMoreMenu() {
   openMoreJobId.value = ''
 }
 
-function toggleMoreMenu(job: BatchImageJobRow, event: MouseEvent) {
+async function toggleMoreMenu(job: BatchImageJobRow, event: MouseEvent | KeyboardEvent) {
   if (openMoreJobId.value === job.id) {
     closeMoreMenu()
     return
@@ -1405,6 +1435,7 @@ function toggleMoreMenu(job: BatchImageJobRow, event: MouseEvent) {
   const trigger = event.currentTarget as HTMLElement | null
   const rect = trigger?.getBoundingClientRect()
   if (!rect) return
+  moreMenuTrigger = trigger
   const menuWidth = 176
   const margin = 8
   const left = Math.max(margin, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - margin))
@@ -1414,6 +1445,41 @@ function toggleMoreMenu(job: BatchImageJobRow, event: MouseEvent) {
     top: `${Math.max(margin, top)}px`,
   }
   openMoreJobId.value = job.id
+  await nextTick()
+  moreMenuRef.value?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
+}
+
+function handleMoreMenuKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' || event.key === 'Tab') {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    moreMenuTrigger?.focus({ preventScroll: true })
+    closeMoreMenu()
+    return
+  }
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  const items = Array.from(moreMenuRef.value?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || [])
+  if (!items.length) return
+  const current = items.indexOf(document.activeElement as HTMLButtonElement)
+  const index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 :
+    (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
+  items[index]?.focus({ preventScroll: true })
+}
+
+function focusPromptPopover() {
+  cancelPromptPopoverClose()
+  promptPopoverRef.value?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
+}
+
+function dismissPromptPopover() {
+  const trigger = activePromptPopoverTarget
+  closePromptPopover()
+  trigger?.focus({ preventScroll: true })
+  // Focusing a trigger opens its preview; Escape must leave it closed.
+  closePromptPopover()
 }
 
 function cancelPromptPopoverClose() {
@@ -1475,9 +1541,9 @@ function openPromptPopover(target: HTMLElement, value: string) {
   if (!rect) return
   const viewportWidth = window.innerWidth || 1280
   const viewportHeight = window.innerHeight || 720
-  const width = Math.min(440, Math.max(320, viewportWidth - 32))
+  const width = Math.min(440, Math.max(0, viewportWidth - 32))
   const left = Math.max(16, Math.min(rect.left, viewportWidth - width - 16))
-  const estimatedHeight = 178
+  const estimatedHeight = Math.min(252, viewportHeight - 32)
   const preferredTop = rect.bottom + 8
   const top = preferredTop + estimatedHeight > viewportHeight
     ? Math.max(16, rect.top - estimatedHeight - 8)
@@ -1489,11 +1555,25 @@ function openPromptPopover(target: HTMLElement, value: string) {
     width: `${width}px`,
   }
   promptPopover.visible = true
+  void nextTick(() => {
+    if (!promptPopover.visible || activePromptPopoverTarget !== target) return
+    const height = promptPopoverRef.value?.getBoundingClientRect().height
+    if (!height) return
+    const currentRect = target.getBoundingClientRect()
+    const below = currentRect.bottom + 8
+    const preferred = below + height <= viewportHeight - 16 ? below : currentRect.top - height - 8
+    promptPopover.style.top = `${Math.max(16, Math.min(preferred, viewportHeight - height - 16))}px`
+  })
 }
 
 function copyPromptPopover() {
   if (!promptPopover.text) return
   void copyToClipboard(promptPopover.text, t('batchImage.promptPopover.copied'))
+}
+
+function handlePromptViewportScroll(event: Event) {
+  if (event.target instanceof Node && promptPopoverRef.value?.contains(event.target)) return
+  closePromptPopover()
 }
 
 async function loadBatchJobs() {
@@ -2612,7 +2692,7 @@ onMounted(() => {
   window.addEventListener('resize', closeMoreMenu)
   window.addEventListener('scroll', closeMoreMenu, true)
   window.addEventListener('resize', closePromptPopover)
-  window.addEventListener('scroll', closePromptPopover, true)
+  window.addEventListener('scroll', handlePromptViewportScroll, true)
 })
 
 watch(
@@ -2647,7 +2727,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', closeMoreMenu)
   window.removeEventListener('scroll', closeMoreMenu, true)
   window.removeEventListener('resize', closePromptPopover)
-  window.removeEventListener('scroll', closePromptPopover, true)
+  window.removeEventListener('scroll', handlePromptViewportScroll, true)
 })
 </script>
 
@@ -2676,10 +2756,18 @@ onBeforeUnmount(() => {
 }
 
 .batch-prompt-popover {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
   user-select: text;
 }
 
+.batch-prompt-popover > div {
+  flex-shrink: 0;
+}
+
 .batch-prompt-popover p {
+  min-height: 0;
   scrollbar-width: thin;
 }
 

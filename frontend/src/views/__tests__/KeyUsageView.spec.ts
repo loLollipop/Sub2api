@@ -166,6 +166,20 @@ describe('KeyUsageView daily detail', () => {
     vi.unstubAllGlobals()
   })
 
+  it('updates the toggle after a system theme change and switches on the first click', async () => {
+    document.documentElement.classList.remove('dark')
+    localStorage.setItem('theme', 'system')
+    const wrapper = mount(KeyUsageView, {
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' }, LocaleSwitcher: true, Icon: true } },
+    })
+    document.documentElement.classList.add('dark')
+    await vi.waitFor(() => expect(wrapper.find('button[title="Light"]').exists()).toBe(true))
+    await wrapper.get('button[title="Light"]').trigger('click')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(localStorage.getItem('theme')).toBe('light')
+    wrapper.unmount()
+  })
+
   it('renders daily usage detail rows after a successful query', async () => {
     const wrapper = mount(KeyUsageView, {
       global: {

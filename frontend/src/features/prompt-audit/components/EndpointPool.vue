@@ -93,7 +93,7 @@
     </div>
 
     <BaseDialog :show="Boolean(editing)" :title="editingIndex < 0 ? t('admin.promptAudit.pool.add') : t('admin.promptAudit.pool.edit')" width="wide" @close="closeEditor">
-      <form v-if="editing" class="grid gap-4 sm:grid-cols-2" @submit.prevent="saveEditor">
+      <form v-if="editing" ref="editorForm" class="grid gap-4 sm:grid-cols-2" @submit.prevent="saveEditor">
         <label class="space-y-1 text-sm text-gray-700 dark:text-dark-200">
           <span>{{ t('admin.promptAudit.pool.name') }}</span>
           <input v-model="editing.name" class="input w-full" required :aria-label="t('admin.promptAudit.pool.name')" />
@@ -157,6 +157,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const editing = ref<PromptAuditEndpointDraft | null>(null)
 const editingIndex = ref(-1)
+const editorForm = ref<HTMLFormElement | null>(null)
 
 function openCreate() {
   editingIndex.value = -1
@@ -171,6 +172,7 @@ function closeEditor() {
   editingIndex.value = -1
 }
 function saveEditor() {
+  if (!editorForm.value?.reportValidity()) return
   if (!editing.value?.id.trim() || !editing.value.name.trim() || !editing.value.base_url.trim()) return
   const next = props.endpoints.map((item) => cloneData(item))
   const value = cloneData(editing.value)

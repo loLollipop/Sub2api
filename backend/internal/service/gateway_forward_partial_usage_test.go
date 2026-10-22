@@ -262,7 +262,7 @@ func TestGatewayService_Forward_PreOutputSSEOverloadedErrorUsesSemantic529(t *te
 	require.Empty(t, rec.Body.String(), "pre-output overload must remain eligible for account failover")
 }
 
-func TestGatewayService_Forward_SSEErrorClassificationRespectsOutput(t *testing.T) {
+func TestGatewayService_Forward_SSEErrorClassificationIndependentOfOutput(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, test := range []struct {
 		kind   string
@@ -298,7 +298,6 @@ func TestGatewayService_Forward_SSEErrorClassificationRespectsOutput(t *testing.
 				require.ErrorAs(t, err, &failure)
 				want := test.status
 				if output {
-					want = http.StatusForbidden
 					require.Contains(t, rec.Body.String(), "message_start")
 				} else {
 					require.Empty(t, rec.Body.String())
@@ -312,7 +311,7 @@ func TestGatewayService_Forward_SSEErrorClassificationRespectsOutput(t *testing.
 	}
 }
 
-func TestGatewayService_Forward_PostOutputSSEOverloadedErrorKeepsExistingStatus(t *testing.T) {
+func TestGatewayService_Forward_PostOutputSSEOverloadedErrorPreservesSemanticStatus(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	rec := httptest.NewRecorder()
@@ -347,7 +346,7 @@ func TestGatewayService_Forward_PostOutputSSEOverloadedErrorKeepsExistingStatus(
 
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
-	require.Equal(t, http.StatusForbidden, failoverErr.StatusCode)
+	require.Equal(t, 529, failoverErr.StatusCode)
 	require.JSONEq(t, errorJSON, string(failoverErr.ResponseBody))
 	require.Zero(t, repo.tempCalls)
 	require.Contains(t, rec.Body.String(), "message_start")

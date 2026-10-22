@@ -1,6 +1,7 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ProfileView from '@/views/user/ProfileView.vue'
+enableAutoUnmount(afterEach)
 
 const {
   fetchPublicSettingsMock,
@@ -65,6 +66,8 @@ describe('ProfileView', () => {
       balance_low_notify_enabled: false,
       balance_low_notify_threshold: 0,
       linuxdo_oauth_enabled: true,
+      dingtalk_oauth_enabled: true,
+      passkey_enabled: true,
       wechat_oauth_enabled: true,
       wechat_oauth_open_enabled: true,
       wechat_oauth_mp_enabled: false,
@@ -73,27 +76,56 @@ describe('ProfileView', () => {
     })
   })
 
-  it('renders the simplified single-column profile shell without separate stat cards', async () => {
+  function mountProfile() {
     const wrapper = mount(ProfileView, {
       global: {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
           StatCard: { template: '<div class="stat-card" />' },
           ProfileInfoCard: { template: '<div data-testid="profile-info-card" />' },
+          ProfileIdentityBindingsSection: { props: ['linuxdoEnabled', 'dingtalkEnabled', 'wechatEnabled', 'wechatOpenEnabled', 'wechatMpEnabled', 'oidcEnabled', 'oidcProviderName'], template: '<div data-testid="profile-bindings" />' },
           ProfileBalanceNotifyCard: { template: '<div data-testid="profile-balance-notify-card" />' },
           ProfilePasswordForm: { template: '<div data-testid="profile-password-form" />' },
           ProfileTotpCard: { template: '<div data-testid="profile-totp-card" />' },
+          ProfilePasskeyCard: { props: ['enabled'], template: '<div data-testid="profile-passkey-card" />' },
+          teleport: true,
           Icon: true
         }
       }
     })
 
+    return wrapper
+  }
+
+  it('keeps security and login capabilities while showing the password form on demand', async () => {
+    const wrapper = mountProfile()
     await flushPromises()
 
     expect(wrapper.findAll('.stat-card')).toHaveLength(0)
     expect(wrapper.get('[data-testid="profile-shell"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="profile-shell"]').html()).toContain('profile-info-card')
-    expect(wrapper.get('[data-testid="profile-shell"]').html()).toContain('profile-password-form')
+    expect(wrapper.find('[data-testid="profile-password-form"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="profile-shell"]').html()).toContain('profile-totp-card')
+    expect(wrapper.findComponent('[data-testid="profile-bindings"]').props()).toMatchObject({
+      linuxdoEnabled: true, dingtalkEnabled: true, oidcEnabled: true, wechatEnabled: true,
+      wechatOpenEnabled: true, wechatMpEnabled: false, oidcProviderName: 'OIDC'
+    })
+    expect(wrapper.findComponent('[data-testid="profile-passkey-card"]').props('enabled')).toBe(true)
+    await wrapper.get('[data-testid="profile-password-open"]').trigger('click')
+    expect(wrapper.find('[data-testid="profile-password-form"]').exists()).toBe(true)
+    wrapper.findComponent('[data-testid="profile-password-form"]').vm.$emit('saved')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="profile-password-form"]').exists()).toBe(false)
+  })
+
+  it('respects notification and provider feature settings', async () => {
+    fetchPublicSettingsMock.mockResolvedValue({ balance_low_notify_enabled: true, balance_low_notify_threshold: 8 })
+    const wrapper = mountProfile()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="profile-balance-notify-card"]').exists()).toBe(true)
+    expect(wrapper.findComponent('[data-testid="profile-bindings"]').props()).toMatchObject({
+      linuxdoEnabled: false, dingtalkEnabled: false, oidcEnabled: false, wechatEnabled: false
+    })
+    expect(wrapper.findComponent('[data-testid="profile-passkey-card"]').props('enabled')).toBe(false)
   })
 })

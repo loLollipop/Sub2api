@@ -1,5 +1,7 @@
 export default {
   common: {
+    oneMonth: '1 个月',
+    oneYear: '1 年',
     loading: '加载中...',
     submitting: '提交中...',
     justNow: '刚刚',
@@ -38,6 +40,7 @@ export default {
     all: '全部',
     none: '无',
     selectAll: '全选',
+    select: '选择',
     noData: '暂无数据',
     expand: '展开',
     collapse: '收起',
@@ -170,7 +173,6 @@ export default {
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',
-    infiniteCanvas: '无限画布',
     batchImage: '批量生图',
     usage: '使用记录',
     redeem: '兑换',
@@ -203,11 +205,6 @@ export default {
     mySubscriptions: '我的订阅',
     buySubscription: '充值中心',
     docs: '文档',
-    myOrders: '我的订单',
-    orderManagement: '订单管理',
-    paymentDashboard: '支付概览',
-    paymentConfig: '支付配置',
-    paymentPlans: '订阅套餐',
     channelManagement: '渠道管理',
     channelPricing: '渠道定价',
     channelMonitor: '渠道监控',
@@ -241,6 +238,8 @@ export default {
     emailLabel: '邮箱',
     emailPlaceholder: '请输入邮箱',
     passwordLabel: '密码',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
     passwordPlaceholder: '请输入密码',
     createPasswordPlaceholder: '创建一个安全的密码',
     passwordHint: '至少 6 个字符',
@@ -403,13 +402,6 @@ export default {
     oauthCallbackPageTitle: 'OAuth 回调',
     wechatProviderName: '微信',
     wechatCallbackPageTitle: '微信登录回调',
-    wechatPaymentCallbackPageTitle: '微信支付回调',
-    wechatPayment: {
-      callbackTitle: '正在恢复微信支付',
-      callbackProcessing: '正在恢复微信支付...',
-      backToPayment: '返回支付页',
-      callbackMissingResumeToken: '微信支付回调缺少恢复令牌。'
-    },
     oauth: {
       callbackTitle: 'OAuth 回调',
       callbackHint: '按需将授权码和状态值复制回后台授权流程。',

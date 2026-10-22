@@ -6,7 +6,7 @@ export type SettingsTab =
   | "security"
   | "users"
   | "gateway"
-  | "payment"
+  | "purchase"
   | "email"
   | "backup";
 </script>
@@ -23,7 +23,7 @@ const settingsTabs = [
   { key: "security" as SettingsTab, icon: "shield" as const },
   { key: "users" as SettingsTab, icon: "user" as const },
   { key: "gateway" as SettingsTab, icon: "server" as const },
-  { key: "payment" as SettingsTab, icon: "creditCard" as const },
+  { key: "purchase" as SettingsTab, icon: "creditCard" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];

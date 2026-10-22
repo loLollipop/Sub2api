@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import AnnouncementPopup from '../AnnouncementPopup.vue'
+import BaseDialog from '../BaseDialog.vue'
 import { useAnnouncementStore } from '@/stores/announcements'
 
 const announcementMarkdownStyles = readFileSync(
@@ -125,5 +126,36 @@ describe('AnnouncementPopup', () => {
     expect(dismissPopup).toHaveBeenCalledTimes(1)
     expect(wrapper.emitted('close')).toBeUndefined()
     wrapper.unmount()
+  })
+
+  it('releases the user popup scroll lock without requiring a mounted header', async () => {
+    const store = useAnnouncementStore()
+    store.currentPopup = announcement
+    vi.spyOn(store, 'dismissPopup').mockImplementation(async () => {
+      store.currentPopup = null
+    })
+    const wrapper = mount(AnnouncementPopup)
+    await wrapper.vm.$nextTick()
+    expect(document.body.classList.contains('modal-open')).toBe(true)
+
+    document.body.querySelector<HTMLButtonElement>('[data-testid="announcement-popup-dismiss"]')?.click()
+    await wrapper.vm.$nextTick()
+
+    expect(document.body.classList.contains('modal-open')).toBe(false)
+    expect(document.body.style.overflow).toBe('')
+    wrapper.unmount()
+  })
+
+  it('retains another dialog scroll lock when the popup is removed', async () => {
+    const dialog = mount(BaseDialog, { props: { show: true, title: 'Another dialog' } })
+    useAnnouncementStore().currentPopup = announcement
+    const wrapper = mount(AnnouncementPopup)
+    await wrapper.vm.$nextTick()
+    wrapper.unmount()
+
+    expect(document.body.classList.contains('modal-open')).toBe(true)
+    expect(document.body.style.overflow).toBe('')
+    dialog.unmount()
+    expect(document.body.classList.contains('modal-open')).toBe(false)
   })
 })

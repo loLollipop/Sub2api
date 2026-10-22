@@ -8,7 +8,7 @@ import (
 )
 
 func TestUserAllowlistRoutesRemoved(t *testing.T) {
-	router, tokens, _ := ticketRouteEnvironment(t)
+	router := retiredFeatureRouteEnvironment(t)
 	for _, route := range []struct {
 		method string
 		path   string
@@ -18,7 +18,7 @@ func TestUserAllowlistRoutesRemoved(t *testing.T) {
 		{http.MethodDelete, "/api/v1/user/cf-allowlist/1"},
 	} {
 		t.Run(route.method, func(t *testing.T) {
-			response := ticketRouteRequest(router, route.method, route.path, tokens[7], "")
+			response := retiredFeatureRouteRequest(router, route.method, route.path)
 			require.Equal(t, http.StatusNotFound, response.Code)
 		})
 	}

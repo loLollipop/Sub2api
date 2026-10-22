@@ -281,6 +281,17 @@ describe('HomeView compact mode', () => {
     document.documentElement.classList.remove('dark')
   })
 
+  it('keeps the landing theme and toggle synchronized with system-driven root changes', async () => {
+    localStorage.setItem('theme', 'system')
+    const wrapper = mountHome()
+    document.documentElement.classList.add('dark')
+    await vi.waitFor(() => expect(wrapper.find('button[aria-label="home.switchToLight"]').exists()).toBe(true))
+    expect(wrapper.get('[data-testid="default-home"]').classes()).toContain('home-landing--dark')
+    await wrapper.get('button[aria-label="home.switchToLight"]').trigger('click')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(localStorage.getItem('theme')).toBe('light')
+  })
+
   it('uses the configured branding and only safe documentation URLs', () => {
     const branded = mountHome({ site_name: 'My gateway', doc_url: 'https://docs.example.com', site_subtitle: 'My subtitle' })
     expect(branded.get('.landing-brand').text()).toBe('My gateway')

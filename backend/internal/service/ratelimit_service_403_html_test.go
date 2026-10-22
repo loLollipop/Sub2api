@@ -74,6 +74,29 @@ func TestHandleUpstreamError_OpenAIWAF403DoesNotPenalizeAccount(t *testing.T) {
 	h.requireNoAccountPenalty(t)
 }
 
+func TestHandleUpstreamError_Cloudflare403AcrossPlatforms(t *testing.T) {
+	for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformAntigravity, PlatformKimi, PlatformDeepseek} {
+		t.Run(platform, func(t *testing.T) {
+			for _, body := range []string{"error code: 1010", `{"cloudflare_error":true,"error_code":1010}`, `{"error":{"error_name":"browser_signature_banned"}}`} {
+				h := newOpenAI403TestHarness(t, 513, 1)
+				h.account.Platform = platform
+				require.False(t, h.handle(body))
+				h.requireNoAccountPenalty(t)
+			}
+		})
+	}
+	h := newOpenAI403TestHarness(t, 514, 1)
+	require.True(t, h.handle(`{"error":{"message":"invalid api key"},"request":{"error_name":"browser_signature_banned"}}`))
+	require.Equal(t, 1, h.counter.increments)
+}
+
+func TestHandleUpstreamError_GenericBlockedMessageDoesNotBroadenCloudflareExemption(t *testing.T) {
+	h := newOpenAI403TestHarness(t, 515, 1)
+	h.account.Platform = PlatformAnthropic
+	require.True(t, h.handle(`{"error":{"message":"Your request was blocked by account permissions"}}`))
+	require.Equal(t, 1, h.repo.setErrorCalls)
+}
+
 func TestHandleUpstreamError_OpenAICooling403DoesNotPenalizeAccount(t *testing.T) {
 	h := newOpenAI403TestHarness(t, 512, 1)
 	require.False(t, h.handle(`{"code":"FORBIDDEN","message":"当前分组内支持该模型的货源均在冷却中。请稍后重试"}`))

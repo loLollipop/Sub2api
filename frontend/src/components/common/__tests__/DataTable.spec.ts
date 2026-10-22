@@ -116,6 +116,36 @@ describe('DataTable', () => {
     localStorage.clear()
   })
 
+  it.each(['desktop', 'mobile'])('makes clickable %s rows keyboard reachable without activating from nested controls', async (layout) => {
+    if (layout === 'mobile') stubMobileMatchMedia()
+    const row = { id: 1, name: 'Account' }
+    const wrapper = mount(DataTable, {
+      props: {
+        columns: [{ key: 'name', label: 'Name' }, { key: 'actions', label: 'Actions' }],
+        data: [row], clickableRows: true, selectable: true,
+      },
+      slots: { 'cell-actions': '<button @click.stop>Action</button><input aria-label="Notes" />' },
+    })
+    const target = wrapper.get(layout === 'desktop' ? 'tbody tr[data-index]' : '.data-table-card')
+    expect(target.attributes('tabindex')).toBe('0')
+    expect(target.classes()).toContain('clickable-table-row')
+    if (layout === 'desktop') expect(target.element.tagName).toBe('TR')
+    await target.trigger('keydown', { key: 'Enter' })
+    await target.trigger('keydown', { key: ' ' })
+    expect(wrapper.emitted('rowClick')).toEqual([[row], [row]])
+    await target.trigger('keydown', { key: ' ', repeat: true })
+    await target.get('button').trigger('keydown', { key: 'Enter' })
+    await target.get('input[aria-label="Notes"]').trigger('keydown', { key: ' ' })
+    await target.get('input[type="checkbox"]').trigger('keydown', { key: ' ' })
+    await target.get('button').trigger('click')
+    expect(wrapper.emitted('rowClick')).toHaveLength(2)
+    await wrapper.setProps({ clickableRows: false })
+    expect(target.attributes('tabindex')).toBeUndefined()
+    await target.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('rowClick')).toHaveLength(2)
+    wrapper.unmount()
+  })
+
   it('renders paired sort arrows and highlights the active direction', async () => {
     const wrapper = mount(DataTable, {
       props: {

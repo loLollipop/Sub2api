@@ -2,6 +2,8 @@ interface DialogLayer {
   zIndex: number
   sequence: number
   onEscape: () => void
+  onTab?: (event: KeyboardEvent) => void
+  onRestoreFocus?: (target: HTMLElement | null) => void
 }
 
 const layers = new Map<symbol, DialogLayer>()
@@ -18,31 +20,45 @@ function topLayer() {
   return top
 }
 
-function handleEscape(event: KeyboardEvent) {
-  if (event.key === 'Escape') topLayer()?.[1].onEscape()
+function handleKeydown(event: KeyboardEvent) {
+  const top = topLayer()?.[1]
+  if (event.key === 'Escape' && top && !event.defaultPrevented) {
+    event.preventDefault()
+    event.stopPropagation()
+    top.onEscape()
+  }
+  else if (event.key === 'Tab' && !event.defaultPrevented) top?.onTab?.(event)
 }
 
 // One listener selects the visual top layer once, even if closing it removes it
 // synchronously. Every registered layer owns the shared body scroll lock.
-export function createDialogLayer(onEscape: () => void) {
+export function createDialogLayer(
+  onEscape: () => void,
+  handlers: Pick<DialogLayer, 'onTab' | 'onRestoreFocus'> = {},
+) {
   const id = Symbol('dialog')
   function update(open: boolean, zIndex: number) {
     if (open) {
       const existing = layers.get(id)
       if (existing) existing.zIndex = zIndex
       else {
-        if (layers.size === 0) document.addEventListener('keydown', handleEscape)
-        layers.set(id, { zIndex, sequence: ++sequence, onEscape })
+        if (layers.size === 0) document.addEventListener('keydown', handleKeydown)
+        layers.set(id, { zIndex, sequence: ++sequence, onEscape, ...handlers })
       }
     } else {
       layers.delete(id)
-      if (layers.size === 0) document.removeEventListener('keydown', handleEscape)
+      if (layers.size === 0) document.removeEventListener('keydown', handleKeydown)
     }
     document.body.classList.toggle('modal-open', layers.size > 0)
   }
   return {
     update,
     isTop: () => topLayer()?.[0] === id,
+    restoreFocus: (target: HTMLElement | null) => {
+      const top = topLayer()?.[1]
+      if (top) top.onRestoreFocus?.(target)
+      else if (target?.isConnected) target.focus()
+    },
     remove: () => update(false, 0),
   }
 }

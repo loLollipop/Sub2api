@@ -29,6 +29,18 @@ async function openCodeStep() {
 }
 
 describe('TOTP setup input synchronization', () => {
+  it('prevents duplicate enable requests while verification is pending', async () => {
+    let finish!: (value: { success: boolean }) => void
+    api.enable.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const wrapper = await openCodeStep()
+    await wrapper.get('form').trigger('submit')
+    await wrapper.get('form').trigger('submit')
+    expect(api.enable).toHaveBeenCalledOnce()
+    finish({ success: true })
+    await flushPromises()
+    expect(wrapper.emitted('success')).toHaveLength(1)
+  })
+
   it('clears displayed digits after verification fails and focuses the first cell', async () => {
     api.enable.mockRejectedValueOnce({ message: 'Invalid code' })
     const wrapper = await openCodeStep()

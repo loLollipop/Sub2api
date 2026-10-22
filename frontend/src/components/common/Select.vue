@@ -16,8 +16,7 @@
         error && 'select-trigger-error',
         disabled && 'select-trigger-disabled'
       ]"
-      @keydown.down.prevent="onTriggerKeyDown"
-      @keydown.up.prevent="onTriggerKeyDown"
+      @keydown="onTriggerKeyDown"
     >
       <span class="select-value">
         <slot name="selected" :option="selectedOption">
@@ -405,6 +404,25 @@ watch(isOpen, (open) => {
   }
 })
 
+// Keep keyboard focus on the same enabled value when search results move it.
+watch(
+  () => filteredOptions.value.map(option => ({
+    value: getOptionValue(option) as unknown,
+    disabled: isOptionDisabled(option),
+  })),
+  (options, previousOptions) => {
+    if (!isOpen.value) return
+    const focusedOption = previousOptions[focusedIndex.value]
+    const retainedIndex = focusedOption
+      ? options.findIndex(option => option.value === focusedOption.value && !option.disabled)
+      : -1
+    focusedIndex.value = retainedIndex >= 0
+      ? retainedIndex
+      : options.findIndex(option => !option.disabled)
+    if (focusedIndex.value >= 0) scrollToFocused()
+  },
+)
+
 // 远程搜索：输入防抖后交给父组件请求（!isOpen 抑制关闭重置 searchQuery 触发的空 query）。
 watch(searchQuery, (query) => {
   if (!props.remote || !isOpen.value) return
@@ -430,14 +448,21 @@ const clearSelection = () => {
 }
 
 // Keyboards
-const onTriggerKeyDown = () => {
-  if (!isOpen.value) {
+const onTriggerKeyDown = (event: KeyboardEvent) => {
+  if (props.disabled) return
+  if (isOpen.value) {
+    onDropdownKeyDown(event)
+  } else if (!event.isComposing && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+    event.preventDefault()
     isOpen.value = true
   }
 }
 
 const onDropdownKeyDown = (e: KeyboardEvent) => {
-  if (e.isComposing) return
+  if (e.isComposing) {
+    if (e.key === 'Escape') e.stopPropagation()
+    return
+  }
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault()
@@ -458,6 +483,7 @@ const onDropdownKeyDown = (e: KeyboardEvent) => {
       break
     case 'Escape':
       e.preventDefault()
+      e.stopPropagation()
       isOpen.value = false
       triggerRef.value?.focus()
       break

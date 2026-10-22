@@ -131,7 +131,7 @@ func TestIsValidAffiliateCodeFormat(t *testing.T) {
 }
 
 type batchRateRecordingAffiliateRepo struct {
-	*paymentFulfillmentAffiliateRepoStub
+	*affiliateFixtureRepo
 	ids []int64
 }
 
@@ -141,7 +141,7 @@ func (r *batchRateRecordingAffiliateRepo) BatchSetUserRebateRate(_ context.Conte
 }
 
 func TestAdminBatchSetUserRebateRateCountDeduplicatesInvalidIDs(t *testing.T) {
-	repo := &batchRateRecordingAffiliateRepo{paymentFulfillmentAffiliateRepoStub: &paymentFulfillmentAffiliateRepoStub{}}
+	repo := &batchRateRecordingAffiliateRepo{affiliateFixtureRepo: &affiliateFixtureRepo{}}
 	svc := NewAffiliateService(repo, nil, nil, nil)
 	rate := 25.0
 	affected, err := svc.AdminBatchSetUserRebateRateCount(context.Background(), []int64{7, 7, 0, -3, 9}, &rate)
@@ -151,7 +151,7 @@ func TestAdminBatchSetUserRebateRateCountDeduplicatesInvalidIDs(t *testing.T) {
 }
 
 type atomicSettingsRecordingAffiliateRepo struct {
-	*paymentFulfillmentAffiliateRepoStub
+	*affiliateFixtureRepo
 	updateCalls int
 }
 
@@ -165,7 +165,7 @@ func (r *atomicSettingsRecordingAffiliateRepo) ClearUserSettings(context.Context
 }
 
 func TestAdminUpdateUserSettingsValidatesBeforeAtomicWrite(t *testing.T) {
-	repo := &atomicSettingsRecordingAffiliateRepo{paymentFulfillmentAffiliateRepoStub: &paymentFulfillmentAffiliateRepoStub{}}
+	repo := &atomicSettingsRecordingAffiliateRepo{affiliateFixtureRepo: &affiliateFixtureRepo{}}
 	svc := NewAffiliateService(repo, nil, nil, nil)
 	badRate := math.NaN()
 	code := "VIP2026"

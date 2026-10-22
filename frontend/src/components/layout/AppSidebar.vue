@@ -1,26 +1,31 @@
 <template>
   <aside
+    id="mobile-console-navigation"
+    ref="sidebarRef"
     class="sidebar"
+    :inert="!isDesktop && !mobileOpen ? true : undefined"
+    :aria-hidden="!isDesktop && !mobileOpen ? true : undefined"
+    tabindex="-1"
     :class="[
       sidebarCollapsed ? 'w-[72px]' : 'w-64',
-      { '-translate-x-full lg:translate-x-0': !mobileOpen, 'signal-sidebar': isConsoleSignal, 'consumer-mobile-sidebar': !isAdmin }
+      { '-translate-x-full lg:translate-x-0': !mobileOpen, 'signal-sidebar': isConsoleSignal }
     ]"
   >
     <!-- Logo/Brand -->
     <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
       <!-- Custom Logo or Default Logo -->
       <router-link
-        :to="homePath"
+        to="/"
         class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow transition-opacity hover:opacity-80"
-        @click="handleMenuItemClick(homePath)"
+        @click="handleMenuItemClick('/')"
       >
         <img v-if="settingsLoaded" :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <router-link
-          :to="homePath"
+          to="/"
           class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
-          @click="handleMenuItemClick(homePath)"
+          @click="handleMenuItemClick('/')"
         >
           {{ siteName }}
         </router-link>
@@ -36,53 +41,34 @@
         <!-- Admin Section -->
         <div class="sidebar-section">
           <template v-for="item in adminNavItems" :key="item.path">
-            <!-- Collapsible group (has children) -->
+            <!-- Group headings and their links stay expanded, including in the icon rail. -->
             <template v-if="item.children?.length">
-              <button
-                type="button"
-                class="sidebar-link mb-1 w-full"
-                :class="{
-                  'sidebar-link-active': isGroupActive(item) && !isGroupExpanded(item),
-                  'sidebar-link-collapsed': sidebarCollapsed
-                }"
-                :title="sidebarCollapsed ? item.label : undefined"
-                @click="handleGroupClick(item)"
-              >
-                <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
-                <span
-                  class="sidebar-label sidebar-label-flex"
-                  :class="{ 'sidebar-label-collapsed': sidebarCollapsed }"
-                  :aria-hidden="sidebarCollapsed ? 'true' : 'false'"
-                >
-                  <span class="min-w-0 truncate">{{ item.label }}</span>
-                  <ChevronDownIcon
-                    class="h-4 w-4 flex-shrink-0 transition-transform duration-200"
-                    :class="isGroupExpanded(item) ? 'rotate-180' : ''"
-                  />
-                </span>
-              </button>
-              <!-- Children -->
-              <div v-if="!sidebarCollapsed && isGroupExpanded(item)" class="mb-1 ml-4 border-l border-gray-200 pl-2 dark:border-dark-600">
-                <router-link
-                  v-for="child in item.children"
-                  :key="child.path"
-                  :to="child.path"
-                  class="sidebar-link mb-0.5 py-1.5 text-sm"
-                  :class="{ 'sidebar-link-active': route.path === child.path }"
-                  @click="handleMenuItemClick(child.path)"
-                >
-                  <component :is="child.icon" class="h-4 w-4 flex-shrink-0" />
-                  <span>{{ child.label }}</span>
-                </router-link>
+              <div class="sidebar-section-title sidebar-group-heading" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+                <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">{{ item.label }}</span>
               </div>
+              <router-link
+                v-for="child in item.children"
+                :key="child.path"
+                :to="child.path"
+                class="sidebar-link mb-1"
+                :class="{ 'sidebar-link-active': route.path === child.path, 'sidebar-link-collapsed': sidebarCollapsed }"
+                :title="sidebarCollapsed ? child.label : undefined"
+                :aria-label="sidebarCollapsed ? child.label : undefined"
+                @click="handleMenuItemClick(child.path)"
+              >
+                <component :is="child.icon" class="h-5 w-5 flex-shrink-0" />
+                <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ child.label }}</span>
+              </router-link>
             </template>
             <!-- Normal item (no children) -->
             <router-link
-              v-else
+              v-else-if="!item.expandOnly"
               :to="item.path"
               class="sidebar-link mb-1"
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
+              :aria-label="sidebarCollapsed ? item.label : undefined"
+              :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
               :id="
                 item.path === '/admin/accounts'
                   ? 'sidebar-channel-manage'
@@ -116,7 +102,8 @@
             class="sidebar-link mb-1"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
             :title="sidebarCollapsed ? item.label : undefined"
-            :data-tour="item.path === '/keys' && (isAdmin || mobileOpen) ? 'sidebar-my-keys' : undefined"
+            :aria-label="sidebarCollapsed ? item.label : undefined"
+            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
             @click="handleMenuItemClick(item.path)"
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
@@ -128,15 +115,19 @@
 
       <!-- Regular User View -->
       <template v-else-if="!appStore.backendModeEnabled">
-        <div class="sidebar-section">
+        <div v-for="section in userSections" :key="section.label" class="sidebar-section">
+          <div class="sidebar-section-title" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+            <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">{{ section.label }}</span>
+          </div>
           <router-link
-            v-for="item in userNavItems"
+            v-for="item in section.items"
             :key="item.path"
             :to="item.path"
             class="sidebar-link mb-1"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
             :title="sidebarCollapsed ? item.label : undefined"
-            :data-tour="item.path === '/keys' && (isAdmin || mobileOpen) ? 'sidebar-my-keys' : undefined"
+            :aria-label="sidebarCollapsed ? item.label : undefined"
+            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
             @click="handleMenuItemClick(item.path)"
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
@@ -147,43 +138,13 @@
       </template>
     </nav>
 
-    <!-- Bottom Section -->
-    <div class="sidebar-footer mt-auto border-t border-gray-100 p-3 dark:border-dark-800">
-      <!-- Theme Toggle -->
-      <button
-        @click="toggleTheme"
-        class="sidebar-link mb-2 w-full"
-        data-test="theme-toggle"
-        :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
-        :title="sidebarCollapsed ? (isDark ? t('nav.lightMode') : t('nav.darkMode')) : undefined"
-      >
-        <SunIcon v-if="isDark" class="h-5 w-5 flex-shrink-0 text-amber-500" />
-        <MoonIcon v-else class="h-5 w-5 flex-shrink-0" />
-        <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{
-          isDark ? t('nav.lightMode') : t('nav.darkMode')
-        }}</span>
-      </button>
-
-      <!-- Collapse Button -->
-      <button
-        v-if="isAdmin"
-        @click="toggleSidebar"
-        class="sidebar-link w-full"
-        :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
-        :title="sidebarCollapsed ? t('nav.expand') : t('nav.collapse')"
-      >
-        <ChevronDoubleLeftIcon v-if="!sidebarCollapsed" class="h-5 w-5 flex-shrink-0" />
-        <ChevronDoubleRightIcon v-else class="h-5 w-5 flex-shrink-0" />
-        <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ t('nav.collapse') }}</span>
-      </button>
-    </div>
   </aside>
 
   <!-- Mobile Overlay -->
   <transition name="fade">
     <div
       v-if="mobileOpen"
-      class="fixed inset-0 z-30 bg-black/50 lg:hidden"
+      class="fixed inset-0 z-40 bg-black/50 lg:hidden"
       @click="closeMobile"
     ></div>
   </transition>
@@ -191,43 +152,44 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
-import { useConsoleNavigation, SunIcon, MoonIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, type NavItem } from '@/composables/useConsoleNavigation'
-import { useMutationObserver } from '@vueuse/core'
+import { useConsoleNavigation } from '@/composables/useConsoleNavigation'
+import { useMediaQuery } from '@vueuse/core'
 import { useConsoleSignal } from '@/composables/useConsoleSignal'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const route = useRoute()
 const { isConsoleSignal } = useConsoleSignal()
-const router = useRouter()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
 const { userNavItems, personalNavItems, adminNavItems, refreshBatchImageAccess } = useConsoleNavigation()
 
-const sidebarCollapsed = computed(() => authStore.isAdmin && appStore.sidebarCollapsed)
+const isDesktop = useMediaQuery('(min-width: 1024px)')
+const sidebarCollapsed = computed(() => isDesktop.value && appStore.sidebarCollapsed)
+const sidebarRef = ref<HTMLElement | null>(null)
 const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
-const isDark = ref(document.documentElement.classList.contains('dark'))
-useMutationObserver(document.documentElement, () => {
-  isDark.value = document.documentElement.classList.contains('dark')
-}, { attributes: true, attributeFilter: ['class'] })
 
-const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 
-// Per-group expand/collapse overrides. A group with no entry follows the
-// automatic behavior (expanded while the active route is one of its children);
-// a chevron click records the user's choice, which wins over the automatic
-// state so an active group can still be collapsed manually.
-const groupExpandOverrides = ref<Map<string, boolean>>(new Map())
+const walletPaths = new Set(['/purchase', '/redeem', '/affiliate', '/profile'])
+const browsePaths = new Set(['/available-channels', '/monitor'])
+const userSections = computed(() => {
+  const chinese = locale.value.startsWith('zh')
+  return [
+    { label: chinese ? '常用功能' : 'Frequent tools', items: userNavItems.value.filter(item => !walletPaths.has(item.path) && !browsePaths.has(item.path)) },
+    { label: chinese ? '个人与钱包' : 'Account & wallet', items: userNavItems.value.filter(item => walletPaths.has(item.path)) },
+    { label: chinese ? '发现' : 'Discover', items: isDesktop.value ? [] : userNavItems.value.filter(item => browsePaths.has(item.path)) },
+  ].filter(section => section.items.length)
+})
 
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
@@ -235,25 +197,14 @@ const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRela
 const siteVersion = computed(() => appStore.siteVersion)
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 
-function toggleSidebar() {
-  appStore.toggleSidebar()
-}
-
-function toggleTheme() {
-  isDark.value = !isDark.value
-  document.documentElement.classList.toggle('dark', isDark.value)
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
-}
-
 function closeMobile() {
   appStore.setMobileOpen(false)
+  void nextTick(() => document.getElementById('mobile-navigation-trigger')?.focus())
 }
 
 function handleMenuItemClick(itemPath: string) {
   if (mobileOpen.value) {
-    setTimeout(() => {
-      appStore.setMobileOpen(false)
-    }, 150)
+    closeMobile()
   }
 
   // Map paths to tour selectors
@@ -273,50 +224,40 @@ function isActive(path: string): boolean {
   return route.path === path || route.path.startsWith(path + '/')
 }
 
-function isGroupActive(item: NavItem): boolean {
-  if (!item.children) return false
-  return item.children.some(child => route.path === child.path)
+function mobileFocusTargets() {
+  return Array.from(sidebarRef.value?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)') ?? [])
 }
 
-function isGroupExpanded(item: NavItem): boolean {
-  const override = groupExpandOverrides.value.get(item.path)
-  if (override !== undefined) return override
-  return isGroupActive(item)
-}
-
-function toggleGroup(item: NavItem) {
-  groupExpandOverrides.value.set(item.path, !isGroupExpanded(item))
-}
-
-/**
- * Click handler for collapsible parent items.
- * - When sidebar is collapsed: do nothing (children are not visible).
- * - When `expandOnly` is true: only toggle expand state.
- * - Otherwise (default, e.g. /admin/orders): navigate to the parent path
- *   (router-link semantics) and ensure the group is expanded.
- */
-function handleGroupClick(item: NavItem) {
-  if (sidebarCollapsed.value) return
-  if (item.expandOnly) {
-    toggleGroup(item)
+function handleMobileKeydown(event: KeyboardEvent) {
+  if (isDesktop.value || !mobileOpen.value || event.defaultPrevented ||
+      document.body.classList.contains('modal-open') || event.isComposing) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeMobile()
     return
   }
-  // Push to path and ensure expanded
-  if (route.path !== item.path) {
-    router.push(item.path)
+  if (event.key !== 'Tab') return
+  const items = mobileFocusTargets()
+  const first = items[0]
+  const last = items.at(-1)
+  if (!first || !last) return
+  if (event.shiftKey && (document.activeElement === first || !sidebarRef.value?.contains(document.activeElement))) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (document.activeElement === last || !sidebarRef.value?.contains(document.activeElement))) {
+    event.preventDefault()
+    first.focus()
   }
-  groupExpandOverrides.value.set(item.path, true)
 }
 
-// Initialize theme
-const savedTheme = localStorage.getItem('theme')
-if (
-  savedTheme === 'dark' ||
-  (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-) {
-  isDark.value = true
-  document.documentElement.classList.add('dark')
-}
+watch([mobileOpen, isDesktop], async ([open, desktop]) => {
+  if (!open || desktop) return
+  await nextTick()
+  if (mobileOpen.value && !isDesktop.value) mobileFocusTargets()[0]?.focus()
+}, { immediate: true })
+watch(() => route.fullPath, () => {
+  if (mobileOpen.value && !isDesktop.value) closeMobile()
+})
 
 // Fetch admin settings (for feature-gated nav items like Ops).
 watch(
@@ -330,6 +271,7 @@ watch(
 )
 
 onMounted(() => {
+  document.addEventListener('keydown', handleMobileKeydown)
   void refreshBatchImageAccess()
   if (isAdmin.value) {
     adminSettingsStore.fetch()
@@ -345,6 +287,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleMobileKeydown)
   if (sidebarNavRef.value) {
     appStore.sidebarScrollTop = sidebarNavRef.value.scrollTop
   }
@@ -352,6 +295,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.sidebar-group-heading {
+  margin-top: 1rem;
+}
+
 .sidebar-logo {
   flex: 0 0 2.25rem;
   min-width: 2.25rem;

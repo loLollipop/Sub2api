@@ -1,7 +1,7 @@
 <template>
-  <div class="plaza-filters">
+  <div class="plaza-filters" :class="{ 'plaza-filters-sidebar': sidebar }">
     <div class="plaza-toolbar">
-      <div class="plaza-search">
+      <div v-if="!hideSearch" class="plaza-search">
         <Icon name="search" size="sm" class="plaza-search-icon" />
         <input
           :value="search"
@@ -21,6 +21,7 @@
           <Icon name="x" size="xs" class="h-3.5 w-3.5" />
         </button>
       </div>
+      <p v-if="sidebar" class="plaza-filter-label">{{ t('modelPlaza.filters.groupLabel') }}</p>
       <Select
         :model-value="groupId"
         :options="groupSelectOptions"
@@ -28,6 +29,7 @@
         class="plaza-select"
         @update:model-value="onGroupChange"
       />
+      <p v-if="sidebar" class="plaza-filter-label">{{ t('modelPlaza.filters.rateLabel') }}</p>
       <Select
         :model-value="rate"
         :options="rateSelectOptions"
@@ -37,26 +39,34 @@
       />
     </div>
 
-    <div class="plaza-seg-wrap">
-      <div
-        class="plaza-seg"
-        role="radiogroup"
-        :aria-label="t('modelPlaza.filters.platformLabel')"
-      >
-        <button
-          v-for="p in platformChoices"
-          :key="`platform-${p}`"
-          type="button"
-          role="radio"
-          class="plaza-seg-item"
-          :aria-checked="platform === p"
-          :disabled="p !== 'all' && !platformEnabled(p)"
-          @click="$emit('update:platform', p)"
+    <div class="plaza-platform-toolbar">
+      <p v-if="sidebar" class="plaza-filter-label">{{ t('modelPlaza.filters.platformLabel') }}</p>
+      <div class="plaza-seg-wrap">
+        <div
+          class="plaza-seg"
+          role="radiogroup"
+          :aria-label="t('modelPlaza.filters.platformLabel')"
+          @keydown="plazaRadioKeyboard"
         >
-          <PlatformIcon v-if="p !== 'all'" :platform="p as GroupPlatform" size="xs" />
-          {{ p === 'all' ? t('modelPlaza.filters.all') : p }}
-        </button>
+          <button
+            v-for="p in platformChoices"
+            :key="`platform-${p}`"
+            type="button"
+            role="radio"
+            class="plaza-seg-item"
+            :aria-checked="platform === p"
+            :tabindex="platform === p ? 0 : -1"
+            :disabled="p !== 'all' && !platformEnabled(p)"
+            @click="$emit('update:platform', p)"
+          >
+            <PlazaProviderIcon v-if="p !== 'all'" :platform="p" size="xs" />
+            {{ p === 'all' ? t('modelPlaza.filters.all') : platformLabel(p) }}
+          </button>
+        </div>
       </div>
+      <button v-if="hasActiveFilters && !sidebar" type="button" class="plaza-reset" data-testid="plaza-clear-filters" @click="$emit('reset')">
+        {{ t('modelPlaza.filters.clearAll') }}
+      </button>
     </div>
   </div>
 </template>
@@ -65,15 +75,16 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
-import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import PlazaProviderIcon from './PlazaProviderIcon.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
-import type { GroupPlatform } from '@/types'
+import { platformLabel } from '@/utils/platformColors'
+import { plazaRadioKeyboard } from './plazaRadioKeyboard'
 
 const props = defineProps<{
   /** 数据中出现的平台(去重排序后)。 */
   platforms: string[]
   /** 全量分组(含平台与生效倍率),三个维度的置灰联动由此推导。 */
-  groups: Array<{ id: number; name: string; platform: string; rate: number; rates?: number[] }>
+  groups: Array<{ id: number; name: string; platform: string; platforms?: string[]; rate: number; rates?: number[] }>
   /** 全量生效倍率去重升序。 */
   rates: number[]
   platform: string
@@ -81,6 +92,8 @@ const props = defineProps<{
   rate: number | 'all'
   /** 模型名搜索词(纯前端过滤)。 */
   search: string
+  hideSearch?: boolean
+  sidebar?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -88,9 +101,12 @@ const emit = defineEmits<{
   'update:groupId': [value: number | 'all']
   'update:rate': [value: number | 'all']
   'update:search': [value: string]
+  reset: []
 }>()
 
 const { t } = useI18n()
+
+const hasActiveFilters = computed(() => props.platform !== 'all' || props.groupId !== 'all' || props.rate !== 'all' || props.search.trim() !== '')
 
 const platformChoices = computed(() => ['all', ...props.platforms])
 
@@ -123,15 +139,15 @@ function matchesRate(g: { rate: number; rates?: number[] }, rate: number): boole
 function platformEnabled(p: string): boolean {
   return props.groups.some(
     (g) =>
-      g.platform === p &&
+      (g.platforms ?? [g.platform]).includes(p) &&
       (props.groupId === 'all' || g.id === props.groupId) &&
       (props.rate === 'all' || matchesRate(g, props.rate))
   )
 }
 
-function groupEnabled(g: { platform: string; rate: number; rates?: number[] }): boolean {
+function groupEnabled(g: { platform: string; platforms?: string[]; rate: number; rates?: number[] }): boolean {
   return (
-    (props.platform === 'all' || g.platform === props.platform) &&
+    (props.platform === 'all' || (g.platforms ?? [g.platform]).includes(props.platform)) &&
     (props.rate === 'all' || matchesRate(g, props.rate))
   )
 }
@@ -140,7 +156,7 @@ function rateEnabled(r: number): boolean {
   return props.groups.some(
     (g) =>
       matchesRate(g, r) &&
-      (props.platform === 'all' || g.platform === props.platform) &&
+      (props.platform === 'all' || (g.platforms ?? [g.platform]).includes(props.platform)) &&
       (props.groupId === 'all' || g.id === props.groupId)
   )
 }
@@ -189,6 +205,7 @@ function onRateChange(value: string | number | boolean | null) {
   min-height: 36px;
   padding: 8px 36px 8px 36px;
   border-radius: 8px;
+  background: color-mix(in srgb, var(--signal-muted, #63636c) 4%, transparent);
 }
 
 .plaza-search-clear {
@@ -213,6 +230,12 @@ function onRateChange(value: string | number | boolean | null) {
 .plaza-select {
   min-width: 0;
 }
+
+.plaza-platform-toolbar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.plaza-platform-toolbar > .plaza-seg-wrap { flex: 1; }
+.plaza-reset { flex-shrink: 0; min-height: 36px; padding: 6px 8px; border-radius: 7px; color: var(--signal-muted, #63636c); font-size: 12px; }
+.plaza-reset:hover { color: var(--signal-text, #202426); background: var(--signal-hover, #f3f4f6); }
+.plaza-reset:focus-visible { outline: 2px solid var(--signal-accent, #007db5); outline-offset: 2px; }
 
 .plaza-seg-wrap {
   min-width: 0;
@@ -254,6 +277,17 @@ function onRateChange(value: string | number | boolean | null) {
   opacity: 0.4;
 }
 
+.plaza-filters-sidebar { gap: 22px; }
+.plaza-filters-sidebar .plaza-toolbar { display: flex; flex-direction: column; order: 2; gap: 8px; }
+.plaza-filter-label { color: var(--signal-text, #1c1c1e); font-size: 12px; font-weight: 500; line-height: 18px; }
+.plaza-filters-sidebar .plaza-filter-label:not(:first-child) { margin-top: 12px; }
+.plaza-filters-sidebar .plaza-platform-toolbar { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.plaza-filters-sidebar .plaza-seg { display: grid; width: 100%; gap: 3px; border-bottom: 0; padding: 0; }
+.plaza-filters-sidebar .plaza-seg-item { justify-content: flex-start; gap: 10px; min-height: 34px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; font-size: 12px; }
+.plaza-filters-sidebar .plaza-seg-item[aria-checked='true'] { background: var(--signal-hover, #e9e9ef); border-color: color-mix(in srgb, var(--signal-line, #dedee4) 60%, transparent); font-weight: 500; }
+.plaza-filters-sidebar .plaza-seg-item:not(:disabled):hover { background: color-mix(in srgb, var(--signal-hover, #e9e9ef) 60%, transparent); }
+.plaza-seg-item:focus-visible { outline: 2px solid var(--signal-accent, #0066d6); outline-offset: -2px; }
+
 @media (max-width: 767px) {
   .plaza-toolbar {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -264,7 +298,9 @@ function onRateChange(value: string | number | boolean | null) {
   }
 
   .plaza-seg-item {
-    min-height: 40px;
+    min-height: 44px;
   }
+  .plaza-filters-sidebar .plaza-seg { display: flex; flex-wrap: wrap; }
+  .plaza-filters-sidebar .plaza-seg-item { min-height: 44px; }
 }
 </style>

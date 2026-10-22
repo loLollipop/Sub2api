@@ -115,4 +115,18 @@ describe('LoginView registration entry', () => {
 
     expect(wrapper.text()).not.toContain('auth.signUp')
   })
+
+  it('exposes password visibility and preserves the entered value when toggling', async () => {
+    const wrapper = mountLogin()
+    await flushPromises()
+    await wrapper.get('#password').setValue('example-password')
+    const toggle = wrapper.get('button[aria-controls="password"]')
+    expect(toggle.attributes('aria-label')).toBe('auth.showPassword')
+    expect(toggle.attributes('aria-pressed')).toBe('false')
+    await toggle.trigger('click')
+    expect(wrapper.get('#password').attributes('type')).toBe('text')
+    expect((wrapper.get('#password').element as HTMLInputElement).value).toBe('example-password')
+    expect(toggle.attributes('aria-label')).toBe('auth.hidePassword')
+    expect(toggle.attributes('aria-pressed')).toBe('true')
+  })
 })

@@ -223,18 +223,6 @@ func TestBackendModeAuthGuard(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			name:       "enabled_blocks_wechat_payment_oauth_start",
-			enabled:    "true",
-			path:       "/api/v1/auth/oauth/wechat/payment/start",
-			wantStatus: http.StatusForbidden,
-		},
-		{
-			name:       "enabled_allows_wechat_payment_oauth_callback",
-			enabled:    "true",
-			path:       "/api/v1/auth/oauth/wechat/payment/callback",
-			wantStatus: http.StatusOK,
-		},
-		{
 			name:       "enabled_blocks_oidc_oauth_start",
 			enabled:    "true",
 			path:       "/api/v1/auth/oauth/oidc/start",

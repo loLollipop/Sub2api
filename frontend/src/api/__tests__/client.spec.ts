@@ -208,7 +208,7 @@ describe('API Client', () => {
       expect(config.headers.get('X-Admin-UI-Request')).toBeFalsy()
     })
 
-    it('支付用户 API 带 User UI 标记，公开支付 API 不带', async () => {
+    it('订阅用户 API 带 User UI 标记，公开设置 API 不带', async () => {
       const adapter = vi.fn().mockResolvedValue({
         status: 200,
         data: { code: 0, data: {} },
@@ -218,10 +218,10 @@ describe('API Client', () => {
       })
       apiClient.defaults.adapter = adapter
 
-      await apiClient.get('/payment/plans')
+      await apiClient.get('/subscriptions')
       expect(adapter.mock.calls[0][0].headers.get('X-User-UI-Request')).toBe('1')
 
-      await apiClient.post('/payment/public/orders/verify', {})
+      await apiClient.get('/settings/public')
       expect(adapter.mock.calls[1][0].headers.get('X-User-UI-Request')).toBeFalsy()
     })
 

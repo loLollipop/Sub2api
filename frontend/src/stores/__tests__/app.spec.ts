@@ -36,7 +36,7 @@ function createPublicSettings(overrides: Partial<PublicSettings> = {}): PublicSe
     home_content: '',
     compact_home_enabled: false,
     hide_ccs_import_button: false,
-    payment_enabled: false,
+    purchase_subscription_enabled: false,
     risk_control_enabled: false,
     table_default_page_size: 20,
     table_page_size_options: [10, 20, 50, 100],
@@ -408,7 +408,7 @@ describe('useAppStore', () => {
     it('并发调用复用并等待同一个请求，包括 force 调用', async () => {
       const deferred = createDeferred<PublicSettings>()
       vi.mocked(getPublicSettings).mockReturnValue(deferred.promise)
-      const settings = createPublicSettings({ payment_enabled: true })
+      const settings = createPublicSettings({ purchase_subscription_enabled: true })
       const store = useAppStore()
 
       const first = store.fetchPublicSettings()
@@ -431,7 +431,7 @@ describe('useAppStore', () => {
         settings,
       ])
       expect(store.publicSettingsLoaded).toBe(true)
-      expect(store.cachedPublicSettings?.payment_enabled).toBe(true)
+      expect(store.cachedPublicSettings?.purchase_subscription_enabled).toBe(true)
     })
 
     it('force 在无活动请求时绕过缓存，刷新期间的普通调用等待刷新结果', async () => {

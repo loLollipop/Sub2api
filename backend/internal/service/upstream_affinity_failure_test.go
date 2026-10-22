@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
@@ -86,4 +87,21 @@ func TestUpstreamAffinityCleanupSurvivesCanceledRequest(t *testing.T) {
 	state, ok := ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts)
 	require.True(t, ok)
 	require.Contains(t, state.failed, int64(1))
+}
+
+func TestUpstreamAffinityLocalImageGateDoesNotPenalizeAccount(t *testing.T) {
+	for _, wrapped := range []bool{false, true} {
+		ctx := withUpstreamAttempts(context.WithValue(context.Background(), ctxkey.UserID, int64(8)))
+		cache := &failedAffinityCacheStub{}
+		err := errGeminiImageGenerationDenied
+		if wrapped {
+			err = fmt.Errorf("forward: %w", err)
+		}
+		(&GatewayService{cache: cache}).InvalidateUpstreamAffinity(ctx, nil, "current", &Account{ID: 1}, err)
+		(&OpenAIGatewayService{cache: cache}).InvalidateUpstreamAffinity(ctx, nil, "current", &Account{ID: 1}, err)
+		require.Empty(t, cache.invalidated)
+		state, ok := ctx.Value(upstreamAttemptContextKey{}).(*upstreamAttempts)
+		require.True(t, ok)
+		require.Empty(t, state.failed)
+	}
 }

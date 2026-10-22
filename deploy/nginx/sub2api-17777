@@ -24,7 +24,6 @@ server {
     proxy_set_header Connection "upgrade";
 
     include /etc/nginx/cloudflare.conf;
-    include /etc/nginx/snippets/infinite-canvas.conf;
     include /etc/nginx/snippets/sub2api-backend-locations.conf;
     include /etc/nginx/snippets/sub2api-spa.conf;
 }

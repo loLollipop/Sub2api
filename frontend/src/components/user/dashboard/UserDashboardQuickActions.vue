@@ -3,7 +3,6 @@
     <h2 class="signal-actions-label">{{ t('dashboard.quickActions') }}</h2>
     <div class="signal-actions-list">
       <button @click="router.push('/keys')"><Icon name="key" size="md" /><span>{{ t('dashboard.createApiKey') }}</span><Icon name="arrowRight" size="sm" /></button>
-      <button @click="router.push('/infinite-canvas')"><Icon name="grid" size="md" /><span>{{ t('dashboard.infiniteCanvas') }}</span><Icon name="arrowRight" size="sm" /></button>
       <button @click="router.push('/usage')"><Icon name="chart" size="md" /><span>{{ t('dashboard.viewUsage') }}</span><Icon name="arrowRight" size="sm" /></button>
       <button v-if="canUseBatchImage" @click="router.push('/batch-image')"><Icon name="sparkles" size="md" /><span>{{ t('dashboard.batchImageAgent') }}</span><Icon name="arrowRight" size="sm" /></button>
       <button @click="router.push('/redeem')"><Icon name="gift" size="md" /><span>{{ t('dashboard.redeemCode') }}</span><Icon name="arrowRight" size="sm" /></button>

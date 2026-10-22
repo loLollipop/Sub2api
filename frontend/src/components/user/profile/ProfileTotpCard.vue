@@ -1,5 +1,24 @@
 <template>
-  <div class="card">
+  <div :class="embedded ? 'profile-totp-setting' : 'card'">
+    <div v-if="embedded" class="profile-security-row">
+      <span class="profile-setting-icon"><Icon name="shield" size="sm" /></span>
+      <div class="profile-setting-copy">
+        <h3>{{ t('profile.totp.title') }}</h3>
+        <p v-if="loading">{{ t('common.loading') }}</p>
+        <p v-else-if="!status">{{ t('profile.totp.loadFailed') }}</p>
+        <p v-else-if="!status.feature_enabled">{{ t('profile.totp.featureDisabledHint') }}</p>
+        <p v-else-if="status.enabled">
+          <span class="text-emerald-600 dark:text-emerald-400">{{ t('profile.totp.enabled') }}</span>
+          <span v-if="status.enabled_at"> · {{ formatDate(status.enabled_at) }}</span>
+        </p>
+        <p v-else>{{ t('profile.totp.notEnabledHint') }}</p>
+      </div>
+      <button v-if="!loading && !status" type="button" class="btn btn-secondary btn-sm" @click="loadStatus">{{ t('common.tryAgain') }}</button>
+      <button v-else-if="!loading && status?.feature_enabled" type="button" class="btn btn-secondary btn-sm" @click="status.enabled ? showDisableDialog = true : showSetupModal = true">
+        {{ status.enabled ? t('profile.totp.disable') : t('profile.totp.enable') }}
+      </button>
+    </div>
+    <template v-else>
     <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
       <h2 class="text-lg font-medium text-gray-900 dark:text-white">
         {{ t('profile.totp.title') }}
@@ -78,6 +97,7 @@
       </div>
     </div>
 
+    </template>
     <!-- Setup Modal -->
     <TotpSetupModal
       v-if="showSetupModal"
@@ -104,6 +124,7 @@ import TotpSetupModal from './TotpSetupModal.vue'
 import TotpDisableDialog from './TotpDisableDialog.vue'
 
 const { t } = useI18n()
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const loading = ref(true)
 const status = ref<TotpStatus | null>(null)

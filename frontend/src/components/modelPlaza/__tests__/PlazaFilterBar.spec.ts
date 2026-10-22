@@ -55,14 +55,26 @@ function mountBar(props: Record<string, unknown> = {}) {
 
 describe('PlazaFilterBar faceted filters', () => {
 
+  it('offers one reset action only while any filter is selected, including a zero rate', async () => {
+    const wrapper = mountBar()
+    expect(wrapper.find('[data-testid="plaza-clear-filters"]').exists()).toBe(false)
+    await wrapper.setProps({ rate: 0 })
+    await wrapper.get('[data-testid="plaza-clear-filters"]').trigger('click')
+    expect(wrapper.emitted('reset')).toEqual([[]])
+    await wrapper.setProps({ rate: 'all', search: 'gpt' })
+    expect(wrapper.find('[data-testid="plaza-clear-filters"]').exists()).toBe(true)
+    await wrapper.setProps({ search: '   ' })
+    expect(wrapper.find('[data-testid="plaza-clear-filters"]').exists()).toBe(false)
+  })
+
   it('keeps unmatched platforms, groups and rates disabled instead of hiding them', () => {
     const byGroup = mountBar({ groupId: 2 })
     const platforms = byGroup.findAll('.plaza-seg-item')
     expect(platforms.map((button) => button.text().replace(/\s+/g, ' ').trim())).toEqual([
       'modelPlaza.filters.all',
-      'anthropic',
-      'openai',
-      'grok',
+      'Anthropic',
+      'OpenAI',
+      'Grok',
     ])
     expect(platforms[1].attributes('disabled')).toBeDefined()
     expect(platforms[2].attributes('disabled')).toBeUndefined()
@@ -80,6 +92,14 @@ describe('PlazaFilterBar faceted filters', () => {
     expect(rateButtons[2].attributes('disabled')).toBeDefined()
   })
 
+  it('supports actual vendors within composite groups in all three facets', () => {
+    const composite = [{ id: 9, name: 'mixed', platform: 'composite', platforms: ['openai', 'anthropic'], rate: 0.5 }]
+    const wrapper = mountBar({ groups: composite, platforms: ['openai', 'anthropic'], rates: [0.5], platform: 'anthropic', groupId: 9 })
+    expect(wrapper.findAll('.plaza-seg-item').every(button => button.attributes('disabled') === undefined)).toBe(true)
+    expect(wrapper.get('[aria-label="modelPlaza.filters.groupLabel"] [data-option="9"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[aria-label="modelPlaza.filters.rateLabel"] [data-option="0.5"]').attributes('disabled')).toBeUndefined()
+  })
+
   it('emits compact toolbar changes without dropping the all option', async () => {
     const wrapper = mountBar()
     await wrapper.get('.plaza-search-input').setValue('gpt-5')
@@ -89,6 +109,46 @@ describe('PlazaFilterBar faceted filters', () => {
     await wrapper.get('[aria-label="modelPlaza.filters.rateLabel"]').get('[data-option="0.07"]').trigger('click')
     expect(wrapper.emitted('update:rate')?.at(-1)).toEqual([0.07])
     await wrapper.get('.plaza-seg-item[aria-checked="true"]').trigger('click')
+    expect(wrapper.emitted('update:platform')?.at(-1)).toEqual(['all'])
+  })
+
+  it('supports directional, Home and End navigation with one tab stop', async () => {
+    const wrapper = mountBar()
+    document.body.append(wrapper.element)
+    try {
+      const radios = wrapper.findAll('[role="radio"]')
+      expect(radios.map(radio => radio.attributes('tabindex'))).toEqual(['0', '-1', '-1', '-1'])
+      for (const [from, key, target, platform] of [
+        [0, 'ArrowDown', 1, 'anthropic'],
+        [1, 'ArrowRight', 2, 'openai'],
+        [2, 'ArrowUp', 1, 'anthropic'],
+        [1, 'ArrowLeft', 0, 'all'],
+        [0, 'ArrowLeft', 3, 'grok'],
+        [3, 'Home', 0, 'all'],
+        [0, 'End', 3, 'grok']
+      ] as const) {
+        await radios[from].trigger('keydown', { key })
+        expect(wrapper.emitted('update:platform')?.at(-1)).toEqual([platform])
+        expect(document.activeElement).toBe(radios[target].element)
+        await wrapper.setProps({ platform })
+        expect(radios.filter(radio => radio.attributes('tabindex') === '0')).toHaveLength(1)
+        expect(radios[target].attributes('aria-checked')).toBe('true')
+      }
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('skips disabled providers and leaves IME composition and ordinary keys alone', async () => {
+    const wrapper = mountBar({ groupId: 2 })
+    const radios = wrapper.findAll('[role="radio"]')
+    await radios[0].trigger('keydown', { key: 'ArrowDown', isComposing: true })
+    await radios[0].trigger('keydown', { key: 'a' })
+    expect(wrapper.emitted('update:platform')).toBeUndefined()
+    await radios[0].trigger('keydown', { key: 'ArrowDown' })
+    expect(wrapper.emitted('update:platform')?.at(-1)).toEqual(['openai'])
+    await wrapper.setProps({ platform: 'openai' })
+    await radios[2].trigger('keydown', { key: 'ArrowDown' })
     expect(wrapper.emitted('update:platform')?.at(-1)).toEqual(['all'])
   })
 })

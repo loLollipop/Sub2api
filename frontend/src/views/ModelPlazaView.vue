@@ -1,5 +1,5 @@
 <template>
-  <!-- 后台内嵌形态:?embedded=1 且已登录,套完整后台布局 -->
+  <!-- 已登录时共享控制台导航，公开访问保留独立页面。 -->
   <AppLayout v-if="isEmbedded">
     <ModelPlazaContent :response="data" :loading="loading" :error="loadFailed" embedded />
   </AppLayout>
@@ -16,7 +16,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
 import '@/styles/console-signal.css'
 import '@/styles/console-studio.css'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -27,12 +26,10 @@ import { getModelPlaza, type ModelPlazaResponse } from '@/api/modelPlaza'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 
-const route = useRoute()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
-// embedded=1 但未登录(如转发的链接)自动降级为独立形态。
-const isEmbedded = computed(() => route.query.embedded === '1' && authStore.isAuthenticated)
+const isEmbedded = computed(() => authStore.isAuthenticated)
 
 const data = ref<ModelPlazaResponse | null>(null)
 const loading = ref(true)

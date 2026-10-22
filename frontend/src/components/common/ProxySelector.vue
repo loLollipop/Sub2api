@@ -1,9 +1,11 @@
 <template>
-  <div class="relative" ref="containerRef">
+  <div class="relative" ref="containerRef" @keydown="handleEscape">
     <button
+      ref="triggerRef"
       type="button"
       @click="toggle"
       :disabled="disabled"
+      :aria-expanded="isOpen"
       :class="[
         'select-trigger',
         isOpen && 'select-trigger-open',
@@ -203,6 +205,7 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const searchQuery = ref('')
 const containerRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLButtonElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
 // Test state
@@ -256,6 +259,7 @@ const selectOption = (value: number | null) => {
   emit('update:modelValue', value)
   isOpen.value = false
   searchQuery.value = ''
+  triggerRef.value?.focus()
 }
 
 const handleTestProxy = async (proxy: Proxy) => {
@@ -296,19 +300,21 @@ const handleClickOutside = (event: MouseEvent) => {
 
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && isOpen.value) {
+    event.stopPropagation()
+    if (event.isComposing) return
+    event.preventDefault()
     isOpen.value = false
     searchQuery.value = ''
+    triggerRef.value?.focus()
   }
 }
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
-  document.addEventListener('keydown', handleEscape)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
-  document.removeEventListener('keydown', handleEscape)
 })
 </script>
 

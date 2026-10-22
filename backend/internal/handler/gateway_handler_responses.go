@@ -119,6 +119,11 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 
+	if geminiImageGenerationRejected(c, apiKey, nil, clientRequestedModel(c, reqModel), reqModel, channelMapping.MappedModel) {
+		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", service.ImageGenerationPermissionMessage())
+		return
+	}
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.responsesSecurityAuditError(c, decision)
 		return
@@ -329,6 +334,14 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		var result *service.ForwardResult
 		setActualUpstreamEndpoint(c, "")
 		if account.IsGeminiOpenAIProtocol() {
+			upstreamModel := account.GetMappedModel(gjson.GetBytes(forwardBody, "model").String())
+			if geminiImageGenerationRejected(c, apiKey, nil, clientRequestedModel(c, reqModel), reqModel, upstreamModel) {
+				if accountReleaseFunc != nil {
+					accountReleaseFunc()
+				}
+				h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", service.ImageGenerationPermissionMessage())
+				return
+			}
 			if h.openAIGatewayService == nil {
 				h.responsesErrorResponse(c, http.StatusBadGateway, "upstream_error", "OpenAI gateway is not configured")
 				if accountReleaseFunc != nil {

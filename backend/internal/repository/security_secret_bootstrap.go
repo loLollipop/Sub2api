@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -14,10 +16,12 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
 const (
 	securitySecretKeyJWT        = "jwt_secret"
+	securitySecretKeyTOTP       = "totp_encryption_key"
 	securitySecretReadRetryMax  = 5
 	securitySecretReadRetryWait = 10 * time.Millisecond
 )
@@ -42,7 +46,7 @@ func ensureBootstrapSecrets(ctx context.Context, client *ent.Client, cfg *config
 			log.Println("Warning: configured JWT secret mismatches persisted value; using persisted secret for cross-instance consistency.")
 		}
 		cfg.JWT.Secret = storedSecret
-		return nil
+		return ensureTOTPInstallationKey(ctx, client, cfg)
 	}
 
 	secret, created, err := getOrCreateGeneratedSecuritySecret(ctx, client, securitySecretKeyJWT, 32)
@@ -53,6 +57,218 @@ func ensureBootstrapSecrets(ctx context.Context, client *ent.Client, cfg *config
 
 	if created {
 		log.Println("Warning: JWT secret auto-generated and persisted to database. Consider rotating to a managed secret for production.")
+	}
+	return ensureTOTPInstallationKey(ctx, client, cfg)
+}
+
+// ensureTOTPInstallationKey supplies the same durable installation key to TOTP,
+// monitoring, plugins and other durable secrets. An explicit legacy key is persisted
+// unchanged, so upgrading never rotates existing ciphertext. A conflicting
+// configuration fails closed instead of silently replacing either key.
+func ensureTOTPInstallationKey(ctx context.Context, client *ent.Client, cfg *config.Config) error {
+	configured := cfg.Totp.HasPersistentEncryptionKey()
+	configuredKey := strings.TrimSpace(cfg.Totp.EncryptionKey)
+	if configured {
+		if err := validateTOTPInstallationKey(configuredKey); err != nil {
+			return fmt.Errorf("configured TOTP installation key: %w", err)
+		}
+	}
+
+	var key string
+	stored, err := client.SecuritySecret.Query().Where(securitysecret.KeyEQ(securitySecretKeyTOTP)).Only(ctx)
+	if err == nil {
+		key = strings.TrimSpace(stored.Value)
+		if configured && !strings.EqualFold(key, configuredKey) {
+			return fmt.Errorf("configured TOTP installation key conflicts with the persisted installation key; restore the original key instead of rotating existing ciphertext")
+		}
+	} else if !ent.IsNotFound(err) {
+		return fmt.Errorf("load TOTP installation key: %w", err)
+	} else {
+
+		// A legacy deployment's explicit key must authenticate every durable
+		// strict secret BEFORE it can become the installation key. With no key, even
+		// one existing ciphertext forbids creating a replacement key.
+		if err := inspectLegacyInstallationSecrets(ctx, client, configuredKey, configured); err != nil {
+			// A concurrent new instance may have registered its key and started
+			// writing ciphertext after our initial lookup. Adopt only its durable
+			// winner; never generate a replacement after a failed inventory.
+			winner, readErr := client.SecuritySecret.Query().Where(securitysecret.KeyEQ(securitySecretKeyTOTP)).Only(ctx)
+			if readErr == nil {
+				return applyTOTPInstallationKey(cfg, strings.TrimSpace(winner.Value), configuredKey, configured)
+			}
+			return err
+		}
+		if configured {
+			key, err = createSecuritySecretIfAbsent(ctx, client, securitySecretKeyTOTP, configuredKey)
+			if err == nil && !strings.EqualFold(key, configuredKey) {
+				return fmt.Errorf("configured TOTP installation key conflicts with the persisted installation key; restore the original key instead of rotating existing ciphertext")
+			}
+		} else {
+			// Discard config.Load's temporary key. Atomic insert-or-read keeps
+			// concurrent first boots on one generated installation key.
+			key, _, err = getOrCreateGeneratedSecuritySecret(ctx, client, securitySecretKeyTOTP, 32)
+		}
+		if err != nil {
+			return fmt.Errorf("persist TOTP installation key: %w", err)
+		}
+	}
+	return applyTOTPInstallationKey(cfg, key, configuredKey, configured)
+}
+
+func applyTOTPInstallationKey(cfg *config.Config, key, configuredKey string, configured bool) error {
+	if configured && !strings.EqualFold(key, configuredKey) {
+		return fmt.Errorf("configured TOTP installation key conflicts with the persisted installation key; restore the original key instead of rotating existing ciphertext")
+	}
+	if err := validateTOTPInstallationKey(key); err != nil {
+		return fmt.Errorf("stored TOTP installation key: %w", err)
+	}
+	cfg.Totp.EncryptionKey = key
+	cfg.Totp.EncryptionKeyPersistent = true
+	return nil
+}
+
+// inspectLegacyInstallationSecrets runs only before first registration. Every
+// durable consumer of the shared AES key belongs here, including disabled and
+// soft-deleted records. Queries stream values and never include user identities
+// or secret material in errors. JWT-derived Live attestations, plugin UI tokens,
+// and other short-lived capabilities do not use this persistent-key inventory.
+func inspectLegacyInstallationSecrets(ctx context.Context, client *ent.Client, keyHex string, verify bool) error {
+	var encryptor service.SecretEncryptor
+	if verify {
+		var err error
+		encryptor, err = NewAESEncryptor(&config.Config{Totp: config.TotpConfig{EncryptionKey: keyHex}})
+		if err != nil {
+			return fmt.Errorf("invalid installation encryption key")
+		}
+	}
+	check := func(source, format, value string) error {
+		if value == "" {
+			return nil
+		}
+		if format == "aes_optional_plaintext" {
+			// Legacy S3 readers accept plaintext when decryption fails. With an
+			// explicit key retain that contract; never infer ciphertext from its
+			// Base64 appearance (a normal 40-character secret has the same shape).
+			if verify {
+				return nil
+			}
+			decoded, err := base64.StdEncoding.DecodeString(value)
+			if err != nil || len(decoded) < 12+16 {
+				return nil
+			}
+			return fmt.Errorf("ambiguous legacy %s requires the original TOTP_ENCRYPTION_KEY before installation-key bootstrap", source)
+		}
+		if !verify {
+			return fmt.Errorf("existing encrypted %s requires the original TOTP_ENCRYPTION_KEY before installation-key bootstrap", source)
+		}
+		valid := false
+		switch format {
+		case "aes", "aes_optional_plaintext":
+			_, err := encryptor.Decrypt(value)
+			valid = err == nil
+
+		}
+		if !valid {
+			return fmt.Errorf("configured installation key cannot decrypt existing %s; no installation key was registered", source)
+		}
+		return nil
+	}
+	stream := func(source, query string, visit func(string) error) error {
+		rows, err := client.QueryContext(ctx, query)
+		if err != nil {
+			return fmt.Errorf("inspect installation secrets in %s failed", source)
+		}
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var value string
+			if rows.Scan(&value) != nil {
+				return fmt.Errorf("inspect installation secrets in %s failed", source)
+			}
+			if err := visit(value); err != nil {
+				return err
+			}
+		}
+		if rows.Err() != nil {
+			return fmt.Errorf("inspect installation secrets in %s failed", source)
+		}
+		return nil
+	}
+	for _, field := range []struct{ source, query string }{
+		{"TOTP authenticators", `SELECT totp_secret_encrypted FROM users WHERE totp_secret_encrypted IS NOT NULL AND totp_secret_encrypted <> ''`},
+		{"channel monitor keys", `SELECT api_key_encrypted FROM channel_monitors WHERE api_key_encrypted <> ''`},
+		{"plugin configuration", `SELECT config_encrypted FROM sub2api_plugin_installations WHERE config_encrypted <> ''`},
+	} {
+		if err := stream(field.source, field.query, func(value string) error { return check(field.source, "aes", value) }); err != nil {
+			return err
+		}
+	}
+	if err := stream("Ollama sessions", `SELECT extra FROM accounts WHERE extra IS NOT NULL`, func(raw string) error {
+		var fields map[string]json.RawMessage
+		if json.Unmarshal([]byte(raw), &fields) != nil {
+			return fmt.Errorf("inspect installation secrets in account metadata failed")
+		}
+		if session, ok := fields[service.OllamaCloudUsageSessionExtraKey]; ok && string(session) != "null" {
+			var value string
+			if json.Unmarshal(session, &value) != nil {
+				return fmt.Errorf("inspect installation secrets in Ollama sessions failed")
+			}
+			return check("Ollama sessions", "aes", value)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	// Close rows before inspecting the bounded settings subset.
+	rows, err := client.QueryContext(ctx, `SELECT key, value FROM settings WHERE key IN ('backup_s3_config','image_storage_config','prompt_audit_config') AND value <> ''`)
+	if err != nil {
+		return fmt.Errorf("inspect installation secrets in settings failed")
+	}
+	values := map[string]string{}
+	for rows.Next() {
+		var name, value string
+		if rows.Scan(&name, &value) != nil {
+			_ = rows.Close()
+			return fmt.Errorf("inspect installation secrets in settings failed")
+		}
+		values[name] = value
+	}
+	err = rows.Err()
+	_ = rows.Close()
+	if err != nil {
+		return fmt.Errorf("inspect installation secrets in settings failed")
+	}
+	for _, name := range []string{"backup_s3_config", "image_storage_config", "prompt_audit_config"} {
+		raw := values[name]
+		if raw == "" {
+			continue
+		}
+		var stored struct {
+			SecretAccessKey string `json:"secret_access_key"`
+			Endpoints       []struct {
+				TokenCiphertext string `json:"token_ciphertext"`
+			} `json:"endpoints"`
+		}
+		if json.Unmarshal([]byte(raw), &stored) != nil {
+			return fmt.Errorf("inspect installation secrets in %s failed", name)
+		}
+		if name == "prompt_audit_config" {
+			for _, endpoint := range stored.Endpoints {
+				if err := check("prompt audit node tokens", "aes", endpoint.TokenCiphertext); err != nil {
+					return err
+				}
+			}
+		} else if err := check(name, "aes_optional_plaintext", stored.SecretAccessKey); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateTOTPInstallationKey(value string) error {
+	decoded, err := hex.DecodeString(value)
+	if err != nil || len(decoded) != 32 {
+		return fmt.Errorf("must be 32 bytes encoded as 64 hexadecimal characters")
 	}
 	return nil
 }

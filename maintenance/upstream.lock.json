@@ -2,28 +2,30 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.18",
-  "imported_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
+  "imported_version": "2.2.20",
+  "imported_commit": "68d3624b59ef92cb9667348a6512936ccdc598a5",
   "personal_baseline_commit": "6e2e5b5da8c4ac9d07c11dcb5e33f92141a5eeb0",
-  "latest_observed_version": "2.2.18",
-  "latest_observed_release_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
-  "latest_observed_main_commit": "450ca5b9ea2e2ecacfd5daf8fa9e760805f870e6",
+  "latest_observed_version": "2.2.20",
+  "latest_observed_release_commit": "68d3624b59ef92cb9667348a6512936ccdc598a5",
+  "latest_observed_main_commit": "177ad1749261db02de9f83383242e2423a158b79",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.18",
-  "reviewed_release_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
+  "reviewed_release_tag": "v2.2.20",
+  "reviewed_release_commit": "68d3624b59ef92cb9667348a6512936ccdc598a5",
   "observed_delta_review": {
-    "from_commit": "6c624219955f467114edb5ae91dc1e3904c1c878",
-    "to_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
-    "status": "selective_formal_v2218_backport",
-    "scope": "Administrator TOTP identity and atomic state protection; Anthropic stream status and Ops terminal fidelity. Preserve local billing, no-replay and error terminal contracts. Exclude infrastructure-IP/embedded-status refusal billing and the optional recovery CLI with non-atomic refresh revocation.",
-    "evidence": "maintenance/notes/upstream-sync-20261022.md"
+    "from_commit": "b60f6160135f90c708f58a4cf5d9228d6eced218",
+    "rewritten_history_equivalent_baseline": "68a18950830d4e186424a2121a847d6ce4a8c36e",
+    "to_commit": "177ad1749261db02de9f83383242e2423a158b79",
+    "status": "selective_formal_v2220_backport",
+    "scope": "Durable media reconciliation and bounded polling, persistent installation encryption key, authenticator-required 2FA disable, audit report validation and unused frontend dependency removal. Preserve local billing and UI; exclude crypto, native payments, Bark and optional recovery/approval commands. Unreleased TOTP input refactor deferred.",
+    "evidence": "maintenance/notes/upstream-sync-20261023.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "b60f6160135f90c708f58a4cf5d9228d6eced218",
+    "source_head": "68d3624b59ef92cb9667348a6512936ccdc598a5",
     "implemented_with_local_regression": [
+      "Formal v2.2.20 selected media reconciliation, installation encryption-key persistence and all-user TOTP disable verification; upstream compatibility defects corrected locally. See dated note.",
       "Formal v2.2.12-v2.2.13 stream error status classification and local durable Responses WebSocket refusal adaptation; see dated sync note for verification and exclusions",
       "Formal v2.2.8-v2.2.11 bounded wallet preload before statistics, four additive Claude aliases, stale modal-load isolation, bulk allowlist parsing and non-failover Grok safety-check classification; preserve authoritative empty catalogs (see dated sync note)",
       "Grok refusal charging and permanent conversation blocks: exact zero-price override, user-scoped full-history identity, atomic billing/block/quota commit and existing-worker recovery. Real PostgreSQL/Redis integration and race regressions passed in v2.1.27 CI; production migration267 and release acceptance passed on 2026-10-21.",
@@ -73,7 +75,11 @@
     "58338b4da",
     "0bec57406",
     "6ce8f3c6f",
-    "b60f61601"
+    "b60f61601",
+    "ac4161a74",
+    "dfff99ac2",
+    "8fd35e844",
+    "68d3624b5"
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
@@ -226,6 +232,14 @@
         "6eda39041"
       ],
       "reason": "Import scanner and safe prefilters, but retain compaction/tool-schema no-op JSON validation and escaping semantics. Single-pass scanner retains hard JSON validation, first-match nested duplicate-key semantics, local thinking support, and range refresh after model rewrite."
+    },
+    {
+      "feature": "v2220-optional-admin-approval-and-unreleased-totp-input",
+      "upstream_commits": [
+        "8fd35e844",
+        "177ad1749"
+      ],
+      "reason": "One-time approval requires an existing JWT session and is not full lost-authenticator recovery. Keep prior recovery CLI exclusion. Unreleased input component is cosmetic; current local six-digit dialog and validation retained. Metadata scanning changes deferred; existing stronger local file scanner retained."
     }
   ],
   "deployment_repository": "loLollipop/Sub2api",

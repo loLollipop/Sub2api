@@ -81,7 +81,7 @@ func TestOpenAIFrameTTFTClassificationMatchesDataEntryPoint(t *testing.T) {
 		{name: "trimmed payload type", data: `{"type":" response.output_text.delta ","delta":"hello"}`, wantClient: true, wantVisible: true, wantSemantic: true},
 		{name: "delta without payload type", data: `{"delta":"hello"}`, fallbackType: "response.output_text.delta", wantClient: true, wantVisible: true, wantSemantic: true},
 		{name: "semantic delta", data: `{"type":"response.output_text.delta","delta":"hello"}`, wantClient: true, wantVisible: true, wantSemantic: true},
-		{name: "empty delta", data: `{"type":"response.output_text.delta","delta":""}`, wantClient: true, wantSemantic: true},
+		{name: "empty delta", data: `{"type":"response.output_text.delta","delta":""}`, wantSemantic: true},
 		{name: "null delta", data: `{"type":"response.output_text.delta","delta":null}`, wantClient: true, wantSemantic: true},
 		{name: "whitespace delta", data: `{"type":"response.output_text.delta","delta":" "}`, wantClient: true, wantVisible: true, wantSemantic: true},
 		{name: "numeric delta compatibility", data: `{"type":"response.output_text.delta","delta":0}`, wantClient: true, wantVisible: true, wantSemantic: true},

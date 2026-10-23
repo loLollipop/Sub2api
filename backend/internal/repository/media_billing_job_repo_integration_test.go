@@ -324,3 +324,71 @@ func assertMediaBillingOutboxDeltas(t *testing.T, ctx context.Context, userID in
 	require.NoError(t, rows.Err())
 	require.Equal(t, want, got)
 }
+
+func TestMediaBillingJobIntegration_ReconciliationRetainsHoldAndResolvesOnce(t *testing.T) {
+	for _, outcome := range []string{"success", "failure"} {
+		t.Run(outcome, func(t *testing.T) {
+			ctx := context.Background()
+			f := newMediaBillingIntegrationFixture(t, 10)
+			job := f.videoJob("media-reconcile-"+fmt.Sprint(time.Now().UnixNano()), 2)
+			_, err := f.repo.CreateMediaBillingJob(ctx, job)
+			require.NoError(t, err)
+			require.NoError(t, f.repo.SubmitMediaBillingJob(ctx, job.ID, "upstream-"+job.ID, []byte(`{}`)))
+			for range 2 {
+				require.NoError(t, f.repo.ReconcileMediaBillingJob(ctx, job.ID))
+			}
+			assertMediaBillingWallet(t, ctx, f.user.ID, 8, 2)
+			assertMediaBillingOutboxDeltas(t, ctx, f.user.ID, []float64{-2})
+			stored, err := f.repo.GetMediaBillingJob(ctx, f.user.ID, f.apiKey.ID, "upstream-"+job.ID)
+			require.NoError(t, err)
+			require.Equal(t, service.MediaBillingReconciliation, stored.Status)
+			leased, err := f.repo.ListMediaBillingJobs(ctx, 32)
+			require.NoError(t, err)
+			for _, candidate := range leased {
+				require.NotEqual(t, job.ID, candidate.ID)
+			}
+			if outcome == "failure" {
+				for range 2 {
+					_, err = f.repo.FailMediaBillingJob(ctx, job.ID)
+					require.NoError(t, err)
+				}
+				assertMediaBillingWallet(t, ctx, f.user.ID, 10, 0)
+				assertMediaBillingOutboxDeltas(t, ctx, f.user.ID, []float64{-2, 2})
+			} else {
+				_, err = f.repo.PrepareMediaBillingIntent(ctx, job.ID, f.intent("media-reconcile:"+job.ID, 1.5))
+				require.NoError(t, err)
+				require.NoError(t, f.repo.ReconcileMediaBillingJob(ctx, job.ID))
+				for range 2 {
+					_, err = f.repo.ApplyMediaBillingJob(ctx, job.ID)
+					require.NoError(t, err)
+				}
+				require.NoError(t, f.repo.CompleteMediaBillingJob(ctx, job.ID))
+				_, err = f.repo.FailMediaBillingJob(ctx, job.ID)
+				require.ErrorIs(t, err, service.ErrUsageBillingRequestConflict)
+				assertMediaBillingWallet(t, ctx, f.user.ID, 8.5, 0)
+				assertMediaBillingOutboxDeltas(t, ctx, f.user.ID, []float64{-2, 0.5})
+			}
+		})
+	}
+}
+func TestMediaBillingJobIntegration_ReconciliationCountsAgainstSubscriptionHold(t *testing.T) {
+	ctx := context.Background()
+	f := newMediaBillingIntegrationFixture(t, 10)
+	_, err := integrationDB.ExecContext(ctx, `UPDATE groups SET daily_limit_usd=3 WHERE id=$1`, f.group.ID)
+	require.NoError(t, err)
+	sub := mustCreateSubscription(t, integrationEntClient, &service.UserSubscription{UserID: f.user.ID, GroupID: f.group.ID, StartsAt: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour), Status: service.SubscriptionStatusActive})
+	job := f.videoJob("media-sub-reconcile-"+fmt.Sprint(time.Now().UnixNano()), 2)
+	job.SubscriptionID = &sub.ID
+	_, err = f.repo.CreateMediaBillingJob(ctx, job)
+	require.NoError(t, err)
+	require.NoError(t, f.repo.SubmitMediaBillingJob(ctx, job.ID, "upstream-"+job.ID, []byte(`{}`)))
+	require.NoError(t, f.repo.ReconcileMediaBillingJob(ctx, job.ID))
+	another := f.videoJob(job.ID+"-another", 2)
+	another.SubscriptionID = &sub.ID
+	_, err = f.repo.CreateMediaBillingJob(ctx, another)
+	require.Error(t, err)
+	_, err = f.repo.FailMediaBillingJob(ctx, job.ID)
+	require.NoError(t, err)
+	_, err = f.repo.CreateMediaBillingJob(ctx, another)
+	require.NoError(t, err)
+}

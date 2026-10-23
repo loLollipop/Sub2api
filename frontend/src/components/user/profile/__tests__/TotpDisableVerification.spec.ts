@@ -24,7 +24,7 @@ beforeEach(() => {
   api.disable.mockResolvedValue({ success: true })
 })
 
-describe('administrator TOTP disable', () => {
+describe('TOTP disable for every role', () => {
   const open = async () => {
     const wrapper = mount(TotpDisableDialog)
     await flushPromises()
@@ -73,14 +73,14 @@ describe('administrator TOTP disable', () => {
     expect(api.disable).not.toHaveBeenCalled()
   })
 
-  it.each(['email', 'password'] as const)('preserves the ordinary user %s method', async method => {
+  it.each(['email', 'password'] as const)('rejects a legacy %s disable method', async method => {
     api.getVerificationMethod.mockResolvedValueOnce({ method })
     const wrapper = await open()
-    expect(wrapper.find('[data-testid="totp-disable-code"]').exists()).toBe(false)
-    await wrapper.get(method === 'email' ? 'input[maxlength="6"]' : 'input[type="password"]').setValue(method === 'email' ? '123456' : 'user-password')
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(showError).toHaveBeenCalled()
     await wrapper.get('form').trigger('submit')
-    await flushPromises()
-    expect(api.disable).toHaveBeenCalledWith(method === 'email' ? { email_code: '123456' } : { password: 'user-password' })
+    expect(api.disable).not.toHaveBeenCalled()
+    expect(api.sendVerifyCode).not.toHaveBeenCalled()
   })
 
   it('does not send an additional disable request while the first is pending', async () => {
@@ -111,13 +111,7 @@ describe('administrator TOTP disable', () => {
     expect(wrapper.emitted('success')).toHaveLength(1)
   })
 
-  it('rejects a nonnumeric ordinary-user email code', async () => {
-    api.getVerificationMethod.mockResolvedValueOnce({ method: 'email' })
-    const wrapper = await open()
-    await wrapper.get('input[maxlength="6"]').setValue('12ab56')
-    await wrapper.get('form').trigger('submit')
-    expect(api.disable).not.toHaveBeenCalled()
-  })
+
 })
 
 describe('TOTP enable with the existing identity verification', () => {

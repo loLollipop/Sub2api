@@ -5,18 +5,19 @@
     "v0.2.14": "0363b8cdba8cec3e2ba4b2dbd49c4481143fa55d",
     "v0.2.15": "f2669c8cf62555cd92389b3f55920e9e6e7c6ff2",
     "v0.2.16": "01842576b3d5c1e2545b5a99ad555d36e28ed306",
-    "v0.2.17": "060d0160417782cd962a0c7f460f6cd4565d4916"
+    "v0.2.17": "060d0160417782cd962a0c7f460f6cd4565d4916",
+    "v0.2.18": "ac1b8f1271be0d674fa6f074403c1410f30a3a81"
   },
-  "latest_reviewed_main_commit": "dba770d56a0ee0ae5bad1b3dc5e11614d323163c",
+  "latest_reviewed_main_commit": "5c185c5c5d4f5e409e2139806e0964ae944e03e8",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v0.2.17",
-  "reviewed_release_commit": "060d0160417782cd962a0c7f460f6cd4565d4916",
+  "reviewed_release_tag": "v0.2.18",
+  "reviewed_release_commit": "ac1b8f1271be0d674fa6f074403c1410f30a3a81",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "dba770d56a0ee0ae5bad1b3dc5e11614d323163c",
+    "source_head": "5c185c5c5d4f5e409e2139806e0964ae944e03e8",
     "implemented_with_local_regression": [
       "Toolchain, cooldown scopes and frontend lifecycle fixes",
       "2026-10-17 Responses created_at, Gemini compatibility thinking, subscription retirement/public catalogs and payment compatibility; dated sync note records local adaptations and verification",
@@ -100,7 +101,8 @@
     {"commit": "47cb84b8b", "scope": "gemini-image-group-permission-gate", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
     {"commit": "38b72d734", "scope": "model-rate-limit-copy-on-write", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
     {"commit": "d5dbb5c36", "scope": "lazy-single-antigravity-probe-with-timeout", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
-    {"commit": "67dca9687", "scope": "quota-sql-dimension-variants", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"}
+    {"commit": "67dca9687", "scope": "quota-sql-dimension-variants", "note": "Local adaptations and validation: maintenance/notes/upstream-sync-20261022.md"},
+    {"commit": "c591412c42ab195dacdede9eb19f9cbfee221144", "scope": "codex-cli-default-empty-stream-preamble-and-overload-retry-after", "note": "Default CLI identity while retaining explicit official UA overrides. Only explicit empty strings in known frames defer client commitment. Observed billable usage prevents retry and is retained. RetryAfter numeric conversion bounded before duration conversion. maintenance/notes/upstream-sync-20261023.md"}
   ],
   "preserve_during_future_sync": [
     "Existing 0.15 billing and fixed-price shop-link recharge customizations",
@@ -120,10 +122,10 @@
     "afbef7c8c duplicate DeepSeek image alias fix: source alias-generation predecessor absent locally; broader input compatibility intentionally not imported."
   ],
   "observed_delta_review": {
-    "from_commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
-    "to_commit": "dba770d56a0ee0ae5bad1b3dc5e11614d323163c",
+    "from_commit": "dba770d56a0ee0ae5bad1b3dc5e11614d323163c",
+    "to_commit": "5c185c5c5d4f5e409e2139806e0964ae944e03e8",
     "status": "selective_main_backport_with_explicit_deferrals",
-    "evidence": "maintenance/notes/upstream-sync-20261022.md"
+    "evidence": "maintenance/notes/upstream-sync-20261023.md"
   },
   "sync_20261022": {
     "evidence": "maintenance/notes/upstream-sync-20261022.md",

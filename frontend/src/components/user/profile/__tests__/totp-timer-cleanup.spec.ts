@@ -99,24 +99,14 @@ describe('TOTP 弹窗定时器清理', () => {
     expect(clearIntervalSpy).toHaveBeenCalledWith(timerId)
   })
 
-  it('TotpDisableDialog 卸载时清理倒计时定时器', async () => {
+  it('TotpDisableDialog uses an authenticator without an email cooldown timer', async () => {
+    mocks.getVerificationMethod.mockResolvedValue({ method: 'totp' })
     const wrapper = mount(TotpDisableDialog)
     await flushPromises()
-
-    const sendButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('profile.totp.sendCode'))
-
-    expect(sendButton).toBeTruthy()
-    await sendButton!.trigger('click')
-    await flushPromises()
-
-    expect(setIntervalSpy).toHaveBeenCalledTimes(1)
-    const timerId = setIntervalSpy.mock.results[0]?.value
-
+    expect(wrapper.find('[data-testid="totp-disable-code"]').exists()).toBe(true)
+    expect(mocks.sendVerifyCode).not.toHaveBeenCalled()
+    expect(setIntervalSpy).not.toHaveBeenCalled()
     wrapper.unmount()
-
-    expect(clearIntervalSpy).toHaveBeenCalledWith(timerId)
   })
 
   it('TotpSetupModal 失败时改用 toast 并不渲染内联错误', async () => {
@@ -138,7 +128,7 @@ describe('TOTP 弹窗定时器清理', () => {
   })
 
   it('TotpDisableDialog 失败时改用 toast 并不渲染内联错误', async () => {
-    mocks.getVerificationMethod.mockResolvedValue({ method: 'password' })
+    mocks.getVerificationMethod.mockResolvedValue({ method: 'totp' })
     mocks.disable.mockRejectedValue({
       response: { data: { message: 'disable failed' } }
     })
@@ -146,7 +136,7 @@ describe('TOTP 弹窗定时器清理', () => {
     const wrapper = mount(TotpDisableDialog)
     await flushPromises()
 
-    await wrapper.get('input[type="password"]').setValue('correct horse battery staple')
+    await wrapper.get('[data-testid="totp-disable-code"]').setValue('012345')
     await wrapper.get('form').trigger('submit.prevent')
     await flushPromises()
 

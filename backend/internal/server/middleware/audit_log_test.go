@@ -188,3 +188,29 @@ func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {
 	require.Equal(t, "<credential-bearing body omitted>", logs[0].RequestBody)
 	require.NotContains(t, logs[0].RequestBody, "audit-canary")
 }
+
+func TestTotpDisableAuditOmitsEntireCredentialBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repository := &auditCaptureRepository{}
+	auditService := service.NewAuditLogService(repository, nil)
+	auditService.Start()
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set(string(ContextKeyUser), AuthSubject{UserID: 77}); c.Next() })
+	router.Use(gin.HandlerFunc(NewAuditLogMiddleware(auditService)))
+	router.POST("/api/v1/user/totp/disable", func(c *gin.Context) {
+		var input map[string]any
+		require.NoError(t, c.ShouldBindJSON(&input))
+		require.Equal(t, "012345", input["totp_code"])
+		c.Status(http.StatusBadRequest)
+	})
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/user/totp/disable", bytes.NewBufferString(`{"totp_code":"012345","password":"audit-canary"}`))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	auditService.Stop()
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	require.Len(t, repository.logs, 1)
+	require.Equal(t, "<credential-bearing body omitted>", repository.logs[0].RequestBody)
+}

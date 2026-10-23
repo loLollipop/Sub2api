@@ -155,7 +155,7 @@ type BackupService struct {
 	settingRepo SettingRepository
 	dbCfg       *config.DatabaseConfig
 	encryptor   SecretEncryptor
-	// encryptionKeyConfigured mirrors cfg.Totp.EncryptionKeyConfigured: false
+	// encryptionKeyConfigured mirrors cfg.Totp.HasPersistentEncryptionKey(): false
 	// means the secret encryption key was auto-generated and does not survive a
 	// restart. Durable-secret writers must refuse to persist new secrets in that
 	// mode (#4524).
@@ -204,7 +204,7 @@ func NewBackupService(
 		settingRepo:             settingRepo,
 		dbCfg:                   &cfg.Database,
 		encryptor:               encryptor,
-		encryptionKeyConfigured: cfg.Totp.EncryptionKeyConfigured,
+		encryptionKeyConfigured: cfg.Totp.HasPersistentEncryptionKey(),
 		storeFactory:            storeFactory,
 		dumper:                  dumper,
 		bgCtx:                   bgCtx,
@@ -335,10 +335,9 @@ func (s *BackupService) Stop() {
 
 // ─── S3 配置管理 ───
 
-// EncryptionKeyConfigured reports whether a fixed (explicitly configured) secret
-// encryption key is in use. When false the key is auto-generated on every start
-// and secrets encrypted with it cannot be recovered after a restart, so callers
-// that persist durable secrets must refuse to do so (#4524).
+// EncryptionKeyConfigured reports whether an explicitly configured or database-
+// persisted encryption key is in use. Callers must refuse durable writes while
+// only a temporary per-process key is available.
 func (s *BackupService) EncryptionKeyConfigured() bool {
 	return s != nil && s.encryptionKeyConfigured
 }

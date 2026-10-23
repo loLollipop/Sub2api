@@ -272,9 +272,8 @@ func (s *TotpService) CompleteSetup(ctx context.Context, userID int64, totpCode,
 	return nil
 }
 
-// Disable requires the administrator's current authenticator code. Passwords,
+// Disable requires the current authenticator code for every user. Passwords,
 // email codes and a previous step-up grant cannot replace this verification.
-// Regular users retain the existing email/password verification.
 func (s *TotpService) Disable(ctx context.Context, userID int64, emailCode, password string, totpCode ...string) error {
 	// Get user
 	user, err := s.userRepo.GetByID(ctx, userID)
@@ -286,24 +285,20 @@ func (s *TotpService) Disable(ctx context.Context, userID int64, emailCode, pass
 		return ErrTotpNotSetup
 	}
 
-	if user.Role == RoleAdmin {
-		if len(totpCode) == 0 || strings.TrimSpace(totpCode[0]) == "" {
-			return ErrTotpInvalidCode
-		}
-		verifiedUser, err := s.verifyCode(ctx, userID, strings.TrimSpace(totpCode[0]))
-		if err != nil {
-			return err
-		}
-		if verifiedUser.Role != user.Role {
-			return ErrUserSecurityStateChanged
-		}
-		user = verifiedUser
-	} else if err := s.verifyIdentity(ctx, user, emailCode, password); err != nil {
+	if len(totpCode) == 0 || strings.TrimSpace(totpCode[0]) == "" {
+		return ErrTotpInvalidCode
+	}
+	verifiedUser, err := s.verifyCode(ctx, userID, strings.TrimSpace(totpCode[0]))
+	if err != nil {
 		return err
 	}
+	if verifiedUser.Role != user.Role {
+		return ErrUserSecurityStateChanged
+	}
+	user = verifiedUser
 
-	// Bind the write to the role used for verification; a concurrent promotion
-	// must not turn a regular user's password into administrator authorization.
+	// Bind the write to the verified role and authenticator secret so a
+	// concurrent promotion or rebind cannot reuse stale authorization.
 	disabler, ok := s.userRepo.(TotpRoleConditionalDisabler)
 	if !ok {
 		return ErrUserSecurityStateChanged
@@ -512,17 +507,17 @@ func generateRandomToken(byteLength int) (string, error) {
 
 // VerificationMethod represents the method required for TOTP operations
 type VerificationMethod struct {
-	Method string `json:"method"` // "email", "password", or "totp" for administrator disable.
+	Method string `json:"method"` // "email", "password", or "totp" for disable.
 }
 
 // GetVerificationMethod returns the verification method for TOTP operations.
-// 管理员启用用密码，关闭用当前 TOTP；普通用户维持邮箱或密码校验。
+// Setup retains email/password verification; disabling requires the current TOTP.
 func (s *TotpService) GetVerificationMethod(ctx context.Context, userID int64, operation ...string) (*VerificationMethod, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}
-	if user.Role == RoleAdmin && len(operation) > 0 && operation[0] == "disable" {
+	if len(operation) > 0 && operation[0] == "disable" {
 		return &VerificationMethod{Method: "totp"}, nil
 	}
 	if s.usesEmailVerification(ctx, user) {

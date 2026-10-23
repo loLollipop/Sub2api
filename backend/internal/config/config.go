@@ -1740,11 +1740,17 @@ type JWTConfig struct {
 // TotpConfig TOTP 双因素认证配置
 type TotpConfig struct {
 	// EncryptionKey 用于加密 TOTP 密钥的 AES-256 密钥（32 字节 hex 编码）
-	// 如果为空，将自动生成一个随机密钥（仅适用于开发环境）
+	// 空值先生成临时密钥；数据库启动阶段加载或持久化安装密钥。
 	EncryptionKey string `mapstructure:"encryption_key"`
 	// EncryptionKeyConfigured 标记加密密钥是否为手动配置（非自动生成）
-	// 只有手动配置了密钥才允许在管理后台启用 TOTP 功能
+	// 持久化能力由 HasPersistentEncryptionKey 统一判断。
 	EncryptionKeyConfigured bool `mapstructure:"-"`
+	// EncryptionKeyPersistent is set only after installation bootstrap.
+	EncryptionKeyPersistent bool `mapstructure:"-"`
+}
+
+func (c TotpConfig) HasPersistentEncryptionKey() bool {
+	return c.EncryptionKeyConfigured || c.EncryptionKeyPersistent
 }
 
 type TurnstileConfig struct {
@@ -2051,7 +2057,7 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 		}
 		cfg.Totp.EncryptionKey = key
 		cfg.Totp.EncryptionKeyConfigured = false
-		slog.Warn("TOTP encryption key auto-generated. Consider setting a fixed key for production.")
+		slog.Info("Temporary encryption key generated; database initialization will load or persist the installation key.")
 	} else {
 		cfg.Totp.EncryptionKeyConfigured = true
 	}

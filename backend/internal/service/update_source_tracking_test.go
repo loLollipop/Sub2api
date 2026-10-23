@@ -141,11 +141,12 @@ func (s *updateTrackingClientStub) FetchLatestRelease(ctx context.Context, repo 
 }
 
 func newUpdateTrackingClient() *updateTrackingClientStub {
+	baselines := defaultUpdateSourceBaselines()
 	return &updateTrackingClientStub{
 		updateServiceGitHubClientStub: updateServiceGitHubClientStub{release: &GitHubRelease{TagName: "v2.1.12"}},
 		releases: map[string]*GitHubRelease{
-			"kiss-kedaya/sub2api": {TagName: "v2.2.7", PublishedAt: "2026-10-20T00:00:00Z"},
-			"Wei-Shaw/sub2api":    {TagName: "v0.2.17", PublishedAt: "2026-08-01T00:00:00Z"},
+			"kiss-kedaya/sub2api": {TagName: baselines[0].releaseTag, PublishedAt: "2026-10-20T00:00:00Z"},
+			"Wei-Shaw/sub2api":    {TagName: baselines[1].releaseTag, PublishedAt: "2026-08-01T00:00:00Z"},
 		},
 		releaseErrs: map[string]error{},
 		heads:       map[string]string{"kiss-kedaya/sub2api": strings.Repeat("a", 40), "Wei-Shaw/sub2api": defaultUpdateSourceBaselines()[1].releaseCommit},

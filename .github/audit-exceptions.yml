@@ -1,28 +1,4 @@
 version: 1
-# 高危/严重依赖漏洞的豁免清单。
-#
-# 判定逻辑见 tools/check_pnpm_audit_exceptions.py：只对「当前 pnpm audit 结果里
-# 仍然出现」的高危/严重项校验是否有豁免、以及豁免是否过期。
-# 因此**漏洞已经消失的条目会被静默忽略**——这类陈旧条目要及时删掉，
-# 否则会给人「我们在跟踪」的假象。
-exceptions:
-  # ---------------------------------------------------------------- 仍然需要
-  # xlsx 的两条解析漏洞豁免已于 2026-10-15 移除：依赖升级并精确锁定到
-  # SHA512 校验的 0.20.3，生产 audit 已无 xlsx advisory。继续由
-  # src/__tests__/xlsxWriteOnly.spec.ts 保护纯写、懒加载的应用边界。
-  - package: nanoid
-    advisory: "GHSA-2v37-7h3g-55p8"
-    severity: high
-    reason: "Custom generator with size=0 not used; all nanoid calls use default size or positive values. Re-checked 2026-09-30 and still absent from the production audit output."
-    mitigation: "No zero-size custom generators in codebase; upgrade when nanoid releases fix"
-    expires_on: "2026-12-31"
-    owner: "security@your-domain"
-
-  # ---------------------------------------------------------------- 已失效，已删除
-  # 以下三条在 2026-09-30 复核时已经不在 pnpm audit 结果里，检查脚本不会校验它们，
-  # 继续留着只会造成「已被跟踪」的误导：
-  #   lodash    GHSA-r5fr-rjxr-66jc  (过期 2026-07-02)
-  #   lodash-es GHSA-r5fr-rjxr-66jc  (过期 2026-07-02)
-  #   axios     GHSA-3p68-rc4w-qgx5  (critical，过期 2026-07-10)
-  # 后者尤其值得注意：一条 critical 豁免过期两个多月却没让 CI 变红，
-  # 仅仅因为该 advisory 已不在结果中——这正是「过期但静默」的典型。
+# Production audit on 2026-10-23 reports no vulnerabilities.
+# Removed stale nanoid exception and unused icon dependency tree.
+exceptions: []

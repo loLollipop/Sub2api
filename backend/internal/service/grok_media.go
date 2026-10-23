@@ -999,6 +999,10 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 			}
 		}
 	}
+	videoStatus := ""
+	if endpoint == GrokMediaEndpointVideoStatus || endpoint == GrokMediaEndpointVideoGenerationsStatus {
+		videoStatus = strings.ToLower(strings.TrimSpace(gjson.GetBytes(respBody, "status").String()))
+	}
 	respBody = adaptGrokVideoClientResponse(endpoint, requestID, respBody)
 	resultModel := requestModel
 	resultBillingModel := requestModel
@@ -1028,6 +1032,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 		VideoCount:           usage.VideoCount,
 		VideoResolution:      usage.VideoResolution,
 		VideoDurationSeconds: usage.VideoDurationSeconds,
+		VideoStatus:          videoStatus,
 	}
 	if err := runGrokMediaBeforePublish(ctx, result); err != nil {
 		return nil, err

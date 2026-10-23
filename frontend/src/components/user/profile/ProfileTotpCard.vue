@@ -1,12 +1,11 @@
 <template>
-  <div :class="embedded ? 'profile-totp-setting' : 'card'">
+  <div v-if="status?.feature_enabled !== false" :class="embedded ? 'profile-totp-setting' : 'card'">
     <div v-if="embedded" class="profile-security-row">
       <span class="profile-setting-icon"><Icon name="shield" size="sm" /></span>
       <div class="profile-setting-copy">
         <h3>{{ t('profile.totp.title') }}</h3>
         <p v-if="loading">{{ t('common.loading') }}</p>
         <p v-else-if="!status">{{ t('profile.totp.loadFailed') }}</p>
-        <p v-else-if="!status.feature_enabled">{{ t('profile.totp.featureDisabledHint') }}</p>
         <p v-else-if="status.enabled">
           <span class="text-emerald-600 dark:text-emerald-400">{{ t('profile.totp.enabled') }}</span>
           <span v-if="status.enabled_at"> · {{ formatDate(status.enabled_at) }}</span>
@@ -31,21 +30,6 @@
       <!-- Loading state -->
       <div v-if="loading" class="flex items-center justify-center py-8">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-      </div>
-
-      <!-- Feature disabled globally -->
-      <div v-else-if="status && !status.feature_enabled" class="flex items-center gap-4 py-4">
-        <div class="flex-shrink-0 rounded-full bg-gray-100 p-3 dark:bg-dark-700">
-          <Icon name="exclamationTriangleRounded" size="none" class="h-6 w-6 text-gray-400" :stroke-width="1.5" />
-        </div>
-        <div>
-          <p class="font-medium text-gray-700 dark:text-gray-300">
-            {{ t('profile.totp.featureDisabled') }}
-          </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ t('profile.totp.featureDisabledHint') }}
-          </p>
-        </div>
       </div>
 
       <!-- 2FA Enabled -->

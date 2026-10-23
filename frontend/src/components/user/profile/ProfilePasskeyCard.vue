@@ -1,5 +1,5 @@
 <template>
-  <div :class="embedded ? 'profile-passkey-setting' : 'card'">
+  <div v-if="enabled" :class="embedded ? 'profile-passkey-setting' : 'card'">
     <div :class="embedded ? 'profile-security-row' : 'flex items-start justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700'">
       <span v-if="embedded" class="profile-setting-icon"><Icon name="key" size="sm" /></span>
       <div :class="{ 'profile-setting-copy': embedded }">
@@ -7,7 +7,7 @@
           {{ t('profile.passkey.title') }}
         </h2>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {{ !enabled ? t('profile.passkey.featureDisabled') : !supported ? t('profile.passkey.unsupported') : t('profile.passkey.description') }}
+          {{ !supported ? t('profile.passkey.unsupported') : t('profile.passkey.description') }}
         </p>
       </div>
       <button

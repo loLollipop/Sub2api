@@ -1,11 +1,11 @@
 <template>
-  <div class="card profile-notifications">
+  <section :class="['profile-notifications', embedded ? 'profile-notifications-embedded' : 'card']" aria-labelledby="profile-notify-title">
     <div class="profile-notifications-heading">
       <span class="profile-setting-icon"><Icon name="bell" size="sm" /></span>
       <div class="profile-setting-copy">
-      <h2 id="profile-notify-title" class="text-lg font-medium text-gray-900 dark:text-white">
+      <component :is="embedded ? 'h3' : 'h2'" id="profile-notify-title" class="text-lg font-medium text-gray-900 dark:text-white">
         {{ t('profile.balanceNotify.title') }}
-      </h2>
+      </component>
       <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
         {{ t('profile.balanceNotify.description') }}
       </p>
@@ -58,7 +58,7 @@
                   <input type="checkbox" :checked="!entry.disabled" @change="handleEmailToggle(entry, $event)" :disabled="savingProfile" class="sr-only peer" :aria-label="entry.email" />
                   <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-gray-500 peer-checked:bg-primary-600"></div>
                 </label>
-                <span class="text-sm text-gray-700 dark:text-gray-300 truncate" :title="entry.email">{{ entry.email }}</span>
+                <span class="profile-notify-email-address text-sm text-gray-700 dark:text-gray-300" :title="entry.email">{{ entry.email }}</span>
                 <span v-if="entry.primary" class="text-xs text-primary-600 dark:text-primary-400 shrink-0">{{ t('profile.balanceNotify.primaryEmail') }}</span>
               </div>
               <div class="flex items-center gap-2 shrink-0">
@@ -153,7 +153,7 @@
         </div>
       </template>
     </fieldset>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -184,6 +184,7 @@ const props = defineProps<{
   extraEmails: NotifyEmailEntry[]
   systemDefaultThreshold: number
   userEmail: string
+  embedded?: boolean
 }>()
 
 const { t } = useI18n()

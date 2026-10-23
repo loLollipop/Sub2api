@@ -1,5 +1,5 @@
 /* Neutral surfaces and an orange accent, shared by every console page. */
-:is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover) {
+:is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover, body:has(.console-signal) > .version-popover-header) {
   --signal-bg: #f8f9fb;
   --signal-surface: #ffffff;
   --signal-raised: #f3f4f6;
@@ -32,7 +32,7 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.dark :is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover) {
+.dark :is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover, body:has(.console-signal) > .version-popover-header) {
   --signal-bg: #111318;
   --signal-surface: #1b1e24;
   --signal-raised: #242830;

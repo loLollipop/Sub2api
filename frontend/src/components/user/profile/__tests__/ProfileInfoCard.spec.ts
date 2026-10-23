@@ -192,11 +192,39 @@ describe('ProfileInfoCard', () => {
 
     expect(wrapper.get('[data-testid="profile-overview-hero"]').text()).toContain('alice@example.com')
     expect(wrapper.get('[data-testid="profile-overview-metric-balance"]').text()).toContain('Account Balance')
-    expect(wrapper.get('[data-testid="profile-overview-metric-concurrency"]').text()).toContain('Concurrency Limit')
-    expect(wrapper.get('[data-testid="profile-overview-metric-member-since"]').text()).toContain('Member Since')
+    expect(wrapper.get('[data-testid="profile-meta-concurrency"]').text()).toContain('Concurrency Limit')
+    expect(wrapper.get('[data-testid="profile-meta-member-since"]').text()).toContain('Member Since')
     expect(wrapper.find('[data-testid="profile-info-summary-grid"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="profile-basics-panel"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="profile-side-column"]').exists()).toBe(false)
+  })
+
+  it('shows actual charges and API requests, including legitimate zero totals', async () => {
+    const wrapper = mount(ProfileInfoCard, {
+      props: { user: createUser(), stats: { total_actual_cost: 42.5, total_requests: 1234 }, statsState: 'ready' },
+      global: { stubs: { Icon: true } }
+    })
+    expect(wrapper.get('[data-testid="profile-overview-metric-spending"]').text()).toContain('$42.50')
+    expect(wrapper.get('[data-testid="profile-overview-metric-requests"]').text()).toContain('1,234')
+    await wrapper.setProps({ stats: { total_actual_cost: 0, total_requests: 0 } })
+    expect(wrapper.get('[data-testid="profile-overview-metric-spending"] dd').text()).toBe('$0.00')
+    expect(wrapper.get('[data-testid="profile-overview-metric-requests"] dd').text()).toBe('0')
+    await wrapper.setProps({ user: createUser({ balance: 0.0047 }), stats: { total_actual_cost: 0.9953, total_requests: 3 } })
+    expect(wrapper.get('[data-testid="profile-overview-metric-balance"] dd').text()).toBe('$0.0047')
+    expect(wrapper.get('[data-testid="profile-overview-metric-spending"] dd').text()).toBe('$0.9953')
+  })
+
+  it.each(['loading', 'error'] as const)('uses a dash and helpful copy when statistics are %s', statsState => {
+    const wrapper = mount(ProfileInfoCard, {
+      props: { user: createUser(), statsState, stats: { total_actual_cost: 50, total_requests: 500 } },
+      global: { stubs: { Icon: true } }
+    })
+    for (const metric of ['spending', 'requests']) {
+      const item = wrapper.get(`[data-testid="profile-overview-metric-${metric}"]`)
+      expect(item.get('dd').text()).toBe('—')
+      expect(item.text()).toContain(statsState === 'loading' ? 'profile.statsLoading' : 'profile.statsUnavailable')
+    }
+    expect(wrapper.get('[data-testid="profile-overview-metric-balance"]').text()).toContain('$10.00')
   })
 
   function mountDialog() {

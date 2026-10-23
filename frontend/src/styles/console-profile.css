@@ -12,11 +12,18 @@
   padding: 0;
   overflow: hidden;
 }
+.console-signal.top-layout .signal-main .signal-profile :is(.profile-overview, .profile-settings-panel) {
+  min-width: 0;
+  border: 1px solid var(--console-edge);
+  border-radius: 14px;
+  background: var(--console-panel);
+  box-shadow: none;
+}
 .console-signal.top-layout .signal-main .signal-profile .profile-overview > .profile-identity {
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 24px;
+  padding: 28px;
 }
 .profile-avatar-trigger { position: relative; flex-shrink: 0; border-radius: 50%; }
 .console-signal.top-layout .signal-main .signal-profile .profile-identity-avatar {
@@ -43,6 +50,9 @@
 .profile-name-edit:hover, .profile-avatar-trigger:hover .profile-avatar-edit { background: var(--signal-accent-soft); color: var(--signal-accent); }
 .profile-name-edit:focus-visible, .profile-avatar-trigger:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 4px; }
 .profile-identity-meta { display: flex; flex-wrap: wrap; gap: 2px 16px; margin-top: 4px; color: var(--signal-muted); font-size: 12px; overflow-wrap: anywhere; }
+.profile-identity-meta > span { min-width: 0; }
+.profile-account-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; color: var(--signal-muted); font-size: 11px; }
+.profile-account-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .profile-source-hints { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; color: var(--signal-muted); font-size: 11px; }
 .profile-source-hints > span { display: inline-flex; align-items: center; gap: 4px; }
 .profile-source-hints svg { width: 12px; height: 12px; flex-shrink: 0; }
@@ -55,14 +65,23 @@
   border-top: 1px solid var(--console-edge);
   background: var(--console-inset);
 }
-.console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div { min-width: 0; padding: 16px 24px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div { min-width: 0; padding: 20px 28px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div + div { border-left: 1px solid var(--console-edge); }
-.profile-identity-metrics dt { color: var(--signal-muted); font-size: 12px; }
+.profile-identity-metrics dt { display: flex; align-items: center; gap: 7px; color: var(--signal-muted); font-size: 12px; }
+.profile-identity-metrics dt svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--signal-accent); }
 .profile-identity-metrics dd { margin-top: 4px; color: var(--signal-text); font-size: 20px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.profile-settings-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: 20px; }
-.console-signal.top-layout .signal-main .signal-profile .profile-settings-panel { padding: 20px; }
+.profile-identity-metrics .profile-metric-hint { margin-top: 5px; color: var(--signal-muted); font-size: 11px; line-height: 18px; font-weight: 400; }
+.profile-settings-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); align-items: start; gap: 20px; }
+.console-signal.top-layout .signal-main .signal-profile .profile-settings-panel { padding: 24px; }
 .profile-section-heading { padding-bottom: 16px; }
 .profile-section-heading p { margin-top: 3px; color: var(--signal-muted); font-size: 12px; line-height: 20px; }
+.profile-panel-heading { display: flex; align-items: flex-start; gap: 10px; }
+.profile-panel-icon { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border: 1px solid var(--console-edge); border-radius: 8px; background: var(--signal-accent-soft); color: var(--signal-accent); }
+.console-signal.top-layout .signal-main .signal-profile .profile-panel-heading h2 { font-size: 14px; line-height: 22px; }
+.profile-login-panel > .profile-panel-heading { margin-bottom: 20px; border-bottom: 1px solid var(--console-edge); }
+.profile-subsection-heading { display: flex; align-items: flex-start; gap: 8px; }
+.profile-subsection-heading > svg { margin-top: 2px; flex-shrink: 0; color: var(--signal-muted); }
+.console-signal.top-layout .signal-main .signal-profile .profile-subsection-heading h3 { font-size: 13px; line-height: 20px; }
 .console-signal.top-layout .signal-main .signal-profile .profile-bindings-list > div { margin-top: 0; }
 .console-signal.top-layout .signal-main .signal-profile .profile-bindings-list .profile-binding-row { margin: 0; border-top: 1px solid var(--console-edge); }
 .profile-bindings-list .profile-binding-row:last-child { padding-bottom: 0; }
@@ -72,6 +91,7 @@
 .profile-bindings-list .profile-binding-row:has(.profile-email-form) .profile-binding-layout > div:first-child { width: 100%; }
 .profile-bindings-list .profile-binding-row > div > div:first-child { gap: 12px; }
 .profile-bindings-list .profile-binding-icon { width: 32px; height: 32px; border-radius: 8px; font-size: 11px; }
+.profile-binding-action { min-width: 60px; justify-content: center; }
 .profile-bindings-list .profile-binding-row .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 5px; }
 .profile-bindings-list .profile-binding-row p { font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
 .profile-bindings-list .profile-binding-row .grid.text-sm { font-size: 11px; line-height: 18px; }
@@ -85,11 +105,19 @@
 .profile-passkey-details:has(form) { padding-left: 0; }
 .profile-passkey-details form { background: var(--console-inset); border-color: var(--console-edge); }
 .profile-passkey-details .flex.items-center.justify-between { flex-wrap: wrap; }
-.console-signal.top-layout .signal-main .signal-profile .profile-notifications { padding: 20px; grid-column: 1 / -1; }
+.console-signal.top-layout .signal-main .signal-profile .profile-notifications { padding: 20px; }
+.console-signal.top-layout .signal-main .signal-profile .profile-notifications-embedded { padding: 24px 0 0; margin-top: 24px; border-top: 1px solid var(--console-edge); background: transparent; }
 .profile-notifications-heading { display: flex; align-items: center; gap: 12px; }
+.profile-notifications-heading > label { flex-shrink: 0; }
 .profile-notifications-body { padding-top: 20px; margin-top: 16px; border-top: 1px solid var(--console-edge); }
 .profile-notifications-body > div { min-width: 0; }
 .console-signal.top-layout .signal-main .signal-profile .profile-notify-email { background: var(--console-inset); }
+.profile-notify-email-address { min-width: 0; overflow-wrap: anywhere; }
+.profile-notify-email > div:first-child { flex-wrap: wrap; }
+.profile-notifications-embedded .profile-notify-email { flex-wrap: wrap; gap: 8px; }
+.profile-notifications-embedded .profile-notify-email > div:last-child { max-width: 100%; flex-wrap: wrap; }
+.profile-notifications-embedded .profile-notify-pending { flex-wrap: wrap; }
+.profile-notifications-embedded .profile-notify-pending > span { min-width: 0; overflow-wrap: anywhere; }
 .profile-notifications-body .text-yellow-600 { color: var(--signal-muted); }
 .profile-support { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; color: var(--signal-muted); font-size: 12px; padding-inline: 2px; }
 .profile-support > svg { align-self: center; width: 15px; height: 15px; }
@@ -107,23 +135,24 @@
 .profile-dialog-form label:has(input[type='file']:focus-visible) { outline: 2px solid var(--signal-accent); outline-offset: 3px; }
 .profile-dialog-form label:has(input[type='file']:disabled) { pointer-events: none; opacity: .5; }
 
-@media (min-width: 960px) {
-  .profile-notifications-body { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 28px; }
-  .profile-notifications-body.space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
-}
 @media (max-width: 959px) {
   .profile-settings-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 }
 @media (max-width: 639px) {
   .console-signal.top-layout .signal-main .signal-profile { gap: 16px; }
-  .console-signal.top-layout .signal-main .signal-profile .profile-overview > .profile-identity { gap: 14px; padding: 18px 16px; align-items: flex-start; }
+  .console-signal.top-layout .signal-main .signal-profile .profile-overview > .profile-identity { gap: 14px; padding: 18px 16px; align-items: flex-start; flex-wrap: wrap; }
   .console-signal.top-layout .signal-main .signal-profile .profile-identity-avatar { width: 52px; height: 52px; font-size: 20px; }
   .console-signal.top-layout .signal-main .signal-profile .profile-name-line h2 { font-size: 18px; line-height: 26px; }
   .profile-name-line { gap: 5px; }
+  .profile-identity-copy { flex-basis: calc(100% - 66px); }
+  .profile-account-meta { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-left: 66px; }
   .console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div { padding: 14px 12px; }
   .profile-identity-metrics dt { font-size: 11px; }
   .profile-identity-metrics dd { font-size: 16px; line-height: 24px; }
   .console-signal.top-layout .signal-main .signal-profile :is(.profile-settings-panel, .profile-notifications) { padding: 16px; }
+  .console-signal.top-layout .signal-main .signal-profile .profile-notifications-embedded { padding: 20px 0 0; margin-top: 20px; }
+  .profile-bindings-list .profile-binding-layout { flex-wrap: wrap; }
+  .profile-bindings-list .profile-binding-row:has(.profile-email-form) .profile-binding-layout > div:last-child { margin-left: 44px; }
   .profile-security-row { flex-wrap: wrap; gap: 10px; }
   .profile-setting-copy { flex-basis: calc(100% - 46px); }
   .profile-security-row > .btn { margin-left: 42px; }
@@ -133,4 +162,9 @@
   .profile-notify-pending, .profile-notify-email.is-verifying { flex-wrap: wrap; gap: 8px; }
   .profile-notify-pending > span, .profile-notify-email.is-verifying > div:first-child { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
   .profile-notify-pending > div, .profile-notify-email.is-verifying > div:last-child { flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 359px) {
+  .console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics { grid-template-columns: minmax(0, 1fr); }
+  .console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div { padding: 14px 16px; }
+  .console-signal.top-layout .signal-main .signal-profile .profile-identity-metrics > div + div { border-left: 0; border-top: 1px solid var(--console-edge); }
 }

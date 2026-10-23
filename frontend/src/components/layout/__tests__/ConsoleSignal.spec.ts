@@ -65,7 +65,7 @@ beforeEach(() => {
   localStorage.clear()
   document.documentElement.classList.remove('dark')
   vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
-    matches: query === '(min-width: 1024px)', media: query, onchange: null,
+    matches: query === '(min-width: 1024px)' || query === '(min-width: 640px)', media: query, onchange: null,
     addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
   }))
 })
@@ -175,6 +175,9 @@ describe('SIGNAL shell route isolation', () => {
 
   it('preserves the admin sidebar collapse and personal destinations', async () => {
     const { app } = await renderShell('/admin/dashboard', 'admin')
+    expect(wrapper!.findAll('version-badge-stub')).toHaveLength(1)
+    expect(wrapper!.get('.top-brand-area version-badge-stub').attributes('placement')).toBe('header')
+    expect(wrapper!.find('.sidebar version-badge-stub').exists()).toBe(false)
     await wrapper!.get('#mobile-navigation-trigger').trigger('click')
     expect(app.sidebarCollapsed).toBe(true)
     expect(wrapper!.classes()).toContain('signal-nav-collapsed')

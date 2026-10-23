@@ -17,7 +17,7 @@ vi.mock('@/composables/useBatchImageAccess', () => ({
 
 let wrapper: VueWrapper | undefined
 let dialog: VueWrapper | undefined
-async function renderSidebar(role: 'user' | 'admin' = 'user', desktop = true) {
+async function renderSidebar(role: 'user' | 'admin' = 'user', desktop = true, realVersion = false) {
   vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
     matches: query === '(min-width: 1024px)' && desktop, media: query, onchange: null,
     addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
@@ -27,6 +27,14 @@ async function renderSidebar(role: 'user' | 'admin' = 'user', desktop = true) {
   const app = useAppStore()
   app.publicSettingsLoaded = true
   app.cachedPublicSettings = { risk_control_enabled: true, affiliate_enabled: true } as NonNullable<typeof app.cachedPublicSettings>
+  if (realVersion) {
+    app.fetchVersion = vi.fn().mockResolvedValue(undefined)
+    app.currentVersion = '2.1.32'
+    app.versionLoaded = true
+    app.upstreamUpdates = [{ repository: 'Wei-Shaw/sub2api', branch: 'main', has_update: false,
+      baseline_commit: 'a'.repeat(40), latest_commit: 'a'.repeat(40), release_tag: 'v0.2.17',
+      release_url: 'https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.17' }]
+  }
   const auth = useAuthStore()
   auth.user = { id: 1, role } as NonNullable<typeof auth.user>
   useAdminSettingsStore().fetch = vi.fn().mockResolvedValue(undefined)
@@ -35,7 +43,7 @@ async function renderSidebar(role: 'user' | 'admin' = 'user', desktop = true) {
   await router.isReady()
   wrapper = mount({ components: { AppSidebar }, template: '<div><button id="mobile-navigation-trigger">Menu</button><AppSidebar /></div>' }, {
     attachTo: document.body,
-    global: { plugins: [pinia, router, createI18n({ legacy: false, locale: 'en', missingWarn: false, fallbackWarn: false, messages: { en: {} } })], stubs: { VersionBadge: true } },
+    global: { plugins: [pinia, router, createI18n({ legacy: false, locale: 'en', missingWarn: false, fallbackWarn: false, messages: { en: {} } })], stubs: { VersionBadge: !realVersion, transition: true } },
   })
   return { app, router }
 }
@@ -90,6 +98,40 @@ describe('AppSidebar scroll position persistence', () => {
 })
 
 describe('AppSidebar direct navigation and responsive collapse', () => {
+  it('moves keyboard focus through the real teleported version panel inside the mobile drawer', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ width: 1, height: 1 }] as unknown as DOMRectList)
+    const { app } = await renderSidebar('admin', false, true)
+    app.setMobileOpen(true)
+    await flushPromises()
+    const trigger = wrapper!.get<HTMLButtonElement>('.version-trigger')
+    trigger.element.focus()
+    await flushPromises()
+    const panel = document.getElementById(trigger.attributes('aria-controls'))!
+    expect(wrapper!.element.contains(panel)).toBe(false)
+    const first = panel.querySelector<HTMLButtonElement>('button')!
+    const last = panel.querySelector<HTMLAnchorElement>('a')!
+    const press = (key: string, shiftKey = false) => document.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }))
+    press('Tab')
+    expect(document.activeElement).toBe(first)
+    press('Tab', true)
+    expect(document.activeElement).toBe(trigger.element)
+    last.focus()
+    press('Tab')
+    expect(document.activeElement).toBe(wrapper!.get('.sidebar-nav a').element)
+    expect(app.mobileOpen).toBe(true)
+    trigger.element.focus()
+    await flushPromises()
+    press('Escape')
+    await flushPromises()
+    expect(document.getElementById(panel.id)).toBeNull()
+    expect(document.activeElement).toBe(trigger.element)
+    expect(app.mobileOpen).toBe(true)
+    press('Escape')
+    await flushPromises()
+    expect(app.mobileOpen).toBe(false)
+  })
+
   it('keeps channel tools flat and folds redemption children beneath an arrow-free parent', async () => {
     const { app } = await renderSidebar('admin')
     const branch = wrapper!.get('button[data-branch="/admin/redemption-center"]')

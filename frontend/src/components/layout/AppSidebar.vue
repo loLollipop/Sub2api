@@ -22,15 +22,17 @@
         <img v-if="settingsLoaded" :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
-        <router-link
-          to="/"
-          class="sidebar-brand-title brand-gradient text-lg font-bold"
-          @click="handleMenuItemClick('/')"
-        >
-          {{ siteName }}
-        </router-link>
-        <!-- Version Badge -->
-        <VersionBadge :version="siteVersion" />
+        <div class="flex items-baseline gap-2">
+          <router-link
+            to="/"
+            class="sidebar-brand-title brand-gradient text-lg font-bold"
+            @click="handleMenuItemClick('/')"
+          >
+            {{ siteName }}
+          </router-link>
+          <VersionBadge v-if="authStore.isAdmin && !showHeaderVersion" :version="appStore.siteVersion" placement="header" />
+        </div>
+        <VersionBadge v-if="!authStore.isAdmin" :version="appStore.siteVersion" />
       </div>
     </div>
 
@@ -181,6 +183,7 @@ const adminSettingsStore = useAdminSettingsStore()
 const { userNavItems, personalNavItems, adminNavItems, refreshBatchImageAccess } = useConsoleNavigation()
 
 const isDesktop = useMediaQuery('(min-width: 1024px)')
+const showHeaderVersion = useMediaQuery('(min-width: 640px)')
 const sidebarCollapsed = computed(() => isDesktop.value && appStore.sidebarCollapsed)
 const sidebarRef = ref<HTMLElement | null>(null)
 const mobileOpen = computed(() => appStore.mobileOpen)
@@ -220,7 +223,6 @@ watch([() => route.path, adminNavItems], () => {
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
-const siteVersion = computed(() => appStore.siteVersion)
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 
 function closeMobile() {
@@ -252,8 +254,15 @@ function isActive(path: string): boolean {
 }
 
 function mobileFocusTargets() {
-  return Array.from(sidebarRef.value?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)') ?? [])
+  const selector = 'a[href], button:not(:disabled)'
+  return [...(sidebarRef.value?.querySelectorAll<HTMLElement>(selector) ?? []),
+    ...(mobileVersionPopover()?.querySelectorAll<HTMLElement>(selector) ?? [])]
     .filter(item => !item.closest('[inert]'))
+}
+
+function mobileVersionPopover() {
+  const panelId = sidebarRef.value?.querySelector('.version-trigger[aria-expanded="true"]')?.getAttribute('aria-controls')
+  return panelId ? document.getElementById(panelId) : null
 }
 
 function handleMobileKeydown(event: KeyboardEvent) {
@@ -269,10 +278,11 @@ function handleMobileKeydown(event: KeyboardEvent) {
   const first = items[0]
   const last = items.at(-1)
   if (!first || !last) return
-  if (event.shiftKey && (document.activeElement === first || !sidebarRef.value?.contains(document.activeElement))) {
+  const focusInside = sidebarRef.value?.contains(document.activeElement) || mobileVersionPopover()?.contains(document.activeElement)
+  if (event.shiftKey && (document.activeElement === first || !focusInside)) {
     event.preventDefault()
     last.focus()
-  } else if (!event.shiftKey && (document.activeElement === last || !sidebarRef.value?.contains(document.activeElement))) {
+  } else if (!event.shiftKey && (document.activeElement === last || !focusInside)) {
     event.preventDefault()
     first.focus()
   }

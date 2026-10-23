@@ -62,6 +62,12 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/charts/__tests__/GroupDistributionChart.spec.ts \
 	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
 	src/components/user/profile/__tests__/ProfileBalanceNotifyCard.spec.ts \
+	src/components/user/profile/__tests__/ProfileIdentityBindingsSection.spec.ts \
+	src/components/user/profile/__tests__/ProfileSecurityVisibility.spec.ts \
+	src/views/user/__tests__/ProfileView.spec.ts \
+	src/components/common/__tests__/VersionBadge.spec.ts \
+	src/components/layout/__tests__/AppHeader.spec.ts \
+	src/stores/__tests__/app.spec.ts \
 	src/views/user/__tests__/RedeemView.spec.ts \
 	src/components/common/__tests__/BaseDialog.ids.spec.ts \
 	src/components/common/__tests__/Pagination.jump.spec.ts \

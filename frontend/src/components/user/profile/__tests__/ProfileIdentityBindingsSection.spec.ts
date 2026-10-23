@@ -49,7 +49,7 @@ vi.mock('vue-i18n', async (importOriginal) => {
         if (key === 'profile.authBindings.providers.linuxdo') return 'LinuxDo'
         if (key === 'profile.authBindings.providers.wechat') return 'WeChat'
         if (key === 'profile.authBindings.providers.oidc') return params?.providerName || 'OIDC'
-        if (key === 'profile.authBindings.bindAction') return `Bind ${params?.providerName || ''}`.trim()
+        if (key === 'profile.authBindings.bindAction') return 'Bind'
         if (key === 'profile.authBindings.emailPlaceholder') return 'Email address'
         if (key === 'profile.authBindings.codePlaceholder') return 'Verification code'
         if (key === 'profile.authBindings.passwordPlaceholder') return 'Set password'
@@ -155,9 +155,10 @@ describe('ProfileIdentityBindingsSection', () => {
     expect(wrapper.get('[data-testid="profile-binding-linuxdo-status"]').text()).toBe('Bound')
     expect(wrapper.get('[data-testid="profile-binding-oidc-status"]').text()).toBe('Not bound')
     expect(wrapper.get('[data-testid="profile-binding-oidc-action"]').text()).toBe(
-      'Bind ExampleID'
+      'Bind'
     )
-    expect(wrapper.get('[data-testid="profile-binding-wechat-action"]').text()).toBe('Bind WeChat')
+    expect(wrapper.get('[data-testid="profile-binding-wechat-action"]').text()).toBe('Bind')
+    expect(wrapper.get('[data-testid="profile-binding-oidc-action"]').attributes('aria-label')).toBe('ExampleID · Bind')
   })
 
   it('starts the WeChat bind flow for the current profile page', async () => {
@@ -199,6 +200,7 @@ describe('ProfileIdentityBindingsSection', () => {
     })
 
     expect(wrapper.find('[data-testid="profile-binding-wechat-action"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-wechat-status"]').exists()).toBe(true)
   })
 
   it('keeps the WeChat bind action visible when only the legacy aggregate setting is present', () => {
@@ -683,7 +685,8 @@ describe('ProfileIdentityBindingsSection', () => {
     })
 
     expect(wrapper.find('[data-testid="profile-binding-email-input"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="profile-binding-email-toggle"]').text()).toBe('Manage email')
+    expect(wrapper.get('[data-testid="profile-binding-email-toggle"]').text()).toBe('Bind')
+    expect(wrapper.get('[data-testid="profile-binding-email-toggle"]').attributes('aria-expanded')).toBe('false')
 
     await wrapper.get('[data-testid="profile-binding-email-toggle"]').trigger('click')
 
@@ -788,5 +791,37 @@ describe('ProfileIdentityBindingsSection', () => {
 
     expect(wrapper.find('[data-testid="profile-binding-linuxdo-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="profile-binding-oidc-action"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-linuxdo-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-oidc-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-dingtalk-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-wechat-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-email-status"]').exists()).toBe(true)
+  })
+
+  it('shows only enabled providers while preserving binding and unbinding controls', async () => {
+    const wrapper = mount(ProfileIdentityBindingsSection, {
+      global: { plugins: [pinia] },
+      props: {
+        compact: true,
+        user: createUser({ auth_bindings: {
+          linuxdo: { bound: true, can_unbind: true },
+          dingtalk: { bound: false, can_bind: true },
+          oidc: { bound: true, can_unbind: true },
+          wechat: { bound: false },
+        } }),
+        linuxdoEnabled: true,
+        dingtalkEnabled: true,
+        oidcEnabled: false,
+        wechatEnabled: false,
+      },
+    })
+    expect(wrapper.find('[data-testid="profile-binding-linuxdo-unbind"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="profile-binding-dingtalk-action"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="profile-binding-oidc-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-wechat-status"]').exists()).toBe(false)
+    await wrapper.setProps({ linuxdoEnabled: false, dingtalkEnabled: false, oidcEnabled: true })
+    expect(wrapper.find('[data-testid="profile-binding-linuxdo-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-dingtalk-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="profile-binding-oidc-unbind"]').exists()).toBe(true)
   })
 })

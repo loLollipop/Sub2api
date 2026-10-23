@@ -31,31 +31,43 @@
             :disabled="!user"
             @click="usernameOpen = true"
           ><Icon name="editSimple" size="sm" /></button>
-          <span :class="['badge', user?.role === 'admin' ? 'badge-primary' : 'badge-gray']">
-            {{ user?.role === 'admin' ? t('profile.administrator') : t('profile.user') }}
-          </span>
-          <span :class="['badge', user?.status === 'active' ? 'badge-success' : 'badge-danger']">
-            {{ user?.status === 'active' ? t('common.active') : t('common.disabled') }}
-          </span>
         </div>
         <div class="profile-identity-meta">
           <span v-if="primaryEmailDisplay">{{ primaryEmailDisplay }}</span>
-          <span v-if="user">{{ t('profile.accountId', { id: user.id }) }}</span>
+          <span v-if="user" data-testid="profile-meta-concurrency">{{ t('profile.concurrencyLimit') }} · {{ user.concurrency }}</span>
+          <span v-if="user" data-testid="profile-meta-member-since">{{ t('profile.memberSince') }} · {{ memberSinceLabel }}</span>
         </div>
         <div v-if="sourceHints.length" class="profile-source-hints">
           <span v-for="hint in sourceHints" :key="hint.key"><Icon name="link" size="sm" />{{ hint.text }}</span>
         </div>
       </div>
+      <div v-if="user" class="profile-account-meta">
+        <div class="profile-account-badges">
+          <span :class="['badge', user.role === 'admin' ? 'badge-primary' : 'badge-gray']">
+            {{ user.role === 'admin' ? t('profile.administrator') : t('profile.user') }}
+          </span>
+          <span :class="['badge', user.status === 'active' ? 'badge-success' : 'badge-danger']">
+            {{ user.status === 'active' ? t('common.active') : t('common.disabled') }}
+          </span>
+        </div>
+        <span>{{ t('profile.accountId', { id: user.id }) }}</span>
+      </div>
     </div>
     <dl class="profile-identity-metrics">
       <div data-testid="profile-overview-metric-balance">
-        <dt>{{ t('profile.accountBalance') }}</dt><dd>{{ formatCurrency(user?.balance || 0) }}</dd>
+        <dt><Icon name="creditCard" size="sm" />{{ t('profile.accountBalance') }}</dt>
+        <dd>{{ user ? formatCurrency(user.balance) : '—' }}</dd>
+        <dd class="profile-metric-hint">{{ user ? t('profile.balanceHint') : t('common.loading') }}</dd>
       </div>
-      <div data-testid="profile-overview-metric-concurrency">
-        <dt>{{ t('profile.concurrencyLimit') }}</dt><dd>{{ user?.concurrency || 0 }}</dd>
+      <div data-testid="profile-overview-metric-spending" :aria-busy="statsState === 'loading'">
+        <dt><Icon name="chart" size="sm" />{{ t('profile.totalSpent') }}</dt>
+        <dd>{{ totalSpentLabel }}</dd>
+        <dd class="profile-metric-hint">{{ statsHint || t('profile.totalSpentHint') }}</dd>
       </div>
-      <div data-testid="profile-overview-metric-member-since">
-        <dt>{{ t('profile.memberSince') }}</dt><dd>{{ memberSinceLabel }}</dd>
+      <div data-testid="profile-overview-metric-requests" :aria-busy="statsState === 'loading'">
+        <dt><Icon name="terminal" size="sm" />{{ t('profile.totalRequests') }}</dt>
+        <dd>{{ totalRequestsLabel }}</dd>
+        <dd class="profile-metric-hint">{{ statsHint || t('profile.totalRequestsHint') }}</dd>
       </div>
     </dl>
   </section>
@@ -104,16 +116,28 @@ import Icon from '@/components/icons/Icon.vue'
 import ProfileAvatarCard from '@/components/user/profile/ProfileAvatarCard.vue'
 import ProfileEditForm from '@/components/user/profile/ProfileEditForm.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import type { UserDashboardStats } from '@/api/usage'
 import type { User, UserAuthBindingStatus, UserAuthProvider, UserProfileSourceContext } from '@/types'
 
 const props = withDefaults(defineProps<{
   user: User | null
   oidcProviderName?: string
+  stats?: Pick<UserDashboardStats, 'total_actual_cost' | 'total_requests'> | null
+  statsState?: 'loading' | 'ready' | 'error'
 }>(), {
   oidcProviderName: 'OIDC',
+  stats: null,
+  statsState: 'loading',
 })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const statsHint = computed(() => props.statsState === 'loading'
+  ? t('profile.statsLoading')
+  : props.statsState === 'error' || !props.stats ? t('profile.statsUnavailable') : '')
+const totalSpentLabel = computed(() => props.statsState === 'ready' && props.stats
+  ? formatCurrency(props.stats.total_actual_cost) : '—')
+const totalRequestsLabel = computed(() => props.statsState === 'ready' && props.stats && Number.isFinite(props.stats.total_requests)
+  ? new Intl.NumberFormat(locale?.value).format(props.stats.total_requests) : '—')
 const avatarOpen = ref(false)
 const avatarBusy = ref(false)
 const usernameOpen = ref(false)
@@ -188,7 +212,9 @@ const providerLabels = computed<Record<UserAuthProvider, string>>(() => ({
 }))
 
 function formatCurrency(value: number): string {
-  return `$${value.toFixed(2)}`
+  return Number.isFinite(value)
+    ? new Intl.NumberFormat(locale?.value, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value)
+    : '—'
 }
 
 function normalizeProvider(value: string): UserAuthProvider | null {

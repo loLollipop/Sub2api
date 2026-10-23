@@ -10,6 +10,7 @@
             <img :src="siteLogo || '/logo.svg'" alt="" class="top-brand-logo" />
             <span class="brand-gradient">{{ appStore.siteName }}</span>
           </router-link>
+          <VersionBadge v-if="authStore.isAdmin && showHeaderVersion" :version="appStore.siteVersion" placement="header" />
         </div>
         <UserTopNav />
         <div class="top-account-area">
@@ -28,11 +29,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAppStore } from '@/stores'
+import { useAppStore, useAuthStore } from '@/stores'
 import { useMediaQuery } from '@vueuse/core'
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
+import VersionBadge from '@/components/common/VersionBadge.vue'
 import ConsoleNavigationSearch from './ConsoleNavigationSearch.vue'
 import ThemeControls from './ThemeControls.vue'
 import { sanitizeUrl } from '@/utils/url'
@@ -42,7 +44,9 @@ import UserTopNav from './UserTopNav.vue'
 const props = defineProps<{ browse?: boolean }>()
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const isDesktop = useMediaQuery('(min-width: 1024px)')
+const showHeaderVersion = useMediaQuery('(min-width: 640px)')
 const compact = ref(false)
 const scrolled = ref(false)
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))

@@ -9,10 +9,10 @@ import AppHeader from '../AppHeader.vue'
 let wrapper: VueWrapper | undefined
 let frames: FrameRequestCallback[]
 
-async function renderHeader(browse = true) {
+async function renderHeader(browse = true, role: 'user' | 'admin' = 'user') {
   const pinia = createPinia()
   setActivePinia(pinia)
-  useAuthStore().user = { id: 1, role: 'user' } as NonNullable<ReturnType<typeof useAuthStore>['user']>
+  useAuthStore().user = { id: 1, role } as NonNullable<ReturnType<typeof useAuthStore>['user']>
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }] })
   await router.push('/model-plaza')
   await router.isReady()
@@ -20,7 +20,7 @@ async function renderHeader(browse = true) {
     props: { browse },
     global: {
       plugins: [pinia, router, createI18n({ legacy: false, locale: 'en', missingWarn: false, fallbackWarn: false, messages: { en: {} } })],
-      stubs: { UserTopNav: true, AccountMenu: true, Icon: true, ThemeControls: true, AnnouncementBell: true, LocaleSwitcher: true, ConsoleNavigationSearch: true, SubscriptionProgressMini: true },
+      stubs: { UserTopNav: true, AccountMenu: true, Icon: true, ThemeControls: true, AnnouncementBell: true, LocaleSwitcher: true, ConsoleNavigationSearch: true, SubscriptionProgressMini: true, VersionBadge: true },
     },
   })
 }
@@ -35,7 +35,7 @@ async function scrollTo(top: number) {
 beforeEach(() => {
   frames = []
   vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
-    matches: query === '(min-width: 1024px)', media: query, onchange: null,
+    matches: query === '(min-width: 1024px)' || query === '(min-width: 640px)', media: query, onchange: null,
     addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
   }))
   vi.spyOn(window, 'scrollY', 'get').mockReturnValue(0)
@@ -139,5 +139,24 @@ describe('header sidebar toggle', () => {
     await trigger.trigger('click')
     expect(app.mobileOpen).toBe(false)
     expect(trigger.attributes('aria-expanded')).toBe('false')
+  })
+})
+
+describe('administrator version entry', () => {
+  it('keeps version checks in the top header independently of sidebar visibility', async () => {
+    await renderHeader(false, 'admin')
+    useAppStore().siteVersion = '2.1.32'
+    await wrapper!.vm.$nextTick()
+    const entry = wrapper!.get('.top-brand-area version-badge-stub')
+    expect(entry.attributes('placement')).toBe('header')
+    expect(entry.attributes('version')).toBe('2.1.32')
+    useAppStore().sidebarCollapsed = true
+    await wrapper!.vm.$nextTick()
+    expect(entry.exists()).toBe(true)
+    await wrapper!.setProps({ browse: true })
+    expect(wrapper!.find('.top-brand-area version-badge-stub').exists()).toBe(true)
+    useAuthStore().user = { id: 2, role: 'user' } as NonNullable<ReturnType<typeof useAuthStore>['user']>
+    await wrapper!.vm.$nextTick()
+    expect(wrapper!.find('version-badge-stub').exists()).toBe(false)
   })
 })

@@ -49,14 +49,123 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-async function openBadge() {
-  wrapper = mount(VersionBadge, { global: { stubs: { Icon: true } } })
+async function openBadge(placement?: 'sidebar' | 'header') {
+  wrapper = mount(VersionBadge, { attachTo: document.body, props: { placement }, global: { stubs: { Icon: true, transition: true, teleport: true } } })
   await flushPromises()
   await wrapper.find('button').trigger('click')
   return wrapper
 }
 
 describe('VersionBadge source checks', () => {
+  it('preserves keyboard focus when the pointer leaves the teleported panel', async () => {
+    wrapper = mount(VersionBadge, {
+      attachTo: document.body, props: { placement: 'header' },
+      global: { stubs: { Icon: true, transition: true } },
+    })
+    await flushPromises()
+    const trigger = wrapper.get<HTMLButtonElement>('.version-trigger')
+    trigger.element.focus()
+    await nextTick()
+    await trigger.trigger('keydown', { key: 'Tab' })
+    const panel = document.getElementById(trigger.attributes('aria-controls'))!
+    const refresh = panel.querySelector('button')!
+    panel.dispatchEvent(new MouseEvent('mouseleave'))
+    await vi.advanceTimersByTimeAsync(200)
+    expect(document.body.contains(panel)).toBe(true)
+    expect(document.activeElement).toBe(refresh)
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      outside.focus()
+      await vi.advanceTimersByTimeAsync(200)
+      expect(document.body.contains(panel)).toBe(false)
+      expect(document.activeElement).toBe(outside)
+    } finally {
+      outside.remove()
+    }
+  })
+
+  it('enters the teleported panel from the keyboard and returns to the trigger', async () => {
+    wrapper = mount(VersionBadge, {
+      attachTo: document.body, props: { placement: 'header' },
+      global: { stubs: { Icon: true, transition: true } },
+    })
+    await flushPromises()
+    const trigger = wrapper.get<HTMLButtonElement>('.version-trigger')
+    trigger.element.focus()
+    await nextTick()
+    const panel = document.getElementById(trigger.attributes('aria-controls'))!
+    expect(panel).not.toBeNull()
+    expect(wrapper.element.contains(panel)).toBe(false)
+    const refresh = panel.querySelector('button')!
+    await trigger.trigger('keydown', { key: 'Tab' })
+    expect(document.activeElement).toBe(refresh)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(document.body.contains(panel)).toBe(true)
+    refresh.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(trigger.element)
+    await trigger.trigger('keydown', { key: 'Escape' })
+    expect(document.body.contains(panel)).toBe(false)
+  })
+
+  it('clears a pending hover close timer on unmount', async () => {
+    const view = await openBadge('header')
+    await view.get('.version-badge').trigger('mouseleave')
+    expect(vi.getTimerCount()).toBeGreaterThan(1)
+    view.unmount()
+    wrapper = undefined
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('opens beside the brand on hover and lets the pointer enter the information panel', async () => {
+    const view = await openBadge('header')
+    await view.get('.version-trigger').trigger('keydown', { key: 'Escape' })
+    view.get<HTMLButtonElement>('.version-trigger').element.blur()
+    await view.get('.version-badge').trigger('mouseenter')
+    expect(view.find('.version-popover').exists()).toBe(true)
+    expect(view.find('.version-trigger icon-stub').exists()).toBe(false)
+    expect(view.find('.version-popover').text()).not.toContain('version.rollback')
+    await view.get('.version-badge').trigger('mouseleave')
+    await vi.advanceTimersByTimeAsync(80)
+    await view.get('.version-popover').trigger('mouseenter')
+    await vi.advanceTimersByTimeAsync(200)
+    expect(view.find('.version-popover').exists()).toBe(true)
+    await view.get('.version-popover').trigger('mouseleave')
+    await vi.advanceTimersByTimeAsync(160)
+    expect(view.find('.version-popover').exists()).toBe(false)
+  })
+
+  it('opens the header entry with source details and closes on Escape or an outside button', async () => {
+    const view = await openBadge('header')
+    const trigger = view.get<HTMLButtonElement>('.version-trigger')
+    expect(trigger.attributes('aria-label')).toContain('version.versionAndUpdates')
+    expect(trigger.attributes('aria-label')).toContain('v2.1.16')
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    expect(view.get('.version-popover').attributes('id')).toBe(trigger.attributes('aria-controls'))
+    expect(view.get('[data-testid="upstream-updates"]').text()).toContain('kiss-kedaya/sub2api')
+    await trigger.trigger('keydown', { key: 'Escape' })
+    expect(view.find('.version-popover').exists()).toBe(false)
+    expect(document.activeElement).toBe(trigger.element)
+    await trigger.trigger('click')
+    // A temporarily disabled refresh button can leave focus on the document.
+    trigger.element.blur()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await nextTick()
+    expect(view.find('.version-popover').exists()).toBe(false)
+    expect(document.activeElement).toBe(trigger.element)
+    await trigger.trigger('click')
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      outside.click()
+      await nextTick()
+      expect(view.find('.version-popover').exists()).toBe(false)
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+    } finally {
+      outside.remove()
+    }
+  })
+
   it('shows independent source changes and warnings and lights the badge', async () => {
     const view = await openBadge()
     expect(view.find('button .animate-ping').exists()).toBe(true)
@@ -118,6 +227,7 @@ describe('VersionBadge source checks', () => {
     expect(checkUpdates).toHaveBeenCalledTimes(2)
     authState.isAdmin = false
     await nextTick()
+    expect(wrapper?.find('.version-popover').exists()).toBe(false)
     store.clearVersionCache()
     await vi.advanceTimersByTimeAsync(VERSION_CACHE_TTL_MS)
     expect(checkUpdates).toHaveBeenCalledTimes(2)
@@ -125,6 +235,8 @@ describe('VersionBadge source checks', () => {
     await nextTick()
     await flushPromises()
     expect(checkUpdates).toHaveBeenCalledTimes(3)
+    expect(wrapper?.find('.version-popover').exists()).toBe(false)
+    expect(wrapper?.get('.version-trigger').attributes('aria-expanded')).toBe('false')
     wrapper?.unmount()
     wrapper = undefined
     store.clearVersionCache()

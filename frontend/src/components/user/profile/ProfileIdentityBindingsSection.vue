@@ -13,13 +13,16 @@
     </div>
 
     <div :class="props.embedded ? 'space-y-4' : 'divide-y divide-gray-100 dark:divide-dark-700'">
-      <div v-if="props.embedded" class="profile-section-heading">
-        <h2 class="text-sm font-semibold text-gray-900 dark:text-white">
+      <div v-if="props.embedded" class="profile-section-heading profile-subsection-heading">
+        <Icon name="link" size="sm" />
+        <div>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
           {{ t('profile.authBindings.title') }}
-        </h2>
+        </h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {{ t('profile.authBindings.description') }}
         </p>
+        </div>
       </div>
 
       <div
@@ -89,6 +92,7 @@
 
               <div
                 v-if="item.provider === 'email' && showEmailForm"
+                id="profile-email-binding-form"
                 data-testid="profile-binding-email-form"
                 class="profile-email-form grid gap-2 sm:grid-cols-[minmax(0,1.4fr)_auto]"
               >
@@ -156,23 +160,23 @@
               v-if="item.provider === 'email' && compact"
               data-testid="profile-binding-email-toggle"
               type="button"
-              class="btn btn-secondary btn-sm"
+              class="btn btn-secondary btn-sm profile-binding-action"
+              :aria-expanded="showEmailForm"
+              :aria-controls="showEmailForm ? 'profile-email-binding-form' : undefined"
+              :aria-label="`${item.label} · ${t('profile.authBindings.bindAction')}`"
               @click="toggleEmailForm"
             >
-              {{
-                showEmailForm
-                  ? t('profile.authBindings.hideEmailFormAction')
-                  : t('profile.authBindings.manageEmailAction')
-              }}
+              {{ t('profile.authBindings.bindAction') }}
             </button>
             <button
               v-if="item.canBind"
               :data-testid="`profile-binding-${item.provider}-action`"
               type="button"
-              :class="['btn btn-sm', compact ? 'btn-secondary' : 'btn-primary']"
+              class="btn btn-secondary btn-sm profile-binding-action"
+              :aria-label="`${item.label} · ${t('profile.authBindings.bindAction')}`"
               @click="startBinding(item.provider)"
             >
-              {{ t('profile.authBindings.bindAction', { providerName: item.label }) }}
+              {{ t('profile.authBindings.bindAction') }}
             </button>
             <button
               v-if="item.canUnbind"
@@ -201,6 +205,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import {
   hasExplicitWeChatOAuthCapabilities,
+  isWeChatWebOAuthEnabled,
   resolveWeChatOAuthStartStrict,
   type WeChatOAuthPublicSettings,
 } from '@/api/auth'
@@ -480,7 +485,9 @@ const providerItems = computed(() => [
     canUnbind: Boolean(getBindingStatus('wechat') && getBindingDetails('wechat')?.can_unbind),
     details: getBindingDetails('wechat'),
   },
-])
+].filter(item => item.provider === 'email' || (item.provider === 'wechat'
+  ? isWeChatWebOAuthEnabled(wechatOAuthSettings.value)
+  : isProviderEnabledForBinding(item.provider))))
 
 function providerInitial(provider: UserAuthProvider): string {
   if (provider === 'linuxdo') {

@@ -1,10 +1,17 @@
 <template>
   <AppLayout>
     <div data-testid="profile-shell" class="signal-account-page signal-profile">
-      <ProfileInfoCard :user="user" :oidc-provider-name="oidcOAuthProviderName" />
+      <ProfileInfoCard :user="user" :oidc-provider-name="oidcOAuthProviderName" :stats="profileStats" :stats-state="statsState" />
 
       <div class="profile-settings-grid">
-        <section data-testid="profile-auth-bindings-panel" class="card profile-settings-panel profile-login-panel">
+        <section data-testid="profile-auth-bindings-panel" class="card profile-settings-panel profile-login-panel" aria-labelledby="profile-settings-title">
+          <header class="profile-section-heading profile-panel-heading">
+            <span class="profile-panel-icon"><Icon name="cog" size="sm" /></span>
+            <div>
+              <h2 id="profile-settings-title">{{ t('profile.settingsTitle') }}</h2>
+              <p>{{ t('profile.settingsDescription') }}</p>
+            </div>
+          </header>
           <ProfileIdentityBindingsSection
             :user="user"
             :linuxdo-enabled="linuxdoOAuthEnabled"
@@ -16,12 +23,25 @@
             :wechat-mp-enabled="wechatOAuthMPEnabled"
             embedded compact
           />
+          <ProfileBalanceNotifyCard
+            v-if="user && balanceLowNotifyEnabled"
+            :key="user.id"
+            embedded
+            :enabled="user.balance_notify_enabled ?? true"
+            :threshold="user.balance_notify_threshold"
+            :extra-emails="user.balance_notify_extra_emails ?? []"
+            :system-default-threshold="systemDefaultThreshold"
+            :user-email="user.email"
+          />
         </section>
 
         <section class="card profile-settings-panel profile-security-panel" aria-labelledby="profile-security-title">
-          <header class="profile-section-heading">
-            <h2 id="profile-security-title">{{ t('profile.securityTitle') }}</h2>
-            <p>{{ t('profile.securityDescription') }}</p>
+          <header class="profile-section-heading profile-panel-heading">
+            <span class="profile-panel-icon"><Icon name="shield" size="sm" /></span>
+            <div>
+              <h2 id="profile-security-title">{{ t('profile.securityTitle') }}</h2>
+              <p>{{ t('profile.securityDescription') }}</p>
+            </div>
           </header>
           <div class="profile-security-row">
             <span class="profile-setting-icon"><Icon name="lock" size="sm" /></span>
@@ -33,19 +53,9 @@
               {{ t('common.edit') }}
             </button>
           </div>
-          <ProfileTotpCard embedded />
-          <ProfilePasskeyCard :enabled="passkeyEnabled" embedded />
+          <ProfileTotpCard v-if="totpEnabled" embedded />
+          <ProfilePasskeyCard v-if="passkeyEnabled" :enabled="passkeyEnabled" embedded />
         </section>
-
-        <ProfileBalanceNotifyCard
-          v-if="user && balanceLowNotifyEnabled"
-          class="profile-notifications-panel"
-          :enabled="user.balance_notify_enabled ?? true"
-          :threshold="user.balance_notify_threshold"
-          :extra-emails="user.balance_notify_extra_emails ?? []"
-          :system-default-threshold="systemDefaultThreshold"
-          :user-email="user.email"
-        />
       </div>
 
       <div v-if="contactInfo" class="profile-support">
@@ -75,7 +85,7 @@
   </AppLayout>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ProfileIdentityBindingsSection from '@/components/user/profile/ProfileIdentityBindingsSection.vue'
@@ -87,6 +97,7 @@ import ProfilePasswordForm from '@/components/user/profile/ProfilePasswordForm.v
 import ProfileTotpCard from '@/components/user/profile/ProfileTotpCard.vue'
 import ProfilePasskeyCard from '@/components/user/profile/ProfilePasskeyCard.vue'
 import { isWeChatWebOAuthEnabled } from '@/api/auth'
+import { usageAPI, type UserDashboardStats } from '@/api/usage'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 
@@ -94,6 +105,29 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
+const profileStats = ref<UserDashboardStats | null>(null)
+const statsState = ref<'loading' | 'ready' | 'error'>('loading')
+
+// Each request belongs to one account. Discard it on account change or unmount.
+watch(() => user.value?.id, async (userId, _previousId, onCleanup) => {
+  let active = true
+  onCleanup(() => { active = false })
+  profileStats.value = null
+  statsState.value = 'loading'
+  if (userId === undefined) return
+  try {
+    const stats = await usageAPI.getDashboardStats()
+    if (active && user.value?.id === userId) {
+      profileStats.value = stats
+      statsState.value = 'ready'
+    }
+  } catch {
+    if (active && user.value?.id === userId) statsState.value = 'error'
+  }
+}, { immediate: true, flush: 'sync' })
+
+let disposed = false
+onUnmounted(() => { disposed = true })
 const passwordOpen = ref(false)
 const passwordBusy = ref(false)
 function closePassword() { if (!passwordBusy.value) passwordOpen.value = false }
@@ -108,6 +142,7 @@ const wechatOAuthOpenEnabled = ref<boolean | undefined>(undefined)
 const wechatOAuthMPEnabled = ref<boolean | undefined>(undefined)
 const oidcOAuthEnabled = ref(false)
 const oidcOAuthProviderName = ref('OIDC')
+const totpEnabled = ref(false)
 const passkeyEnabled = ref(false)
 
 onMounted(async () => {
@@ -117,7 +152,7 @@ onMounted(async () => {
 
   const settingsLoad = appStore.fetchPublicSettings()
     .then((settings) => {
-      if (!settings) {
+      if (!settings || disposed) {
         return
       }
       contactInfo.value = settings.contact_info || ''
@@ -134,6 +169,7 @@ onMounted(async () => {
         : undefined
       oidcOAuthEnabled.value = settings.oidc_oauth_enabled ?? false
       oidcOAuthProviderName.value = settings.oidc_oauth_provider_name || 'OIDC'
+      totpEnabled.value = settings.totp_enabled === true
       passkeyEnabled.value = settings.passkey_enabled === true
     })
     .catch((error) => {

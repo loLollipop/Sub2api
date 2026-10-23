@@ -1,38 +1,56 @@
 <template>
-  <div class="relative">
+  <div ref="badgeRef" class="version-badge relative" :class="{ 'version-badge-header': placement === 'header' }" @mouseenter="openOnHover" @mouseleave="scheduleHoverClose" @focusin="openOnFocus" @focusout="handleFocusOut">
     <!-- Admin: Full version badge with dropdown -->
     <template v-if="isAdmin">
       <button
-        @click="toggleDropdown"
-        class="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
+        ref="triggerRef"
+        type="button"
+        @click="handleTriggerClick"
+        @keydown="handleTriggerKeydown"
+        class="version-trigger flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
         :class="[
           hasUpdate || hasWarning
             ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-800 dark:text-dark-400 dark:hover:bg-dark-700'
         ]"
-        :title="hasUpdate ? t('version.updateAvailable') : checkComplete ? t('version.upToDate') : t('version.checkUnknown')"
+        :title="placement === 'header' ? undefined : triggerTitle"
+        :aria-label="triggerTitle"
+        :aria-expanded="dropdownOpen"
+        :aria-controls="dropdownOpen ? panelId : undefined"
       >
-        <span v-if="currentVersion" class="font-medium">{{ displayCurrentVersion }}</span>
+        <span v-if="currentVersion" class="version-trigger-label font-medium">{{ displayCurrentVersion }}</span>
         <span
           v-else
-          class="h-3 w-12 animate-pulse rounded bg-gray-200 font-medium dark:bg-dark-600"
+          class="version-trigger-label h-3 w-12 animate-pulse rounded bg-gray-200 font-medium dark:bg-dark-600"
         ></span>
         <!-- Update indicator -->
-        <span v-if="hasUpdate" class="relative flex h-2 w-2">
+        <span v-if="hasUpdate" class="version-update-dot relative flex h-2 w-2" aria-hidden="true">
           <span
+            v-if="placement !== 'header'"
             class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"
           ></span>
           <span class="relative inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
         </span>
+        <span v-else-if="hasWarning" class="version-update-dot flex h-2 w-2 rounded-full bg-amber-500" aria-hidden="true"></span>
       </button>
 
       <!-- Dropdown -->
+      <Teleport to="body" :disabled="placement !== 'header'">
       <transition name="dropdown">
         <div
           v-if="dropdownOpen"
           ref="dropdownRef"
-          class="absolute left-0 z-50 mt-2 overflow-hidden whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
-          :class="rollbackPanelOpen && isReleaseBuild ? 'w-80' : 'w-64'"
+          :id="panelId"
+          role="region"
+          :aria-label="t('version.versionAndUpdates')"
+          class="version-popover absolute left-0 z-50 mt-2 overflow-hidden whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
+          :class="[rollbackPanelOpen && isReleaseBuild ? 'w-80' : 'w-64', { 'version-popover-header': placement === 'header' }]"
+          :style="placement === 'header' ? popoverStyle : undefined"
+          @mouseenter="cancelHoverClose"
+          @mouseleave="scheduleHoverClose"
+          @focusin="cancelHoverClose"
+          @focusout="handleFocusOut"
+          @keydown="handlePanelKeydown"
         >
           <!-- Header with refresh button -->
           <div
@@ -42,10 +60,12 @@
               t('version.currentVersion')
             }}</span>
             <button
+              type="button"
               @click="refreshVersion(true)"
               class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700 dark:hover:text-dark-200"
               :disabled="loading"
               :title="t('version.refresh')"
+              :aria-label="t('version.refresh')"
             >
               <Icon
                 name="refresh"
@@ -108,7 +128,7 @@
               <p v-if="versionWarning" data-testid="version-warning" class="mb-3 break-words rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
                 {{ t('version.checkFailed') }}: {{ versionWarning }}
               </p>
-              <p class="mb-2 text-xs font-medium text-gray-600 dark:text-dark-300">{{ t('version.projectRelease') }}</p>
+              <p v-if="placement !== 'header'" class="mb-2 text-xs font-medium text-gray-600 dark:text-dark-300">{{ t('version.projectRelease') }}</p>
 
               <!-- Priority 1: Rollback success - need restart -->
               <div v-if="updateSuccess && needRestart" class="space-y-2">
@@ -277,7 +297,7 @@
               </div>
 
               <!-- Rollback always uses this project's releases. -->
-              <div v-if="!updateSuccess" class="border-t border-gray-100 pt-2 dark:border-dark-700">
+              <div v-if="placement !== 'header' && !updateSuccess" class="border-t border-gray-100 pt-2 dark:border-dark-700">
                   <button
                     @click="toggleRollbackPanel"
                     class="group flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 dark:text-dark-500 dark:hover:bg-dark-700/50 dark:hover:text-dark-300"
@@ -527,6 +547,7 @@
           </div>
         </div>
       </transition>
+      </Teleport>
     </template>
 
     <!-- Non-admin: Simple static version text -->
@@ -537,7 +558,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import {
@@ -558,6 +579,7 @@ const { t } = useI18n()
 
 const props = defineProps<{
   version?: string
+  placement?: 'sidebar' | 'header'
 }>()
 
 const authStore = useAuthStore()
@@ -566,7 +588,99 @@ const appStore = useAppStore()
 const isAdmin = computed(() => authStore.isAdmin)
 
 const dropdownOpen = ref(false)
+const badgeRef = ref<HTMLElement | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLButtonElement | null>(null)
+const panelId = `version-updates-${props.placement || 'sidebar'}`
+const popoverStyle = ref<CSSProperties>({ left: '12px', top: '48px' })
+let hoverCloseTimer: ReturnType<typeof setTimeout> | undefined
+let restoringFocus = false
+
+function updatePopoverPosition() {
+  if (!dropdownOpen.value || props.placement !== 'header' || !triggerRef.value) return
+  const rect = triggerRef.value.getBoundingClientRect()
+  const width = Math.min(360, window.innerWidth - 24)
+  const top = rect.bottom + 10
+  popoverStyle.value = {
+    left: `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    maxHeight: `${Math.max(0, window.innerHeight - top - 12)}px`,
+  }
+}
+
+watch(dropdownOpen, open => {
+  if (open) void nextTick(updatePopoverPosition)
+})
+
+function cancelHoverClose() {
+  if (hoverCloseTimer) clearTimeout(hoverCloseTimer)
+  hoverCloseTimer = undefined
+}
+
+function openOnHover() {
+  if (props.placement !== 'header' || !isAdmin.value) return
+  cancelHoverClose()
+  dropdownOpen.value = true
+}
+
+function scheduleHoverClose() {
+  if (props.placement !== 'header') return
+  cancelHoverClose()
+  hoverCloseTimer = setTimeout(() => {
+    hoverCloseTimer = undefined
+    if (!isInsideBadge(document.activeElement)) closeDropdown()
+  }, 150)
+}
+
+function openOnFocus() {
+  if (!restoringFocus) openOnHover()
+}
+
+function isInsideBadge(target: EventTarget | null) {
+  return target instanceof Node && (badgeRef.value?.contains(target) || dropdownRef.value?.contains(target))
+}
+
+function handleFocusOut(event: FocusEvent) {
+  if (props.placement === 'header' && !isInsideBadge(event.relatedTarget) &&
+      !badgeRef.value?.matches(':hover') && !dropdownRef.value?.matches(':hover')) scheduleHoverClose()
+}
+
+const focusableSelector = 'a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])'
+
+function panelFocusTargets() {
+  return [...(dropdownRef.value?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])]
+    .filter(item => item.tabIndex >= 0 && !item.closest('[inert]'))
+}
+
+function handleTriggerKeydown(event: KeyboardEvent) {
+  if (props.placement !== 'header' || !dropdownOpen.value || event.key !== 'Tab' || event.shiftKey) return
+  const first = panelFocusTargets()[0]
+  if (first) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+function handlePanelKeydown(event: KeyboardEvent) {
+  if (props.placement !== 'header' || event.key !== 'Tab') return
+  const targets = panelFocusTargets()
+  if (event.shiftKey && document.activeElement === targets[0]) {
+    event.preventDefault()
+    triggerRef.value?.focus()
+  } else if (!event.shiftKey && document.activeElement === targets.at(-1)) {
+    // Resume the page's tab order after the trigger, despite Teleport's DOM order.
+    const pageTargets = [...document.querySelectorAll<HTMLElement>(focusableSelector)]
+      .filter(item => item.tabIndex >= 0 && !dropdownRef.value?.contains(item) &&
+        !item.closest('[inert]') && item.getClientRects().length > 0)
+    const triggerIndex = pageTargets.indexOf(triggerRef.value!)
+    const next = triggerIndex >= 0 ? pageTargets[triggerIndex + 1] : undefined
+    if (next) {
+      event.preventDefault()
+      next.focus()
+    }
+  }
+}
 
 // Use store's cached version state
 const loading = computed(() => appStore.versionLoading)
@@ -591,6 +705,15 @@ const versionWarning = computed(() => appStore.versionWarning)
 const hasWarning = computed(() => !!versionWarning.value || upstreamUpdates.value.some((source) => !!source.warning))
 const checkComplete = computed(() => appStore.versionLoaded && !hasWarning.value)
 const releaseCheckComplete = computed(() => appStore.versionLoaded && !versionWarning.value)
+const triggerTitle = computed(() => {
+  const status = hasUpdate.value
+    ? t('version.updateAvailable')
+    : checkComplete.value ? t('version.upToDate') : t('version.checkUnknown')
+  return props.placement === 'header'
+    ? [t('version.versionAndUpdates'), displayCurrentVersion.value,
+      !hasUpdate.value && hasWarning.value ? t('version.checkFailed') : status].filter(Boolean).join(' · ')
+    : status
+})
 
 function upstreamSourceURL(source: UpstreamUpdateInfo): string {
   return source.release_url || `https://github.com/${source.repository}/releases`
@@ -653,12 +776,19 @@ const activeManualCommand = computed(() =>
 // Only show update check for release builds (binary/docker deployment)
 const isReleaseBuild = computed(() => buildType.value === 'release')
 
-function toggleDropdown() {
-  dropdownOpen.value = !dropdownOpen.value
+function handleTriggerClick() {
+  cancelHoverClose()
+  dropdownOpen.value = props.placement === 'header' || !dropdownOpen.value
 }
 
-function closeDropdown() {
+function closeDropdown(restoreFocus = false) {
+  cancelHoverClose()
   dropdownOpen.value = false
+  if (restoreFocus) {
+    restoringFocus = true
+    triggerRef.value?.focus()
+    restoringFocus = false
+  }
 }
 
 async function refreshVersion(force = true) {
@@ -801,15 +931,23 @@ async function checkServiceAndReload() {
 }
 
 function handleClickOutside(event: MouseEvent) {
-  const target = event.target as Node
-  const button = (event.target as Element).closest('button')
-  if (dropdownRef.value && !dropdownRef.value.contains(target) && !button?.contains(target)) {
+  if (dropdownOpen.value && !isInsideBadge(event.target)) {
     closeDropdown()
+  }
+}
+
+function handleEscape(event: KeyboardEvent) {
+  if (dropdownOpen.value && event.key === 'Escape') {
+    event.preventDefault()
+    closeDropdown(true)
   }
 }
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', handleEscape)
+  window.addEventListener('resize', updatePopoverPosition)
+  window.addEventListener('scroll', updatePopoverPosition, { passive: true })
 })
 
 // The store expires version data after 20 minutes and shares active requests.
@@ -817,8 +955,15 @@ onMounted(() => {
 let versionPoll: ReturnType<typeof setInterval> | undefined
 watch(isAdmin, (admin) => {
   if (versionPoll) clearInterval(versionPoll)
+  cancelHoverClose()
   versionPoll = undefined
-  if (!admin) return
+  if (!admin) {
+    closeDropdown()
+    updateSuccess.value = false
+    needRestart.value = false
+    resetRollbackState()
+    return
+  }
   void appStore.fetchVersion(false)
   versionPoll = setInterval(() => {
     if (!document.hidden) void appStore.fetchVersion(false)
@@ -827,11 +972,67 @@ watch(isAdmin, (admin) => {
 
 onBeforeUnmount(() => {
   if (versionPoll) clearInterval(versionPoll)
+  cancelHoverClose()
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', handleEscape)
+  window.removeEventListener('resize', updatePopoverPosition)
+  window.removeEventListener('scroll', updatePopoverPosition)
 })
 </script>
 
 <style scoped>
+.version-badge-header { flex-shrink: 0; }
+.version-badge-header .version-trigger {
+  position: relative;
+  justify-content: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--signal-muted);
+  font-size: 11px;
+  line-height: 20px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.version-badge-header .version-trigger:hover,
+.version-badge-header .version-trigger[aria-expanded='true'] {
+  background: transparent;
+  color: var(--signal-text);
+}
+.version-badge-header .version-trigger:focus-visible {
+  outline: 2px solid var(--signal-accent);
+  outline-offset: 2px;
+}
+.version-badge-header .version-trigger-label { font-weight: 400; }
+.version-badge-header .version-update-dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+}
+.version-popover-header {
+  position: fixed;
+  z-index: 60;
+  margin: 0;
+  max-width: calc(100vw - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-color: var(--signal-line);
+  background: var(--signal-surface);
+  color: var(--signal-text);
+  box-shadow: var(--signal-popover-shadow);
+  font-size: 12px;
+}
+@media (max-width: 1023px) {
+  .version-badge-header .version-trigger { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .version-badge-header :is(.animate-ping, .animate-spin, .animate-pulse) { animation: none; }
+}
+
 .dropdown-enter-active,
 .dropdown-leave-active {
   transition: all 0.2s ease;

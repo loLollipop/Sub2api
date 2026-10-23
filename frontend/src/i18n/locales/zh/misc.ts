@@ -19,6 +19,7 @@ export default {
 
   // Version Badge
   version: {
+    versionAndUpdates: '版本与更新',
     currentVersion: '当前版本',
     latestVersion: '最新版本',
     upToDate: '已是最新版本',

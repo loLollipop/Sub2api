@@ -198,7 +198,7 @@ func TestTotpDisableAuditOmitsEntireCredentialBody(t *testing.T) {
 	router.Use(func(c *gin.Context) { c.Set(string(ContextKeyUser), AuthSubject{UserID: 77}); c.Next() })
 	router.Use(gin.HandlerFunc(NewAuditLogMiddleware(auditService)))
 	router.POST("/api/v1/user/totp/disable", func(c *gin.Context) {
-		var input map[string]interface{}
+		var input map[string]any
 		require.NoError(t, c.ShouldBindJSON(&input))
 		require.Equal(t, "012345", input["totp_code"])
 		c.Status(http.StatusBadRequest)

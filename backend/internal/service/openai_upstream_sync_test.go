@@ -210,7 +210,7 @@ func TestOpenAIEmptyStreamTimeoutRetainsObservedUsage(t *testing.T) {
 	for _, native := range []bool{true, false} {
 		t.Run(map[bool]string{true: "native", false: "passthrough"}[native], func(t *testing.T) {
 			reader, writer := io.Pipe()
-			defer writer.Close()
+			defer func() { _ = writer.Close() }()
 			go func() {
 				_, _ = io.WriteString(writer, "data: {\"type\":\"response.created\",\"response\":{\"usage\":{\"input_tokens\":12}}}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"\"}\n\n")
 			}()

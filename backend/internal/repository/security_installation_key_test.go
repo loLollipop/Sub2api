@@ -95,9 +95,9 @@ func storeLegacyInstallationSecret(t *testing.T, client *dbent.Client, kind, val
 		_, err := client.ExecContext(ctx, `INSERT INTO sub2api_plugin_installations (config_encrypted) VALUES (?)`, value)
 		require.NoError(t, err)
 	case "ollama":
-		require.NoError(t, client.Account.Create().SetName("key-test").SetPlatform("openai").SetType("apikey").SetCredentials(map[string]interface{}{}).SetExtra(map[string]interface{}{service.OllamaCloudUsageSessionExtraKey: value}).Exec(ctx))
+		require.NoError(t, client.Account.Create().SetName("key-test").SetPlatform("openai").SetType("apikey").SetCredentials(map[string]any{}).SetExtra(map[string]any{service.OllamaCloudUsageSessionExtraKey: value}).Exec(ctx))
 	case "prompt_audit_config":
-		raw, _ := json.Marshal(map[string]interface{}{"endpoints": []map[string]string{{"token_ciphertext": value}}})
+		raw, _ := json.Marshal(map[string]any{"endpoints": []map[string]string{{"token_ciphertext": value}}})
 		require.NoError(t, client.Setting.Create().SetKey(kind).SetValue(string(raw)).Exec(ctx))
 	default:
 		raw, _ := json.Marshal(map[string]string{"secret_access_key": value})

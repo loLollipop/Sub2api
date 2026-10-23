@@ -2621,8 +2621,8 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 					s.markOpenAIStreamFinalFailure(c, account, true, upstreamRequestID, false)
 					return resultWithUsage(), errOpenAIFirstOutputStageLimit
 				}
-				pendingOutput.WriteString(line)
-				pendingOutput.WriteByte('\n')
+				_, _ = pendingOutput.WriteString(line)
+				_ = pendingOutput.WriteByte('\n')
 				continue
 			}
 			if !clientOutputStarted && pendingOutput.Len() > 0 {

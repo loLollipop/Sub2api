@@ -426,7 +426,7 @@ func ProvideOllamaCloudUsageService(
 	lockCache LeaderLockCache,
 	db *sql.DB,
 ) *OllamaCloudUsageService {
-	keyConfigured := cfg != nil && cfg.Totp.EncryptionKeyConfigured
+	keyConfigured := cfg != nil && cfg.Totp.HasPersistentEncryptionKey()
 	svc := NewOllamaCloudUsageService(accountRepo, httpUpstream, settingService, encryptor, keyConfigured)
 	svc.lockCache = lockCache
 	svc.db = db

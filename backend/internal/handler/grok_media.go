@@ -199,7 +199,11 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	}
 
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
-	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body))
+	inflightDone := func() {}
+	var inflightErr error
+	if durableVideo == nil {
+		inflightDone, inflightErr = reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body))
+	}
 	if inflightErr != nil {
 		status, code, message, retryAfter := billingErrorDetails(inflightErr)
 		if retryAfter > 0 {

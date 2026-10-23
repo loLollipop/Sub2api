@@ -504,3 +504,10 @@ func TestConfigLoadedIsLoggedOnlyWhenSomethingChanged(t *testing.T) {
 	require.NoError(t, manager.Reload(context.Background()))
 	require.Equal(t, 4, loadedCount(), "recovering from a failed reload must be visible")
 }
+
+func TestConfigManagerAcceptsPersistentInstallationKey(t *testing.T) {
+	cfg := &config.Config{Totp: config.TotpConfig{EncryptionKeyPersistent: true}}
+	require.False(t, cfg.Totp.EncryptionKeyConfigured)
+	manager := NewConfigManager(nil, nil, nil, prefixEncryptor{}, cfg)
+	require.True(t, manager.encryptionKeyConfigured)
+}

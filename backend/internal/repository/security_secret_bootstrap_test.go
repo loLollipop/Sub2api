@@ -29,12 +29,15 @@ func newSecuritySecretTestClient(t *testing.T) *dbent.Client {
 	db, err := sql.Open("sqlite", dsn)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
+	db.SetMaxOpenConns(1)
 
 	_, err = db.Exec("PRAGMA foreign_keys = ON")
 	require.NoError(t, err)
 
 	drv := entsql.OpenDB(dialect.SQLite, db)
 	client := enttest.NewClient(t, enttest.WithOptions(dbent.Driver(drv)))
+	_, err = db.Exec(`CREATE TABLE sub2api_plugin_installations (id INTEGER PRIMARY KEY, config_encrypted TEXT NOT NULL DEFAULT '')`)
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = client.Close() })
 	return client
 }

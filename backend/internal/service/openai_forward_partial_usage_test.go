@@ -87,24 +87,37 @@ func TestOpenAIGatewayService_Forward_StreamErrorPreservesPartialUsage(t *testin
 	require.Contains(t, recorder.Body.String(), "partial")
 }
 
-func TestOpenAIGatewayService_Forward_PreOutputFailoverDropsPartialUsage(t *testing.T) {
-	body := []byte(`{"model":"gpt-5.4","instructions":"answer","input":"hello","stream":true}`)
-	c, recorder := newOpenAIPartialUsageContext(t, body)
-	upstream := &httpUpstreamRecorder{resp: &http.Response{
-		StatusCode: http.StatusOK,
-		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
-		Body:       io.NopCloser(strings.NewReader(partialOpenAIResponsesSSE(false))),
-	}}
-
-	result, err := newOpenAIPartialUsageService(upstream).Forward(
-		context.Background(), c, newOpenAIPartialUsageAccount(false), body,
-	)
-
-	require.Error(t, err)
-	var failoverErr *UpstreamFailoverError
-	require.ErrorAs(t, err, &failoverErr)
-	require.Nil(t, result, "a replayable attempt must not expose partial usage")
-	require.Empty(t, recorder.Body.String())
+func TestOpenAIGatewayService_Forward_PreOutputDisconnectUsageBoundary(t *testing.T) {
+	for _, passthrough := range []bool{false, true} {
+		for _, observed := range []bool{false, true} {
+			t.Run(map[bool]string{false: "native", true: "passthrough"}[passthrough]+map[bool]string{false: "_empty", true: "_usage"}[observed], func(t *testing.T) {
+				body := []byte(`{"model":"gpt-5.4","instructions":"answer","input":"hello","stream":true}`)
+				c, recorder := newOpenAIPartialUsageContext(t, body)
+				stream := partialOpenAIResponsesSSE(false)
+				if !observed {
+					stream = strings.ReplaceAll(stream, `"input_tokens":13`, `"input_tokens":0`)
+				}
+				upstream := &httpUpstreamRecorder{resp: &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+					Body:       io.NopCloser(strings.NewReader(stream)),
+				}}
+				result, err := newOpenAIPartialUsageService(upstream).Forward(
+					context.Background(), c, newOpenAIPartialUsageAccount(passthrough), body,
+				)
+				require.Error(t, err)
+				var failoverErr *UpstreamFailoverError
+				require.Equal(t, !observed, errors.As(err, &failoverErr))
+				if observed {
+					require.NotNil(t, result, "observed usage survives a terminal disconnect without replay")
+					require.Equal(t, 13, result.Usage.InputTokens)
+				} else {
+					require.Nil(t, result, "a replayable attempt must not expose partial usage")
+				}
+				require.Empty(t, recorder.Body.String())
+			})
+		}
+	}
 }
 
 func TestOpenAIGatewayService_PassthroughStreamErrorPreservesPartialUsage(t *testing.T) {

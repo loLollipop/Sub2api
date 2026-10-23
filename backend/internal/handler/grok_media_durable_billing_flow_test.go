@@ -305,6 +305,7 @@ type durableMediaUpstream struct {
 	createErr    error
 	taskID       string
 	content      string
+	statusBody   string
 }
 
 func (u *durableMediaUpstream) Do(req *http.Request, _ string, accountID int64, _ int) (*http.Response, error) {
@@ -336,6 +337,9 @@ func (u *durableMediaUpstream) Do(req *http.Request, _ string, accountID int64, 
 	}
 	u.statusCalls++
 	body := `{"request_id":"` + u.taskID + `","status":"done","model":"grok-imagine-video","video":{"url":"https://vidgen.x.ai/test.mp4","duration":6}}`
+	if u.statusBody != "" {
+		body = u.statusBody
+	}
 	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
 }
 
@@ -618,4 +622,182 @@ func TestGrokAsyncImagePublishesOnlyAfterDurableSettlement(t *testing.T) {
 			}
 		})
 	}
+}
+
+func (r *durableMediaHandlerRepo) ReconcileMediaBillingJob(_ context.Context, id string) error {
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	job := r.jobs[id]
+	if job == nil {
+		return service.ErrMediaBillingJobNotFound
+	}
+	if job.Kind == service.MediaBillingKindGrokVideo && job.Status == service.MediaBillingSubmitted && job.Intent == nil {
+		job.Status = service.MediaBillingReconciliation
+	}
+	return nil
+
+}
+
+// Use real API-key authentication ahead of the handler: a direct handler test
+// cannot catch a balance rejection before the durable ownership lookup.
+type durableVideoAuthRepo struct {
+	service.APIKeyRepository
+	key *service.APIKey
+}
+
+func (r durableVideoAuthRepo) GetByKeyForAuth(_ context.Context, key string) (*service.APIKey, error) {
+	if key != r.key.Key {
+		return nil, service.ErrAPIKeyNotFound
+	}
+	clone := *r.key
+	user := *r.key.User
+	clone.User = &user
+	return &clone, nil
+}
+func (durableVideoAuthRepo) UpdateLastUsed(context.Context, int64, time.Time) error { return nil }
+func (f *durableMediaHandlerFixture) authenticatedRequest(method, path string, key *service.APIKey) *httptest.ResponseRecorder {
+	cfg := &config.Config{RunMode: config.RunModeStandard}
+	auth := service.NewAPIKeyService(durableVideoAuthRepo{key: key}, nil, nil, nil, nil, nil, cfg)
+	router := gin.New()
+	router.Use(gin.HandlerFunc(middleware.NewAPIKeyAuthMiddleware(auth, nil, cfg)))
+	router.Use(middleware.UsageInflight(), middleware.GroupModelAllowlist(), middleware.RequireGroupAssignment(nil, middleware.AnthropicErrorWriter))
+	for _, prefix := range []string{"", "/v1"} {
+		for _, alias := range []string{"", "/generations", "/edits", "/extensions"} {
+			router.GET(prefix+"/videos"+alias+"/:request_id", f.handlers[1].GrokVideoStatus)
+			router.GET(prefix+"/videos"+alias+"/:request_id/content", f.handlers[1].GrokVideoContent)
+		}
+		router.POST(prefix+"/videos/generations", f.handlers[1].GrokVideoGeneration)
+	}
+	body := ""
+	if method == http.MethodPost {
+		body = `{"model":"grok-imagine-video","prompt":"test","duration":6}`
+	}
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+key.Key)
+	req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+	return recorder
+}
+func TestGrokVideoAuthenticatedDurableOwnerCanResolveZeroBalance(t *testing.T) {
+	for _, state := range []string{"done", "failed", "expired"} {
+		t.Run(state, func(t *testing.T) {
+			f := newDurableMediaHandlerFixture(t)
+			require.Equal(t, http.StatusOK, f.request(0, http.MethodPost, "create", nil).Code)
+			f.repo.mu.Lock()
+			for _, job := range f.repo.jobs {
+				job.Status = service.MediaBillingReconciliation
+			}
+			f.repo.mu.Unlock()
+			f.key.Status, f.key.Key, f.key.User.Balance = service.StatusActive, "synthetic-owner-auth", 0
+			f.upstream.statusBody = `{"status":"` + state + `"}`
+			if state == "done" {
+				f.upstream.statusBody = `{"status":"done","video":{"url":"https://vidgen.x.ai/test.mp4","duration":6}}`
+			}
+			reads := f.cache.reads()
+			for range 2 {
+				result := f.authenticatedRequest(http.MethodGet, "/v1/videos/"+f.taskID, f.key)
+				require.Equal(t, http.StatusOK, result.Code, result.Body.String())
+			}
+			require.Equal(t, reads, f.cache.reads())
+			job, balance, applied, failed, direct := f.repo.snapshotByTask(f.taskID)
+			require.Zero(t, direct)
+			switch state {
+			case "done":
+				require.Equal(t, service.MediaBillingDone, job.Status)
+				require.Equal(t, 1, applied)
+				require.Zero(t, failed)
+				require.Zero(t, balance)
+			case "failed":
+				require.Equal(t, service.MediaBillingFailed, job.Status)
+				require.Zero(t, applied)
+				require.Equal(t, 1, failed)
+				require.InDelta(t, f.initial, balance, 1e-8)
+			case "expired":
+				require.Equal(t, service.MediaBillingReconciliation, job.Status)
+				require.Zero(t, applied)
+				require.Zero(t, failed)
+				require.Zero(t, balance)
+			}
+		})
+	}
+}
+func TestGrokVideoAuthenticatedLookupAliasesAndAdmission(t *testing.T) {
+	f := newDurableMediaHandlerFixture(t)
+	require.Equal(t, http.StatusOK, f.request(0, http.MethodPost, "create", nil).Code)
+	f.key.Status, f.key.Key, f.key.User.Balance = service.StatusActive, "synthetic-owner-auth", 0
+	for _, prefix := range []string{"", "/v1"} {
+		for _, alias := range []string{"", "/generations", "/edits", "/extensions"} {
+			for _, suffix := range []string{"", "/content"} {
+				result := f.authenticatedRequest(http.MethodGet, prefix+"/videos"+alias+"/"+f.taskID+suffix, f.key)
+				require.Equal(t, http.StatusOK, result.Code, result.Body.String())
+			}
+		}
+	}
+	createBefore, statusBefore, contentBefore := f.upstream.counts()
+	for _, scenario := range []string{"unknown", "other-key", "other-user", "disabled", "expired-key", "quota", "inactive-user", "new-generation"} {
+		t.Run(scenario, func(t *testing.T) {
+			key := *f.key
+			user := *key.User
+			key.User = &user
+			method, path := http.MethodGet, "/v1/videos/"+f.taskID
+			switch scenario {
+			case "unknown":
+				path += "-missing"
+			case "other-key":
+				key.ID++
+			case "other-user":
+				key.UserID++
+				key.User.ID++
+			case "disabled":
+				key.Status = "disabled"
+			case "expired-key":
+				key.Status = service.StatusAPIKeyExpired
+			case "quota":
+				key.Quota = 1
+				key.QuotaUsed = 1
+			case "inactive-user":
+				key.User.Status = "disabled"
+			case "new-generation":
+				method, path = http.MethodPost, "/v1/videos/generations"
+			}
+			result := f.authenticatedRequest(method, path, &key)
+			require.GreaterOrEqual(t, result.Code, 400, result.Body.String())
+		})
+	}
+	// Even with funds, another key cannot use the original task binding.
+	other := *f.key
+	other.ID++
+	other.RouteGroupIDs = nil
+	user := *other.User
+	user.Balance = 10
+	other.User = &user
+	f.repo.mu.Lock()
+	f.repo.balance = 10
+	f.repo.mu.Unlock()
+	result := f.authenticatedRequest(http.MethodGet, "/v1/videos/"+f.taskID, &other)
+	require.Equal(t, http.StatusNotFound, result.Code, result.Body.String())
+	createAfter, statusAfter, contentAfter := f.upstream.counts()
+	require.Equal(t, createBefore, createAfter)
+	require.Equal(t, statusBefore, statusAfter)
+	require.Equal(t, contentBefore, contentAfter)
+}
+
+func TestGrokVideoAuthenticatedLegacyTaskStillRequiresBillingAdmission(t *testing.T) {
+	f := newDurableMediaHandlerFixture(t)
+	require.Equal(t, http.StatusOK, f.request(0, http.MethodPost, "create", nil).Code)
+	// Keep the legacy owner routing snapshot, but remove the durable reservation.
+	f.repo.mu.Lock()
+	f.repo.jobs = map[string]*service.MediaBillingJob{}
+	f.repo.mu.Unlock()
+	f.key.Status, f.key.Key, f.key.User.Balance = service.StatusActive, "synthetic-legacy-owner", 0
+	_, beforeStatus, beforeContent := f.upstream.counts()
+	beforeReads := f.cache.reads()
+	result := f.authenticatedRequest(http.MethodGet, "/v1/videos/"+f.taskID, f.key)
+	require.GreaterOrEqual(t, result.Code, 400, result.Body.String())
+	require.Greater(t, f.cache.reads(), beforeReads, "a legacy binding alone must not waive billing eligibility")
+	_, afterStatus, afterContent := f.upstream.counts()
+	require.Equal(t, beforeStatus, afterStatus)
+	require.Equal(t, beforeContent, afterContent)
 }

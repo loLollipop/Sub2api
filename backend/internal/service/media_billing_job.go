@@ -8,14 +8,15 @@ import (
 )
 
 const (
-	MediaBillingKindGrokVideo = "grok_video"
-	MediaBillingKindImage     = "image_usage"
-	MediaBillingCreating      = "creating"
-	MediaBillingSubmitted     = "submitted"
-	MediaBillingReady         = "ready"
-	MediaBillingBilled        = "billed"
-	MediaBillingDone          = "done"
-	MediaBillingFailed        = "failed"
+	MediaBillingKindGrokVideo  = "grok_video"
+	MediaBillingKindImage      = "image_usage"
+	MediaBillingCreating       = "creating"
+	MediaBillingSubmitted      = "submitted"
+	MediaBillingReconciliation = "reconciliation"
+	MediaBillingReady          = "ready"
+	MediaBillingBilled         = "billed"
+	MediaBillingDone           = "done"
+	MediaBillingFailed         = "failed"
 )
 
 var ErrMediaBillingJobNotFound = errors.New("media billing job not found")
@@ -61,6 +62,7 @@ type MediaBillingJobRepository interface {
 	PrepareMediaBillingIntent(context.Context, string, *MediaBillingIntent) (*MediaBillingIntent, error)
 	ApplyMediaBillingJob(context.Context, string) (*UsageBillingApplyResult, error)
 	FailMediaBillingJob(context.Context, string) (*UsageBillingApplyResult, error)
+	ReconcileMediaBillingJob(context.Context, string) error
 	CompleteMediaBillingJob(context.Context, string) error
 	ListMediaBillingJobs(context.Context, int) ([]*MediaBillingJob, error)
 	RetryMediaBillingJob(context.Context, string, time.Duration) error

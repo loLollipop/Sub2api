@@ -23,30 +23,7 @@
         </div>
 
         <form v-else @submit.prevent="handleDisable" class="space-y-4">
-          <!-- Email verification -->
-          <div v-if="verificationMethod === 'email'">
-            <label class="input-label">{{ t('profile.totp.emailCode') }}</label>
-            <div class="flex gap-2">
-              <input
-                v-model="form.emailCode"
-                type="text"
-                maxlength="6"
-                inputmode="numeric"
-                class="input flex-1"
-                :placeholder="t('profile.totp.enterEmailCode')"
-              />
-              <button
-                type="button"
-                class="btn btn-secondary whitespace-nowrap"
-                :disabled="sendingCode || codeCooldown > 0"
-                @click="handleSendCode"
-              >
-                {{ codeCooldown > 0 ? `${codeCooldown}s` : (sendingCode ? t('common.sending') : t('profile.totp.sendCode')) }}
-              </button>
-            </div>
-          </div>
-
-          <div v-else-if="verificationMethod === 'totp'">
+          <div v-if="verificationMethod === 'totp'">
             <label for="totp-disable-code" class="input-label">{{ t('profile.totp.authenticatorCode') }}</label>
             <input
               id="totp-disable-code"
@@ -61,21 +38,6 @@
               :placeholder="t('profile.totp.enterCode')"
             />
             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('profile.totp.disableTotpHint') }}</p>
-          </div>
-
-          <!-- Password verification -->
-          <div v-else-if="verificationMethod === 'password'">
-            <label for="password" class="input-label">
-              {{ t('profile.currentPassword') }}
-            </label>
-            <input
-              id="password"
-              v-model="form.password"
-              type="password"
-              autocomplete="current-password"
-              class="input"
-              :placeholder="t('profile.totp.enterPassword')"
-            />
           </div>
 
           <!-- Actions -->
@@ -99,7 +61,7 @@
 
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { totpAPI } from '@/api'
@@ -117,65 +79,27 @@ const appStore = useAppStore()
 const methodLoading = ref(true)
 const verificationMethod = ref<TotpVerificationMethod['method'] | null>(null)
 const loading = ref(false)
-const sendingCode = ref(false)
-const codeCooldown = ref(0)
-const cooldownTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const form = ref({
-  emailCode: '',
-  password: '',
-  totpCode: ''
-})
+const form = ref({ totpCode: '' })
 
 const canSubmit = computed(() => {
   if (methodLoading.value) return false
   if (verificationMethod.value === 'totp') {
     return /^\d{6}$/.test(form.value.totpCode.trim())
   }
-  if (verificationMethod.value === 'email') {
-    return /^\d{6}$/.test(form.value.emailCode)
-  }
-  return verificationMethod.value === 'password' && form.value.password.length > 0
+  return false
 })
 
 const loadVerificationMethod = async () => {
   methodLoading.value = true
   try {
     const method = await totpAPI.getVerificationMethod('disable')
-    if (!['email', 'password', 'totp'].includes(method.method)) throw new Error(t('profile.totp.disableFailed'))
+    if (method.method !== 'totp') throw new Error(t('profile.totp.disableFailed'))
     verificationMethod.value = method.method
-  } catch (err: any) {
+  } catch (err: unknown) {
     appStore.showError(extractApiErrorMessage(err, t('common.error')))
     emit('close')
   } finally {
     methodLoading.value = false
-  }
-}
-
-const handleSendCode = async () => {
-  if (verificationMethod.value !== 'email') return
-  sendingCode.value = true
-  try {
-    await totpAPI.sendVerifyCode()
-    appStore.showSuccess(t('profile.totp.codeSent'))
-    // Start cooldown
-    codeCooldown.value = 60
-    if (cooldownTimer.value) {
-      clearInterval(cooldownTimer.value)
-      cooldownTimer.value = null
-    }
-    cooldownTimer.value = setInterval(() => {
-      codeCooldown.value--
-      if (codeCooldown.value <= 0) {
-        if (cooldownTimer.value) {
-          clearInterval(cooldownTimer.value)
-          cooldownTimer.value = null
-        }
-      }
-    }, 1000)
-  } catch (err: any) {
-    appStore.showError(extractApiErrorMessage(err, t('profile.totp.sendCodeFailed')))
-  } finally {
-    sendingCode.value = false
   }
 }
 
@@ -185,16 +109,10 @@ const handleDisable = async () => {
   loading.value = true
 
   try {
-    const request = verificationMethod.value === 'totp'
-      ? { totp_code: form.value.totpCode.trim() }
-      : verificationMethod.value === 'email'
-        ? { email_code: form.value.emailCode }
-        : { password: form.value.password }
-
-    await totpAPI.disable(request)
+    await totpAPI.disable({ totp_code: form.value.totpCode.trim() })
     appStore.showSuccess(t('profile.totp.disableSuccess'))
     emit('success')
-  } catch (err: any) {
+  } catch (err: unknown) {
     appStore.showError(extractApiErrorMessage(err, t('profile.totp.disableFailed')))
   } finally {
     form.value.totpCode = ''
@@ -206,10 +124,4 @@ onMounted(() => {
   loadVerificationMethod()
 })
 
-onUnmounted(() => {
-  if (cooldownTimer.value) {
-    clearInterval(cooldownTimer.value)
-    cooldownTimer.value = null
-  }
-})
 </script>

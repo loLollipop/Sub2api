@@ -158,6 +158,9 @@ type mediaAccountRepo struct {
 }
 
 func (r mediaAccountRepo) GetByID(context.Context, int64) (*Account, error) { return r.account, nil }
+func (r mediaAccountRepo) SetTempUnschedulable(context.Context, int64, time.Time, string) error {
+	return nil
+}
 
 func (r *mediaUsageMemoryRepo) Create(_ context.Context, log *UsageLog) (bool, error) {
 	r.mu.Lock()
@@ -344,4 +347,107 @@ func TestMediaBillingNotificationLookupFailureDoesNotChangeCharge(t *testing.T) 
 	require.Equal(t, 3.0, params.Cost.ActualCost)
 	require.Equal(t, int64(42), params.User.ID)
 	require.False(t, params.User.BalanceNotifyEnabled)
+}
+
+func (r *mediaJobMemoryRepo) ReconcileMediaBillingJob(_ context.Context, id string) error {
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	job := r.jobs[id]
+	if job == nil {
+		return ErrMediaBillingJobNotFound
+	}
+	if job.Kind == MediaBillingKindGrokVideo && job.Status == MediaBillingSubmitted && job.Intent == nil {
+		job.Status = MediaBillingReconciliation
+	}
+	return nil
+
+}
+
+func TestGrokVideoRecoveryBudgetAndMissingGrace(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		age       time.Duration
+		code      int
+		status    string
+		reconcile bool
+	}{
+		{"budget", 24 * time.Hour, 200, "pending", true}, {"missing-young", time.Minute, 404, "", false},
+		{"missing-old", 6 * time.Minute, 404, "", true}, {"gone-old", 6 * time.Minute, 410, "", true},
+		{"transient-error", 6 * time.Minute, 503, "", false}, {"expired-is-unknown", time.Minute, 200, "expired", true},
+		{"failed-is-confirmed", time.Minute, 200, "failed", false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			svc, repo, input, pending := newMediaBillingServiceTest(t)
+			job, err := svc.CreateGrokVideoBillingJob(context.Background(), input, pending)
+			require.NoError(t, err)
+			require.NoError(t, svc.SubmitGrokVideoBillingJob(context.Background(), job, "recovery-task", pending))
+			repo.jobs[job.ID].CreatedAt = time.Now().Add(-scenario.age)
+			upstream := &httpUpstreamRecorder{responses: []*http.Response{{StatusCode: scenario.code, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"status":"` + scenario.status + `","error":{"message":"task unavailable"}}`))}}}
+			if scenario.code == http.StatusNotFound {
+				upstream.responses = append(upstream.responses, &http.Response{StatusCode: scenario.code, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"task unavailable"}}`))})
+			}
+			account := newOpenAIRejectedFieldTestAccount()
+			account.ID = input.Account.ID
+			account.Platform = PlatformGrok
+			svc.accountRepo, svc.httpUpstream = mediaAccountRepo{account: account}, upstream
+			svc.recoverMediaBillingJobs(context.Background())
+			stored, err := repo.GetMediaBillingJobByID(context.Background(), job.ID)
+			require.NoError(t, err)
+			if scenario.reconcile {
+				require.Equal(t, MediaBillingReconciliation, stored.Status)
+			} else if scenario.status == "failed" {
+				require.Equal(t, MediaBillingFailed, stored.Status)
+			} else {
+				require.Equal(t, MediaBillingSubmitted, stored.Status)
+			}
+			if scenario.status == "failed" {
+				require.InDelta(t, 100, repo.balance, 1e-8)
+			} else {
+				require.InDelta(t, 96.4, repo.balance, 1e-8)
+			}
+			require.Zero(t, repo.applied)
+			if scenario.name == "budget" {
+				require.Empty(t, upstream.requests)
+			}
+		})
+	}
+}
+func TestMediaBillingRecoveryDelayOnlyBacksOffUnresolvedVideo(t *testing.T) {
+	failure := errors.New("unavailable")
+	video := &MediaBillingJob{Kind: MediaBillingKindGrokVideo, Status: MediaBillingSubmitted, Attempts: 20, CreatedAt: time.Now().Add(-48 * time.Hour)}
+	for attempt, want := range []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 15 * time.Minute} {
+		video.Attempts = attempt
+		require.Equal(t, want, mediaBillingRecoveryDelay(video, failure))
+	}
+	video.Attempts = 20
+	require.Equal(t, 15*time.Minute, mediaBillingRecoveryDelay(video, failure))
+	require.Equal(t, 15*time.Second, mediaBillingRecoveryDelay(video, nil))
+	require.True(t, grokVideoAutomaticPollExpired(video, time.Now()))
+	for _, status := range []string{MediaBillingReady, MediaBillingBilled, MediaBillingReconciliation} {
+		copy := *video
+		copy.Status = status
+		require.False(t, grokVideoAutomaticPollExpired(&copy, time.Now()))
+		require.Equal(t, time.Minute, mediaBillingRecoveryDelay(&copy, failure))
+	}
+	video.Intent = &MediaBillingIntent{}
+	require.False(t, grokVideoAutomaticPollExpired(video, time.Now()))
+	require.Equal(t, time.Minute, mediaBillingRecoveryDelay(video, failure))
+	video.Intent = nil
+	video.Kind = MediaBillingKindImage
+	require.False(t, grokVideoAutomaticPollExpired(video, time.Now()))
+	require.Equal(t, time.Minute, mediaBillingRecoveryDelay(video, failure))
+}
+func TestGrokVideoForwardPreservesRawExpiredStatus(t *testing.T) {
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"status":"expired"}`))}}}
+	svc := newOpenAIRejectedFieldTestService(upstream)
+	account := newOpenAIRejectedFieldTestAccount()
+	account.Platform = PlatformGrok
+	c := newOpenAIRejectedFieldTestContext(nil)
+	var captured string
+	ctx := ContextWithGrokMediaBeforePublish(context.Background(), func(_ context.Context, result *OpenAIForwardResult) error { captured = result.VideoStatus; return nil })
+	result, err := svc.ForwardGrokMedia(ctx, c, account, GrokMediaEndpointVideoStatus, "expired-task", nil, "")
+	require.NoError(t, err)
+	require.Equal(t, "expired", result.VideoStatus)
+	require.Equal(t, "expired", captured)
 }

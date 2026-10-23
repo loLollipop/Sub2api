@@ -34,7 +34,7 @@ const (
 	openaiPlatformAPIURL            = "https://api.openai.com/v1/responses"
 	openaiPlatformAPIInputTokensURL = "https://api.openai.com/v1/responses/input_tokens"
 	openaiStickySessionTTL          = time.Hour // 粘性会话TTL
-	// 与真实 Codex TUI 的 User-Agent 结构对齐：
+	// 与真实 Codex CLI 的 User-Agent 结构对齐：
 	// {originator}/{version} ({OS} {OS_version}; {arch}) {terminal}
 	// 缺少 OS/架构/终端后缀的形态易被上游指纹识别为非官方客户端。
 	// 该后缀是 UA 形态的唯一定义处，buildCodexCLIUserAgent 按运行时版本号复用它。
@@ -293,6 +293,8 @@ type OpenAIForwardResult struct {
 	ImageSizeBreakdown       map[string]int
 	VideoCount               int
 	VideoResolution          string
+	// VideoStatus is the original upstream status, before client compatibility rewriting.
+	VideoStatus string
 	// VideoDurationSeconds 是提交时请求的生成时长（xAI 按输出秒数计费），已归一化到 1-15 秒。
 	VideoDurationSeconds int
 	// WebSearchCalls 是 Codex alpha/search 网页搜索调用次数（每次成功请求为 1）。

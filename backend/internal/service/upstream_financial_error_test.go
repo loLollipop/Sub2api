@@ -318,25 +318,33 @@ func TestUpstreamFinancialResponsesStreamEndToEnd(t *testing.T) {
 					account := &Account{ID: 42, Platform: platform, Type: AccountTypeAPIKey}
 					var err error
 					var tokens int
+					var nonBillable bool
 					if passthrough {
 						result, e := svc.handleStreamingResponsePassthrough(c.Request.Context(), resp, c, account, time.Now(), "model", "model")
 						err = e
 						if result != nil {
 							tokens = result.usage.InputTokens
+							nonBillable = result.nonBillableUpstreamError
 						}
 					} else {
 						result, e := svc.handleStreamingResponse(c.Request.Context(), resp, c, account, time.Now(), "model", "model")
 						err = e
 						if result != nil {
 							tokens = result.usage.InputTokens
+							nonBillable = result.nonBillableUpstreamError
 						}
 					}
 					require.Error(t, err)
+					require.False(t, nonBillable, "authoritative usage must clear any earlier error-only exemption")
 					if !priorOutput {
 						var failover *UpstreamFailoverError
-						require.True(t, errors.As(err, &failover))
-						require.False(t, c.Writer.Written())
-						require.Contains(t, string(failover.ResponseBody), "sk-secret")
+						require.False(t, errors.As(err, &failover), "reported usage must not be discarded by replay")
+						require.Equal(t, 8, tokens)
+						require.True(t, c.Writer.Written())
+						require.Equal(t, http.StatusBadGateway, rec.Code)
+						require.Equal(t, 1, strings.Count(rec.Body.String(), UpstreamUnavailableMessage))
+						require.NotContains(t, rec.Body.String(), "sk-secret")
+						require.NotContains(t, rec.Body.String(), "host.internal")
 						return
 					}
 					require.Equal(t, 200, rec.Code)

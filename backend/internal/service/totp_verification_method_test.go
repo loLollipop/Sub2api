@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -113,23 +115,26 @@ func TestTotpDisableAdminRejectsPasswordAndEmailWithoutTotp(t *testing.T) {
 	require.False(t, userRepo.disableCalled)
 }
 
-func TestTotpDisableRegularUserStillRequiresEmailCode(t *testing.T) {
+func TestTotpDisableRegularUserRejectsEmailAndPassword(t *testing.T) {
 	user := &User{ID: 2, Email: "user@example.com", Role: RoleUser, TotpEnabled: true}
 	require.NoError(t, user.SetPassword("whatever"))
 	svc, _ := newTotpVMService(t, user, true)
 
 	err := svc.Disable(context.Background(), user.ID, "", "whatever")
-	require.ErrorIs(t, err, ErrVerifyCodeRequired)
+	require.ErrorIs(t, err, ErrTotpInvalidCode)
+	method, err := svc.GetVerificationMethod(context.Background(), user.ID, "disable")
+	require.NoError(t, err)
+	require.Equal(t, "totp", method.Method)
 }
 
-func TestTotpDisableRegularUserPasswordRemainsSupported(t *testing.T) {
+func TestTotpDisableRegularUserPasswordCannotReplaceAuthenticator(t *testing.T) {
 	user := &User{ID: 2, Role: RoleUser, Status: StatusActive, TotpEnabled: true}
 	require.NoError(t, user.SetPassword("correct-password"))
 	svc, repo := newTotpVMService(t, user, false)
-	require.ErrorIs(t, svc.Disable(context.Background(), user.ID, "", "wrong-password"), ErrPasswordIncorrect)
+	require.ErrorIs(t, svc.Disable(context.Background(), user.ID, "", "wrong-password"), ErrTotpInvalidCode)
 	require.False(t, repo.disableCalled)
-	require.NoError(t, svc.Disable(context.Background(), user.ID, "", "correct-password"))
-	require.True(t, repo.disableCalled)
+	require.ErrorIs(t, svc.Disable(context.Background(), user.ID, "123456", "correct-password"), ErrTotpInvalidCode)
+	require.False(t, repo.disableCalled)
 }
 
 type legacyTotpDisableRepo struct {
@@ -140,10 +145,11 @@ type legacyTotpDisableRepo struct {
 func (r *legacyTotpDisableRepo) GetByID(context.Context, int64) (*User, error) { return r.user, nil }
 
 func TestTotpDisableFailsClosedWithoutConditionalDisabler(t *testing.T) {
-	user := &User{ID: 2, Role: RoleUser, Status: StatusActive, TotpEnabled: true}
-	require.NoError(t, user.SetPassword("correct-password"))
-	svc, _ := newTotpVMService(t, user, false)
-	svc.userRepo = &legacyTotpDisableRepo{user: user}
-	require.ErrorIs(t, svc.Disable(context.Background(), user.ID, "", "correct-password"), ErrUserSecurityStateChanged)
+	encrypted := "encrypted:JBSWY3DPEHPK3PXP"
+	user := &User{ID: 2, Role: RoleUser, Status: StatusActive, TotpEnabled: true, TotpSecretEncrypted: &encrypted}
+	svc := NewTotpService(&legacyTotpDisableRepo{user: user}, totpSecretRaceEncryptor{}, totpSecretRaceCache{}, nil, nil, nil)
+	code, err := totp.GenerateCode("JBSWY3DPEHPK3PXP", time.Now())
+	require.NoError(t, err)
+	require.ErrorIs(t, svc.Disable(context.Background(), user.ID, "", "", code), ErrUserSecurityStateChanged)
 	require.True(t, user.TotpEnabled)
 }

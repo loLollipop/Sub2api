@@ -18,7 +18,7 @@ enableAutoUnmount(afterEach)
 
 beforeEach(() => {
   vi.resetAllMocks()
-  mocks.totpAPI.getVerificationMethod.mockResolvedValue({ method: 'password' })
+  mocks.totpAPI.getVerificationMethod.mockImplementation(async (operation: string) => ({ method: operation === 'disable' ? 'totp' : 'password' }))
 })
 
 describe.each([
@@ -33,7 +33,7 @@ describe.each([
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
-  it('shows why the email verification code cannot be sent', async () => {
+  it.runIf(name === 'setup')('shows why the email verification code cannot be sent', async () => {
     mocks.totpAPI.getVerificationMethod.mockResolvedValue({ method: 'email' })
     mocks.totpAPI.sendVerifyCode.mockRejectedValue({ status: 429, message: 'Please wait before requesting another code' })
     const wrapper = mount(component)
@@ -51,7 +51,7 @@ describe.each([
     action.mockRejectedValue(error)
     const wrapper = mount(component)
     await flushPromises()
-    await wrapper.get('input[type="password"]').setValue('incorrect-password')
+    await wrapper.get(name === 'setup' ? 'input[type="password"]' : '[data-testid="totp-disable-code"]').setValue(name === 'setup' ? 'incorrect-password' : '012345')
     if (name === 'setup') await wrapper.get('.btn-primary').trigger('click')
     else await wrapper.get('form').trigger('submit')
     await flushPromises()

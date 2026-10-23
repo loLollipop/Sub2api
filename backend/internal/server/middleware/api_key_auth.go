@@ -260,7 +260,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				}
 			} else {
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
-				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
+				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) && !isGrokVideoTaskRead(c.Request.Method, c.Request.URL.Path) {
 					abortWithInsufficientBalance(c)
 					return
 				}
@@ -358,6 +358,30 @@ func isAsyncImageTaskRead(method, path string) bool {
 		return false
 	}
 	return strings.HasPrefix(path, "/v1/images/tasks/") || strings.HasPrefix(path, "/images/tasks/")
+}
+
+// Only balance admission is deferred for these reads. The Grok handler must
+// either load an owner-scoped durable job or perform normal billing admission
+// before forwarding a lookup. Generation and unrelated paths never qualify.
+func isGrokVideoTaskRead(method, path string) bool {
+	if method != http.MethodGet {
+		return false
+	}
+	if strings.HasPrefix(path, "/v1/videos/") {
+		path = strings.TrimPrefix(path, "/v1")
+	} else if !strings.HasPrefix(path, "/videos/") {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	if len(parts) < 2 || parts[0] != "videos" {
+		return false
+	}
+	parts = parts[1:]
+	if parts[0] == "generations" || parts[0] == "edits" || parts[0] == "extensions" {
+		parts = parts[1:]
+	}
+	return len(parts) == 1 && parts[0] != "" ||
+		len(parts) == 2 && parts[0] != "" && parts[1] == "content"
 }
 
 // GetAPIKeyFromContext 从上下文中获取API key

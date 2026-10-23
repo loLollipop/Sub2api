@@ -30,7 +30,7 @@ type ConfigManager struct {
 	redis     *redis.Client
 	encryptor SecretEncryptor
 	clock     Clock
-	// encryptionKeyConfigured mirrors cfg.Totp.EncryptionKeyConfigured. With an
+	// encryptionKeyConfigured mirrors cfg.Totp.HasPersistentEncryptionKey(). With an
 	// auto-generated (per-boot) key, newly saved endpoint tokens would become
 	// undecryptable after the next restart, so Save rejects them (issue #4887).
 	encryptionKeyConfigured bool
@@ -61,7 +61,7 @@ type ConfigManager struct {
 func NewConfigManager(db *sql.DB, settings service.SettingRepository, redisClient *redis.Client, encryptor service.SecretEncryptor, cfg *config.Config) *ConfigManager {
 	return &ConfigManager{
 		db: db, settings: settings, redis: redisClient, encryptor: encryptor, clock: realClock{},
-		encryptionKeyConfigured: cfg != nil && cfg.Totp.EncryptionKeyConfigured,
+		encryptionKeyConfigured: cfg != nil && cfg.Totp.HasPersistentEncryptionKey(),
 	}
 }
 

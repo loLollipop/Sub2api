@@ -1381,3 +1381,15 @@ func TestBackupService_UpdateS3Config_InheritedSecretRejectsEphemeralKey(t *test
 	require.NoError(t, err)
 	require.Equal(t, before, after, "a rejected update must leave the encrypted configuration unchanged")
 }
+
+func TestPersistentInstallationKeyEnablesDurableServiceGates(t *testing.T) {
+	cfg := &config.Config{Totp: config.TotpConfig{EncryptionKeyPersistent: true}}
+	require.False(t, cfg.Totp.EncryptionKeyConfigured)
+	require.True(t, NewSettingService(nil, cfg).IsTotpEncryptionKeyConfigured())
+	backup := NewBackupService(nil, cfg, &plainEncryptor{}, nil, nil)
+	defer backup.bgCancel()
+	require.True(t, backup.EncryptionKeyConfigured())
+	ollama := ProvideOllamaCloudUsageService(nil, nil, nil, &plainEncryptor{}, cfg, nil, nil)
+	defer ollama.Stop()
+	require.True(t, ollama.encryptionKeyConfigured)
+}

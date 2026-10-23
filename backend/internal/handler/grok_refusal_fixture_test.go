@@ -78,3 +78,7 @@ func (*unblockedGrokHandlerBillingRepo) ListMediaBillingJobs(context.Context, in
 func (r *unblockedGrokHandlerBillingRepo) RetryMediaBillingJob(context.Context, string, time.Duration) error {
 	return r.unexpected()
 }
+
+func (r *unblockedGrokHandlerBillingRepo) ReconcileMediaBillingJob(_ context.Context, id string) error {
+	return r.unexpected()
+}

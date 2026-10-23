@@ -219,6 +219,10 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 
 	usage := &OpenAIUsage{}
 	imageCounter := newOpenAIImageOutputCounter()
+	searchCounter := 0
+	observedBillingUnits := func() bool {
+		return openAIUsageHasTokens(usage) || imageCounter.Count() > 0 || searchCounter > 0
+	}
 	responseID := ""
 	// 流式预扣补扣：仅当请求持有带 tracker 的活动预扣 guard 时非空；逐帧仅整数
 	// 累加，跨输出窗口时才原子补扣一次，补扣失败中止上游流。
@@ -341,9 +345,13 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				message = "OpenAI first-output staging limit exceeded"
 			}
 			logger.LegacyPrintf("service.openai_gateway", "%s: account=%d model=%s error=%v", message, streamAccountID, originalModel, err)
-			failoverErr := s.newOpenAIStreamFailoverErrorWithModel(c, account, false, upstreamRequestID, nil, message, mappedModel)
-			failoverErr.SafeToFailoverAfterWrite = true
-			streamEarlyErr = failoverErr
+			if observedBillingUnits() || openAIStreamClientOutputStarted(c, clientOutputStarted) {
+				streamEarlyErr = fmt.Errorf("%s: %w", message, err)
+			} else {
+				failoverErr := s.newOpenAIStreamFailoverErrorWithModel(c, account, false, upstreamRequestID, nil, message, mappedModel)
+				failoverErr.SafeToFailoverAfterWrite = true
+				streamEarlyErr = failoverErr
+			}
 			_ = resp.Body.Close()
 			return
 		}
@@ -410,7 +418,6 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	streamDoneItems := newResponsesStreamOutputItems()
 	streamImageOutputs := make([]json.RawMessage, 0, 1)
 	streamSeenImages := make(map[string]struct{})
-	searchCounter := 0
 	// Dedup search tool calls across SSE events (item.done + response.completed
 	// both list the same call_id — counting both would ~2× the surcharge).
 	var streamSearchSeen map[string]struct{}
@@ -425,7 +432,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			imageCount:               imageCounter.Count(),
 			imageOutputSizes:         imageCounter.Sizes(),
 			searchCount:              searchCounter,
-			nonBillableUpstreamError: nonBillableUpstreamError,
+			nonBillableUpstreamError: nonBillableUpstreamError && !observedBillingUnits(),
 			clientDisconnect:         clientDisconnected,
 		}
 	}
@@ -472,6 +479,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			s.clearOpenAIProxyStreamDisconnect(account)
 		}
 		if !clientDisconnected && !sawTerminalEvent && !openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush {
+			if observedBillingUnits() {
+				return resultWithUsage(), errors.New("stream usage incomplete: missing terminal event")
+			}
 			return resultWithUsage(), s.newOpenAIStreamFailoverErrorWithModel(
 				c,
 				account,
@@ -510,6 +520,10 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				return result, err, true
 			}
 			return resultWithUsage(), fmt.Errorf("stream usage incomplete after disconnect: %w", scanErr), true
+		}
+		if (errors.Is(scanErr, errOpenAIFirstOutputScannerLimit) || errors.Is(scanErr, bufio.ErrTooLong)) &&
+			!firstOutputProgressObserved && observedBillingUnits() {
+			return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", scanErr), true
 		}
 		if errors.Is(scanErr, errOpenAIFirstOutputScannerLimit) && !firstOutputProgressObserved {
 			logger.LegacyPrintf("service.openai_gateway", "SSE token exceeded guarded first-output limit: account=%d limit=%d error=%v", streamAccountID, openAIFirstOutputStageMaxBytes+openAIFirstOutputScannerFramingAllowance, scanErr)
@@ -556,6 +570,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			return resultWithUsage(), scanErr, true
 		}
 		if !openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush {
+			if observedBillingUnits() {
+				return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", scanErr), true
+			}
 			msg := "OpenAI stream disconnected before completion"
 			if errText := strings.TrimSpace(scanErr.Error()); errText != "" {
 				msg += ": " + errText
@@ -581,8 +598,10 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			dataBytes := []byte(data)
 			frame := parseOpenAISSEDataFrame(dataBytes, pendingSSEEventType)
 			eventType := frame.eventType
+			// Account for this frame before staging or any early error return.
+			// The frame that exceeds the stage limit can itself report usage.
+			s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
 			if sawResponseFailed && (eventType == "response.failed" || eventType == "error") {
-				s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
 				return
 			}
 			if codexFailureTerminal && sawBareError && !sawResponseFailed &&
@@ -641,7 +660,6 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				// response.failed 自带上游已消耗的 usage（input token 通常已扣）；必须先解析
 				// 再打 cyber 标记，否则 mark 记到的是解析前的 0，导致流式 cyber 按 0 token 计费
 				// 而漏记真实用量。对齐 WS V2 / Chat 流式路径（均先解析 usage 再 Mark）。
-				s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
 				if hit, code, msg := detectOpenAICyberPolicy(dataBytes); hit {
 					cyberHit = true
 					MarkOpsCyberPolicy(c, CyberPolicyMark{
@@ -654,10 +672,10 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 					})
 				}
 				outputStarted := openAIStreamClientOutputStarted(c, clientOutputStarted)
-				if !outputStarted && !cyberHit && isOpenAINonBillableRequestError(failedMessage, dataBytes) {
-					nonBillableUpstreamError = true
+				if !outputStarted && !cyberHit {
+					nonBillableUpstreamError = !observedBillingUnits() && isOpenAINonBillableRequestError(failedMessage, dataBytes)
 				}
-				if !clientDisconnected && !outputStarted && !cyberHit {
+				if !clientDisconnected && !outputStarted && !cyberHit && !observedBillingUnits() {
 					if compactErr := newOpenAICompactFallbackSignal(c, dataBytes, failedMessage); compactErr != nil {
 						sawFailedEvent = true
 						streamEarlyErr = compactErr
@@ -683,7 +701,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 							shouldFailover = openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
 						}
 					}
-					if shouldFailover {
+					if shouldFailover && !observedBillingUnits() {
 						sawFailedEvent = true
 						streamEarlyErr = s.newOpenAIStreamFailoverErrorWithModel(c, account, false, upstreamRequestID, dataBytes, failedMessage, mappedModel, resp.Header)
 						return
@@ -862,7 +880,6 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				firstTokenMs = &ms
 				stopFirstOutputTimer()
 			}
-			s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
 			return
 		}
 
@@ -1064,7 +1081,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			// legacy stream_timeout path so partial SSE is not dual-written.
 			if account != nil && account.Platform == PlatformGrok {
 				s.tempUnscheduleGrok(ctx, account, grokStreamIdleCooldown, "grok stream idle timeout")
-				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush {
+				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush && !observedBillingUnits() {
 					_ = resp.Body.Close()
 					return resultWithUsage(), grokStreamIdleFailoverError(account, streamInterval)
 				}
@@ -1087,6 +1104,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				return finalizeStream()
 			}
 			_ = resp.Body.Close()
+			if observedBillingUnits() {
+				return resultWithUsage(), errors.New("stream usage incomplete: first output timeout")
+			}
 			return resultWithUsage(), s.newOpenAIFirstOutputTimeoutError(
 				ctx, c, account, opsUpstreamProxyID(account), opsUpstreamProxyName(account),
 				startTime, originalModel, reasoningEffort,

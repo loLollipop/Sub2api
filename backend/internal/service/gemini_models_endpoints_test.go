@@ -75,6 +75,37 @@ func TestSelectAccountForModelsEndpoints_PrefersAPIKeyOverVertex(t *testing.T) {
 	require.Equal(t, int64(19), account.ID)
 }
 
+func TestSelectAccountForModelsEndpoints_NativeProtocolAndScope(t *testing.T) {
+	groupID := int64(8)
+	for _, protocol := range []string{"", APIProtocolAdaptive, APIProtocolChatCompletions, APIProtocolResponses, APIProtocolAnthropic} {
+		t.Run(protocol, func(t *testing.T) {
+			account := *geminiBridgeAccount(protocol)
+			account.Credentials["model_mapping"] = map[string]any{"gemini-public": "gemini-native"}
+			svc := newGeminiModelsEndpointsTestService([]Account{account}, nil)
+			selected, err := svc.SelectAccountForModelsEndpoints(context.Background(), &groupID, "gemini-public")
+			if protocol != "" && protocol != APIProtocolAdaptive {
+				require.Error(t, err)
+				require.Nil(t, selected)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, account.ID, selected.ID)
+			selected, err = svc.SelectAccountForModelsEndpoints(context.Background(), &groupID, "gemini-unmapped")
+			require.Error(t, err)
+			require.Nil(t, selected)
+			ctx := WithResolvedTargetPlatform(context.Background(), PlatformAntigravity)
+			selected, err = svc.SelectAccountForModelsEndpoints(ctx, &groupID, "gemini-public")
+			require.Error(t, err)
+			require.Nil(t, selected)
+			account.Platform = PlatformAntigravity
+			svc = newGeminiModelsEndpointsTestService([]Account{account}, nil)
+			selected, err = svc.SelectAccountForModelsEndpoints(context.Background(), &groupID)
+			require.Error(t, err)
+			require.Nil(t, selected)
+		})
+	}
+}
+
 func TestForwardListModels_VertexServiceAccountReturnsAIStudioFormat(t *testing.T) {
 	upstream := &httpUpstreamRecorder{responses: []*http.Response{
 		vertexModelsJSONResponse(http.StatusOK, `{"publisherModels":[

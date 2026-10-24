@@ -128,22 +128,12 @@
               <label class="input-label text-center block mb-3">
                 {{ t('profile.totp.enterCode') }}
               </label>
-              <div class="flex justify-center gap-2">
-                <input
-                  v-for="(_, index) in 6"
-                  :key="index"
-                  :ref="(el) => setInputRef(el, index)"
-                  :value="code[index]"
-                  type="text"
-                  maxlength="1"
-                  inputmode="numeric"
-                  pattern="[0-9]"
-                  class="h-12 w-10 rounded-lg border border-gray-300 text-center text-lg font-semibold focus:border-primary-500 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-700"
-                  @input="handleCodeInput($event, index)"
-                  @keydown="handleKeydown($event, index)"
-                  @paste="handlePaste"
-                />
-              </div>
+              <TotpCodeInput
+                ref="codeInput"
+                v-model="code"
+                :label="t('profile.totp.enterCode')"
+                :disabled="verifying"
+              />
             </div>
 
             <div class="flex justify-end gap-3">
@@ -153,7 +143,7 @@
               <button
                 type="submit"
                 class="btn btn-primary"
-                :disabled="verifying || !/^\d{6}$/.test(code.join(''))"
+                :disabled="verifying || !/^\d{6}$/.test(code)"
               >
                 {{ verifying ? t('common.verifying') : t('profile.totp.verify') }}
               </button>
@@ -167,6 +157,7 @@
 
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
+import TotpCodeInput from '@/components/common/TotpCodeInput.vue'
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -195,8 +186,8 @@ const cooldownTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const setupLoading = ref(false)
 const setupData = ref<TotpSetupResponse | null>(null)
 const verifying = ref(false)
-const code = ref<string[]>(['', '', '', '', '', ''])
-const inputRefs = ref<(HTMLInputElement | null)[]>([])
+const code = ref('')
+const codeInput = ref<InstanceType<typeof TotpCodeInput> | null>(null)
 const qrCodeDataUrl = ref('')
 
 const stepDescription = computed(() => {
@@ -243,62 +234,6 @@ watch(
   },
   { immediate: true }
 )
-
-const setInputRef = (el: any, index: number) => {
-  inputRefs.value[index] = el as HTMLInputElement | null
-}
-
-const handleCodeInput = (event: Event, index: number) => {
-  const input = event.target as HTMLInputElement
-  const value = input.value.replace(/[^0-9]/g, '')
-  code.value[index] = value
-
-  if (value && index < 5) {
-    nextTick(() => {
-      inputRefs.value[index + 1]?.focus()
-    })
-  }
-}
-
-const handleKeydown = (event: KeyboardEvent, index: number) => {
-  if (event.key === 'Backspace') {
-    const input = event.target as HTMLInputElement
-    // If current cell is empty and not the first, move to previous cell
-    if (!input.value && index > 0) {
-      event.preventDefault()
-      inputRefs.value[index - 1]?.focus()
-    }
-    // Otherwise, let the browser handle the backspace naturally
-    // The input event will sync code.value via handleCodeInput
-  }
-}
-
-const handlePaste = (event: ClipboardEvent) => {
-  event.preventDefault()
-  const pastedData = event.clipboardData?.getData('text') || ''
-  const digits = pastedData.replace(/[^0-9]/g, '').slice(0, 6).split('')
-
-  // Update both the ref and the input elements
-  digits.forEach((digit, index) => {
-    code.value[index] = digit
-    if (inputRefs.value[index]) {
-      inputRefs.value[index]!.value = digit
-    }
-  })
-
-  // Clear remaining inputs if pasted less than 6 digits
-  for (let i = digits.length; i < 6; i++) {
-    code.value[i] = ''
-    if (inputRefs.value[i]) {
-      inputRefs.value[i]!.value = ''
-    }
-  }
-
-  const focusIndex = Math.min(digits.length, 5)
-  nextTick(() => {
-    inputRefs.value[focusIndex]?.focus()
-  })
-}
 
 const copySecret = async () => {
   if (setupData.value) {
@@ -372,7 +307,7 @@ const handleVerifyAndSetup = async () => {
 }
 
 const handleVerify = async () => {
-  const totpCode = code.value.join('')
+  const totpCode = code.value
   if (!/^\d{6}$/.test(totpCode) || !setupData.value || verifying.value) return
 
   verifying.value = true
@@ -386,9 +321,9 @@ const handleVerify = async () => {
     emit('success')
   } catch (err: any) {
     appStore.showError(extractApiErrorMessage(err, t('profile.totp.verifyFailed')))
-    code.value = ['', '', '', '', '', '']
+    code.value = ''
     nextTick(() => {
-      inputRefs.value[0]?.focus()
+      codeInput.value?.focus()
     })
   } finally {
     verifying.value = false

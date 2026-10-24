@@ -130,9 +130,10 @@ func TestBuildOpenAIModelsURL(t *testing.T) {
 func TestBuildGeminiModelsURL(t *testing.T) {
 	t.Parallel()
 
-	require.Equal(t, "https://generativelanguage.googleapis.com/v1beta/models", buildGeminiModelsURL("https://generativelanguage.googleapis.com"))
-	require.Equal(t, "https://generativelanguage.googleapis.com/v1beta/models", buildGeminiModelsURL("https://generativelanguage.googleapis.com/v1beta"))
-	require.Equal(t, "https://generativelanguage.googleapis.com/v1beta/models", buildGeminiModelsURL("https://generativelanguage.googleapis.com/v1beta/models"))
+	for _, suffix := range []string{"", "/v1beta", "/v1beta/models"} {
+		account := &Account{Type: AccountTypeAPIKey, Platform: PlatformGemini, Credentials: map[string]any{"base_url": "https://generativelanguage.googleapis.com" + suffix}}
+		require.Equal(t, "https://generativelanguage.googleapis.com/v1beta/models", buildGeminiModelsURL(account.GetGeminiBaseURL("")))
+	}
 }
 
 func TestExtractUpstreamModelIDs(t *testing.T) {

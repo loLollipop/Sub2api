@@ -50,7 +50,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelsEndpoints(ctx contex
 	var selected *Account
 	for i := range accounts {
 		acc := &accounts[i]
-		if acc.IsGeminiOpenAIProtocol() || acc.Platform != PlatformGemini {
+		if !acc.UsesNativeGeminiUpstream() || acc.Platform != PlatformGemini {
 			continue
 		}
 		if platform, resolved := ResolvedTargetPlatformFromContext(ctx); resolved && platform != acc.Platform {
@@ -436,7 +436,7 @@ func (s *GeminiMessagesCompatService) GeminiOpenAIModelIDs(ctx context.Context, 
 	var ids []string
 	for i := range accounts {
 		account := &accounts[i]
-		if account.IsGeminiOpenAIProtocol() {
+		if account.IsGeminiOpenAIProtocol() && !account.UsesNativeGeminiUpstream() {
 			ids = append(ids, configuredGeminiModelIDs(account)...)
 		}
 	}

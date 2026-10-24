@@ -1650,14 +1650,8 @@ func buildOpenAIModelsURL(base string) string {
 }
 
 func buildGeminiModelsURL(base string) string {
-	normalized := strings.TrimRight(strings.TrimSpace(base), "/")
-	if strings.HasSuffix(normalized, "/v1beta/models") {
-		return normalized
-	}
-	if strings.HasSuffix(normalized, "/v1beta") {
-		return normalized + "/models"
-	}
-	return normalized + "/v1beta/models"
+	// Account.GetGeminiBaseURL has removed the protocol suffix exactly once.
+	return strings.TrimRight(strings.TrimSpace(base), "/") + "/v1beta/models"
 }
 
 type upstreamModelEntry struct {

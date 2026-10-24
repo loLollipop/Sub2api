@@ -131,10 +131,6 @@ vi.mock("@/composables/useClipboard", () => ({
   }),
 }));
 
-vi.mock("@/utils/apiError", () => ({
-  extractApiErrorMessage: () => "error",
-}));
-
 vi.mock("vue-i18n", async () => {
   const actual = await vi.importActual<typeof import("vue-i18n")>("vue-i18n");
   const translations: Record<string, string> = {
@@ -505,6 +501,7 @@ function mountView() {
   return mount(SettingsView, {
     global: {
       stubs: {
+        teleport: true,
         AppLayout: AppLayoutStub,
         Select: SelectStub,
         Toggle: ToggleStub,
@@ -760,7 +757,7 @@ describe("admin SettingsView settings controls", () => {
     expect(updateSettings).toHaveBeenCalledTimes(1);
     expect(updateSettings.mock.calls[0]?.[0][field]).toBe(true);
     expect(verifyStepUp).not.toHaveBeenCalled();
-    expect(wrapper.getComponent(TotpStepUpDialog).find('input[maxlength="1"]').exists()).toBe(false);
+    expect(wrapper.getComponent(TotpStepUpDialog).find('input[autocomplete="one-time-code"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -775,9 +772,7 @@ describe("admin SettingsView settings controls", () => {
     expect(updateSettings).toHaveBeenCalledTimes(1);
     const original = updateSettings.mock.calls[0]?.[0];
     const dialog = wrapper.getComponent(TotpStepUpDialog);
-    const digits = dialog.findAll('input[maxlength="1"]');
-    expect(digits).toHaveLength(6);
-    for (const [index, digit] of digits.entries()) await digit.setValue(String(index + 1));
+    await dialog.get('input[autocomplete="one-time-code"]').setValue("123456");
     await flushPromises();
     expect(verifyStepUp).toHaveBeenCalledWith("123456");
     expect(updateSettings).toHaveBeenCalledTimes(2);
@@ -814,12 +809,12 @@ describe("admin SettingsView settings controls", () => {
     await wrapper.find("form").trigger("submit.prevent");
     await flushPromises();
     const dialog = wrapper.getComponent(TotpStepUpDialog);
-    for (const digit of dialog.findAll('input[maxlength="1"]')) await digit.setValue("1");
+    await dialog.get('input[autocomplete="one-time-code"]').setValue("111111");
     await flushPromises();
     expect(updateSettings).toHaveBeenCalledTimes(1);
     expect(showError).toHaveBeenCalledWith("Authenticator code expired");
     expect(showSuccess).not.toHaveBeenCalled();
-    expect(dialog.findAll('input[maxlength="1"]')).toHaveLength(6);
+    expect(dialog.findAll('input[autocomplete="one-time-code"]')).toHaveLength(1);
     await dialog.get('button').trigger("click");
     await flushPromises();
     wrapper.unmount();

@@ -4,6 +4,7 @@ interface DialogLayer {
   onEscape: () => void
   onTab?: (event: KeyboardEvent) => void
   onRestoreFocus?: (target: HTMLElement | null) => void
+  onTopChange?: (isTop: boolean) => void
 }
 
 const layers = new Map<symbol, DialogLayer>()
@@ -20,6 +21,12 @@ function topLayer() {
   return top
 }
 
+// Sensitive verification must open above its caller, including custom layers.
+// Keep explicit z-index ordering unchanged for ordinary dialogs.
+export function nextDialogZIndex(minimum = 60) {
+  return Math.max(minimum, (topLayer()?.[1].zIndex ?? 50) + 10)
+}
+
 function handleKeydown(event: KeyboardEvent) {
   const top = topLayer()?.[1]
   if (event.key === 'Escape' && top && !event.defaultPrevented) {
@@ -34,7 +41,7 @@ function handleKeydown(event: KeyboardEvent) {
 // synchronously. Every registered layer owns the shared body scroll lock.
 export function createDialogLayer(
   onEscape: () => void,
-  handlers: Pick<DialogLayer, 'onTab' | 'onRestoreFocus'> = {},
+  handlers: Pick<DialogLayer, 'onTab' | 'onRestoreFocus' | 'onTopChange'> = {},
 ) {
   const id = Symbol('dialog')
   function update(open: boolean, zIndex: number) {
@@ -46,10 +53,13 @@ export function createDialogLayer(
         layers.set(id, { zIndex, sequence: ++sequence, onEscape, ...handlers })
       }
     } else {
+      layers.get(id)?.onTopChange?.(false)
       layers.delete(id)
       if (layers.size === 0) document.removeEventListener('keydown', handleKeydown)
     }
     document.body.classList.toggle('modal-open', layers.size > 0)
+    const topId = topLayer()?.[0]
+    for (const [layerId, layer] of layers) layer.onTopChange?.(layerId === topId)
   }
   return {
     update,

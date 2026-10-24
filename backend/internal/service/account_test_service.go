@@ -2556,10 +2556,7 @@ func (s *AccountTestService) buildGeminiAPIKeyRequest(ctx context.Context, accou
 		return nil, fmt.Errorf("no API key available")
 	}
 
-	baseURL := account.GetCredential("base_url")
-	if baseURL == "" {
-		baseURL = geminicli.AIStudioBaseURL
-	}
+	baseURL := account.GetGeminiBaseURL(geminicli.AIStudioBaseURL)
 	normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
 	if err != nil {
 		return nil, err
@@ -2597,10 +2594,7 @@ func (s *AccountTestService) buildGeminiOAuthRequest(ctx context.Context, accoun
 	projectID := strings.TrimSpace(account.GetCredential("project_id"))
 	if projectID == "" {
 		// AI Studio OAuth mode (no project_id): call generativelanguage API directly with Bearer token.
-		baseURL := account.GetCredential("base_url")
-		if strings.TrimSpace(baseURL) == "" {
-			baseURL = geminicli.AIStudioBaseURL
-		}
+		baseURL := account.GetGeminiBaseURL(geminicli.AIStudioBaseURL)
 		normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
 		if err != nil {
 			return nil, err

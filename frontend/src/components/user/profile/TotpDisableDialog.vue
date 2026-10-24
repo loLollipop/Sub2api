@@ -24,18 +24,12 @@
 
         <form v-else @submit.prevent="handleDisable" class="space-y-4">
           <div v-if="verificationMethod === 'totp'">
-            <label for="totp-disable-code" class="input-label">{{ t('profile.totp.authenticatorCode') }}</label>
-            <input
-              id="totp-disable-code"
+            <TotpCodeInput
+              ref="codeInput"
               v-model="form.totpCode"
-              type="text"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              maxlength="6"
-              pattern="[0-9]{6}"
-              class="input"
+              :label="t('profile.totp.authenticatorCode')"
+              :disabled="loading"
               data-testid="totp-disable-code"
-              :placeholder="t('profile.totp.enterCode')"
             />
             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('profile.totp.disableTotpHint') }}</p>
           </div>
@@ -61,7 +55,8 @@
 
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
+import TotpCodeInput from '@/components/common/TotpCodeInput.vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { totpAPI } from '@/api'
@@ -80,6 +75,7 @@ const methodLoading = ref(true)
 const verificationMethod = ref<TotpVerificationMethod['method'] | null>(null)
 const loading = ref(false)
 const form = ref({ totpCode: '' })
+const codeInput = ref<InstanceType<typeof TotpCodeInput> | null>(null)
 
 const canSubmit = computed(() => {
   if (methodLoading.value) return false
@@ -117,6 +113,7 @@ const handleDisable = async () => {
   } finally {
     form.value.totpCode = ''
     loading.value = false
+    nextTick(() => codeInput.value?.focus())
   }
 }
 

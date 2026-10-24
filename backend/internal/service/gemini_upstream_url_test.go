@@ -22,6 +22,22 @@ func TestBuildGeminiAIStudioModelActionURL(t *testing.T) {
 	require.Equal(t, base+"/v1beta/models/gemini-2.5-pro:countTokens", got)
 }
 
+func TestBuildGeminiAIStudioModelActionURLNormalizesProtocolSuffixes(t *testing.T) {
+	for _, suffix := range []string{"", "/", "/v1beta/models", "/v1beta", "/v1/responses", "/v1/chat/completions", "/v1"} {
+		t.Run(suffix, func(t *testing.T) {
+			account := &Account{Type: AccountTypeAPIKey, Platform: PlatformGemini, Credentials: map[string]any{"base_url": " https://relay.example.com/prefix" + suffix + "/ "}}
+			got, err := buildGeminiAIStudioModelActionURL(account.GetGeminiBaseURL(""), "gemini-native", "streamGenerateContent", true)
+			require.NoError(t, err)
+			require.Equal(t, "https://relay.example.com/prefix/v1beta/models/gemini-native:streamGenerateContent?alt=sse", got)
+		})
+	}
+	for _, prefix := range []string{"v1beta-custom", "v1beta/models-extra", "v1/responses-extra", "v1/chat/completions-extra", "v10"} {
+		got, err := buildGeminiAIStudioModelActionURL("https://relay.example.com/"+prefix, "gemini-native", "countTokens", false)
+		require.NoError(t, err)
+		require.Equal(t, "https://relay.example.com/"+prefix+"/v1beta/models/gemini-native:countTokens", got)
+	}
+}
+
 // TestBuildGeminiAIStudioModelActionURLRejectsNonConformingModel 锁定不变式：
 // 模型名来自客户端（native 路由的 URL 片段 / compat 路由的请求体），
 // 只有合规的路径片段才允许拼进上游 URL。

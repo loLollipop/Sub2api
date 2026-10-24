@@ -14,12 +14,26 @@ var geminiAIStudioActions = map[string]struct{}{
 	"countTokens":           {},
 }
 
+// normalizeGeminiAIStudioBaseURL removes a protocol suffix while preserving a
+// relay's deployment prefix, so native paths are appended once.
+func normalizeGeminiAIStudioBaseURL(raw string) string {
+	base := strings.TrimRight(strings.TrimSpace(raw), "/")
+	for _, suffix := range []string{"/v1beta/models", "/v1beta", "/v1/responses", "/v1/chat/completions", "/v1"} {
+		if strings.HasSuffix(base, suffix) {
+			return strings.TrimRight(strings.TrimSuffix(base, suffix), "/")
+		}
+	}
+	return base
+}
+
 // buildGeminiAIStudioModelActionURL 组装 AI Studio 的
 // /v1beta/models/{model}:{action} 上游 URL。
 //
 // model 是客户端可控的（native 路由取自 URL 片段，compat 路由取自请求体的 model
 // 字段，之后可能再经渠道映射），因此必须先过路径片段护栏才能拼进 path，
 // 见 upstream_path_guard.go。新增 AI Studio 端点请一律走本函数。
+// baseURL must already be normalized by Account.GetGeminiBaseURL. Repeating
+// suffix removal here could strip a versioned relay/deployment prefix.
 func buildGeminiAIStudioModelActionURL(baseURL, model, action string, stream bool) (string, error) {
 	trimmedBase := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if trimmedBase == "" {

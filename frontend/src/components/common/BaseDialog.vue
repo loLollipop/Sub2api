@@ -7,7 +7,8 @@
         :style="zIndexStyle"
         :aria-labelledby="dialogId"
         role="dialog"
-        aria-modal="true"
+        :aria-modal="isTopDialog || undefined"
+        :aria-hidden="!isTopDialog || undefined"
         @click.self="handleClose"
       >
         <!-- Modal panel -->
@@ -63,6 +64,7 @@ const dialogId = `modal-title-${++dialogIdCounter}`
 // 焦点管理
 const dialogRef = ref<HTMLElement | null>(null)
 const modalBodyRef = ref<HTMLElement | null>(null)
+const isTopDialog = ref(false)
 let previousActiveElement: HTMLElement | null = null
 let lastFocusedElement: HTMLElement | null = null
 
@@ -173,7 +175,7 @@ const dialogLayer = createDialogLayer(
   () => {
     if (props.show && props.closeOnEscape) emit('close')
   },
-  { onTab: handleTab, onRestoreFocus: focusDialog }
+  { onTab: handleTab, onRestoreFocus: focusDialog, onTopChange: top => { isTopDialog.value = top } }
 )
 
 let opened = false

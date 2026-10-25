@@ -82,11 +82,14 @@ function compactDestination(wrapper: ReturnType<typeof mountHome>) {
 }
 
 describe('HomeView compact mode', () => {
-  it.each([false, true])('shows a leaderboard link when enabled in compact mode=%s', compact => {
-    const enabled = mountHome({ compact_home_enabled: compact, leaderboard_enabled: true })
+  it.each([false, true])('gates home browse links while preserving compact mode=%s', compact => {
+    const enabled = mountHome({ compact_home_enabled: compact, leaderboard_enabled: true, model_plaza_enabled: true })
     expect(enabled.findAllComponents(RouterLinkStub).some(link => link.props('to') === '/leaderboard')).toBe(true)
-    const disabled = mountHome({ compact_home_enabled: compact, leaderboard_enabled: false })
-    expect(disabled.findAllComponents(RouterLinkStub).some(link => link.props('to') === '/leaderboard')).toBe(false)
+    expect(enabled.findAllComponents(RouterLinkStub).some(link => link.props('to') === '/model-plaza')).toBe(!compact)
+    const disabled = mountHome({ compact_home_enabled: compact, leaderboard_enabled: false, model_plaza_enabled: false })
+    for (const path of ['/leaderboard', '/model-plaza']) {
+      expect(disabled.findAllComponents(RouterLinkStub).some(link => link.props('to') === path)).toBe(false)
+    }
   })
   beforeEach(() => {
     authStore.isAuthenticated = false
@@ -154,11 +157,11 @@ describe('HomeView compact mode', () => {
     expect(appStore.fetchPublicSettings).not.toHaveBeenCalled()
   })
 
-  it.each([false, true])('removes model plaza and integration links with compact mode=%s', (compact) => {
+  it.each([false, true])('exposes integration only in the default mode=%s', (compact) => {
     authStore.isAuthenticated = true
     const wrapper = mountHome({ compact_home_enabled: compact, model_plaza_enabled: true })
-    expect(wrapper.findAllComponents(RouterLinkStub).some((link) => link.props('to') === '/model-plaza')).toBe(false)
-    expect(wrapper.find('a[href="#integration"]').exists()).toBe(false)
+    expect(wrapper.findAllComponents(RouterLinkStub).some((link) => link.props('to') === '/model-plaza')).toBe(!compact)
+    expect(wrapper.find('a[href="#integration"]').exists()).toBe(!compact)
   })
 
   it.each([undefined, null, '', ' \n\t '])('does not render a blank or missing subtitle (%s) in either mode', (subtitle) => {
@@ -193,7 +196,7 @@ describe('HomeView compact mode', () => {
     expect(wrapper.findAll('.landing-feature')).toHaveLength(3)
     expect(wrapper.find('.landing-sticker').exists()).toBe(false)
     expect(wrapper.find('.api-preview__guide').exists()).toBe(false)
-    expect(wrapper.get('.landing-hero h1').text()).toBe('Test site.')
+    expect(wrapper.get('.landing-hero h1').text()).toBe('Test site')
     expect(wrapper.get('[data-testid="home-code-cursor"]').attributes('aria-hidden')).toBe('true')
   })
 
@@ -214,7 +217,7 @@ describe('HomeView compact mode', () => {
       expect(accountMenu.get('.header-avatar').text()).toBe('LO')
       expect(accountMenu.find('.header-identity').exists()).toBe(false)
       expect(accountMenu.get('.header-user-button').classes()).toContain('avatar-only')
-      expect(wrapper.findAllComponents(RouterLinkStub).filter((link) => link.props('to') === path)).toHaveLength(1)
+      expect(wrapper.findAllComponents(RouterLinkStub).filter((link) => link.props('to') === path)).toHaveLength(2)
     } else {
       expect(wrapper.getComponent('[data-testid="home-account-entry"]').props('to')).toBe('/login')
       expect(wrapper.find('[data-testid="home-account-menu"]').exists()).toBe(false)

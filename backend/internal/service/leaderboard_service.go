@@ -241,6 +241,10 @@ func (s *LeaderboardService) Get(ctx context.Context, period string) (*Leaderboa
 		if value.Err != nil {
 			return nil, value.Err
 		}
-		return value.Val.(*LeaderboardResponse), nil
+		response, ok := value.Val.(*LeaderboardResponse)
+		if !ok || response == nil {
+			return nil, errors.New("invalid leaderboard result")
+		}
+		return response, nil
 	}
 }

@@ -264,7 +264,7 @@ func (u *AnthropicUsage) Merge(src AnthropicUsage) {
 	// incomplete or contradictory detail object accompanies it. An empty
 	// detail object has no update and must not erase an aggregate-only total.
 	hasTTLUpdate := src.CacheCreation != nil && (src.CacheCreation.Ephemeral5mInputTokens != nil || src.CacheCreation.Ephemeral1hInputTokens != nil)
-	if hasTTLUpdate && !(src.HasCacheCreationInputTokens() && src.CacheCreationInputTokens == 0) {
+	if hasTTLUpdate && (!src.HasCacheCreationInputTokens() || src.CacheCreationInputTokens != 0) {
 		var detail AnthropicCacheCreation
 		if u.CacheCreation != nil {
 			detail = *u.CacheCreation

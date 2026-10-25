@@ -12,6 +12,7 @@ let frames: FrameRequestCallback[]
 async function renderHeader(browse = true, role: 'user' | 'admin' = 'user') {
   const pinia = createPinia()
   setActivePinia(pinia)
+  useAuthStore().token = 'test-session'
   useAuthStore().user = { id: 1, role } as NonNullable<ReturnType<typeof useAuthStore>['user']>
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }] })
   await router.push('/model-plaza')
@@ -50,6 +51,23 @@ afterEach(() => {
   wrapper?.unmount()
   wrapper = undefined
   vi.restoreAllMocks()
+})
+
+describe('browse header authentication', () => {
+  it('shows private utilities only with an authenticated session', async () => {
+    await renderHeader()
+    expect(wrapper!.find('console-navigation-search-stub').exists()).toBe(true)
+    expect(wrapper!.find('subscription-progress-mini-stub').exists()).toBe(true)
+    expect(wrapper!.find('announcement-bell-stub').exists()).toBe(true)
+    expect(wrapper!.find('.top-browse-link').exists()).toBe(false)
+
+    useAuthStore().token = null
+    await wrapper!.vm.$nextTick()
+    expect(wrapper!.find('console-navigation-search-stub').exists()).toBe(false)
+    expect(wrapper!.find('subscription-progress-mini-stub').exists()).toBe(false)
+    expect(wrapper!.find('announcement-bell-stub').exists()).toBe(false)
+    expect(wrapper!.get('.top-browse-link').attributes('href')).toContain('/login?redirect=')
+  })
 })
 
 describe('browse header scroll morph', () => {

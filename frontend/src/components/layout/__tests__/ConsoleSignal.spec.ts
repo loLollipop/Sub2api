@@ -30,6 +30,7 @@ async function renderShell(path: string, role: 'user' | 'admin' = 'user') {
   app.publicSettingsLoaded = true
   app.docUrl = '/docs'
   const auth = useAuthStore()
+  auth.token = 'test-session'
   auth.user = {
     id: 1,
     role,

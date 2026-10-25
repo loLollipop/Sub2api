@@ -31,7 +31,10 @@ func TestLeaderboardUsageQueryUsesBoundedRetainedRawLogs(t *testing.T) {
 	})
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(matcher))
 	require.NoError(t, err)
-	defer db.Close()
+	t.Cleanup(func() {
+		mock.ExpectClose()
+		require.NoError(t, db.Close())
+	})
 	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.AddDate(1, 0, 0)
 	mock.ExpectQuery("leaderboard").WithArgs(start, end, "month", timezone.Location().String()).
@@ -50,7 +53,10 @@ func TestLeaderboardUsageQueryUsesBoundedRetainedRawLogs(t *testing.T) {
 func TestLeaderboardUsageEmptyInvalidAndQueryFailure(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	t.Cleanup(func() {
+		mock.ExpectClose()
+		require.NoError(t, db.Close())
+	})
 	repo := newUsageLogRepositoryWithSQL(nil, db)
 	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	rows, err := repo.GetLeaderboardUsage(context.Background(), start, start, "day")

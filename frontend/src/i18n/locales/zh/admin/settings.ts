@@ -55,6 +55,14 @@ export default {
           priceDescription: '价格说明（Markdown）',
           priceDescriptionHint: '展示在模型广场页面顶部，可用于说明计费规则、汇率、优惠活动等。',
         },
+        leaderboard: {
+          title: '排行榜',
+          description: '展示本站模型用量、厂商份额与排名趋势。默认关闭，仅提供汇总数据。',
+          enabled: '启用排行榜',
+          enabledHint: '开启后顶栏显示入口，也可通过 /leaderboard 独立访问。',
+          requireAuth: '需要登录才可访问',
+          requireAuthHint: '开启后未登录访问将跳转登录页；关闭后访客也能查看平台汇总用量。',
+        },
         pluginManagement: {
           title: '插件管理',
           description: '控制管理员侧边栏是否显示插件管理入口。此开关不控制插件运行状态。',

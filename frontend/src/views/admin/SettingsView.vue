@@ -5874,6 +5874,29 @@
           </div>
         </div>
 
+        <div class="card" data-testid="leaderboard-settings">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('admin.settings.features.leaderboard.title') }}</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.settings.features.leaderboard.description') }}</p>
+          </div>
+          <div class="space-y-5 p-6">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <label id="leaderboard-enabled-label" class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.settings.features.leaderboard.enabled') }}</label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.features.leaderboard.enabledHint') }}</p>
+              </div>
+              <Toggle v-model="form.leaderboard_enabled" aria-labelledby="leaderboard-enabled-label" />
+            </div>
+            <div v-if="form.leaderboard_enabled" class="flex items-center justify-between gap-4">
+              <div>
+                <label id="leaderboard-auth-label" class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.settings.features.leaderboard.requireAuth') }}</label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.features.leaderboard.requireAuthHint') }}</p>
+              </div>
+              <Toggle v-model="form.leaderboard_require_auth" aria-labelledby="leaderboard-auth-label" />
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -7463,6 +7486,8 @@ const form = reactive<SettingsForm>({
   // Model Plaza feature switches + description
   model_plaza_enabled: false,
   model_plaza_require_auth: false,
+  leaderboard_enabled: false,
+  leaderboard_require_auth: false,
   model_plaza_description: '',
   // Plugin management menu visibility; plugin runtime is unaffected.
   plugin_management_enabled: false,
@@ -9204,6 +9229,8 @@ async function saveSettings() {
       // Model Plaza feature switches + description
       model_plaza_enabled: form.model_plaza_enabled,
       model_plaza_require_auth: form.model_plaza_require_auth,
+      leaderboard_enabled: form.leaderboard_enabled,
+      leaderboard_require_auth: form.leaderboard_require_auth,
       model_plaza_description: form.model_plaza_description,
       plugin_management_enabled: form.plugin_management_enabled,
       // Affiliate (邀请返利) feature switch

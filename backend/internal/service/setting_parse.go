@@ -205,7 +205,9 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 		// Model plaza feature (default disabled; opt-in, public unless require_auth)
 		SettingKeyModelPlazaEnabled:       "false",
+		SettingKeyLeaderboardEnabled:      "false",
 		SettingKeyModelPlazaRequireAuth:   "false",
+		SettingKeyLeaderboardRequireAuth:  "false",
 		SettingKeyModelPlazaDescription:   "",
 		SettingKeyPluginManagementEnabled: "false",
 
@@ -828,7 +830,9 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 
 	// Model plaza feature (default: disabled; strict true)
 	result.ModelPlazaEnabled = settings[SettingKeyModelPlazaEnabled] == "true"
+	result.LeaderboardEnabled = settings[SettingKeyLeaderboardEnabled] == "true"
 	result.ModelPlazaRequireAuth = settings[SettingKeyModelPlazaRequireAuth] == "true"
+	result.LeaderboardRequireAuth = settings[SettingKeyLeaderboardRequireAuth] == "true"
 	result.ModelPlazaDescription = settings[SettingKeyModelPlazaDescription]
 	result.PluginManagementEnabled = settings[SettingKeyPluginManagementEnabled] == "true"
 

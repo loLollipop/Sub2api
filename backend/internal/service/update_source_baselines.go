@@ -4,8 +4,8 @@ package service
 // this project's release version. A reviewed checkpoint does not imply every
 // feature was merged. Update only after the corresponding review/sync completes.
 const (
-	forkImportedVersion    = "2.2.29"
-	forkImportedCommit     = "6add01cc1cbc2b89cf557aab1154503aa07cd297"
+	forkImportedVersion    = "2.2.31"
+	forkImportedCommit     = "a3401d78c7d774042ddcb43c4c005945b249160f"
 	originalReviewedCommit = "5c185c5c5d4f5e409e2139806e0964ae944e03e8"
 )
 
@@ -20,7 +20,7 @@ type updateSourceBaseline struct {
 
 func defaultUpdateSourceBaselines() []updateSourceBaseline {
 	return []updateSourceBaseline{
-		{repository: "kiss-kedaya/sub2api", branch: "main", commit: forkImportedCommit, releaseTag: "v2.2.29", releaseCommit: forkImportedCommit},
+		{repository: "kiss-kedaya/sub2api", branch: "main", commit: forkImportedCommit, releaseTag: "v2.2.31", releaseCommit: forkImportedCommit},
 		{repository: "Wei-Shaw/sub2api", branch: "main", commit: originalReviewedCommit, releaseTag: "v0.2.18", releaseCommit: "ac1b8f1271be0d674fa6f074403c1410f30a3a81"},
 	}
 }

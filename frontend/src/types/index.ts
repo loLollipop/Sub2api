@@ -283,6 +283,8 @@ export interface PublicSettings {
   available_channels_enabled: boolean
   model_plaza_enabled: boolean
   model_plaza_require_auth: boolean
+  leaderboard_enabled: boolean
+  leaderboard_require_auth: boolean
   plugin_management_enabled: boolean
   /** Removed from the public API; retained only for old injected configs. */
   service_quota_enabled?: boolean

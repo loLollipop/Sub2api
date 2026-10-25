@@ -330,6 +330,34 @@ describe('API Client', () => {
   // --- 401 Token 刷新 ---
 
   describe('401 Token 刷新', () => {
+    it.each(['anonymous', 'expired', 'refresh-rejected'])('排行榜认证收紧时保留周期和返回地址（%s）', async (session) => {
+      const originalLocation = window.location
+      Object.defineProperty(window, 'location', {
+        value: { ...originalLocation, pathname: '/leaderboard', search: '?period=month', hash: '#ranking', href: '/leaderboard?period=month#ranking' },
+        writable: true,
+      })
+      try {
+        if (session !== 'anonymous') localStorage.setItem('auth_token', 'expired-token')
+        if (session === 'refresh-rejected') {
+          localStorage.setItem('refresh_token', 'refresh-token')
+          const refresh = await import('@/api/tokenRefresh')
+          vi.spyOn(refresh, 'refreshAuthTokens').mockRejectedValueOnce(
+            Object.assign(new axios.AxiosError('Refresh rejected'), { response: { status: 401 } }),
+          )
+        }
+        apiClient.defaults.adapter = vi.fn().mockRejectedValueOnce({
+          response: { status: 401, data: { message: 'Authentication required' } },
+          config: { url: '/leaderboard', headers: {} },
+        })
+
+        await expect(apiClient.get('/leaderboard')).rejects.toMatchObject({ status: 401 })
+        expect(window.location.href).toBe('/login?redirect=%2Fleaderboard%3Fperiod%3Dmonth%23ranking')
+        expect(localStorage.getItem('auth_token')).toBeNull()
+      } finally {
+        Object.defineProperty(window, 'location', { value: originalLocation, writable: true })
+      }
+    })
+
     it('无 refresh_token 时 401 清除 localStorage', async () => {
       localStorage.setItem('auth_token', 'expired-token')
       // 不设置 refresh_token
@@ -357,6 +385,7 @@ describe('API Client', () => {
       await expect(apiClient.get('/test')).rejects.toBeDefined()
 
       expect(localStorage.getItem('auth_token')).toBeNull()
+      expect(window.location.href).toBe('/login')
 
       // 恢复 location
       Object.defineProperty(window, 'location', {

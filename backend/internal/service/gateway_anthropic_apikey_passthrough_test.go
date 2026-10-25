@@ -1297,9 +1297,9 @@ func TestGatewayService_ParseSSEUsagePassthrough_MessageStartFallbacks(t *testin
 
 	require.Equal(t, 12, usage.InputTokens)
 	require.Equal(t, 9, usage.CacheReadInputTokens, "应兼容 cached_tokens 字段")
-	require.Equal(t, 7, usage.CacheCreationInputTokens, "聚合字段为空时应从 5m/1h 明细回填")
-	require.Equal(t, 3, usage.CacheCreation5mTokens)
-	require.Equal(t, 4, usage.CacheCreation1hTokens)
+	require.Zero(t, usage.CacheCreationInputTokens, "显式 0 聚合字段优先于 TTL 明细")
+	require.Zero(t, usage.CacheCreation5mTokens, "零聚合不能留下可计费的时长明细")
+	require.Zero(t, usage.CacheCreation1hTokens)
 }
 
 func TestGatewayService_ParseSSEUsagePassthrough_MessageDeltaSelectiveOverwrite(t *testing.T) {
@@ -1310,7 +1310,7 @@ func TestGatewayService_ParseSSEUsagePassthrough_MessageDeltaSelectiveOverwrite(
 
 	parseSSEUsagePassthrough(data, usage)
 
-	require.Equal(t, 10, usage.InputTokens, "message_delta 中 0 值不应覆盖已有 input_tokens")
+	require.Zero(t, usage.InputTokens, "message_delta 中显式 0 必须覆盖旧值；只有省略或 null 才保留")
 	require.Equal(t, 5, usage.OutputTokens)
 	require.Equal(t, 463184, usage.CacheCreationInputTokens)
 	require.Equal(t, 11, usage.CacheReadInputTokens, "cache_read_input_tokens 为空时应回退到 cached_tokens")

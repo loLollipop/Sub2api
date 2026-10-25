@@ -3,7 +3,7 @@
     <header class="top-header" :class="{ 'is-compact': compact, 'is-scrolled': scrolled && !browse }">
       <div class="top-header-primary">
         <div class="top-brand-area">
-          <button v-if="!browse || !isDesktop" id="mobile-navigation-trigger" type="button" class="top-sidebar-toggle btn-ghost btn-icon" :aria-label="isDesktop ? (appStore.sidebarCollapsed ? t('nav.expand') : t('nav.collapse')) : t('common.toggleMenu')" :aria-expanded="isDesktop ? !appStore.sidebarCollapsed : appStore.mobileOpen" aria-controls="mobile-console-navigation" @click="isDesktop ? appStore.toggleSidebar() : appStore.toggleMobileSidebar()">
+          <button v-if="!hideSidebarToggle && (!browse || !isDesktop)" id="mobile-navigation-trigger" type="button" class="top-sidebar-toggle btn-ghost btn-icon" :aria-label="isDesktop ? (appStore.sidebarCollapsed ? t('nav.expand') : t('nav.collapse')) : t('common.toggleMenu')" :aria-expanded="isDesktop ? !appStore.sidebarCollapsed : appStore.mobileOpen" aria-controls="mobile-console-navigation" @click="isDesktop ? appStore.toggleSidebar() : appStore.toggleMobileSidebar()">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16m-3-9h.01M6 14h.01" /></svg>
           </button>
           <router-link to="/" class="top-brand" :title="appStore.siteName">
@@ -14,12 +14,13 @@
         </div>
         <UserTopNav />
         <div class="top-account-area">
-          <ConsoleNavigationSearch expanded />
-          <SubscriptionProgressMini class="header-subscriptions" />
+          <ConsoleNavigationSearch v-if="authStore.isAuthenticated" expanded />
+          <SubscriptionProgressMini v-if="authStore.isAuthenticated" class="header-subscriptions" />
           <ThemeControls />
-          <AnnouncementBell class="top-announcements" />
+          <AnnouncementBell v-if="authStore.isAuthenticated" class="top-announcements" />
           <LocaleSwitcher compact class="top-locale" />
           <AccountMenu compact utilities />
+          <router-link v-if="!authStore.isAuthenticated" :to="{ path: '/login', query: { redirect: route.fullPath } }" class="top-browse-link">{{ t('modelPlaza.nav.login') }}</router-link>
         </div>
       </div>
     </header>
@@ -29,6 +30,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { useAppStore, useAuthStore } from '@/stores'
 import { useMediaQuery } from '@vueuse/core'
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
@@ -41,7 +43,8 @@ import { sanitizeUrl } from '@/utils/url'
 import AccountMenu from './AccountMenu.vue'
 import UserTopNav from './UserTopNav.vue'
 
-const props = defineProps<{ browse?: boolean }>()
+const props = defineProps<{ browse?: boolean; hideSidebarToggle?: boolean }>()
+const route = useRoute()
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()

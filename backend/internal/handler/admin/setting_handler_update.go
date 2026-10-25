@@ -316,9 +316,11 @@ type UpdateSettingsRequest struct {
 	AvailableChannelsEnabled *bool `json:"available_channels_enabled"`
 
 	// Model Plaza feature switches + description
-	ModelPlazaEnabled     *bool   `json:"model_plaza_enabled"`
-	ModelPlazaRequireAuth *bool   `json:"model_plaza_require_auth"`
-	ModelPlazaDescription *string `json:"model_plaza_description"`
+	ModelPlazaEnabled      *bool   `json:"model_plaza_enabled"`
+	LeaderboardEnabled     *bool   `json:"leaderboard_enabled"`
+	ModelPlazaRequireAuth  *bool   `json:"model_plaza_require_auth"`
+	LeaderboardRequireAuth *bool   `json:"leaderboard_require_auth"`
+	ModelPlazaDescription  *string `json:"model_plaza_description"`
 
 	// Plugin management menu visibility switch; plugin runtime is unaffected.
 	PluginManagementEnabled *bool `json:"plugin_management_enabled"`
@@ -1957,11 +1959,23 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.ModelPlazaEnabled
 		}(),
+		LeaderboardEnabled: func() bool {
+			if req.LeaderboardEnabled != nil {
+				return *req.LeaderboardEnabled
+			}
+			return previousSettings.LeaderboardEnabled
+		}(),
 		ModelPlazaRequireAuth: func() bool {
 			if req.ModelPlazaRequireAuth != nil {
 				return *req.ModelPlazaRequireAuth
 			}
 			return previousSettings.ModelPlazaRequireAuth
+		}(),
+		LeaderboardRequireAuth: func() bool {
+			if req.LeaderboardRequireAuth != nil {
+				return *req.LeaderboardRequireAuth
+			}
+			return previousSettings.LeaderboardRequireAuth
 		}(),
 		ModelPlazaDescription: func() string {
 			if req.ModelPlazaDescription != nil {
@@ -2331,7 +2345,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AvailableChannelsEnabled: updatedSettings.AvailableChannelsEnabled,
 
 		ModelPlazaEnabled:       updatedSettings.ModelPlazaEnabled,
+		LeaderboardEnabled:      updatedSettings.LeaderboardEnabled,
 		ModelPlazaRequireAuth:   updatedSettings.ModelPlazaRequireAuth,
+		LeaderboardRequireAuth:  updatedSettings.LeaderboardRequireAuth,
 		ModelPlazaDescription:   updatedSettings.ModelPlazaDescription,
 		PluginManagementEnabled: updatedSettings.PluginManagementEnabled,
 

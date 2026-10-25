@@ -6,6 +6,7 @@ import channelMonitorV3 from './channelMonitorV3'
 import batchImage from './batchImage'
 import admin from './admin'
 import misc from './misc'
+import leaderboard from './leaderboard'
 
 export default {
   ...landing,
@@ -16,4 +17,5 @@ export default {
   ...batchImage,
   admin,
   ...misc,
+  ...leaderboard,
 }

@@ -55,6 +55,14 @@ export default {
           priceDescription: 'Pricing notes (Markdown)',
           priceDescriptionHint: 'Rendered at the top of the plaza page. Use it for billing rules, exchange rates, promotions, etc.',
         },
+        leaderboard: {
+          title: 'Leaderboard',
+          description: 'Show model usage, provider shares and ranking trends on this platform. Disabled by default; only aggregate data is exposed.',
+          enabled: 'Enable leaderboard',
+          enabledHint: 'When enabled, an entry appears in the header and the page is reachable at /leaderboard.',
+          requireAuth: 'Require sign-in to access',
+          requireAuthHint: 'When enabled, visitors are redirected to sign in. When off, visitors can view platform usage totals.',
+        },
         pluginManagement: {
           title: 'Plugin Management',
           description: 'Controls whether the plugin management entry appears in the admin sidebar. This switch does not control plugin runtime state.',

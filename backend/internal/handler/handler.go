@@ -64,6 +64,7 @@ type Handlers struct {
 	Passkey          *PasskeyHandler
 	AvailableChannel *AvailableChannelHandler
 	ModelPlaza       *ModelPlazaHandler
+	Leaderboard      *LeaderboardHandler
 	AsyncImage       *AsyncImageHandler
 	BatchImage       *BatchImageHandler
 }

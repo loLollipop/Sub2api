@@ -61,7 +61,7 @@ jobs:
         run: go test -race -p 1 -tags=unit ./internal/service -run 'Test(TerminalOpenBody|OpenAIStream|OpenAIHTTP524|GrokSimpleMessages|AnthropicCacheTTLBeta|RequestNeedsExtendedCacheTTLBeta|EnsureExtendedCacheTTLBeta|ApplyExtendedCacheTTLBetaHeader)' -count=1
       - name: Anthropic cache conversion and committed-stream regression
         working-directory: backend
-        run: go test -race -p 1 -tags=unit ./internal/pkg/apicompat ./internal/service ./internal/handler -run 'Test(ChatAnthropicCacheControl|ResponsesAnthropicCacheControl|ConvertedAnthropic|NativeAnthropicCachePolicy|GatewayConvertedToolFileError|EnforceCacheControlLimit|NormalizeCacheControlTTLOrder)' -count=1
+        run: go test -race -p 1 -tags=unit ./internal/pkg/apicompat ./internal/service ./internal/handler -run 'Test(AnthropicUsagePresence|MergeAnthropicUsage|ParseSSEUsage|GatewayService_ParseSSEUsagePassthrough|ChatAnthropicCacheControl|ResponsesAnthropicCacheControl|ConvertedAnthropic|NativeAnthropicCachePolicy|GatewayConvertedToolFileError|EnforceCacheControlLimit|NormalizeCacheControlTTLOrder)' -count=1
       - name: Passthrough lifecycle and domestic model catalog concurrency regression
         working-directory: backend
         run: go test -race -p 1 -tags=unit ./internal/service ./internal/handler -run 'Test(PassthroughLifecycle|DomesticModel|DomesticUpstream|GatewayModelsDomestic|ResponsesPassthroughHeartbeat)' -count=1

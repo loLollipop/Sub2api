@@ -131,6 +131,7 @@ func anthropicUsageFromResponsesUsage(usage *ResponsesUsage) AnthropicUsage {
 		OutputTokens:             usage.OutputTokens,
 		CacheReadInputTokens:     cachedTokens,
 		CacheCreationInputTokens: usage.CacheCreationInputTokens,
+		CacheCreation:            usage.CacheCreation,
 	}
 }
 

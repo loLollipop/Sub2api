@@ -34,6 +34,15 @@ export const apiClient: AxiosInstance = axios.create({
 // because its caller forgot an endpoint-local Axios option.
 export const LONG_RUNNING_REPORT_TIMEOUT_MS = 180000
 
+function loginRedirectPath(): string {
+  // A public leaderboard may start requiring sign-in while already open.
+  // The hard redirect must preserve its period before the view can handle 401.
+  const { pathname, search, hash } = window.location
+  return pathname === '/leaderboard'
+    ? `/login?redirect=${encodeURIComponent(pathname + search + hash)}`
+    : '/login'
+}
+
 const longRunningReportPath = (url: string): boolean => {
   const path = url
     .split('?')[0]
@@ -244,7 +253,7 @@ apiClient.interceptors.response.use(
             sessionStorage.setItem('auth_expired', '1')
 
             if (!window.location.pathname.includes('/login')) {
-              window.location.href = '/login'
+              window.location.href = loginRedirectPath()
             }
 
             return Promise.reject({
@@ -275,7 +284,7 @@ apiClient.interceptors.response.use(
         }
         // Only redirect if not already on login page
         if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login'
+          window.location.href = loginRedirectPath()
         }
       }
 

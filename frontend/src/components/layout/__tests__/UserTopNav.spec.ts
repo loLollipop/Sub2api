@@ -66,6 +66,19 @@ afterEach(() => {
 })
 
 describe('browse navigation and sidebar operations', () => {
+  it('gates the leaderboard entry and marks it active without selecting the console', async () => {
+    const { app, router } = await render()
+    expect(primary()).not.toContain('/leaderboard')
+    app.cachedPublicSettings!.leaderboard_enabled = true
+    await router.push('/leaderboard')
+    await flushPromises()
+    expect(primary()).toContain('/leaderboard')
+    expect(wrapper!.findAll('.top-browse-link.is-active').map(link => link.attributes('href'))).toEqual(['/leaderboard'])
+    expect(wrapper!.get('a[href="/leaderboard"]').attributes('aria-current')).toBe('page')
+    app.cachedPublicSettings!.leaderboard_enabled = false
+    await flushPromises()
+    expect(primary()).not.toContain('/leaderboard')
+  })
   it('keeps navigation flat without category headings', async () => {
     await render()
     expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1', '/available-channels', '/monitor'])

@@ -182,6 +182,13 @@ const routes: RouteRecordRaw[] = [
     }
   },
 
+  {
+    path: '/leaderboard',
+    name: 'Leaderboard',
+    component: () => import('@/views/LeaderboardView.vue'),
+    meta: { requiresAuth: false, title: 'Leaderboard', titleKey: 'leaderboard.title' }
+  },
+
   // ==================== User Routes ====================
   {
     path: '/',
@@ -740,8 +747,8 @@ router.beforeEach(async (to, _from, next) => {
       next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
       return
     }
-    // Model Plaza:公开路由但受「启用开关 + 可选强制登录」双重控制(后端同口径 fail-closed)
-    if (to.path === '/model-plaza') {
+    // Public browse pages share feature gates and optional sign-in requirements.
+    if (to.path === '/model-plaza' || to.path === '/leaderboard') {
       if (!appStore.publicSettingsLoaded) {
         try {
           await appStore.fetchPublicSettings()
@@ -750,8 +757,10 @@ router.beforeEach(async (to, _from, next) => {
         }
       }
       const plazaSettings = appStore.cachedPublicSettings
+      const enabled = to.path === '/leaderboard' ? plazaSettings?.leaderboard_enabled : plazaSettings?.model_plaza_enabled
+      const requireLogin = to.path === '/leaderboard' ? plazaSettings?.leaderboard_require_auth : plazaSettings?.model_plaza_require_auth
       // 仅在设置成功加载且明确为 false 时拦截(瞬时加载失败视为未知,由后端 404 兜底)
-      if (appStore.publicSettingsLoaded && plazaSettings?.model_plaza_enabled === false) {
+      if (appStore.publicSettingsLoaded && enabled === false) {
         next(
           authStore.isAuthenticated
             ? authStore.isAdmin
@@ -761,7 +770,7 @@ router.beforeEach(async (to, _from, next) => {
         )
         return
       }
-      if (plazaSettings?.model_plaza_require_auth === true && !authStore.isAuthenticated) {
+      if (requireLogin === true && !authStore.isAuthenticated) {
         next({ path: '/login', query: { redirect: to.fullPath } })
         return
       }

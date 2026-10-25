@@ -143,6 +143,15 @@ func AnthropicToResponsesResponse(resp *AnthropicResponse, effectiveModel ...str
 		OutputTokens:             resp.Usage.OutputTokens,
 		TotalTokens:              totalInputTokens + resp.Usage.OutputTokens,
 		CacheCreationInputTokens: resp.Usage.CacheCreationInputTokens,
+		CacheCreation:            resp.Usage.CacheCreation,
+	}
+	if resp.Usage.CacheCreation != nil {
+		if v := resp.Usage.CacheCreation.Ephemeral5mInputTokens; v != nil {
+			out.Usage.CacheCreation5mTokens = max(*v, 0)
+		}
+		if v := resp.Usage.CacheCreation.Ephemeral1hInputTokens; v != nil {
+			out.Usage.CacheCreation1hTokens = max(*v, 0)
+		}
 	}
 	if resp.Usage.CacheReadInputTokens > 0 {
 		out.Usage.InputTokensDetails = &ResponsesInputTokensDetails{
@@ -223,6 +232,7 @@ type AnthropicEventToResponsesState struct {
 	OutputTokens             int
 	CacheReadInputTokens     int
 	CacheCreationInputTokens int
+	Usage                    AnthropicUsage
 
 	StopReason string
 }
@@ -294,15 +304,7 @@ func anthToResHandleMessageStart(evt *AnthropicStreamEvent, state *AnthropicEven
 		if state.Model == "" {
 			state.Model = evt.Message.Model
 		}
-		if evt.Message.Usage.InputTokens > 0 {
-			state.InputTokens = evt.Message.Usage.InputTokens
-		}
-		if evt.Message.Usage.CacheReadInputTokens > 0 {
-			state.CacheReadInputTokens = evt.Message.Usage.CacheReadInputTokens
-		}
-		if evt.Message.Usage.CacheCreationInputTokens > 0 {
-			state.CacheCreationInputTokens = evt.Message.Usage.CacheCreationInputTokens
-		}
+		state.mergeUsage(evt.Message.Usage)
 	}
 
 	if state.CreatedSent {
@@ -580,22 +582,25 @@ func anthToResHandleContentBlockStop(evt *AnthropicStreamEvent, state *Anthropic
 
 func anthToResHandleMessageDelta(evt *AnthropicStreamEvent, state *AnthropicEventToResponsesState) []ResponsesStreamEvent {
 	if evt.Usage != nil {
-		state.OutputTokens = evt.Usage.OutputTokens
-		if evt.Usage.InputTokens > 0 {
-			state.InputTokens = evt.Usage.InputTokens
-		}
-		if evt.Usage.CacheReadInputTokens > 0 {
-			state.CacheReadInputTokens = evt.Usage.CacheReadInputTokens
-		}
-		if evt.Usage.CacheCreationInputTokens > 0 {
-			state.CacheCreationInputTokens = evt.Usage.CacheCreationInputTokens
-		}
+		state.mergeUsage(*evt.Usage)
 	}
 	if evt.Delta != nil && evt.Delta.StopReason != "" {
 		state.StopReason = evt.Delta.StopReason
 	}
 
 	return nil
+}
+
+func (state *AnthropicEventToResponsesState) mergeUsage(usage AnthropicUsage) {
+	state.Usage.InputTokens = state.InputTokens
+	state.Usage.OutputTokens = state.OutputTokens
+	state.Usage.CacheReadInputTokens = state.CacheReadInputTokens
+	state.Usage.CacheCreationInputTokens = state.CacheCreationInputTokens
+	state.Usage.Merge(usage)
+	state.InputTokens = state.Usage.InputTokens
+	state.OutputTokens = state.Usage.OutputTokens
+	state.CacheReadInputTokens = state.Usage.CacheReadInputTokens
+	state.CacheCreationInputTokens = state.Usage.CacheCreationInputTokens
 }
 
 func anthToResHandleMessageStop(state *AnthropicEventToResponsesState) []ResponsesStreamEvent {
@@ -725,6 +730,15 @@ func makeResponsesCompletedEvent(
 		OutputTokens:             state.OutputTokens,
 		TotalTokens:              totalInputTokens + state.OutputTokens,
 		CacheCreationInputTokens: state.CacheCreationInputTokens,
+		CacheCreation:            state.Usage.CacheCreation,
+	}
+	if state.Usage.CacheCreation != nil {
+		if v := state.Usage.CacheCreation.Ephemeral5mInputTokens; v != nil {
+			usage.CacheCreation5mTokens = max(*v, 0)
+		}
+		if v := state.Usage.CacheCreation.Ephemeral1hInputTokens; v != nil {
+			usage.CacheCreation1hTokens = max(*v, 0)
+		}
 	}
 	if state.CacheReadInputTokens > 0 {
 		usage.InputTokensDetails = &ResponsesInputTokensDetails{

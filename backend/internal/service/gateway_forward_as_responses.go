@@ -87,7 +87,12 @@ func (s *GatewayService) ForwardAsResponses(
 	responsesReq.Model = mappedModel
 	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(&responsesReq)
 	if err != nil {
-		writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		if StopOpenAICompactSSEKeepaliveCommitted(c) {
+			MarkResponseCommitted(c)
+			writeOpenAICompactSSEFailureMessage(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		} else {
+			writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		}
 		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
 	}
 	anthropicReq.Stream = true

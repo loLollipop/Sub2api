@@ -76,7 +76,14 @@ func (s *GatewayService) ForwardAsChatCompletions(
 	responsesReq.Model = mappedModel
 	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(responsesReq)
 	if err != nil {
-		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		if StopOpenAICompactSSEKeepaliveCommitted(c) {
+			MarkResponseCommitted(c)
+			MarkOpsStreamError(c, "invalid_request_error", err.Error(), http.StatusBadRequest)
+			_, _ = c.Writer.WriteString(buildChatStreamErrorSSE("invalid_request_error", err.Error()) + "data: [DONE]\n\n")
+			c.Writer.Flush()
+		} else {
+			writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		}
 		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
 	}
 	anthropicReq.Stream = true

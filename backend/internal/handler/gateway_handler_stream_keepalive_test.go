@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,7 +12,71 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
+
+func TestGatewayConvertedToolFileErrorAfterPreHeaderKeepalive(t *testing.T) {
+	for _, protocol := range []string{"chat", "responses"} {
+		t.Run(protocol, func(t *testing.T) {
+			path := EndpointChatCompletions
+			payload := `{"model":"public-alias","stream":true,"messages":[{"role":"assistant","tool_calls":[{"id":"call_file","type":"function","function":{"name":"read","arguments":"{}"}}]},{"role":"tool","tool_call_id":"call_file","content":[{"type":"file","file":{"file_id":"file_synthetic"}}]}]}`
+			if protocol == "responses" {
+				path = EndpointResponses
+				payload = `{"model":"public-alias","stream":true,"input":[{"type":"function_call","call_id":"call_file","name":"read","arguments":"{}"},{"type":"function_call_output","call_id":"call_file","output":[{"type":"input_file","file_id":"file_synthetic"}]}]}`
+			}
+			c, recorder, stop := committedGatewayKeepaliveContext(t, path)
+			defer stop()
+			c.Set("api_key", &service.APIKey{Group: &service.Group{CrossProtocolConversionEnabled: true}})
+			account := &service.Account{ID: 1, Platform: service.PlatformAnthropic, Type: service.AccountTypeAPIKey,
+				Credentials: map[string]any{"model_mapping": map[string]any{"public-alias": "claude-sonnet-4-6"}}}
+			svc := &service.GatewayService{}
+			var result *service.ForwardResult
+			var err error
+			if protocol == "chat" {
+				result, err = svc.ForwardAsChatCompletions(context.Background(), c, account, []byte(payload), nil)
+			} else {
+				result, err = svc.ForwardAsResponses(context.Background(), c, account, []byte(payload), nil)
+			}
+			require.Error(t, err)
+			require.Nil(t, result)
+			require.True(t, service.IsResponseCommitted(c))
+			beforeFallback := recorder.Body.String()
+			require.False(t, (&GatewayHandler{}).ensureForwardErrorResponse(c, false))
+			require.Equal(t, beforeFallback, recorder.Body.String())
+			require.Equal(t, http.StatusOK, recorder.Code)
+			require.Equal(t, "text/event-stream", recorder.Header().Get("Content-Type"))
+			errorFrames, doneFrames := 0, 0
+			for _, block := range strings.Split(strings.TrimSpace(recorder.Body.String()), "\n\n") {
+				for _, line := range strings.Split(block, "\n") {
+					if strings.HasPrefix(line, ":") || strings.HasPrefix(line, "event:") {
+						continue
+					}
+					require.True(t, strings.HasPrefix(line, "data: "), "unexpected unframed output: %s", line)
+					data := strings.TrimPrefix(line, "data: ")
+					if data == "[DONE]" {
+						doneFrames++
+						continue
+					}
+					require.True(t, json.Valid([]byte(data)))
+					errorPath := "error.code"
+					if protocol == "responses" {
+						require.Equal(t, "response.failed", gjson.Get(data, "type").String())
+						errorPath = "response.error.code"
+					}
+					require.Equal(t, "invalid_request_error", gjson.Get(data, errorPath).String())
+					require.Contains(t, data, "provider file IDs cannot be shared")
+					errorFrames++
+				}
+			}
+			require.Equal(t, 1, errorFrames)
+			if protocol == "chat" {
+				require.Equal(t, 1, doneFrames)
+			} else {
+				require.Zero(t, doneFrames)
+			}
+		})
+	}
+}
 
 // committedGatewayKeepaliveContext forces the pre-header heartbeat through the
 // service manager instead of waiting on a timer, keeping these protocol tests

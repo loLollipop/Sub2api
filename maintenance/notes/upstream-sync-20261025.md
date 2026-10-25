@@ -24,6 +24,8 @@
 
 发布复核进一步统一 Anthropic 平台转换错误为 400 输入错误，不再仅对 Claude 5.5 模型返回明确错误，避免其他模型的附件输入错误退化为 502 和无效重试。新增非 Claude 5.5 映射模型的 Chat/Responses、流式/非流式回归，均在请求上游前拒绝。
 
+独立复核进一步覆盖已提交心跳的等待场景：转换错误先同步停止心跳，尚未提交时返回 400 JSON，已提交时写入 Chat 错误帧及 DONE 或 Responses `response.failed` 终止事件并标记响应已处理，防止裸 JSON 污染 SSE 或 handler 重复兜底。handler 回归使用真实心跳 writer 和强制首拍，覆盖两种协议的帧格式及单次终止。
+
 保留本地转换顺序和配置：先使用可配置的 `min_output_tokens`，再写入最终映射模型，最后转换到 Anthropic，继续按最终模型执行 thinking 处理。保留 signed-thinking 与本地 usage 字段，不照搬无关 reasoning 重构。
 
 转换路径遵循既有密钥级/全局缓存 TTL 策略；原生 Anthropic builder 统一执行断点配额、TTL 顺序及所需 1h beta。顶层自动缓存占用一个断点槽，最终显式 1h 标记与自动缓存目标一致时协调 TTL，防止上游拒绝。
@@ -43,6 +45,7 @@
 - `gofmt -l` 改动 Go 文件无输出，`git diff --check` 通过。仓库敏感信息扫描4888个 tracked 文件通过，另用同一 scanner 检查5个新增文件，无发现。文件修复后再次检查全部21个改动/新增文件，无发现。
 - 视频范围独立 deep_auditor 未确认缺陷；缓存独立 reviewer 发现的文件型工具结果丢失已修复并增加回归，独立狭窄复核确认修复且未确认新缺陷。
 - 发布复核后的 service 定向回归 `TestConvertedAnthropic|TestNativeAnthropicCachePolicy|Test.*Claude55.*` 通过，含新增四种附件输入错误场景。首次运行发现测试误用 Responses 错误字段，按现有 `error.code` 响应契约修正断言后通过。
+- 已提交心跳的 handler/service 扩展回归通过，独立 deep_auditor 确认停止心跳、SSE 终止和 handler 去重路径。Linux 全量单测首次指出原生路由测试仍期望仅有客户端 beta；按新的 1h 必需 beta 行为更新测试，继续精确断言客户端标记被保留。
 - 主代理复核实际 diff 与关键代码；共享 Git 数据和历史 backing 工作树未提交状态保持不变。
 - 原始验证证据保留在本地 `development/diagnostics/fork-v2229-20261025/`；实现阶段定向日志在 `.artifacts/fork-v2229-20261025/`。
 

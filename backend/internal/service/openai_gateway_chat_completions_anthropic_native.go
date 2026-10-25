@@ -58,7 +58,7 @@ func (s *OpenAIGatewayService) forwardChatCompletionsViaNativeAnthropic(
 	includeUsage := ccReq.StreamOptions != nil && ccReq.StreamOptions.IncludeUsage
 
 	// 2. Convert CC → Responses → Anthropic (chained conversion)
-	responsesReq, err := chatCompletionsToResponses(s.cfg, &ccReq)
+	responsesReq, err := chatCompletionsToResponsesForAnthropic(s.cfg, &ccReq)
 	if err != nil {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", "Failed to convert request")
 		return nil, fmt.Errorf("convert chat completions to responses: %w", err)
@@ -96,7 +96,6 @@ func (s *OpenAIGatewayService) forwardChatCompletionsViaNativeAnthropic(
 	// 与 /v1/messages 直通路径相同的 pre-filter。
 	anthropicBody = StripEmptyTextBlocks(anthropicBody)
 	anthropicBody = FilterWebSearchHistoryBlocks(anthropicBody, upstreamModel)
-	anthropicBody = enforceCacheControlLimit(anthropicBody)
 	anthropicBody = sanitizeAnthropicThinkingForModel(anthropicBody, upstreamModel)
 
 	apiKey := strings.TrimSpace(account.GetOpenAIProtocolAPIKey())

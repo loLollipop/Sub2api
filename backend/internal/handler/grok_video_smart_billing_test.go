@@ -168,9 +168,7 @@ func TestGrokVideoSmartRouteLegacyAmbiguousGroupDoesNotBill(t *testing.T) {
 	for key := range f.cache.pending {
 		f.cache.pending[key] = []byte(`{"model":"grok-imagine-video","video_duration_seconds":6,"video_resolution":"720p"}`)
 	}
-	account, err := f.h.gatewayService.GetGrokMediaBoundAccount(context.Background(), 17001)
-	require.NoError(t, err)
-	account.GroupIDs = []int64{9, 17}
+	f.accounts[0].GroupIDs = []int64{9, 17}
 	response := f.request(http.MethodGet, "status")
 	require.Equal(t, http.StatusServiceUnavailable, response.Code, response.Body.String())
 	require.Empty(t, f.settlement.commands)
@@ -215,6 +213,7 @@ func TestGrokVideoSmartRouteStoreFailureDoesNotExposeTaskID(t *testing.T) {
 
 type videoRouteBillingFixture struct {
 	h           *OpenAIGatewayHandler
+	accounts    []service.Account
 	key         *service.APIKey
 	cache       *videoRouteBillingCache
 	settlement  *videoRouteSettlement
@@ -280,7 +279,7 @@ func newVideoRouteBillingFixture(t *testing.T, independent bool) *videoRouteBill
 	concurrency := service.NewConcurrencyService(testutil.StubConcurrencyCache{})
 	h := NewOpenAIGatewayHandler(gateway, concurrency, billingCache, &service.APIKeyService{}, nil, nil, nil, nil, cfg)
 	key := &service.APIKey{ID: 71, UserID: 42, User: &service.User{ID: 42, Status: service.StatusActive}, GroupID: &primary.ID, Group: primary, RouteGroupIDs: []int64{9, 17}}
-	return &videoRouteBillingFixture{h: h, key: key, cache: cache, settlement: settlement, usage: usage, upstream: upstream, task: task}
+	return &videoRouteBillingFixture{h: h, accounts: accountRepo.accounts, key: key, cache: cache, settlement: settlement, usage: usage, upstream: upstream, task: task}
 }
 
 func (f *videoRouteBillingFixture) request(method, endpoint string) *httptest.ResponseRecorder {

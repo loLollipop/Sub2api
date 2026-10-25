@@ -26,3 +26,7 @@ func settingServiceConfig(settingService *SettingService) *config.Config {
 	}
 	return settingService.cfg
 }
+
+func chatCompletionsToResponsesForAnthropic(cfg *config.Config, req *apicompat.ChatCompletionsRequest) (*apicompat.ResponsesRequest, error) {
+	return apicompat.ChatCompletionsToResponsesForAnthropic(req, configuredMinOutputTokens(cfg))
+}

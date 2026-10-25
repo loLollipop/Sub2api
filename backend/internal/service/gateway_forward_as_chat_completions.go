@@ -52,7 +52,7 @@ func (s *GatewayService) ForwardAsChatCompletions(
 	includeUsage := ccReq.StreamOptions != nil && ccReq.StreamOptions.IncludeUsage
 
 	// 2. Convert CC → Responses → Anthropic (chained conversion)
-	responsesReq, err := chatCompletionsToResponses(s.cfg, &ccReq)
+	responsesReq, err := chatCompletionsToResponsesForAnthropic(s.cfg, &ccReq)
 	if err != nil {
 		return nil, fmt.Errorf("convert chat completions to responses: %w", err)
 	}
@@ -76,7 +76,12 @@ func (s *GatewayService) ForwardAsChatCompletions(
 	responsesReq.Model = mappedModel
 	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(responsesReq)
 	if err != nil {
-		if isClaude55SignedThinkingModel(mappedModel) {
+		if StopOpenAICompactSSEKeepaliveCommitted(c) {
+			MarkResponseCommitted(c)
+			MarkOpsStreamError(c, "invalid_request_error", err.Error(), http.StatusBadRequest)
+			_, _ = c.Writer.WriteString(buildChatStreamErrorSSE("invalid_request_error", err.Error()) + "data: [DONE]\n\n")
+			c.Writer.Flush()
+		} else {
 			writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		}
 		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
@@ -107,6 +112,11 @@ func (s *GatewayService) ForwardAsChatCompletions(
 
 	if shouldMimicClaudeCode {
 		anthropicBody = s.applyClaudeCodeOAuthMimicryToBody(ctx, c, account, anthropicBody, anthropicReq.System, mappedModel)
+	}
+
+	// Apply the same key/global TTL policy as native Messages requests.
+	if ttlMode, applyTTL := s.resolveAnthropicCacheTTLMode(ctx, c, account); applyTTL {
+		anthropicBody = forceEphemeralCacheControlTTL(anthropicBody, ttlMode)
 	}
 
 	// 7. Enforce cache_control block limit

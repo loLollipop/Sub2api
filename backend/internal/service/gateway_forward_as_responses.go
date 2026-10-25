@@ -87,7 +87,10 @@ func (s *GatewayService) ForwardAsResponses(
 	responsesReq.Model = mappedModel
 	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(&responsesReq)
 	if err != nil {
-		if isClaude55SignedThinkingModel(mappedModel) {
+		if StopOpenAICompactSSEKeepaliveCommitted(c) {
+			MarkResponseCommitted(c)
+			writeOpenAICompactSSEFailureMessage(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		} else {
 			writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		}
 		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
@@ -118,6 +121,11 @@ func (s *GatewayService) ForwardAsResponses(
 
 	if shouldMimicClaudeCode {
 		anthropicBody = s.applyClaudeCodeOAuthMimicryToBody(ctx, c, account, anthropicBody, anthropicReq.System, mappedModel)
+	}
+
+	// Apply the same key/global TTL policy as native Messages requests.
+	if ttlMode, applyTTL := s.resolveAnthropicCacheTTLMode(ctx, c, account); applyTTL {
+		anthropicBody = forceEphemeralCacheControlTTL(anthropicBody, ttlMode)
 	}
 
 	// 7. Enforce cache_control block limit

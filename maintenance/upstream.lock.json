@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.24",
-  "imported_commit": "7d83b16e7230e33ebee91a591a7da5217cf45be0",
+  "imported_version": "2.2.29",
+  "imported_commit": "6add01cc1cbc2b89cf557aab1154503aa07cd297",
   "personal_baseline_commit": "6e2e5b5da8c4ac9d07c11dcb5e33f92141a5eeb0",
-  "latest_observed_version": "2.2.24",
-  "latest_observed_release_commit": "7d83b16e7230e33ebee91a591a7da5217cf45be0",
-  "latest_observed_main_commit": "b7e8d034ec75e3f2a9dc5a902241732f72912219",
+  "latest_observed_version": "2.2.29",
+  "latest_observed_release_commit": "6add01cc1cbc2b89cf557aab1154503aa07cd297",
+  "latest_observed_main_commit": "63c1a4e66fe79b780f81bec3053efb6df8140130",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.24",
-  "reviewed_release_commit": "7d83b16e7230e33ebee91a591a7da5217cf45be0",
+  "reviewed_release_tag": "v2.2.29",
+  "reviewed_release_commit": "6add01cc1cbc2b89cf557aab1154503aa07cd297",
   "observed_delta_review": {
-    "from_commit": "177ad1749261db02de9f83383242e2423a158b79",
-    "to_commit": "b7e8d034ec75e3f2a9dc5a902241732f72912219",
-    "status": "selective_formal_v2224_backport",
-    "scope": "Native Gemini adaptive passthrough, model catalog selection and relay URL normalization; unified TOTP input and local stacked step-up focus/keyboard fixes. Preserve local billing, admin permissions and UI. Exclude wallets/native payments/Bark, hard-coded primary-admin observer role and response-rewriting source-IP notices.",
-    "evidence": "maintenance/notes/upstream-sync-20261024.md"
+    "from_commit": "b7e8d034ec75e3f2a9dc5a902241732f72912219",
+    "to_commit": "63c1a4e66fe79b780f81bec3053efb6df8140130",
+    "status": "selective_formal_v2229_backport",
+    "scope": "Formal v2.2.25-v2.2.29 review: selectively adapt v2.2.27 video-task source failure/ownership/current-account behavior and v2.2.28 Anthropic cache-marker conversion, TTL policy and breakpoint handling. Preserve local mapped-model/min_output_tokens, billing and UI; exclude removed native crypto/payment features and their grant/logout changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261025.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "7d83b16e7230e33ebee91a591a7da5217cf45be0",
+    "source_head": "6add01cc1cbc2b89cf557aab1154503aa07cd297",
     "implemented_with_local_regression": [
+      "Formal v2.2.25-v2.2.29 selected video-task lookup and Anthropic cache conversion/policy adaptations; preserve current source credentials, ownership, final mapped-model and configured output limits. See 2026-10-25 note for exact validation and exclusions.",
       "Formal v2.2.24 selected native Gemini adaptive/catalog/URL and unified TOTP input/stacked step-up adaptations; keep explicit protocol bridges and local admin roles. See dated note for validation and limits.",
       "Formal v2.2.20 selected media reconciliation, installation encryption-key persistence and all-user TOTP disable verification; upstream compatibility defects corrected locally. See dated note.",
       "Formal v2.2.12-v2.2.13 stream error status classification and local durable Responses WebSocket refusal adaptation; see dated sync note for verification and exclusions",
@@ -81,7 +82,12 @@
     "8fd35e844",
     "68d3624b5",
     "177ad1749",
-    "7d83b16e7"
+    "7d83b16e7",
+    "9fa60cad5",
+    "a388738ca",
+    "43abd82d3",
+    "7286b33bd",
+    "9d4286738"
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
@@ -295,5 +301,22 @@
       "0bec57406 optional recovery CLI: refresh rotation can outlive token-set cleanup"
     ],
     "migration": "269 belongs to selected original Gemini image permission adaptation; existing migrations unchanged."
+  },
+  "sync_20261025": {
+    "evidence": "maintenance/notes/upstream-sync-20261025.md",
+    "secondary_tag": "v2.2.29",
+    "selected_releases": [
+      "v2.2.27",
+      "v2.2.28"
+    ],
+    "excluded_releases": [
+      "v2.2.25",
+      "v2.2.26",
+      "v2.2.29"
+    ],
+    "excluded_scope": "Removed native crypto deposits, RPC verification/scanning, sweep/gas/Bark and short-lived crypto grants including grant-specific auth/logout/audit changes.",
+    "preserved": "Local UI and removals; authoritative billing details and account/global usage overrides; mapped model thinking semantics and configured min_output_tokens.",
+    "migration": "None. Existing migrations and module dependencies unchanged; project VERSION advanced separately to 2.1.36 for the authorized release.",
+    "release_status": "v2.1.36 release preparation authorized; CI, artifact identity and deployment acceptance recorded separately"
   }
 }

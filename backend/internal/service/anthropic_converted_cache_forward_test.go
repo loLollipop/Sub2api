@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,49 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
+
+func TestConvertedAnthropicToolFileErrorsAreBadRequests(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, protocol := range []string{"chat", "responses"} {
+		for _, stream := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/stream=%t", protocol, stream), func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(rec)
+				c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+				c.Set("api_key", &APIKey{Group: &Group{CrossProtocolConversionEnabled: true}})
+				account := newAnthropicAPIKeyAccountForTest()
+				account.Credentials["model_mapping"] = map[string]any{"public-alias": "claude-sonnet-4-6"}
+				payload := `{"model":"public-alias","messages":[{"role":"assistant","tool_calls":[{"id":"call_file","type":"function","function":{"name":"read","arguments":"{}"}}]},{"role":"tool","tool_call_id":"call_file","content":[{"type":"file","file":{"file_id":"file_synthetic"}}]}]}`
+				if protocol == "responses" {
+					c.Request.URL.Path = "/v1/responses"
+					payload = `{"model":"public-alias","input":[{"type":"function_call","call_id":"call_file","name":"read","arguments":"{}"},{"type":"function_call_output","call_id":"call_file","output":[{"type":"input_file","file_id":"file_synthetic"}]}]}`
+				}
+				var wire map[string]any
+				require.NoError(t, json.Unmarshal([]byte(payload), &wire))
+				wire["stream"] = stream
+				body, err := json.Marshal(wire)
+				require.NoError(t, err)
+				// No upstream dependency: invalid attachments must fail before sending.
+				svc := &GatewayService{}
+				var result *ForwardResult
+				if protocol == "chat" {
+					result, err = svc.ForwardAsChatCompletions(context.Background(), c, account, body, nil)
+				} else {
+					result, err = svc.ForwardAsResponses(context.Background(), c, account, body, nil)
+				}
+				require.Error(t, err)
+				require.Nil(t, result)
+				require.Equal(t, http.StatusBadRequest, rec.Code)
+				errorField := "error.type"
+				if protocol == "responses" {
+					errorField = "error.code"
+				}
+				require.Equal(t, "invalid_request_error", gjson.Get(rec.Body.String(), errorField).String())
+				require.Contains(t, rec.Body.String(), "provider file IDs cannot be shared")
+			})
+		}
+	}
+}
 
 func TestConvertedAnthropicCachePolicyAtUpstream(t *testing.T) {
 	gin.SetMode(gin.TestMode)

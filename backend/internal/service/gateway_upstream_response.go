@@ -1262,6 +1262,7 @@ func (s *GatewayService) parseSSEUsage(data string, usage *ClaudeUsage) {
 }
 
 type sseUsagePatch struct {
+	providerUsage            gjson.Result
 	inputTokens              int
 	hasInputTokens           bool
 	outputTokens             int
@@ -1283,58 +1284,30 @@ func (s *GatewayService) extractSSEUsagePatch(event map[string]any) *sseUsagePat
 
 	eventType, _ := event["type"].(string)
 	switch eventType {
-	case "message_start":
-		msg, _ := event["message"].(map[string]any)
-		usageObj, _ := msg["usage"].(map[string]any)
-		if len(usageObj) == 0 {
-			return nil
-		}
-
-		patch := &sseUsagePatch{}
-		patch.hasInputTokens = true
-		if v, ok := parseSSEUsageInt(usageObj["input_tokens"]); ok {
-			patch.inputTokens = v
-		}
-		patch.hasCacheCreationInput = true
-		if v, ok := parseSSEUsageInt(usageObj["cache_creation_input_tokens"]); ok {
-			patch.cacheCreationInputTokens = v
-		}
-		patch.hasCacheReadInput = true
-		if v, ok := parseSSEUsageInt(usageObj["cache_read_input_tokens"]); ok {
-			patch.cacheReadInputTokens = v
-		}
-		if cc, ok := usageObj["cache_creation"].(map[string]any); ok {
-			if v, exists := parseSSEUsageInt(cc["ephemeral_5m_input_tokens"]); exists {
-				patch.cacheCreation5mTokens = v
-				patch.hasCacheCreation5m = true
-			}
-			if v, exists := parseSSEUsageInt(cc["ephemeral_1h_input_tokens"]); exists {
-				patch.cacheCreation1hTokens = v
-				patch.hasCacheCreation1h = true
-			}
-		}
-		return patch
-
-	case "message_delta":
+	case "message_start", "message_delta":
 		usageObj, _ := event["usage"].(map[string]any)
+		if eventType == "message_start" {
+			msg, _ := event["message"].(map[string]any)
+			usageObj, _ = msg["usage"].(map[string]any)
+		}
 		if len(usageObj) == 0 {
 			return nil
 		}
 
 		patch := &sseUsagePatch{}
-		if v, ok := parseSSEUsageInt(usageObj["input_tokens"]); ok && v > 0 {
+		if v, ok := parseSSEUsageInt(usageObj["input_tokens"]); ok {
 			patch.inputTokens = v
 			patch.hasInputTokens = true
 		}
-		if v, ok := parseSSEUsageInt(usageObj["output_tokens"]); ok && v > 0 {
+		if v, ok := parseSSEUsageInt(usageObj["output_tokens"]); ok {
 			patch.outputTokens = v
 			patch.hasOutputTokens = true
 		}
-		if v, ok := parseSSEUsageInt(usageObj["cache_creation_input_tokens"]); ok && v > 0 {
+		if v, ok := parseSSEUsageInt(usageObj["cache_creation_input_tokens"]); ok {
 			patch.cacheCreationInputTokens = v
 			patch.hasCacheCreationInput = true
 		}
-		if v, ok := parseSSEUsageInt(usageObj["cache_read_input_tokens"]); ok && v > 0 {
+		if v, ok := parseSSEUsageInt(usageObj["cache_read_input_tokens"]); ok {
 			patch.cacheReadInputTokens = v
 			patch.hasCacheReadInput = true
 		}
@@ -1346,6 +1319,12 @@ func (s *GatewayService) extractSSEUsagePatch(event map[string]any) *sseUsagePat
 			if v, exists := parseSSEUsageInt(cc["ephemeral_1h_input_tokens"]); exists {
 				patch.cacheCreation1hTokens = v
 				patch.hasCacheCreation1h = true
+			}
+		}
+		if usageObj["cached_tokens"] != nil || usageObj["prompt_tokens"] != nil ||
+			usageObj["prompt_tokens_details"] != nil || usageObj["prompt_cache_hit_tokens"] != nil || usageObj["prompt_cache_miss_tokens"] != nil {
+			if raw, err := json.Marshal(usageObj); err == nil {
+				patch.providerUsage = gjson.ParseBytes(raw)
 			}
 		}
 		return patch
@@ -1376,6 +1355,19 @@ func mergeSSEUsagePatch(usage *ClaudeUsage, patch *sseUsagePatch) {
 	}
 	if patch.hasCacheCreation1h {
 		usage.CacheCreation1hTokens = patch.cacheCreation1hTokens
+	}
+	if patch.hasCacheCreationInput && patch.cacheCreationInputTokens == 0 {
+		usage.CacheCreation5mTokens = 0
+		usage.CacheCreation1hTokens = 0
+	}
+	if !patch.hasCacheCreationInput && (patch.hasCacheCreation5m || patch.hasCacheCreation1h) {
+		usage.CacheCreationInputTokens = usage.CacheCreation5mTokens + usage.CacheCreation1hTokens
+	}
+	if patch.providerUsage.Exists() {
+		if v := patch.providerUsage.Get("cached_tokens"); usage.CacheReadInputTokens == 0 && v.Int() > 0 {
+			usage.CacheReadInputTokens = int(v.Int())
+		}
+		normalizeAnthropicCompatiblePromptUsage(patch.providerUsage, usage)
 	}
 }
 

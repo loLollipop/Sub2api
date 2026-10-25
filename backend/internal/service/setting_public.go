@@ -234,7 +234,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyChannelMonitorHideUserRanking,
 		SettingKeyAvailableChannelsEnabled,
 		SettingKeyModelPlazaEnabled,
+		SettingKeyLeaderboardEnabled,
 		SettingKeyModelPlazaRequireAuth,
+		SettingKeyLeaderboardRequireAuth,
 		SettingKeyPluginManagementEnabled,
 		SettingKeyAffiliateEnabled,
 		SettingKeyRiskControlEnabled,
@@ -364,7 +366,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		AvailableChannelsEnabled: settings[SettingKeyAvailableChannelsEnabled] == "true",
 
 		ModelPlazaEnabled:       settings[SettingKeyModelPlazaEnabled] == "true",
+		LeaderboardEnabled:      settings[SettingKeyLeaderboardEnabled] == "true",
 		ModelPlazaRequireAuth:   settings[SettingKeyModelPlazaRequireAuth] == "true",
+		LeaderboardRequireAuth:  settings[SettingKeyLeaderboardRequireAuth] == "true",
 		PluginManagementEnabled: settings[SettingKeyPluginManagementEnabled] == "true",
 
 		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
@@ -631,7 +635,9 @@ type PublicSettingsInjectionPayload struct {
 	ChannelMonitorShowQuota       bool `json:"channel_monitor_show_quota"`
 	AvailableChannelsEnabled      bool `json:"available_channels_enabled"`
 	ModelPlazaEnabled             bool `json:"model_plaza_enabled"`
+	LeaderboardEnabled            bool `json:"leaderboard_enabled"`
 	ModelPlazaRequireAuth         bool `json:"model_plaza_require_auth"`
+	LeaderboardRequireAuth        bool `json:"leaderboard_require_auth"`
 	PluginManagementEnabled       bool `json:"plugin_management_enabled"`
 	AffiliateEnabled              bool `json:"affiliate_enabled"`
 	RiskControlEnabled            bool `json:"risk_control_enabled"`
@@ -713,7 +719,9 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		ChannelMonitorHideUserRanking:        settings.ChannelMonitorHideUserRanking,
 		AvailableChannelsEnabled:             settings.AvailableChannelsEnabled,
 		ModelPlazaEnabled:                    settings.ModelPlazaEnabled,
+		LeaderboardEnabled:                   settings.LeaderboardEnabled,
 		ModelPlazaRequireAuth:                settings.ModelPlazaRequireAuth,
+		LeaderboardRequireAuth:               settings.LeaderboardRequireAuth,
 		PluginManagementEnabled:              settings.PluginManagementEnabled,
 		AffiliateEnabled:                     settings.AffiliateEnabled,
 		RiskControlEnabled:                   settings.RiskControlEnabled,

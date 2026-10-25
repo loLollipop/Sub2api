@@ -61,8 +61,8 @@
 .top-layout .top-sidebar-toggle > svg { width: 18px; height: 18px; flex-shrink: 0; }
 .top-layout .top-browse-nav { display: flex; align-items: center; justify-content: center; gap: 3px; min-width: 0; }
 .top-layout .top-browse-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 5px 10px; border-radius: 6px; white-space: nowrap; color: var(--signal-muted); font-size: 12px; font-weight: 500; transition: background-color 160ms ease, color 160ms ease; }
-.top-layout .top-browse-link:hover { color: var(--signal-text); background: var(--signal-hover); }
-.top-layout .top-browse-link.is-active { color: var(--signal-text); background: var(--signal-hover); font-weight: 500; }
+.top-layout .top-browse-link:hover { color: var(--signal-accent); }
+.top-layout .top-browse-link.is-active { color: var(--signal-accent); background: transparent; font-weight: 600; }
 .top-layout .top-account-area { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex: 0 0 auto; }
 .console-signal.top-layout .top-header .console-search-trigger { border: 1px solid color-mix(in srgb, var(--signal-muted) 16%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--signal-muted) 4%, transparent); color: var(--signal-muted); box-shadow: none; }
 .console-signal.top-layout .top-header .console-search-trigger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--signal-muted) 24%, transparent); background: color-mix(in srgb, var(--signal-muted) 8%, transparent); color: var(--signal-text); }

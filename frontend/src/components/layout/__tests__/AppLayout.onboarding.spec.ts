@@ -12,7 +12,7 @@ import AppLayout from '../AppLayout.vue'
 const { createDriver } = vi.hoisted(() => ({ createDriver: vi.fn() }))
 vi.mock('driver.js', () => ({ driver: createDriver }))
 
-const browsePaths = ['/model-plaza', '/available-channels', '/monitor']
+const browsePaths = ['/model-plaza', '/available-channels', '/monitor', '/leaderboard']
 let wrapper: VueWrapper | undefined
 
 async function renderLayout(path: string, role: 'admin' | 'user' = 'admin', reuseLayout = false, simpleMode = false) {

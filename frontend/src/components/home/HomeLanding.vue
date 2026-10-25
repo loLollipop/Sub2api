@@ -6,8 +6,9 @@
           <img :src="siteLogo || '/logo.svg'" alt="" width="34" height="34" />
           <span class="brand-gradient">{{ siteName }}</span>
         </router-link>
-        <div v-if="docUrl" class="landing-nav__links">
-          <a :href="docUrl" target="_blank" rel="noopener noreferrer">{{ t('home.docs') }}</a>
+        <div v-if="docUrl || leaderboardEnabled" class="landing-nav__links">
+          <router-link v-if="leaderboardEnabled" to="/leaderboard">{{ t('leaderboard.title') }}</router-link>
+          <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer">{{ t('home.docs') }}</a>
         </div>
         <div class="landing-nav__actions">
           <LocaleSwitcher />
@@ -75,6 +76,7 @@ import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import LegalFooterLinks from '@/components/legal/LegalFooterLinks.vue'
 import AccountMenu from '@/components/layout/AccountMenu.vue'
 import HomeApiPreview from './HomeApiPreview.vue'
+import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
 const props = defineProps<{
   siteName: string
@@ -90,6 +92,7 @@ const props = defineProps<{
 defineEmits<{ toggleTheme: [] }>()
 const { t } = useI18n()
 const entryPath = computed(() => props.isAuthenticated ? props.dashboardPath : '/login')
+const leaderboardEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.leaderboard))
 const features = [
   { key: 'connect', icon: 'server' },
   { key: 'routing', icon: 'shield' },

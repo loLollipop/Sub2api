@@ -633,6 +633,8 @@ export interface SystemSettings {
   // Model Plaza feature switches + description
   model_plaza_enabled: boolean;
   model_plaza_require_auth: boolean;
+  leaderboard_enabled: boolean;
+  leaderboard_require_auth: boolean;
   model_plaza_description: string;
   plugin_management_enabled: boolean;
 
@@ -917,6 +919,8 @@ export interface UpdateSettingsRequest {
   // Model Plaza feature switches + description
   model_plaza_enabled?: boolean;
   model_plaza_require_auth?: boolean;
+  leaderboard_enabled?: boolean;
+  leaderboard_require_auth?: boolean;
   model_plaza_description?: string;
   plugin_management_enabled?: boolean;
 

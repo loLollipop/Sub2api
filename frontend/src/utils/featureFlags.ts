@@ -109,6 +109,11 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Model Plaza',
   }),
+  leaderboard: defineFlag({
+    key: 'leaderboard_enabled',
+    mode: 'opt-in',
+    label: 'Leaderboard',
+  }),
   pluginManagement: defineFlag({
     key: 'plugin_management_enabled',
     mode: 'opt-in',

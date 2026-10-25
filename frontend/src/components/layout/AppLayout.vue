@@ -6,10 +6,10 @@
     <!-- Background Decoration -->
     <div v-if="!isConsoleSignal" class="pointer-events-none fixed inset-0 bg-mesh-gradient"></div>
 
-    <AppHeader :browse="isBrowse" :inert="mobileDrawerOpen || undefined" />
+    <AppHeader :browse="isBrowse" :hide-sidebar-toggle="publicBrowse" :inert="mobileDrawerOpen || undefined" />
 
     <div class="shell-workspace">
-      <AppSidebar />
+      <AppSidebar v-if="!publicBrowse" />
       <div class="relative min-w-0 flex-1" :class="{ 'signal-frame': isConsoleSignal }" :inert="mobileDrawerOpen || undefined">
         <main class="p-4 md:p-6 lg:p-8" :class="{ 'signal-main': isConsoleSignal }">
           <slot />
@@ -40,13 +40,14 @@ import { useConsoleWorkspace } from '@/composables/useConsoleWorkspace'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 
+const props = defineProps<{ publicBrowse?: boolean }>()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const isDesktop = useMediaQuery('(min-width: 1024px)')
-const mobileDrawerOpen = computed(() => appStore.mobileOpen && !isDesktop.value)
+const mobileDrawerOpen = computed(() => !props.publicBrowse && appStore.mobileOpen && !isDesktop.value)
 const route = useRoute()
 const router = useRouter()
-const isBrowse = computed(() => ['/model-plaza', '/available-channels', '/monitor'].includes(route.path))
+const isBrowse = computed(() => ['/model-plaza', '/available-channels', '/monitor', '/leaderboard'].includes(route.path))
 const { isConsoleSignal, isAdminSignal } = useConsoleSignal()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const { isAdminWorkspace: isAdmin } = useConsoleWorkspace()

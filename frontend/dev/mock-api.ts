@@ -12,6 +12,8 @@ import type {
 } from '../src/types'
 import type { MonitorMatrixGroupBy, MonitorMatrixRow } from '../src/api/channelMonitorV2'
 import { readFileSync } from 'node:fs'
+import { leaderboardFixture } from './leaderboard-fixture'
+import type { LeaderboardPeriod } from '../src/api/leaderboard'
 
 // Local preview fixture: a real generated artwork so the hover player shows a
 // lifelike animation instead of a placeholder.
@@ -721,6 +723,11 @@ export function createMockApi(now = new Date()) {
         ] }
         if (path === '/api/v1/channels/available') return data.availableChannels
         if (path === '/api/v1/model-plaza') return data.modelPlaza
+        if (path === '/api/v1/leaderboard') {
+          const period = query.get('period') || 'week'
+          if (!['day', 'week', 'month', 'year'].includes(period)) throw new PreviewError(400, '无效的排行榜周期')
+          return leaderboardFixture(period as LeaderboardPeriod)
+        }
         if (path === '/api/v1/subscriptions') return data.subscriptions
         if (path === '/api/v1/subscriptions/active') return data.subscriptions.filter(item => item.status === 'active')
         if (path === '/api/v1/subscriptions/progress') return data.subscriptionProgress

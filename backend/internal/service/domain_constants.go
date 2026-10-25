@@ -519,6 +519,10 @@ const (
 	// and the header entry is hidden. Defaults to false (opt-in feature).
 	SettingKeyModelPlazaEnabled = "model_plaza_enabled"
 
+	// Leaderboard is opt-in and public unless authentication is required.
+	SettingKeyLeaderboardEnabled     = "leaderboard_enabled"
+	SettingKeyLeaderboardRequireAuth = "leaderboard_require_auth"
+
 	// SettingKeyModelPlazaRequireAuth controls whether the Model Plaza page requires a
 	// logged-in user. When false the page is public and anonymous visitors see only
 	// non-exclusive groups.

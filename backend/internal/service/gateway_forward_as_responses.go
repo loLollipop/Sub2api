@@ -307,57 +307,68 @@ func mergeAnthropicUsage(dst *ClaudeUsage, src apicompat.AnthropicUsage) {
 	if dst == nil {
 		return
 	}
-	if src.CacheCreation != nil {
-		if src.CacheCreation.Ephemeral5mInputTokens != nil {
-			dst.CacheCreation5mTokens = max(*src.CacheCreation.Ephemeral5mInputTokens, 0)
-		}
-		if src.CacheCreation.Ephemeral1hInputTokens != nil {
-			dst.CacheCreation1hTokens = max(*src.CacheCreation.Ephemeral1hInputTokens, 0)
-		}
-		if src.CacheCreationInputTokens == 0 {
-			src.CacheCreationInputTokens = dst.CacheCreation5mTokens + dst.CacheCreation1hTokens
-		}
+	if src.HasInputTokens() {
+		dst.InputTokens = src.InputTokens
 	}
-
-	// Some Anthropic-compatible providers retain OpenAI-style prompt/cache
-	// fields. Prefer those authoritative totals or hit/miss buckets over the
-	// overloaded input_tokens field. This covers Kimi's changing stream
-	// semantics as well as GLM/DeepSeek cache aliases.
-	if src.PromptTokens > 0 || src.PromptCacheHitTokens != nil || src.PromptCacheMissTokens != nil {
-		cacheReadTokens := src.CacheReadInputTokens
-		if cacheReadTokens == 0 && src.CachedTokens > 0 {
-			cacheReadTokens = src.CachedTokens
-		}
-		if cacheReadTokens == 0 && src.PromptTokensDetails != nil && src.PromptTokensDetails.CachedTokens > 0 {
-			cacheReadTokens = src.PromptTokensDetails.CachedTokens
-		}
-		if cacheReadTokens == 0 && src.PromptCacheHitTokens != nil {
-			cacheReadTokens = max(*src.PromptCacheHitTokens, 0)
-		}
-
-		if src.PromptCacheMissTokens != nil {
-			dst.InputTokens = max(*src.PromptCacheMissTokens, 0)
-		} else {
-			dst.InputTokens = max(src.PromptTokens-cacheReadTokens-src.CacheCreationInputTokens, 0)
-		}
-		dst.CacheReadInputTokens = cacheReadTokens
+	if src.HasCacheReadInputTokens() {
+		dst.CacheReadInputTokens = src.CacheReadInputTokens
+	}
+	if src.HasCacheCreationInputTokens() {
 		dst.CacheCreationInputTokens = src.CacheCreationInputTokens
-	} else {
-		if src.InputTokens > 0 {
-			dst.InputTokens = src.InputTokens
+	}
+	if src.HasCacheCreationInputTokens() && src.CacheCreationInputTokens == 0 {
+		// Never retain billable TTL details behind an authoritative zero.
+		dst.CacheCreation5mTokens = 0
+		dst.CacheCreation1hTokens = 0
+	} else if src.CacheCreation != nil && (src.CacheCreation.Ephemeral5mInputTokens != nil || src.CacheCreation.Ephemeral1hInputTokens != nil) {
+		if value := src.CacheCreation.Ephemeral5mInputTokens; value != nil {
+			dst.CacheCreation5mTokens = max(*value, 0)
 		}
-		if src.CacheReadInputTokens > 0 {
-			dst.CacheReadInputTokens = src.CacheReadInputTokens
-		} else if src.CachedTokens > 0 {
-			dst.CacheReadInputTokens = src.CachedTokens
+		if value := src.CacheCreation.Ephemeral1hInputTokens; value != nil {
+			dst.CacheCreation1hTokens = max(*value, 0)
 		}
-		if src.CacheCreationInputTokens > 0 || src.CacheCreation != nil {
-			dst.CacheCreationInputTokens = src.CacheCreationInputTokens
+		if !src.HasCacheCreationInputTokens() {
+			dst.CacheCreationInputTokens = dst.CacheCreation5mTokens + dst.CacheCreation1hTokens
 		}
 	}
-	if src.OutputTokens > 0 {
+
+	// Preserve provider-native prompt/cache aliases while keeping billing
+	// buckets mutually exclusive. A canonical read zero still permits Kimi's
+	// cached_tokens alias; it must not retain the preceding cache-read value.
+	if src.CacheReadInputTokens == 0 {
+		switch {
+		case src.CachedTokens > 0:
+			dst.CacheReadInputTokens = src.CachedTokens
+		case src.PromptTokensDetails != nil && src.PromptTokensDetails.CachedTokens > 0:
+			dst.CacheReadInputTokens = src.PromptTokensDetails.CachedTokens
+		case src.PromptCacheHitTokens != nil:
+			dst.CacheReadInputTokens = max(*src.PromptCacheHitTokens, 0)
+		}
+	}
+	if src.PromptCacheMissTokens != nil {
+		dst.InputTokens = max(*src.PromptCacheMissTokens, 0)
+	} else if src.PromptTokens > 0 {
+		dst.InputTokens = max(src.PromptTokens-dst.CacheReadInputTokens-dst.CacheCreationInputTokens, 0)
+	}
+	if src.HasOutputTokens() {
 		dst.OutputTokens = src.OutputTokens
 	}
+}
+
+func claudeUsageToAnthropicUsage(usage ClaudeUsage) apicompat.AnthropicUsage {
+	out := apicompat.AnthropicUsage{
+		InputTokens:              usage.InputTokens,
+		OutputTokens:             usage.OutputTokens,
+		CacheCreationInputTokens: usage.CacheCreationInputTokens,
+		CacheReadInputTokens:     usage.CacheReadInputTokens,
+	}
+	if usage.CacheCreation5mTokens > 0 || usage.CacheCreation1hTokens > 0 {
+		out.CacheCreation = &apicompat.AnthropicCacheCreation{
+			Ephemeral5mInputTokens: &usage.CacheCreation5mTokens,
+			Ephemeral1hInputTokens: &usage.CacheCreation1hTokens,
+		}
+	}
+	return out
 }
 
 // parseAnthropicSSEField parses an SSE field line in the form "field:value" or "field: value".
@@ -479,14 +490,7 @@ func (s *GatewayService) handleResponsesBufferedStreamingResponse(
 	}
 
 	// Update usage from accumulated delta
-	if usage.InputTokens > 0 || usage.OutputTokens > 0 {
-		finalResp.Usage = apicompat.AnthropicUsage{
-			InputTokens:              usage.InputTokens,
-			OutputTokens:             usage.OutputTokens,
-			CacheCreationInputTokens: usage.CacheCreationInputTokens,
-			CacheReadInputTokens:     usage.CacheReadInputTokens,
-		}
-	}
+	finalResp.Usage = claudeUsageToAnthropicUsage(usage)
 
 	// Convert to Responses format
 	responsesResp := apicompat.AnthropicToResponsesResponse(finalResp, mappedModel)

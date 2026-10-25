@@ -580,6 +580,23 @@ describe("admin SettingsView email domain quota copy", () => {
 });
 
 describe("admin SettingsView settings controls", () => {
+  it("loads and saves both leaderboard switches from the feature settings card", async () => {
+    getSettings.mockResolvedValueOnce({ ...baseSettingsResponse, leaderboard_enabled: true, leaderboard_require_auth: false });
+    const wrapper = mountView();
+    await flushPromises();
+    const tab = wrapper.findAll("button").find(button => button.text().includes("admin.settings.tabs.features"));
+    expect(tab).toBeDefined();
+    await tab!.trigger("click");
+    await flushPromises();
+    const toggles = wrapper.get('[data-testid="leaderboard-settings"]').findAllComponents(ToggleStub);
+    expect(toggles.map(toggle => toggle.props('modelValue'))).toEqual([true, false]);
+    toggles[1].vm.$emit('update:modelValue', true);
+    await wrapper.vm.$nextTick();
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings.mock.calls.at(-1)![0]).toMatchObject({ leaderboard_enabled: true, leaderboard_require_auth: true });
+    wrapper.unmount();
+  });
   beforeEach(() => {
     getSettings.mockReset();
     updateSettings.mockReset();

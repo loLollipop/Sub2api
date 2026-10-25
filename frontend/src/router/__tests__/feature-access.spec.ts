@@ -27,6 +27,8 @@ const appStore = vi.hoisted(() => ({
     purchase_subscription_enabled?: boolean
     risk_control_enabled?: boolean
     custom_menu_items?: []
+    leaderboard_enabled?: boolean
+    leaderboard_require_auth?: boolean
   },
   fetchPublicSettings: vi.fn(),
 }))
@@ -117,9 +119,41 @@ describe('feature route guard', () => {
     authStore.isAuthenticated = true
     authStore.isAdmin = false
     authStore.isSimpleMode = false
+    appStore.backendModeEnabled = false
     appStore.publicSettingsLoaded = false
     appStore.cachedPublicSettings = null
     appStore.fetchPublicSettings.mockReset()
+  })
+
+  it('registers the public leaderboard and hides the route when explicitly disabled', async () => {
+    expect(routerHarness.paths).toContain('/leaderboard')
+    appStore.publicSettingsLoaded = true
+    appStore.cachedPublicSettings = { leaderboard_enabled: false }
+    const { navigation, next } = runGuard({ requiresAuth: false }, '/leaderboard')
+    await navigation
+    expect(next).toHaveBeenCalledWith('/dashboard')
+  })
+
+  it('preserves the leaderboard destination when sign-in is required', async () => {
+    authStore.isAuthenticated = false
+    appStore.publicSettingsLoaded = true
+    appStore.cachedPublicSettings = { leaderboard_enabled: true, leaderboard_require_auth: true }
+    const { navigation, next } = runGuard({ requiresAuth: false }, '/leaderboard')
+    await navigation
+    expect(next).toHaveBeenCalledWith({ path: '/login', query: { redirect: '/leaderboard' } })
+  })
+
+  it('allows anonymous leaderboard access only when public and outside backend-only mode', async () => {
+    authStore.isAuthenticated = false
+    appStore.publicSettingsLoaded = true
+    appStore.cachedPublicSettings = { leaderboard_enabled: true, leaderboard_require_auth: false }
+    const publicVisit = runGuard({ requiresAuth: false }, '/leaderboard')
+    await publicVisit.navigation
+    expect(publicVisit.next).toHaveBeenCalledWith()
+    appStore.backendModeEnabled = true
+    const backendVisit = runGuard({ requiresAuth: false }, '/leaderboard')
+    await backendVisit.navigation
+    expect(backendVisit.next).toHaveBeenCalledWith('/login')
   })
 
   it('removes native checkout routes while retaining shop, redemption, subscriptions and WeChat login', () => {

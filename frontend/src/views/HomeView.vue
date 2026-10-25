@@ -29,6 +29,7 @@
           <span class="brand-gradient min-w-0 truncate text-base font-semibold">{{ siteName }}</span>
         </div>
         <div class="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
+          <router-link v-if="leaderboardEnabled" to="/leaderboard" class="px-2 text-sm text-gray-600 hover:text-primary-600 dark:text-gray-300">{{ t('leaderboard.title') }}</router-link>
           <LocaleSwitcher />
           <a
             v-if="docUrl"
@@ -111,11 +112,13 @@ import Icon from '@/components/icons/Icon.vue'
 import HomeLanding from '@/components/home/HomeLanding.vue'
 import LegalFooterLinks from '@/components/legal/LegalFooterLinks.vue'
 import { sanitizeUrl } from '@/utils/url'
+import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
 const { t } = useI18n()
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
+const leaderboardEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.leaderboard))
 
 // Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')

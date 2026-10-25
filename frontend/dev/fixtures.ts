@@ -628,5 +628,6 @@ export const settings: PublicSettings = {
   channel_monitor_default_interval_seconds: 60, channel_monitor_show_quota: true,
   available_channels_enabled: true,
   model_plaza_enabled: true, model_plaza_require_auth: false, plugin_management_enabled: false,
+  leaderboard_enabled: true, leaderboard_require_auth: false,
   service_quota_enabled: false, affiliate_enabled: true, allow_user_view_error_requests: true,
 }

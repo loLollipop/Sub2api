@@ -82,6 +82,12 @@ function compactDestination(wrapper: ReturnType<typeof mountHome>) {
 }
 
 describe('HomeView compact mode', () => {
+  it.each([false, true])('shows a leaderboard link when enabled in compact mode=%s', compact => {
+    const enabled = mountHome({ compact_home_enabled: compact, leaderboard_enabled: true })
+    expect(enabled.findAllComponents(RouterLinkStub).some(link => link.props('to') === '/leaderboard')).toBe(true)
+    const disabled = mountHome({ compact_home_enabled: compact, leaderboard_enabled: false })
+    expect(disabled.findAllComponents(RouterLinkStub).some(link => link.props('to') === '/leaderboard')).toBe(false)
+  })
   beforeEach(() => {
     authStore.isAuthenticated = false
     authStore.isAdmin = false

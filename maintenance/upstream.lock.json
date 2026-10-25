@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.29",
-  "imported_commit": "6add01cc1cbc2b89cf557aab1154503aa07cd297",
+  "imported_version": "2.2.31",
+  "imported_commit": "a3401d78c7d774042ddcb43c4c005945b249160f",
   "personal_baseline_commit": "6e2e5b5da8c4ac9d07c11dcb5e33f92141a5eeb0",
-  "latest_observed_version": "2.2.29",
-  "latest_observed_release_commit": "6add01cc1cbc2b89cf557aab1154503aa07cd297",
-  "latest_observed_main_commit": "63c1a4e66fe79b780f81bec3053efb6df8140130",
+  "latest_observed_version": "2.2.31",
+  "latest_observed_release_commit": "a3401d78c7d774042ddcb43c4c005945b249160f",
+  "latest_observed_main_commit": "3af71dc396fd9f84647c43e95293e07a27d78d52",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.29",
-  "reviewed_release_commit": "6add01cc1cbc2b89cf557aab1154503aa07cd297",
+  "reviewed_release_tag": "v2.2.31",
+  "reviewed_release_commit": "a3401d78c7d774042ddcb43c4c005945b249160f",
   "observed_delta_review": {
-    "from_commit": "b7e8d034ec75e3f2a9dc5a902241732f72912219",
-    "to_commit": "63c1a4e66fe79b780f81bec3053efb6df8140130",
-    "status": "selective_formal_v2229_backport",
-    "scope": "Formal v2.2.25-v2.2.29 review: selectively adapt v2.2.27 video-task source failure/ownership/current-account behavior and v2.2.28 Anthropic cache-marker conversion, TTL policy and breakpoint handling. Preserve local mapped-model/min_output_tokens, billing and UI; exclude removed native crypto/payment features and their grant/logout changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261025.md"
+    "from_commit": "63c1a4e66fe79b780f81bec3053efb6df8140130",
+    "to_commit": "3af71dc396fd9f84647c43e95293e07a27d78d52",
+    "status": "selective_formal_v2230_usage_backport_v2231_payment_excluded",
+    "scope": "Formal v2.2.30 cumulative Anthropic usage presence, final zero values, cache-write TTL buckets and buffered final usage. Preserve stronger local disconnect draining, no-replay boundaries, domestic-provider aliases, pricing context and local leaderboard. Formal v2.2.31 native crypto sweep changes are excluded because the module was removed.",
+    "evidence": "maintenance/notes/upstream-sync-20261025-v2231.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "6add01cc1cbc2b89cf557aab1154503aa07cd297",
+    "source_head": "a3401d78c7d774042ddcb43c4c005945b249160f",
     "implemented_with_local_regression": [
+      "Formal v2.2.30 selected cumulative Anthropic usage presence/final-zero and 5m/1h TTL fidelity adaptations; retain domestic aliases, pricing context and stronger local disconnect/no-replay handling. Formal v2.2.31 is reviewed but its removed crypto sweep fixes are excluded. See 2026-10-25 v2231 note for validation and limits.",
       "Formal v2.2.25-v2.2.29 selected video-task lookup and Anthropic cache conversion/policy adaptations; preserve current source credentials, ownership, final mapped-model and configured output limits. See 2026-10-25 note for exact validation and exclusions.",
       "Formal v2.2.24 selected native Gemini adaptive/catalog/URL and unified TOTP input/stacked step-up adaptations; keep explicit protocol bridges and local admin roles. See dated note for validation and limits.",
       "Formal v2.2.20 selected media reconciliation, installation encryption-key persistence and all-user TOTP disable verification; upstream compatibility defects corrected locally. See dated note.",
@@ -87,7 +88,12 @@
     "a388738ca",
     "43abd82d3",
     "7286b33bd",
-    "9d4286738"
+    "9d4286738",
+    "bb39d2f0a",
+    "d1ae31bd5",
+    "40defffdd",
+    "9f728c580",
+    "42f68aa31"
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
@@ -318,5 +324,27 @@
     "preserved": "Local UI and removals; authoritative billing details and account/global usage overrides; mapped model thinking semantics and configured min_output_tokens.",
     "migration": "None. Existing migrations and module dependencies unchanged; project VERSION advanced separately to 2.1.36 for the authorized release.",
     "release_status": "v2.1.36 release preparation authorized; CI, artifact identity and deployment acceptance recorded separately"
+  },
+  "sync_20261025_v2231": {
+    "evidence": "maintenance/notes/upstream-sync-20261025-v2231.md",
+    "reviewed_release_tag": "v2.2.31",
+    "reviewed_release_commit": "a3401d78c7d774042ddcb43c4c005945b249160f",
+    "selected_releases": [
+      "v2.2.30"
+    ],
+    "excluded_releases": [
+      "v2.2.31"
+    ],
+    "already_satisfied_source_changes": {
+      "12ccb50f0": "Keep existing stronger anthropicCompatStream/native pump disconnect draining and no-replay handling; add final usage regressions without replacing streaming control flow."
+    },
+    "excluded_commits": [
+      "50f3bb2eb",
+      "07d16bf35"
+    ],
+    "excluded_scope": "Removed native crypto sweep balance-refresh and per-address minimum behavior, including its frontend changes.",
+    "preserved": "All 66 pre-existing leaderboard changes; UI and prior removals; domestic-provider aliases, mapped model and repricing context, output limits, cache policy, TTL billing and no-replay boundaries.",
+    "migration": "None; existing migrations and module dependencies unchanged.",
+    "release_status": "Local only. No commit, push or deployment. Project VERSION remains 2.1.36."
   }
 }

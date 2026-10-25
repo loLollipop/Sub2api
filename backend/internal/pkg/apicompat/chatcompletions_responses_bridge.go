@@ -1606,9 +1606,18 @@ func ChatUsageToResponsesUsage(usage *ChatUsage) *ResponsesUsage {
 		return nil
 	}
 	out := &ResponsesUsage{
-		InputTokens:  usage.PromptTokens,
-		OutputTokens: usage.CompletionTokens,
-		TotalTokens:  usage.TotalTokens,
+		InputTokens:   usage.PromptTokens,
+		OutputTokens:  usage.CompletionTokens,
+		TotalTokens:   usage.TotalTokens,
+		CacheCreation: usage.CacheCreation,
+	}
+	if usage.CacheCreation != nil {
+		if v := usage.CacheCreation.Ephemeral5mInputTokens; v != nil {
+			out.CacheCreation5mTokens = max(*v, 0)
+		}
+		if v := usage.CacheCreation.Ephemeral1hInputTokens; v != nil {
+			out.CacheCreation1hTokens = max(*v, 0)
+		}
 	}
 	if out.TotalTokens == 0 {
 		out.TotalTokens = out.InputTokens + out.OutputTokens

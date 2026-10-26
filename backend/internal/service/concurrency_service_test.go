@@ -44,6 +44,7 @@ type stubConcurrencyCacheForTest struct {
 	trackedAPIKeyRequestIDs  []string
 	releasedAPIKeyIDs        []int64
 	releasedAPIKeyRequestIDs []string
+	userAcquireLimits        []int
 }
 
 type ingressLeaseCacheForTest struct {
@@ -118,7 +119,8 @@ func (c *stubConcurrencyCacheForTest) DecrementAccountWaitCount(_ context.Contex
 func (c *stubConcurrencyCacheForTest) GetAccountWaitingCount(_ context.Context, _ int64) (int, error) {
 	return c.waitCount, c.waitCountErr
 }
-func (c *stubConcurrencyCacheForTest) AcquireUserSlot(_ context.Context, _ int64, _ int, _ string) (bool, error) {
+func (c *stubConcurrencyCacheForTest) AcquireUserSlot(_ context.Context, _ int64, limit int, _ string) (bool, error) {
+	c.userAcquireLimits = append(c.userAcquireLimits, limit)
 	return c.acquireResult, c.acquireErr
 }
 func (c *stubConcurrencyCacheForTest) ReleaseUserSlot(_ context.Context, _ int64, _ string) error {
@@ -262,16 +264,17 @@ func TestAcquireUserSlot_IndependentFromAccount(t *testing.T) {
 	require.NotNil(t, result.ReleaseFunc)
 }
 
-func TestAcquireUserSlot_MinimumConcurrency(t *testing.T) {
+func TestAcquireUserSlot_ConcurrencyLimits(t *testing.T) {
 	cache := &stubConcurrencyCacheForTest{acquireResult: true}
 	svc := NewConcurrencyService(cache)
 
-	for _, maxConcurrency := range []int{0, -1} {
+	for _, maxConcurrency := range []int{0, -1, 5} {
 		result, err := svc.AcquireUserSlot(context.Background(), 1, maxConcurrency)
 		require.NoError(t, err)
-		require.True(t, result.Acquired, "maxConcurrency=%d should retain one slot", maxConcurrency)
+		require.True(t, result.Acquired, "maxConcurrency=%d should acquire a tracked slot", maxConcurrency)
 		require.NotNil(t, result.ReleaseFunc)
 	}
+	require.Equal(t, []int{0, 1, 5}, cache.userAcquireLimits)
 }
 
 func TestTrackAPIKeySlot_ReleaseDecrements(t *testing.T) {

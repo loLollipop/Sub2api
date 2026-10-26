@@ -1113,9 +1113,14 @@ defineExpose({ requestedModelStats, refreshData })
   display: flex;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 0 8px;
   border-bottom: 1px solid var(--signal-line);
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+.usage-detail-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .usage-detail-tab {
@@ -1123,7 +1128,6 @@ defineExpose({ requestedModelStats, refreshData })
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
-  margin-bottom: -1px;
   padding: 12px 14px;
   border-bottom: 2px solid transparent;
   white-space: nowrap;

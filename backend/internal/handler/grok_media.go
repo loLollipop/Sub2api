@@ -496,7 +496,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			return
 		}
 		sessionHash = ensureOpenAIPoolModeSessionHash(sessionHash, account)
-		setOpsSelectedAccount(c, account.ID, account.Platform)
+		setOpsSelectedAccount(c, account.ID, account.Platform, account.Name)
 
 		admissionSessionHash := sessionHash
 		if boundLookupAccountID > 0 {
@@ -826,7 +826,12 @@ func (h *OpenAIGatewayHandler) restoreGrokVideoBillingRoute(
 	c.Set(string(middleware2.ContextKeyAPIKey), routed)
 	c.Set(string(middleware2.ContextKeySubscription), resolvedSubscription)
 	c.Request = c.Request.WithContext(ctx)
-	service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) { snap.GroupID = *routed.GroupID })
+	service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) {
+		snap.GroupID, snap.GroupName = *routed.GroupID, ""
+		if routed.Group != nil && routed.Group.ID == snap.GroupID {
+			snap.GroupName = strings.TrimSpace(routed.Group.Name)
+		}
+	})
 	return routed, resolvedSubscription, pending, nil
 }
 

@@ -51,6 +51,8 @@ go test -p 1 -tags=unit ./internal/service ./internal/repository ./internal/hand
 
 独立 critical_reviewer 对生产 diff、四个新增回归及必要调用上下文完成只读复核，未发现新增阻断问题。两个换组入口的名称分支未单独新增端点测试，已有路由回归和选号辅助函数名称回归通过。本机 CGO 关闭且无 gcc，本轮不声明 race、全量后端测试、真实 PostgreSQL/Redis 集成、Linux CI 或生产验收通过。浏览器使用本地 mock，不代替线上验收；预览进程已停止。
 
+首次发布 CI 的完整后端单测发现程序内上游检查点未随维护记录更新，`TestUpdateSourceCheckpointsMatchMaintenanceRecords` 失败。补齐 `update_source_baselines.go` 的二改正式版及 commit，并从版本常量派生 release tag；保留一致性检查，重新验证后继续发布。
+
 取消审计生成的三个未跟踪测试保留为 `unit && billing_audit_deferred`，不参与本轮 unit 测试，不纳入同步文件。其删除被自动审批策略拒绝，未尝试其他删除方式。
 
 同步完成时先保留本地，随后用户于 2026-10-26 授权提交 GitHub 并更新部署，按本项目 v2.1.39 准备发布。新增 CI 定向 race 回归覆盖用户零并发、Sonnet 目录和在途 DTO/名称；最终 CI、制品和生产验收证据独立记录。检查点表示已审来源及选择性适配，不表示上游所有变更已合并。

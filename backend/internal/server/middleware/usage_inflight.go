@@ -291,6 +291,11 @@ func fillUsageInflightDisplay(c *gin.Context, snap *service.UsageInflightSnapsho
 	if c == nil || snap == nil {
 		return
 	}
+	if c.Request != nil {
+		if group, ok := c.Request.Context().Value(ctxkey.Group).(*service.Group); ok && group != nil && group.ID == snap.GroupID {
+			snap.GroupName = strings.TrimSpace(group.Name)
+		}
+	}
 	if value, exists := c.Get(string(ContextKeyAPIKey)); exists {
 		if key, ok := value.(*service.APIKey); ok && key != nil {
 			if name := strings.TrimSpace(key.Name); name != "" {

@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.31",
-  "imported_commit": "a3401d78c7d774042ddcb43c4c005945b249160f",
-  "personal_baseline_commit": "6e2e5b5da8c4ac9d07c11dcb5e33f92141a5eeb0",
-  "latest_observed_version": "2.2.31",
-  "latest_observed_release_commit": "a3401d78c7d774042ddcb43c4c005945b249160f",
-  "latest_observed_main_commit": "3af71dc396fd9f84647c43e95293e07a27d78d52",
+  "imported_version": "2.2.32",
+  "imported_commit": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
+  "personal_baseline_commit": "a6bd5b3db9e9970d1015824c8e7d739efb9d1d6e",
+  "latest_observed_version": "2.2.32",
+  "latest_observed_release_commit": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
+  "latest_observed_main_commit": "41a4df17ffd7e6594d1ea7e7aa1aa724e8692c82",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.31",
-  "reviewed_release_commit": "a3401d78c7d774042ddcb43c4c005945b249160f",
+  "reviewed_release_tag": "v2.2.32",
+  "reviewed_release_commit": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
   "observed_delta_review": {
-    "from_commit": "63c1a4e66fe79b780f81bec3053efb6df8140130",
-    "to_commit": "3af71dc396fd9f84647c43e95293e07a27d78d52",
-    "status": "selective_formal_v2230_usage_backport_v2231_payment_excluded",
-    "scope": "Formal v2.2.30 cumulative Anthropic usage presence, final zero values, cache-write TTL buckets and buffered final usage. Preserve stronger local disconnect draining, no-replay boundaries, domestic-provider aliases, pricing context and local leaderboard. Formal v2.2.31 native crypto sweep changes are excluded because the module was removed.",
-    "evidence": "maintenance/notes/upstream-sync-20261025-v2231.md"
+    "from_commit": "3af71dc396fd9f84647c43e95293e07a27d78d52",
+    "to_commit": "41a4df17ffd7e6594d1ea7e7aa1aa724e8692c82",
+    "status": "selective_formal_v2232_pricing_concurrency_and_inflight_adapted_wallet_batch_deferred",
+    "scope": "Formal v2.2.32 Sonnet 5.5 cache-read base price, tracked unlimited user concurrency and inflight routing names adapted to local architecture. Preserve explicit local pricing overrides, independent account/API-key limits, user/admin visibility and local UI. Ordered live-wallet outbox batching deferred as a separate performance change.",
+    "evidence": "maintenance/notes/upstream-sync-20261026-v2232.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "a3401d78c7d774042ddcb43c4c005945b249160f",
+    "source_head": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
     "implemented_with_local_regression": [
+      "Formal v2.2.32 selected Sonnet 5.5 catalog/fallback cache-read price correction with explicit overrides retained, zero-as-unlimited tracked user slots and synchronized inflight account/group names. Local usage tabs and narrow-screen chart headers corrected separately. Live-wallet batching explicitly deferred; see 2026-10-26 v2232 note for verification and limits.",
       "Formal v2.2.30 selected cumulative Anthropic usage presence/final-zero and 5m/1h TTL fidelity adaptations; retain domestic aliases, pricing context and stronger local disconnect/no-replay handling. Formal v2.2.31 is reviewed but its removed crypto sweep fixes are excluded. See 2026-10-25 v2231 note for validation and limits.",
       "Formal v2.2.25-v2.2.29 selected video-task lookup and Anthropic cache conversion/policy adaptations; preserve current source credentials, ownership, final mapped-model and configured output limits. See 2026-10-25 note for exact validation and exclusions.",
       "Formal v2.2.24 selected native Gemini adaptive/catalog/URL and unified TOTP input/stacked step-up adaptations; keep explicit protocol bridges and local admin roles. See dated note for validation and limits.",
@@ -97,6 +98,13 @@
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2232-ordered-live-wallet-outbox-batching",
+      "upstream_commits": [
+        "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba"
+      ],
+      "reason": "Performance-only change across SQL claiming/acknowledgement, worker/recovery ordering and atomic Redis watermark batching. The generic balance-adjustment outbox remains in use, independently of removed native payments. Retain its current per-event implementation and defer batching until a dedicated ordering/replay/integration review. Pricing, user concurrency and inflight names from the same release are adapted independently."
+    },
     {
       "feature": "anthropic-disabled-thinking-omission",
       "upstream_commits": [
@@ -324,6 +332,21 @@
     "preserved": "Local UI and removals; authoritative billing details and account/global usage overrides; mapped model thinking semantics and configured min_output_tokens.",
     "migration": "None. Existing migrations and module dependencies unchanged; project VERSION advanced separately to 2.1.36 for the authorized release.",
     "release_status": "v2.1.36 release preparation authorized; CI, artifact identity and deployment acceptance recorded separately"
+  },
+  "sync_20261026_v2232": {
+    "evidence": "maintenance/notes/upstream-sync-20261026-v2232.md",
+    "reviewed_release_tag": "v2.2.32",
+    "reviewed_release_commit": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
+    "selected_commits": [
+      "0b7b6fc186841c5061f7e7013ba0dce12b213231",
+      "d9328f9da6092958c6b11c02a88f632295a0ae9b",
+      "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba"
+    ],
+    "selected_scope": "Sonnet 5.5 cache-read base price; tracked unlimited user concurrency; local lock-protected inflight routing names and user/admin DTO projection.",
+    "deferred_scope": "Ordered live-wallet outbox batching; source usage-panel redesign not copied over the local UI.",
+    "preserved": "Explicit pricing overrides, cache TTL fields, account/API-key limits, local shadcn shell, existing admin roles and all prior user-requested module removals.",
+    "migration": "None; existing migrations and module dependencies unchanged.",
+    "release_status": "v2.1.39 release and deployment authorized on 2026-10-26; final CI, immutable artifact/GHCR identity and production acceptance recorded separately."
   },
   "sync_20261025_v2231": {
     "evidence": "maintenance/notes/upstream-sync-20261025-v2231.md",

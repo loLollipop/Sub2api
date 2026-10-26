@@ -73,7 +73,10 @@ jobs:
         run: go test -race -p 1 -tags=unit ./internal/service ./internal/repository -run 'Test(UpstreamPreferences|UpstreamAffinity|FailedAffinity)' -count=1
       - name: Inflight snapshot and cache concurrency regression
         working-directory: backend
-        run: go test -race -p 1 -tags=unit ./internal/server/middleware ./internal/handler ./internal/handler/admin ./internal/service ./internal/repository -run 'Test(UsageInflight|TrackUsageInflight|PageUsageInflight|UserUsageInflight|AdminUsageInflight|KeyRouteBindingUsesSelectedPricing)' -count=1
+        run: go test -race -p 1 -tags=unit ./internal/server/middleware ./internal/handler ./internal/handler/dto ./internal/handler/admin ./internal/service ./internal/repository -run 'Test(UsageInflight|TrackUsageInflight|PageUsageInflight|UserUsageInflight|AdminUsageInflight|UsageLogFromInflight|SetOpsSelectedAccountInflight|KeyRouteBindingUsesSelectedPricing)' -count=1
+      - name: User concurrency limits and Sonnet catalog regression
+        working-directory: backend
+        run: go test -race -p 1 -tags=unit ./internal/service ./internal/repository -run 'Test(AcquireUserSlot|UserConcurrency|LiveLease|CalculateMaxWait|Sonnet55CatalogCacheReadPrice|NewModelPricingCatalogFallbackAndContext|PricingService_AntigravityClaude55TiersUseBaseModelPricing)' -count=1
       - name: Billing and media concurrency regression
         working-directory: backend
         run: go test -race -p 1 -tags=unit ./internal/handler ./internal/service ./internal/repository -run 'Test(ContentDownload|ForwardGrokMediaContent|GrokVideoDurable|GrokRefusal|MediaBilling|AsyncImage|ImageTask|OpenAIResponsesWebSocket.*(Balance|Subscription|Settlement)|SmartBilling|.*Refund.*Pending)' -count=1

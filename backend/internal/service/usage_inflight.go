@@ -21,7 +21,9 @@ type UsageInflightSnapshot struct {
 	UserID           int64     `json:"user_id"`
 	APIKeyID         int64     `json:"api_key_id"`
 	GroupID          int64     `json:"group_id,omitempty"`
+	GroupName        string    `json:"group_name,omitempty"`
 	AccountID        int64     `json:"account_id,omitempty"`
+	AccountName      string    `json:"account_name,omitempty"`
 	Email            string    `json:"email,omitempty"`
 	APIKeyName       string    `json:"api_key_name,omitempty"`
 	Model            string    `json:"model,omitempty"`

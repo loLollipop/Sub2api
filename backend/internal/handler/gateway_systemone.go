@@ -217,7 +217,7 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 		}
 		account = latest
 		accountRelease = wrapReleaseOnDone(c.Request.Context(), accountRelease)
-		setOpsSelectedAccount(c, account.ID, account.Platform)
+		setOpsSelectedAccount(c, account.ID, account.Platform, account.Name)
 		service.SetOpsUpstreamModel(c, model)
 		if !account.IsTypeSafe() || account.Type != service.AccountTypeAPIKey || account.GetMappedModel(model) != model {
 			if accountRelease != nil {

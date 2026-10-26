@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	middleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -166,7 +167,12 @@ func bindSelectedKeyRoute(c *gin.Context, gateway keyRouteBillingProvider, billi
 	c.Set(string(middleware.ContextKeyAPIKey), selected)
 	c.Set(string(middleware.ContextKeySubscription), subscription)
 	c.Request = c.Request.WithContext(ctx)
-	service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) { snap.GroupID = *selected.GroupID })
+	service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) {
+		snap.GroupID, snap.GroupName = *selected.GroupID, ""
+		if selected.Group != nil && selected.Group.ID == snap.GroupID {
+			snap.GroupName = strings.TrimSpace(selected.Group.Name)
+		}
+	})
 	return nil
 }
 

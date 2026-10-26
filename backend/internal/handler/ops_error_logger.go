@@ -494,6 +494,7 @@ func setOpsEndpointContext(c *gin.Context, upstreamModel string, requestType int
 	c.Set(opsRequestTypeKey, requestType)
 }
 
+// Optional values are platform followed by the selected account's display name.
 func setOpsSelectedAccount(c *gin.Context, accountID int64, platform ...string) {
 	if c == nil || accountID <= 0 {
 		return
@@ -509,7 +510,17 @@ func setOpsSelectedAccount(c *gin.Context, accountID int64, platform ...string) 
 			}
 		}
 		c.Request = c.Request.WithContext(ctx)
-		service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) { snap.AccountID = accountID })
+		name := ""
+		if len(platform) > 1 {
+			name = strings.TrimSpace(platform[1])
+		}
+		service.UpdateUsageInflight(ctx, func(snap *service.UsageInflightSnapshot) {
+			// ID-only selections clear the previous name after failover.
+			snap.AccountID, snap.AccountName = accountID, name
+			if group, ok := ctx.Value(ctxkey.Group).(*service.Group); ok && group != nil {
+				snap.GroupID, snap.GroupName = group.ID, strings.TrimSpace(group.Name)
+			}
+		})
 	}
 }
 

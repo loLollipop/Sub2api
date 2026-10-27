@@ -53,7 +53,13 @@ func TestGatewayStabilityAnthropicErrorIsTerminal(t *testing.T) {
 				resp := &http.Response{Header: http.Header{}, Body: io.NopCloser(strings.NewReader(line + "\n\n"))}
 				svc := &GatewayService{cfg: &config.Config{}}
 				result, err := svc.handleStreamingResponseAnthropicAPIKeyPassthrough(context.Background(), resp, c, &Account{ID: 1}, time.Now(), "claude-sonnet-4-5")
-				require.NoError(t, err)
+				var terminalErr *AnthropicPassthroughStreamError
+				require.ErrorAs(t, err, &terminalErr)
+				require.True(t, terminalErr.ResponseWritten)
+				require.Equal(t, test.want, terminalErr.StatusCode)
+				require.Equal(t, test.kind, terminalErr.ErrorType)
+				var replay *UpstreamFailoverError
+				require.NotErrorAs(t, err, &replay)
 				require.NotNil(t, result)
 				streamErr, ok := GetOpsStreamError(c)
 				require.True(t, ok)

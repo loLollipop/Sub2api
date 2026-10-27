@@ -18,6 +18,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -2536,7 +2537,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 							c.JSON(status, gin.H{
 								"error": gin.H{
 									"type":    errType,
-									"message": errMsg,
+									"message": clientprivacy.Text(errMsg),
 								},
 							})
 							return resultWithUsage(), fmt.Errorf("upstream response failed: passthrough rule matched message=%s", errMsg)

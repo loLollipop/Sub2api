@@ -49,6 +49,8 @@
 - 独立 critical reviewer 确认重复信封、Gemini 投影、Raw CC/Embeddings 等已知阻断关闭；其后发现的 OpenAI 透传流使用脱敏副本解析 usage 已另行动态复现并修复。现在三处 usage 解析均使用预先保留的原始字节及事件类型，managed/passthrough × safe/private diagnostic 四组用例均维持原 11/3 用量，不受重复键重编码为 999/999 的影响。独立 deep auditor 追踪字节所有权并确认该剩余阻断关闭。前后日志为 `privacy-usage-before.log`、`privacy-usage-after.log`；最终 v5 还显式执行了 `TestPluginRequestSentErrorDoesNotFailOver`。
 - 本机没有 gcc，未执行 Linux race；新增 CI race 步骤只是后续运行配置，不代表已通过。未执行真实数据库升级、生产验收、付费模型调用。只能提供无返回值 `Flush` 的 writer 无法报告底层 flush 错误；已验证可访问的 `FlushError/Unwrap` 路径。
 
+发布审查还发现 `/v1/responses` 两条流式路径命中自定义错误透传规则后会提前写回原始 message。发布补丁只在最终客户端写出时脱敏，保留规则匹配和内部错误证据；新增 managed/passthrough × safe/private 四组实际流回归，修复前两组 private 用例失败。完整 CI 同时检出了四个旧测试与本次脱敏掩码、Anthropic 失败返回类型不再一致，已更新预期并补强已发送终态、不重放和保留内部记录的断言；另修正一处 staticcheck tagged-switch 提示。后续完整 CI 与部署验收单独记录。
+
 三个此前延期的 `billing_audit_deferred` 未跟踪测试保留原样，不纳入本轮同步或普通 unit。Git 共享数据库和历史工作区未删除。
 
 同步开发阶段仅保留本地，未提交、未推送、未部署，基线发行版本为 v2.1.39。用户随后于 2026-10-28 授权提交 GitHub 并更新部署，本次发行版本设为 v2.1.40；最终发布和上线结果以对应 GitHub Actions 与部署验收记录为准。维护检查点表示已审来源和已记录的选择性适配，不代表全量合并上游。

@@ -727,7 +727,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 							c.JSON(status, gin.H{
 								"error": gin.H{
 									"type":    errType,
-									"message": errMsg,
+									"message": clientprivacy.Text(errMsg),
 								},
 							})
 							streamEarlyErr = fmt.Errorf("upstream response failed: passthrough rule matched message=%s", errMsg)

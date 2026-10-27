@@ -13,11 +13,69 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/model"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
+
+func TestClientErrorPrivacyStreamingPassthroughRuleKeepsInternalEvidence(t *testing.T) {
+	for _, passthrough := range []bool{false, true} {
+		for _, private := range []bool{false, true} {
+			t.Run(fmt.Sprintf("passthrough=%t/private=%t", passthrough, private), func(t *testing.T) {
+				message := "Your input exceeds the context window of this model."
+				if private {
+					message += " provider https://private-provider.example api_key=synthetic-private-value"
+				}
+				payload := fmt.Sprintf(`{"type":"response.failed","response":{"id":"resp_privacy_rule","error":{"type":"invalid_request_error","code":"context_length_exceeded","message":%q}}}`, message)
+				wire := "event: response.failed\ndata: " + payload + "\n\n"
+				rec := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(rec)
+				c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+				rule := newNonFailoverPassthroughRule(http.StatusBadRequest, "context_length_exceeded", http.StatusBadRequest, "")
+				rule.Platforms = []string{PlatformOpenAI}
+				rule.PassthroughBody = true
+				rule.CustomMessage = nil
+				rules := &ErrorPassthroughService{}
+				rules.setLocalCache([]*model.ErrorPassthroughRule{rule})
+				BindErrorPassthroughService(c, rules)
+				svc := &OpenAIGatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{
+					MaxLineSize: defaultMaxLineSize, LogUpstreamErrorBody: true,
+				}}}
+				resp := &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(wire))}
+				account := &Account{ID: 1, Platform: PlatformOpenAI, Name: "fixture"}
+				var err error
+				if passthrough {
+					_, err = svc.handleStreamingResponsePassthrough(c.Request.Context(), resp, c, account, time.Now(), "model", "model")
+				} else {
+					_, err = svc.handleStreamingResponse(c.Request.Context(), resp, c, account, time.Now(), "model", "model")
+				}
+				require.Error(t, err)
+				var failover *UpstreamFailoverError
+				require.False(t, errors.As(err, &failover))
+				require.True(t, IsResponseCommitted(c))
+				require.Equal(t, http.StatusBadRequest, rec.Code)
+				require.Equal(t, "upstream_error", gjson.Get(rec.Body.String(), "error.type").String())
+				clientMessage := gjson.Get(rec.Body.String(), "error.message").String()
+				require.Contains(t, clientMessage, "Your input exceeds the context window")
+				if private {
+					require.NotContains(t, clientMessage, "private-provider.example")
+					require.NotContains(t, clientMessage, "synthetic-private-value")
+				} else {
+					require.Equal(t, message, clientMessage)
+				}
+				require.Contains(t, err.Error(), message, "internal error retains the original diagnostic")
+				events, exists := c.Get(OpsUpstreamErrorsKey)
+				require.True(t, exists)
+				ops, ok := events.([]*OpsUpstreamErrorEvent)
+				require.True(t, ok)
+				require.NotEmpty(t, ops)
+				require.Equal(t, payload, ops[0].Detail, "ops retains the original evidence")
+			})
+		}
+	}
+}
 
 func TestClientErrorPrivacyPreservesSuccessfulDocuments(t *testing.T) {
 	for _, body := range []string{
@@ -45,9 +103,10 @@ func TestClientErrorPrivacyResponseContentTypeAtRealWrites(t *testing.T) {
 					c, _ := gin.CreateTestContext(rec)
 					c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
 					body := `{"type":"message","content":[{"type":"text","text":"https://public.example"}],"usage":{"input_tokens":5}}`
-					if protocol == "anthropic-stream" {
+					switch protocol {
+					case "anthropic-stream":
 						body = "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
-					} else if protocol == "deepseek-tools" {
+					case "deepseek-tools":
 						body = `{"results":[{"url":"https://public.example"}]}`
 					}
 					resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{

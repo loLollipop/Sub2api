@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -531,8 +532,8 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 		c.JSON(status, gin.H{
 			"type": "error",
 			"error": gin.H{
-				"type":    errType,
-				"message": errMsg,
+				"type":    clientprivacy.Text(errType),
+				"message": clientprivacy.Text(errMsg),
 			},
 		})
 
@@ -558,7 +559,7 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 
 	switch resp.StatusCode {
 	case 400:
-		c.Data(http.StatusBadRequest, "application/json", body)
+		c.Data(http.StatusBadRequest, "application/json", sanitizeClientUpstreamErrorBody(http.StatusBadRequest, body))
 		summary := upstreamMsg
 		if summary == "" {
 			summary = truncateForLog(body, 512)
@@ -577,8 +578,8 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 	c.JSON(statusCode, gin.H{
 		"type": "error",
 		"error": gin.H{
-			"type":    errType,
-			"message": errMsg,
+			"type":    clientprivacy.Text(errType),
+			"message": clientprivacy.Text(errMsg),
 		},
 	})
 
@@ -683,8 +684,8 @@ func (s *GatewayService) handleRetryExhaustedError(ctx context.Context, resp *ht
 		c.JSON(status, gin.H{
 			"type": "error",
 			"error": gin.H{
-				"type":    errType,
-				"message": errMsg,
+				"type":    clientprivacy.Text(errType),
+				"message": clientprivacy.Text(errMsg),
 			},
 		})
 
@@ -789,7 +790,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 	c.Header("X-Accel-Buffering", "no")
 
 	// 透传其他响应头
-	if v := resp.Header.Get("x-request-id"); v != "" {
+	if v := resp.Header.Get("x-request-id"); v != "" && responseheaders.SafeValue(v) {
 		c.Header("x-request-id", v)
 	}
 
@@ -905,7 +906,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 			"type": "error",
 			"error": map[string]string{
 				"type":    reason,
-				"message": message,
+				"message": clientprivacy.Text(message),
 			},
 		})
 		if err != nil {
@@ -1548,7 +1549,7 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 	body = reverseToolNamesIfPresent(c, body)
 
 	// 写入响应
-	c.Data(resp.StatusCode, contentType, body)
+	c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 
 	return &response.Usage, nil
 }

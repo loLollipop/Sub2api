@@ -1,8 +1,6 @@
 package service
 
-// 本文件由 gateway_service.go 纯移动拆分而来：Anthropic APIKey 直通
-// （passthrough）转发路径及其流式/非流式响应与 usage 解析。仅做代码搬迁，
-// 无任何行为变更。
+// Anthropic APIKey 直通（passthrough）转发路径及其流式/非流式响应与 usage 解析。
 
 import (
 	"bufio"
@@ -19,6 +17,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -34,6 +33,10 @@ type anthropicPassthroughForwardInput struct {
 	RequestStream bool
 	StartTime     time.Time
 }
+
+// Error diagnostics must not grow to the normal model-content response limit.
+// Only terminal error events use this cap; ordinary output keeps its own limit.
+const anthropicPassthroughMaxErrorEventBytes = 1 << 20
 
 func (s *GatewayService) forwardAnthropicAPIKeyPassthrough(
 	ctx context.Context,
@@ -428,7 +431,7 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 	if contentType == "" {
 		contentType = "text/event-stream"
 	}
-	c.Header("Content-Type", contentType)
+	c.Header("Content-Type", responseheaders.ContentType(contentType, "text/event-stream"))
 	if c.Writer.Header().Get("Cache-Control") == "" {
 		c.Header("Cache-Control", "no-cache")
 	}
@@ -436,7 +439,7 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 		c.Header("Connection", "keep-alive")
 	}
 	c.Header("X-Accel-Buffering", "no")
-	if v := resp.Header.Get("x-request-id"); v != "" {
+	if v := resp.Header.Get("x-request-id"); v != "" && responseheaders.SafeValue(v) {
 		c.Header("x-request-id", v)
 	}
 
@@ -451,8 +454,69 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 	clientDisconnected := false
 	sawTerminalEvent := false
 	pendingErrorHeader := ""
+	var pendingErrorLines strings.Builder
+	var pendingErrorData strings.Builder
+	pendingErrorDataLines := 0
+	pendingErrorBytes := 0
+	errorEventTooLarge := func() (*streamingResult, error) {
+		const message = "upstream error event exceeds size limit"
+		setOpsUpstreamError(c, http.StatusBadGateway, message, "")
+		MarkOpsStreamFailure(c, "upstream_error", "", message, http.StatusBadGateway)
+		return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, &AnthropicPassthroughStreamError{
+			StatusCode: http.StatusBadGateway,
+			ErrorType:  "upstream_error",
+			Message:    message,
+		}
+	}
+	finishStreamError := func(payload, wire string) (*streamingResult, error) {
+		if IsUpstreamFinancialError(0, []byte(payload)) {
+			setOpsUpstreamError(c, http.StatusBadGateway, extractUpstreamErrorMessage([]byte(payload)), "")
+			if !clientDisconnected {
+				WriteUpstreamFinancialError(c, 0, []byte(payload))
+			}
+			return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
+		}
+		if len(wire) > anthropicPassthroughMaxErrorEventBytes {
+			return errorEventTooLarge()
+		}
+		status, errorType, message := anthropicStreamErrorSemantics(payload)
+		setOpsUpstreamError(c, status, message, "")
+		MarkOpsStreamFailure(c, errorType, "", message, status)
+		streamErr := &AnthropicPassthroughStreamError{
+			StatusCode: status,
+			ErrorType:  errorType,
+			Message:    message,
+			RawData:    payload,
+		}
+		if !clientDisconnected {
+			// Classify the original payload above, then redact only the client
+			// copy. Keep the SSE envelope and never append a second error.
+			wire = clientprivacy.ErrorSSE(wire)
+			if !gjson.Valid(payload) {
+				wire = "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"upstream_error\",\"message\":\"Upstream returned an invalid error event\"}}\n\n"
+			}
+			n, err := io.WriteString(w, wire)
+			if err != nil || n != len(wire) {
+				clientDisconnected = true
+			} else {
+				if err := flushAnthropicPassthroughError(w); err != nil {
+					clientDisconnected = true
+				} else {
+					streamErr.ResponseWritten = true
+				}
+			}
+		}
+		return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, streamErr
+	}
+	finishPendingError := func() (*streamingResult, error) {
+		wire := pendingErrorHeader + "\n"
+		if pendingErrorLines.Len() > 0 {
+			wire += pendingErrorLines.String()
+		}
+		return finishStreamError(pendingErrorData.String(), wire+"\n")
+	}
 
-	scanner := bufio.NewScanner(newUpstreamErrorFrameReader(resp.Body, resolveUpstreamResponseReadLimit(s.cfg)))
+	scanner := bufio.NewScanner(newUpstreamErrorFrameReaderWithErrorLimit(resp.Body, resolveUpstreamResponseReadLimit(s.cfg), anthropicPassthroughMaxErrorEventBytes))
 	maxLineSize := defaultMaxLineSize
 	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.cfg.Gateway.MaxLineSize
@@ -537,10 +601,8 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 		select {
 		case ev, ok := <-events:
 			if !ok {
-				if pendingErrorHeader != "" && !clientDisconnected {
-					if _, err := io.WriteString(w, pendingErrorHeader+"\n\n"); err != nil {
-						clientDisconnected = true
-					}
+				if pendingErrorHeader != "" {
+					return finishPendingError()
 				}
 				if !clientDisconnected {
 					// 兜底补刷，确保最后一个未以空行结尾的事件也能及时送达客户端。
@@ -558,6 +620,14 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 				return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
 			}
 			if ev.err != nil {
+				if errors.Is(ev.err, errUpstreamErrorFrameTooLarge) {
+					return errorEventTooLarge()
+				}
+				if pendingErrorHeader != "" {
+					// An upstream error event remains a failure even if the socket
+					// then ends with unexpected EOF instead of a final blank line.
+					return finishPendingError()
+				}
 				if sawTerminalEvent {
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
 				}
@@ -575,12 +645,14 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 			}
 
 			line := ev.line
-			if strings.TrimSpace(line) == "event: error" {
-				pendingErrorHeader = line
-				continue
+			if eventName, ok := strings.CutPrefix(strings.TrimSpace(line), "event:"); ok && strings.TrimSpace(eventName) == "error" {
+				if pendingErrorHeader == "" {
+					pendingErrorHeader = line
+					pendingErrorBytes = len(line) + 2 // header newline plus final event boundary
+					continue
+				}
 			}
 			if data, ok := extractAnthropicSSEDataLine(line); ok {
-				trimmed := strings.TrimSpace(data)
 				if upstreamFinancialFailureEnvelope([]byte(data)) || pendingErrorHeader != "" && IsUpstreamFinancialError(0, []byte(data)) {
 					setOpsUpstreamError(c, http.StatusBadGateway, extractUpstreamErrorMessage([]byte(data)), "")
 					if !clientDisconnected {
@@ -588,6 +660,31 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 					}
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
 				}
+			}
+			if pendingErrorHeader != "" {
+				if line == "" {
+					return finishPendingError()
+				}
+				if len(line)+1 > anthropicPassthroughMaxErrorEventBytes-pendingErrorBytes {
+					return errorEventTooLarge()
+				}
+				pendingErrorBytes += len(line) + 1
+				_, _ = pendingErrorLines.WriteString(line)
+				_ = pendingErrorLines.WriteByte('\n')
+				if data, ok := extractAnthropicSSEDataLine(line); ok {
+					if pendingErrorDataLines > 0 {
+						_ = pendingErrorData.WriteByte('\n')
+					}
+					_, _ = pendingErrorData.WriteString(data)
+					pendingErrorDataLines++
+				}
+				continue
+			}
+			if payload, ok := anthropicStreamErrorPayload(line); ok {
+				return finishStreamError(payload, line+"\n\n")
+			}
+			if data, ok := extractAnthropicSSEDataLine(line); ok {
+				trimmed := strings.TrimSpace(data)
 				observer.ObserveAnthropic([]byte(trimmed))
 				if anthropicStreamEventIsTerminal("", trimmed) {
 					sawTerminalEvent = true
@@ -604,28 +701,8 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 				}
 			}
 
-			// An in-stream error is the semantic terminal event. Preserve its
-			// frame and usage observation, without appending a synthetic 502.
-			if payload, ok := anthropicStreamErrorPayload(line); ok {
-				if IsUpstreamFinancialError(0, []byte(payload)) {
-					setOpsUpstreamError(c, http.StatusBadGateway, extractUpstreamErrorMessage([]byte(payload)), "")
-					if !clientDisconnected {
-						WriteUpstreamFinancialError(c, 0, []byte(payload))
-					}
-					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
-				}
-				sawTerminalEvent = true
-				errStatus, errType, errMsg := anthropicStreamErrorSemantics(payload)
-				setOpsUpstreamError(c, errStatus, errMsg, "")
-				MarkOpsStreamError(c, errType, errMsg, errStatus)
-			}
-
 			if !clientDisconnected {
 				restored := string(reverseToolNamesIfPresent(c, []byte(line)))
-				if pendingErrorHeader != "" {
-					restored = pendingErrorHeader + "\n" + restored
-					pendingErrorHeader = ""
-				}
 				if _, err := io.WriteString(w, restored); err != nil {
 					clientDisconnected = true
 					logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] Client disconnected during streaming, continue draining upstream for usage: account=%d", account.ID)
@@ -707,7 +784,7 @@ func anthropicStreamErrorPayload(line string) (string, bool) {
 	if data, ok := extractAnthropicSSEDataLine(trimmed); ok {
 		trimmed = strings.TrimSpace(data)
 	}
-	if !gjson.Valid(trimmed) || !strings.HasPrefix(trimmed, "{") || gjson.Get(trimmed, "type").String() != "error" {
+	if !clientprivacy.IsErrorJSON([]byte(trimmed)) {
 		return "", false
 	}
 	return trimmed, true
@@ -995,7 +1072,7 @@ func (s *GatewayService) handleNonStreamingResponseAnthropicAPIKeyPassthrough(
 	if upstreamFinancialFailureEnvelope(body) {
 		defer GuardUpstreamFinancialError(c, 0, body)()
 	}
-	c.Data(resp.StatusCode, contentType, body)
+	c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 	return usage, nil
 }
 
@@ -1019,10 +1096,10 @@ func writeAnthropicPassthroughResponseHeaders(dst http.Header, src http.Header, 
 		responseheaders.WriteFilteredHeaders(dst, src, filter)
 		return
 	}
-	if v := strings.TrimSpace(src.Get("Content-Type")); v != "" {
+	if v := responseheaders.ContentType(strings.TrimSpace(src.Get("Content-Type")), ""); v != "" {
 		dst.Set("Content-Type", v)
 	}
-	if v := strings.TrimSpace(src.Get("x-request-id")); v != "" {
+	if v := strings.TrimSpace(src.Get("x-request-id")); v != "" && responseheaders.SafeValue(v) {
 		dst.Set("x-request-id", v)
 	}
 }

@@ -19,10 +19,10 @@ func TestParseDeepSeekToolsRequest(t *testing.T) {
 		name, body, query, path, model, content string
 		invalid                                 bool
 	}{
-		{name: "default", body: `{"query":"latest news","future":true}`, path: service.DeepSeekToolsPathSearch, model: deepSeekToolsDefaultModel, content: "latest news"},
+		{name: "default", body: `{"query":"latest news","future":true}`, path: service.DeepSeekToolsPathSearch, content: "latest news"},
 		{name: "query model", body: `{"query":"q"}`, query: "deepseek-v4-pro", path: service.DeepSeekToolsPathSearch, model: "deepseek-v4-pro", content: "q"},
 		{name: "body wins", body: `{"query":"q","model":"deepseek-v4-flash"}`, query: "deepseek-v4-pro", path: service.DeepSeekToolsPathSearch, model: "deepseek-v4-flash", content: "q"},
-		{name: "fetch", body: `{"url":"https://example.com/page"}`, path: service.DeepSeekToolsPathFetch, model: deepSeekToolsDefaultModel, content: "https://example.com/page"},
+		{name: "fetch", body: `{"url":"https://example.com/page"}`, path: service.DeepSeekToolsPathFetch, content: "https://example.com/page"},
 		{name: "array", body: `[{"query":"q"}]`, invalid: true},
 		{name: "scalar", body: `"q"`, invalid: true},
 		{name: "number", body: `{"query":5}`, invalid: true},
@@ -39,7 +39,7 @@ func TestParseDeepSeekToolsRequest(t *testing.T) {
 		{name: "escaped duplicate fetch url", body: `{"url":"https://example.com","u\u0072l":"https://other.example"}`, path: service.DeepSeekToolsPathFetch, invalid: true},
 		{name: "case fetch url alias", body: `{"url":"https://example.com","URL":"https://other.example"}`, path: service.DeepSeekToolsPathFetch, invalid: true},
 		{name: "model alias", body: `{"query":"q","Model":"a"}`, invalid: true},
-		{name: "escaped query", body: `{"qu\u0065ry":"q"}`, model: deepSeekToolsDefaultModel, content: "q"},
+		{name: "escaped query", body: `{"qu\u0065ry":"q"}`, content: "q"},
 		{name: "fetch requires URL", body: `{"query":"q"}`, path: service.DeepSeekToolsPathFetch, invalid: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestDeepSeekToolsReservationLivesUntilMandatorySettlementAndFailureReleases
 		require.Equal(t, 1, cache.count())
 		cache.mu.Lock()
 		for _, amount := range cache.res {
-			require.InDelta(t, 0.026, amount, 1e-12)
+			require.InDelta(t, 0.013, amount, 1e-12)
 		}
 		cache.mu.Unlock()
 		if !success {

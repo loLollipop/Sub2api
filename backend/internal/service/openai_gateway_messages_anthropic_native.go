@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -279,7 +280,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicBufferedResponse(
 		contentType = "application/json"
 	}
 	body = reverseToolNamesIfPresent(c, body)
-	c.Data(resp.StatusCode, contentType, body)
+	c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 
 	return &OpenAIForwardResult{
 		RequestID:        resp.Header.Get("x-request-id"),
@@ -323,7 +324,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 	if contentType == "" {
 		contentType = "text/event-stream"
 	}
-	c.Header("Content-Type", contentType)
+	c.Header("Content-Type", responseheaders.ContentType(contentType, "text/event-stream"))
 	if c.Writer.Header().Get("Cache-Control") == "" {
 		c.Header("Cache-Control", "no-cache")
 	}
@@ -331,7 +332,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 		c.Header("Connection", "keep-alive")
 	}
 	c.Header("X-Accel-Buffering", "no")
-	if v := resp.Header.Get("x-request-id"); v != "" {
+	if v := resp.Header.Get("x-request-id"); v != "" && responseheaders.SafeValue(v) {
 		c.Header("x-request-id", v)
 	}
 

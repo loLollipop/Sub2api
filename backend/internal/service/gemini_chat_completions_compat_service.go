@@ -224,7 +224,9 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 		requestID = resp.Header.Get("x-goog-request-id")
 	}
 	if requestID != "" {
-		c.Header("x-request-id", requestID)
+		if responseheaders.SafeValue(requestID) {
+			c.Header("x-request-id", requestID)
+		}
 	}
 
 	reasoningEffort := extractGeminiReasoningEffortFromBody(geminiReq)

@@ -4,19 +4,29 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 )
 
 type upstreamErrorFrameReader struct {
-	reader  *bufio.Reader
-	limit   int64
-	pending []byte
-	err     error
+	reader     *bufio.Reader
+	limit      int64
+	pending    []byte
+	err        error
+	errorLimit int64
 }
+
+var errUpstreamErrorFrameTooLarge = errors.New("upstream error event exceeds size limit")
 
 func newUpstreamErrorFrameReader(reader io.Reader, limit int64) io.Reader {
 	return &upstreamErrorFrameReader{reader: bufio.NewReader(reader), limit: limit}
+}
+
+// A separate optional limit bounds named SSE errors before the frame buffer
+// allocates the much larger limit used for regular model output.
+func newUpstreamErrorFrameReaderWithErrorLimit(reader io.Reader, limit, errorLimit int64) io.Reader {
+	return &upstreamErrorFrameReader{reader: bufio.NewReader(reader), limit: limit, errorLimit: errorLimit}
 }
 
 func (reader *upstreamErrorFrameReader) Read(target []byte) (int, error) {
@@ -42,8 +52,12 @@ func (reader *upstreamErrorFrameReader) readFrame() ([]byte, error) {
 	dataLines := 0
 	plainJSON := false
 	lineStart := 0
+	namedError := false
 	for {
 		line, err := reader.reader.ReadSlice('\n')
+		if namedError && reader.errorLimit > 0 && int64(frame.Len()+len(line)) > reader.errorLimit {
+			return nil, errUpstreamErrorFrameTooLarge
+		}
 		if int64(frame.Len()+len(line)) > reader.limit {
 			return nil, bufio.ErrTooLong
 		}
@@ -82,12 +96,21 @@ func (reader *upstreamErrorFrameReader) readFrame() ([]byte, error) {
 			continue
 		}
 		text := strings.TrimRight(string(line), "\r\n")
+		if eventName, ok := strings.CutPrefix(text, "event:"); ok && strings.TrimSpace(eventName) == "error" {
+			namedError = true
+			if reader.errorLimit > 0 && int64(frame.Len()) > reader.errorLimit {
+				return nil, errUpstreamErrorFrameTooLarge
+			}
+		}
 		if frame.Len() == len(line) && strings.HasPrefix(text, ":") {
 			return frame.Bytes(), err
 		}
 		if data, ok := extractOpenAISSEDataLine(text); ok {
 			dataLines++
-			if dataLines == 1 && (data == "[DONE]" || json.Valid([]byte(data))) {
+			// Keep a bounded named error together through its event boundary.
+			// Otherwise a valid first data line would reset namedError before a
+			// later oversized line, bypassing the smaller diagnostic limit.
+			if dataLines == 1 && (!namedError || reader.errorLimit == 0) && (data == "[DONE]" || json.Valid([]byte(data))) {
 				return frame.Bytes(), err
 			}
 		}

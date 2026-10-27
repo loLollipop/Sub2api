@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )
@@ -134,12 +135,12 @@ func writeOpenAIUpstreamClientError(c *gin.Context, statusCode int, body []byte,
 	if errType == "api_error" && status == http.StatusBadRequest {
 		errType = openAIUpstreamClientErrorFallbackType
 	}
-	errorPayload := gin.H{"type": errType, "message": message}
+	errorPayload := gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(message)}
 	if errCode != "" {
-		errorPayload["code"] = errCode
+		errorPayload["code"] = clientprivacy.Text(errCode)
 	}
 	if param := strings.TrimSpace(gjson.GetBytes(body, "error.param").String()); param != "" {
-		errorPayload["param"] = param
+		errorPayload["param"] = clientprivacy.Text(param)
 	}
 	c.JSON(status, gin.H{"error": errorPayload})
 }

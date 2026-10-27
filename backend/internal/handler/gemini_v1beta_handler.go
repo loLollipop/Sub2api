@@ -21,6 +21,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
@@ -112,7 +114,7 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		if err != nil || res == nil {
 			continue
 		}
-		if res.StatusCode != http.StatusOK {
+		if res.StatusCode != http.StatusOK || clientprivacy.IsErrorJSON(res.Body) {
 			if failure == nil {
 				failure = res
 			}
@@ -425,7 +427,7 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 			sawTransportError = true
 			continue
 		}
-		if res.StatusCode == http.StatusOK {
+		if res.StatusCode == http.StatusOK && !clientprivacy.IsErrorJSON(res.Body) {
 			if model != publicModel {
 				var metadata map[string]json.RawMessage
 				if json.Unmarshal(res.Body, &metadata) != nil || metadata == nil {
@@ -1029,7 +1031,7 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 			}
 
 			defer service.GuardUpstreamFinancialError(c, respCode, []byte(msg))()
-			googleError(c, respCode, msg)
+			googleError(c, respCode, clientprivacy.Text(msg))
 			return
 		}
 	}
@@ -1069,14 +1071,13 @@ func writeUpstreamResponse(c *gin.Context, res *service.UpstreamHTTPResult) {
 			continue
 		}
 		for _, v := range vv {
-			c.Writer.Header().Add(k, v)
+			if responseheaders.SafeValue(v) {
+				c.Writer.Header().Add(k, v)
+			}
 		}
 	}
-	contentType := res.Headers.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/json"
-	}
-	c.Data(res.StatusCode, contentType, res.Body)
+	contentType := responseheaders.ContentType(res.Headers.Get("Content-Type"), "application/json")
+	c.Data(res.StatusCode, contentType, service.SanitizeClientUpstreamErrorBody(res.StatusCode, res.Body))
 }
 
 // extractGeminiCLISessionHash 从 Gemini CLI 请求中提取会话标识。

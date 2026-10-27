@@ -2127,7 +2127,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
-	if v := resp.Header.Get("x-request-id"); v != "" {
+	if v := resp.Header.Get("x-request-id"); v != "" && responseheaders.SafeValue(v) {
 		c.Header("x-request-id", v)
 	}
 
@@ -2383,6 +2383,9 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 		line, _ = repairChatCompletionChunkSSELine(line)
 		if data, ok := extractOpenAISSEDataLine(line); ok {
 			dataBytes := []byte(data)
+			// Client presentation can re-encode duplicate JSON keys. Keep the
+			// upstream bytes separately for every accounting observation below.
+			upstreamUsageData := dataBytes
 			trimmedData := strings.TrimSpace(data)
 			frame := parseOpenAISSEDataFrame(dataBytes, pendingSSEEventType)
 			authoritativeTerminalDataPending = frame.validJSON && frame.payloadEventType != "" &&
@@ -2428,7 +2431,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			}
 			eventType := frame.eventType
 			if sawResponseFailed && (eventType == "response.failed" || eventType == "error") {
-				s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
+				s.parseSSEUsageBytesWithType(upstreamUsageData, rawEventType, usage)
 				continue
 			}
 			if codexFailureTerminal && sawBareError && !sawResponseFailed &&
@@ -2473,7 +2476,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				// response.failed 自带上游已消耗的 usage（input token 通常已扣）；必须先解析
 				// 再打 cyber 标记，否则 mark 记到的是解析前的 0，导致流式 cyber 按 0 token 计费
 				// 而漏记真实用量。对齐 WS V2 / Chat 流式路径（均先解析 usage 再 Mark）。
-				s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
+				s.parseSSEUsageBytesWithType(upstreamUsageData, rawEventType, usage)
 				if hit, code, msg := detectOpenAICyberPolicy(dataBytes); hit {
 					cyberHit = true
 					MarkOpsCyberPolicy(c, CyberPolicyMark{
@@ -2595,7 +2598,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				ms := int(time.Since(startTime).Milliseconds())
 				firstTokenMs = &ms
 			}
-			s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
+			s.parseSSEUsageBytesWithType(upstreamUsageData, rawEventType, usage)
 		}
 		terminalFrameComplete := line == "" && (sawDone || sawTerminalEvent) && terminalEventType != "error"
 		if line == "" {
@@ -2866,7 +2869,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	}
 	body = repairChatCompletionMessageRole(body)
 	if !writeOpenAICompactSSEBridge(c, resp.StatusCode, body) {
-		c.Data(resp.StatusCode, contentType, body)
+		c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 	}
 	return &openaiNonStreamingResultPassthrough{
 		OpenAIUsage:      usage,
@@ -2948,7 +2951,7 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 		}
 	}
 	if !writeOpenAICompactSSEBridge(c, resp.StatusCode, body) {
-		c.Data(resp.StatusCode, contentType, body)
+		c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 	}
 
 	return &openaiNonStreamingResultPassthrough{
@@ -2968,7 +2971,7 @@ func writeOpenAIPassthroughResponseHeaders(dst http.Header, src http.Header, fil
 		responseheaders.WriteFilteredHeaders(dst, src, filter)
 	} else {
 		// 兜底：尽量保留最基础的 content-type
-		if v := strings.TrimSpace(src.Get("Content-Type")); v != "" {
+		if v := responseheaders.ContentType(strings.TrimSpace(src.Get("Content-Type")), ""); v != "" {
 			dst.Set("Content-Type", v)
 		}
 	}
@@ -3003,7 +3006,9 @@ func writeOpenAIPassthroughResponseHeaders(dst http.Header, src http.Header, fil
 		key := http.CanonicalHeaderKey(rawKey)
 		dst.Del(key)
 		for _, v := range vals {
-			dst.Add(key, v)
+			if responseheaders.SafeValue(v) {
+				dst.Add(key, v)
+			}
 		}
 	}
 
@@ -3013,6 +3018,8 @@ func writeOpenAIPassthroughResponseHeaders(dst http.Header, src http.Header, fil
 	turnStateKey := http.CanonicalHeaderKey(openAICodexTurnStateHeader)
 	dst.Del(turnStateKey)
 	for _, v := range getCaseInsensitiveValues(src, openAICodexTurnStateHeader) {
+		// This is a protocol-defined opaque state token, not an error
+		// diagnostic. Rewriting it would corrupt the client's next turn.
 		dst.Add(turnStateKey, v)
 	}
 }

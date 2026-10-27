@@ -20,27 +20,47 @@ import (
 )
 
 func TestDeepSeekToolsFlowUsesRealModelSelectedGroupAndReleasesSlots(t *testing.T) {
-	for _, scenario := range []string{"success", "group rejects model", "capability excluded", "upstream failure", "duplicate query", "escaped query", "case query", "duplicate url", "escaped url", "case url"} {
+	for _, scenario := range []string{"success", "non DeepSeek primary", "alternate catalog model", "no replay across models", "empty result", "group rejects model", "capability excluded", "upstream failure", "duplicate query", "escaped query", "case query", "duplicate url", "escaped url", "case url"} {
 		t.Run(scenario, func(t *testing.T) {
 			gin.SetMode(gin.TestMode)
 			cfg := &config.Config{}
 			cfg.Default.RateMultiplier = 1
 			price := 9.0
 			primary := &service.Group{ID: 9, Platform: service.PlatformDeepseek, Status: service.StatusActive, Hydrated: true, RateMultiplier: 1}
+			if scenario == "non DeepSeek primary" {
+				primary.Platform = service.PlatformOpenAI
+			}
 			backup := &service.Group{ID: 17, Platform: service.PlatformDeepseek, Status: service.StatusActive, Hydrated: true, RateMultiplier: 2, SearchPricePer1k: &price}
 			for _, g := range []*service.Group{primary, backup} {
-				g.ModelAllowlist = service.GroupModelsListConfig{Enabled: true, Models: []string{deepSeekToolsDefaultModel}}
+				g.ModelAllowlist = service.GroupModelsListConfig{Enabled: true, Models: []string{"deepseek-v5-flash"}}
 				if scenario == "group rejects model" {
 					g.ModelAllowlist.Models = []string{"deepseek-v4-pro"}
 				}
 			}
 			account := service.Account{ID: 32, Platform: service.PlatformDeepseek, Type: service.AccountTypeAPIKey, Status: service.StatusActive, Schedulable: true, Concurrency: 2, GroupIDs: []int64{17},
-				Credentials: map[string]any{"api_key": "fixture-only", "base_url": "https://api.deepseek.com/v1", "model_mapping": map[string]any{deepSeekToolsDefaultModel: deepSeekToolsDefaultModel}}}
+				Credentials: map[string]any{"api_key": "fixture-only", "base_url": "https://api.deepseek.com/v1", "model_mapping": map[string]any{"deepseek-v5-flash": "deepseek-v5-flash"}}}
 			if scenario == "capability excluded" {
 				account.Credentials["openai_capabilities"] = []string{"chat_completions"}
 			}
 			accountRepo := openAIImagesFailoverAccountRepo{accounts: []service.Account{account}}
-			snapshot := service.NewSchedulerSnapshotService(&smartRouteHandlerSnapshot{fakeSchedulerCache{accounts: []*service.Account{&account}}}, nil, accountRepo, smartRouteHandlerGroups{groups: map[int64]*service.Group{9: primary, 17: backup}}, cfg)
+			accounts := []*service.Account{&account}
+			if scenario == "alternate catalog model" || scenario == "no replay across models" {
+				other := account
+				other.ID = 31
+				other.Credentials = map[string]any{"api_key": "fixture-only", "base_url": "https://api.deepseek.com/v1"}
+				if scenario == "alternate catalog model" {
+					other.GroupIDs = []int64{primary.ID}
+					other.Credentials["model_mapping"] = map[string]any{"deepseek-v4-flash": "deepseek-v4-flash"}
+					other.Credentials["openai_capabilities"] = []string{"chat_completions"}
+					primary.ModelAllowlist.Models = []string{"deepseek-v4-flash"}
+				} else {
+					other.Credentials["model_mapping"] = map[string]any{"deepseek-v6-pro": "deepseek-v6-pro"}
+					backup.ModelAllowlist.Models = append(backup.ModelAllowlist.Models, "deepseek-v6-pro")
+				}
+				accountRepo.accounts = append(accountRepo.accounts, other)
+				accounts = append(accounts, &other)
+			}
+			snapshot := service.NewSchedulerSnapshotService(&smartRouteHandlerSnapshot{fakeSchedulerCache{accounts: accounts}}, nil, accountRepo, smartRouteHandlerGroups{groups: map[int64]*service.Group{9: primary, 17: backup}}, cfg)
 			for _, id := range []int64{9, 17} {
 				_, err := snapshot.GetGroupByIDLite(context.Background(), id)
 				require.NoError(t, err)
@@ -83,6 +103,12 @@ func TestDeepSeekToolsFlowUsesRealModelSelectedGroupAndReleasesSlots(t *testing.
 					status = 400
 					payload = `{"error":{"message":"fixture-only"}}`
 				}
+				if scenario == "no replay across models" {
+					status, payload = 500, `{"error":{"message":"upstream failed"}}`
+				}
+				if scenario == "empty result" {
+					payload = `{"results":[]}`
+				}
 				return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(payload))}, nil
 			}}
 			gateway := service.NewOpenAIGatewayService(accountRepo, usage, smartRouteHandlerBilling{}, nil, nil, nil, nil, cfg, snapshot, concurrency, service.NewBillingService(cfg, nil), nil, billing, upstream, &service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil)
@@ -102,23 +128,31 @@ func TestDeepSeekToolsFlowUsesRealModelSelectedGroupAndReleasesSlots(t *testing.
 			if invalid {
 				require.Equal(t, http.StatusBadRequest, recorder.Code, recorder.Body.String())
 			}
-			if scenario == "success" {
+			if scenario == "success" || scenario == "alternate catalog model" || scenario == "non DeepSeek primary" {
 				require.Equal(t, 200, recorder.Code, recorder.Body.String())
 				require.Equal(t, 1, calls)
 				select {
 				case log := <-usage.logs:
 					require.Equal(t, backup.ID, *log.GroupID)
-					require.Equal(t, 2.0, log.RateMultiplier)
-					require.InDelta(t, 0.018, log.ActualCost, 1e-12)
+					require.Equal(t, 1.0, log.RateMultiplier)
+					require.InDelta(t, 0.009, log.ActualCost, 1e-12)
 					require.Equal(t, service.DeepSeekToolsLabelSearch, log.Model)
 					require.Equal(t, service.DeepSeekToolsPathSearch, *log.InboundEndpoint)
 					require.Equal(t, service.DeepSeekToolsPathSearch, *log.UpstreamEndpoint)
 				case <-time.After(3 * time.Second):
 					t.Fatal("successful search usage missing")
 				}
+			} else if scenario == "empty result" {
+				require.Equal(t, 200, recorder.Code, recorder.Body.String())
+				require.Equal(t, 1, calls)
+				select {
+				case <-usage.logs:
+					t.Fatal("empty results must not be billed")
+				default:
+				}
 			} else {
 				require.GreaterOrEqual(t, recorder.Code, 400, recorder.Body.String())
-				if scenario == "upstream failure" {
+				if scenario == "upstream failure" || scenario == "no replay across models" {
 					require.Equal(t, 1, calls)
 				} else {
 					require.Zero(t, calls)

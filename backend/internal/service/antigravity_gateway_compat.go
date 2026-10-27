@@ -12,6 +12,8 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 )
 
@@ -414,7 +416,9 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatResponse(
 
 	requestID := resp.Header.Get("x-request-id")
 	if requestID != "" {
-		c.Header("x-request-id", requestID)
+		if responseheaders.SafeValue(requestID) {
+			c.Header("x-request-id", requestID)
+		}
 	}
 	streamResult, err := s.consumeAntigravityCompatSuccess(c, call, resp)
 	if err != nil {
@@ -538,8 +542,8 @@ func (s *AntigravityGatewayService) writeAntigravityCompatError(
 	MarkResponseCommitted(c)
 	c.JSON(status, gin.H{
 		"error": gin.H{
-			"message": message,
-			"type":    errType,
+			"message": clientprivacy.Text(message),
+			"type":    clientprivacy.Text(errType),
 			"param":   nil,
 			"code":    nil,
 		},
@@ -572,7 +576,7 @@ func (s *AntigravityGatewayService) writeMappedAntigravityCompatError(
 	})
 	c.JSON(mapUpstreamStatusCode(upstreamStatus), gin.H{
 		"error": gin.H{
-			"message": getPassthroughOrDefault(message, "Upstream request failed"),
+			"message": clientprivacy.Text(getPassthroughOrDefault(message, "Upstream request failed")),
 			"type":    "upstream_error",
 			"param":   nil,
 			"code":    nil,

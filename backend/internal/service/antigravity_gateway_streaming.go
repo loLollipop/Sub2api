@@ -13,6 +13,8 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 )
 
@@ -128,7 +130,7 @@ func (s *AntigravityGatewayService) handleGeminiStreamingResponse(c *gin.Context
 	if contentType == "" {
 		contentType = "text/event-stream; charset=utf-8"
 	}
-	c.Header("Content-Type", contentType)
+	c.Header("Content-Type", responseheaders.ContentType(contentType, "text/event-stream"))
 
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
@@ -627,7 +629,7 @@ func (s *AntigravityGatewayService) writeClaudeError(c *gin.Context, status int,
 	MarkResponseCommitted(c)
 	c.JSON(status, gin.H{
 		"type":  "error",
-		"error": gin.H{"type": errType, "message": message},
+		"error": gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(message)},
 	})
 	return fmt.Errorf("%s", message)
 }
@@ -671,7 +673,7 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 	); matched {
 		c.JSON(ptStatus, gin.H{
 			"type":  "error",
-			"error": gin.H{"type": ptErrType, "message": ptErrMsg},
+			"error": gin.H{"type": clientprivacy.Text(ptErrType), "message": clientprivacy.Text(ptErrMsg)},
 		})
 		if upstreamMsg == "" {
 			return fmt.Errorf("upstream error: %d", upstreamStatus)
@@ -711,7 +713,7 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 
 	c.JSON(statusCode, gin.H{
 		"type":  "error",
-		"error": gin.H{"type": errType, "message": errMsg},
+		"error": gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(errMsg)},
 	})
 	if upstreamMsg == "" {
 		return fmt.Errorf("upstream error: %d", upstreamStatus)
@@ -738,7 +740,7 @@ func (s *AntigravityGatewayService) writeGoogleError(c *gin.Context, status int,
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,
-			"message": message,
+			"message": clientprivacy.Text(message),
 			"status":  statusStr,
 		},
 	})

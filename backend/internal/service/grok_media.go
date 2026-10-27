@@ -1905,7 +1905,7 @@ func writeGrokMediaResponse(c *gin.Context, resp *http.Response, body []byte, fi
 	if contentType == "" {
 		contentType = "application/json"
 	}
-	c.Data(resp.StatusCode, contentType, body)
+	c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 }
 
 func writeGrokMediaContentResponse(c *gin.Context, resp *http.Response) error {
@@ -1921,7 +1921,11 @@ func writeGrokMediaContentResponse(c *gin.Context, resp *http.Response) error {
 		"Content-Disposition",
 	} {
 		if value := strings.TrimSpace(resp.Header.Get(name)); value != "" {
-			c.Header(name, value)
+			if name == "Content-Type" {
+				c.Header(name, responseheaders.ContentType(value, "application/octet-stream"))
+			} else {
+				c.Header(name, value)
+			}
 		}
 	}
 	if strings.TrimSpace(c.Writer.Header().Get("Content-Length")) == "" && resp.ContentLength >= 0 {

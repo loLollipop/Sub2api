@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -1512,8 +1513,8 @@ func writeAnthropicError(c *gin.Context, statusCode int, errType, message string
 	c.JSON(statusCode, gin.H{
 		"type": "error",
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clientprivacy.Text(errType),
+			"message": clientprivacy.Text(message),
 		},
 	})
 }
@@ -1526,8 +1527,8 @@ func buildAnthropicStreamErrorSSE(errType, message string) string {
 	payload, err := json.Marshal(gin.H{
 		"type": "error",
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clientprivacy.Text(errType),
+			"message": clientprivacy.Text(message),
 		},
 	})
 	if err != nil {

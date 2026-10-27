@@ -29,6 +29,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -2181,7 +2182,7 @@ func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *se
 			}
 
 			defer service.GuardUpstreamFinancialError(c, respCode, []byte(msg))()
-			h.handleStreamingAwareError(c, respCode, "upstream_error", msg, streamStarted)
+			h.handleStreamingAwareError(c, respCode, "upstream_error", clientprivacy.Text(msg), streamStarted)
 			return
 		}
 	}
@@ -2315,6 +2316,11 @@ func gatewayForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForw
 	}
 	if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) == writerSizeBeforeForward {
 		return false
+	}
+
+	var streamErr *service.AnthropicPassthroughStreamError
+	if errors.As(err, &streamErr) {
+		return streamErr.ResponseWritten
 	}
 
 	contentType := strings.ToLower(strings.TrimSpace(c.Writer.Header().Get("Content-Type")))

@@ -14,6 +14,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 )
 
@@ -99,9 +100,9 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 		}
 
 		// 透传上游错误
-		c.Header("Content-Type", resp.Header.Get("Content-Type"))
+		c.Header("Content-Type", responseheaders.ContentType(resp.Header.Get("Content-Type"), "application/json"))
 		c.Status(resp.StatusCode)
-		_, _ = c.Writer.Write(respBody)
+		_, _ = c.Writer.Write(sanitizeClientUpstreamErrorBody(resp.StatusCode, respBody))
 
 		return &ForwardResult{
 			Model: originalModel,
@@ -137,9 +138,9 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 		upstreamResponseModelObserverFromContext(c).ObserveAnthropic(respBody)
 		usage = s.extractClaudeUsage(respBody)
 
-		c.Header("Content-Type", resp.Header.Get("Content-Type"))
+		c.Header("Content-Type", responseheaders.ContentType(resp.Header.Get("Content-Type"), "application/json"))
 		c.Status(http.StatusOK)
-		_, _ = c.Writer.Write(respBody)
+		_, _ = c.Writer.Write(sanitizeClientUpstreamErrorBody(resp.StatusCode, respBody))
 	}
 
 	// 构建计费结果

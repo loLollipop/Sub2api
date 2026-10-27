@@ -25,6 +25,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 
@@ -1149,7 +1150,9 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 		requestID = resp.Header.Get("x-goog-request-id")
 	}
 	if requestID != "" {
-		c.Header("x-request-id", requestID)
+		if responseheaders.SafeValue(requestID) {
+			c.Header("x-request-id", requestID)
+		}
 	}
 
 	var usage *ClaudeUsage
@@ -1575,7 +1578,9 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 		requestID = resp.Header.Get("x-goog-request-id")
 	}
 	if requestID != "" {
-		c.Header("x-request-id", requestID)
+		if responseheaders.SafeValue(requestID) {
+			c.Header("x-request-id", requestID)
+		}
 	}
 
 	isOAuth := account.Type == AccountTypeOAuth
@@ -1969,7 +1974,7 @@ func (s *GeminiMessagesCompatService) writeGeminiNativeUpstreamError(c *gin.Cont
 		contentType = "application/json"
 	}
 	MarkResponseCommitted(c)
-	c.Data(resp.StatusCode, contentType, respBody)
+	c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, respBody))
 	if upstreamMsg == "" {
 		return fmt.Errorf("gemini upstream error: %d", resp.StatusCode)
 	}
@@ -2047,7 +2052,7 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 	); matched {
 		c.JSON(status, gin.H{
 			"type":  "error",
-			"error": gin.H{"type": errType, "message": errMsg},
+			"error": gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(errMsg)},
 		})
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
@@ -2102,7 +2107,7 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 		}
 		c.JSON(statusCode, gin.H{
 			"type":  "error",
-			"error": gin.H{"type": errType, "message": errMsg},
+			"error": gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(errMsg)},
 		})
 		return fmt.Errorf("upstream error: %d", upstreamStatus)
 	}
@@ -2124,7 +2129,7 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 
 	c.JSON(statusCode, gin.H{
 		"type":  "error",
-		"error": gin.H{"type": errType, "message": errMsg},
+		"error": gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(errMsg)},
 	})
 	if upstreamMsg == "" {
 		return fmt.Errorf("upstream error: %d", upstreamStatus)
@@ -2621,7 +2626,7 @@ func (s *GeminiMessagesCompatService) writeClaudeError(c *gin.Context, status in
 	MarkResponseCommitted(c)
 	c.JSON(status, gin.H{
 		"type":  "error",
-		"error": gin.H{"type": errType, "message": message},
+		"error": gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(message)},
 	})
 	return fmt.Errorf("%s", message)
 }
@@ -2631,7 +2636,7 @@ func (s *GeminiMessagesCompatService) writeGoogleError(c *gin.Context, status in
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,
-			"message": message,
+			"message": clientprivacy.Text(message),
 			"status":  googleapi.HTTPStatusToGoogleStatus(status),
 		},
 	})
@@ -2953,7 +2958,7 @@ func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Co
 	if contentType == "" {
 		contentType = "application/json"
 	}
-	c.Data(resp.StatusCode, contentType, respBody)
+	c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, respBody))
 
 	if u := extractGeminiUsage(respBody); u != nil {
 		return u, nil
@@ -2985,7 +2990,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 	if contentType == "" {
 		contentType = "text/event-stream; charset=utf-8"
 	}
-	c.Header("Content-Type", contentType)
+	c.Header("Content-Type", responseheaders.ContentType(contentType, "text/event-stream"))
 
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
@@ -3059,9 +3064,13 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 					}
 
 					var writeErr error
-					if isOAuth {
+					clientBytes := sanitizeClientUpstreamErrorBody(http.StatusOK, []byte(rawToWrite))
+					if pendingErrorHeader != "" {
+						clientBytes = clientprivacy.JSON([]byte(rawToWrite))
+					}
+					if isOAuth || !bytes.Equal(clientBytes, []byte(rawToWrite)) {
 						// SSE format requires double newline (\n\n) to separate events
-						_, writeErr = fmt.Fprintf(c.Writer, "%sdata: %s\n\n", pendingErrorHeader, rawToWrite)
+						_, writeErr = fmt.Fprintf(c.Writer, "%sdata: %s\n\n", pendingErrorHeader, clientBytes)
 					} else {
 						// Pass-through for AI Studio responses.
 						_, writeErr = io.WriteString(c.Writer, pendingErrorHeader+line)

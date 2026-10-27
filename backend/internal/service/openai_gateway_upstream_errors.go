@@ -15,6 +15,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -650,7 +652,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		clientMsg := grokContentPolicyClientMessage(body)
 		setOpsUpstreamError(c, resp.StatusCode, clientMsg, truncateString(string(body), 2048))
 		return nil, s.writeGrokRefusalError(c, account, clientMsg, func(c *gin.Context, code int, typ, message string) {
-			c.JSON(code, gin.H{"error": gin.H{"type": typ, "message": message}})
+			c.JSON(code, gin.H{"error": gin.H{"type": clientprivacy.Text(typ), "message": clientprivacy.Text(message)}})
 		})
 	}
 	// cyber_policy 硬阻断：透传上游原始错误体给客户端（不重包成通用 502），不冷却账号。
@@ -669,7 +671,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		if contentType == "" {
 			contentType = "application/json"
 		}
-		c.Data(resp.StatusCode, contentType, body)
+		c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 		if cyberMsg == "" {
 			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
 		}
@@ -735,8 +737,8 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		MarkResponseCommitted(c)
 		c.JSON(status, gin.H{
 			"error": gin.H{
-				"type":    errType,
-				"message": errMsg,
+				"type":    clientprivacy.Text(errType),
+				"message": clientprivacy.Text(errMsg),
 			},
 		})
 		if upstreamMsg == "" {
@@ -889,7 +891,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		if clientMsg == "" {
 			clientMsg = "Request blocked by upstream cyber-security policy"
 		}
-		writeError(c, resp.StatusCode, "invalid_request_error", clientMsg)
+		writeError(c, resp.StatusCode, "invalid_request_error", clientprivacy.Text(clientMsg))
 		if cyberMsg == "" {
 			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
 		}
@@ -918,7 +920,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		http.StatusBadGateway, "api_error", "Upstream request failed",
 	); matched {
 		MarkResponseCommitted(c)
-		writeError(c, status, errType, errMsg)
+		writeError(c, status, clientprivacy.Text(errType), clientprivacy.Text(errMsg))
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
 		}
@@ -998,6 +1000,6 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		errType = "api_error"
 	}
 
-	writeError(c, resp.StatusCode, errType, upstreamMsg)
+	writeError(c, resp.StatusCode, clientprivacy.Text(errType), clientprivacy.Text(upstreamMsg))
 	return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
 }

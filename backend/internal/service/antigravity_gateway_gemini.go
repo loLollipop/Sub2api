@@ -13,6 +13,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 )
 
@@ -345,7 +346,9 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 
 		requestID := resp.Header.Get("x-request-id")
 		if requestID != "" {
-			c.Header("x-request-id", requestID)
+			if responseheaders.SafeValue(requestID) {
+				c.Header("x-request-id", requestID)
+			}
 		}
 
 		unwrapped, unwrapErr := s.unwrapV1InternalResponse(respBody)
@@ -412,14 +415,16 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		logger.LegacyPrintf("service.antigravity_gateway", "[antigravity-Forward] upstream error status=%d body=%s", resp.StatusCode, truncateForLog(unwrappedForOps, 500))
 		defer GuardUpstreamFinancialError(c, resp.StatusCode, unwrappedForOps)()
 		MarkResponseCommitted(c)
-		c.Data(resp.StatusCode, contentType, unwrappedForOps)
+		c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, unwrappedForOps))
 		return nil, fmt.Errorf("antigravity upstream error: %d", resp.StatusCode)
 	}
 
 handleSuccess:
 	requestID := resp.Header.Get("x-request-id")
 	if requestID != "" {
-		c.Header("x-request-id", requestID)
+		if responseheaders.SafeValue(requestID) {
+			c.Header("x-request-id", requestID)
+		}
 	}
 
 	var usage *ClaudeUsage

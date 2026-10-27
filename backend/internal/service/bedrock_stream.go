@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -41,7 +42,7 @@ func (s *GatewayService) handleBedrockStreamingResponse(
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
-	if v := resp.Header.Get("x-amzn-requestid"); v != "" {
+	if v := resp.Header.Get("x-amzn-requestid"); v != "" && responseheaders.SafeValue(v) {
 		c.Header("x-request-id", v)
 	}
 

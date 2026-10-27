@@ -19,15 +19,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// deepSeekToolsDefaultModel is the model used to pick an account for the
-// standalone Search/Fetch endpoints when the client omits a routing model.
-const deepSeekToolsDefaultModel = "deepseek-v4-flash"
-
 // DeepSeekToolsSearch / DeepSeekToolsFetch proxy DeepSeek's standalone tool
 // endpoints (/v1/tools/search, /v1/tools/fetch). They are raw JSON endpoints
 // with Bearer auth, so the client body is forwarded as-is and the upstream
-// successful response is passed through. Each 2xx is billed once using the
-// group search price per 1,000 calls.
+// successful response is passed through. HTTP 200 with actual results is billed
+// once at the fixed group search price per 1,000 calls.
 func (h *OpenAIGatewayHandler) DeepSeekToolsSearch(c *gin.Context) {
 	h.deepSeekTools(c, service.DeepSeekToolsPathSearch, service.DeepSeekToolsLabelSearch)
 }
@@ -46,10 +42,6 @@ func (h *OpenAIGatewayHandler) deepSeekTools(c *gin.Context, toolPath string, mo
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok || apiKey == nil || apiKey.Group == nil {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
-		return
-	}
-	if apiKey.Group.Platform != service.PlatformDeepseek {
-		h.errorResponse(c, http.StatusNotFound, "not_found_error", "DeepSeek tools are only available for DeepSeek groups")
 		return
 	}
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
@@ -87,6 +79,13 @@ func (h *OpenAIGatewayHandler) deepSeekTools(c *gin.Context, toolPath string, mo
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
+	toolsKey, routingModels, err := h.gatewayService.PrepareDeepSeekToolsRouting(c.Request.Context(), apiKey, routingModel)
+	if err != nil {
+		h.errorResponse(c, http.StatusBadGateway, "upstream_error", "No available DeepSeek search accounts")
+		return
+	}
+	modelIndex := 0
+	routingModel = routingModels[modelIndex]
 	setOpsRequestContext(c, modelLabel, false)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeSync))
 	setActualUpstreamEndpoint(c, toolPath)
@@ -125,11 +124,12 @@ func (h *OpenAIGatewayHandler) deepSeekTools(c *gin.Context, toolPath string, mo
 	switchCount := 0
 	routingStart := time.Now()
 	channelMapping := service.ChannelMappingResult{}
+	forwardAttempted := false
 
 	for {
 		selection, _, routedKey, err := h.gatewayService.SelectAccountWithSchedulerForCapabilityAlongKeyRoutes(
 			c.Request.Context(),
-			apiKey,
+			toolsKey,
 			"",
 			sessionHash,
 			routingModel,
@@ -141,6 +141,13 @@ func (h *OpenAIGatewayHandler) deepSeekTools(c *gin.Context, toolPath string, mo
 			false,
 			service.PlatformDeepseek,
 		)
+		// Try another published model only before any request reached upstream.
+		// Never replay a tool invocation under another model after a real failure.
+		if errors.Is(err, service.ErrNoAvailableAccounts) && !forwardAttempted && modelIndex+1 < len(routingModels) {
+			modelIndex++
+			routingModel = routingModels[modelIndex]
+			continue
+		}
 		if err == nil && routedKey != nil {
 			if routedKey.Group == nil || routedKey.Group.Platform != service.PlatformDeepseek {
 				releaseRejectedKeyRouteSelection(selection)
@@ -216,6 +223,7 @@ func (h *OpenAIGatewayHandler) deepSeekTools(c *gin.Context, toolPath string, mo
 			}
 			defer done()
 			defer func() { c.Request = previousRequest }()
+			forwardAttempted = true
 			result, forwardErr := h.gatewayService.ForwardDeepSeekTools(c.Request.Context(), c, account, toolPath, body)
 			if forwardErr == nil && result != nil {
 				h.recordDeepSeekToolsUsage(c, reqLog, apiKey, account, subscription, body, result, subject.UserID, asPricingAt)
@@ -357,9 +365,6 @@ func parseDeepSeekToolsRequest(body []byte, queryModel, toolPath string) (string
 			return "", nil, fmt.Errorf("model must be a non-empty string")
 		}
 		model = strings.TrimSpace(v.String())
-	}
-	if model == "" {
-		model = deepSeekToolsDefaultModel
 	}
 	auditBody, err := json.Marshal(map[string]any{
 		"messages": []map[string]string{{"role": "user", "content": value.String()}},

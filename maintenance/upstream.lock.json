@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.32",
-  "imported_commit": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
-  "personal_baseline_commit": "a6bd5b3db9e9970d1015824c8e7d739efb9d1d6e",
-  "latest_observed_version": "2.2.32",
-  "latest_observed_release_commit": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
-  "latest_observed_main_commit": "41a4df17ffd7e6594d1ea7e7aa1aa724e8692c82",
+  "imported_version": "2.2.39",
+  "imported_commit": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
+  "personal_baseline_commit": "c77f1e67cee2ee0a909a6767ccb192dc177b7844",
+  "latest_observed_version": "2.2.39",
+  "latest_observed_release_commit": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
+  "latest_observed_main_commit": "bad13f1767ee8791878c9986a0b9b8c7bc1fe6f7",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.32",
-  "reviewed_release_commit": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
+  "reviewed_release_tag": "v2.2.39",
+  "reviewed_release_commit": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
   "observed_delta_review": {
-    "from_commit": "3af71dc396fd9f84647c43e95293e07a27d78d52",
-    "to_commit": "41a4df17ffd7e6594d1ea7e7aa1aa724e8692c82",
-    "status": "selective_formal_v2232_pricing_concurrency_and_inflight_adapted_wallet_batch_deferred",
-    "scope": "Formal v2.2.32 Sonnet 5.5 cache-read base price, tracked unlimited user concurrency and inflight routing names adapted to local architecture. Preserve explicit local pricing overrides, independent account/API-key limits, user/admin visibility and local UI. Ordered live-wallet outbox batching deferred as a separate performance change.",
-    "evidence": "maintenance/notes/upstream-sync-20261026-v2232.md"
+    "from_commit": "084790c5523fe810f68c47184a75a324d95d7557",
+    "to_commit": "bad13f1767ee8791878c9986a0b9b8c7bc1fe6f7",
+    "status": "selective_formal_v2239_adapted_and_locally_verified_with_explicit_deferrals",
+    "scope": "Formal v2.2.33-v2.2.39 reviewed after equivalent-tree upstream history rewrite. Adapt Anthropic terminal failures and bounded error frames, client-facing upstream error privacy and safe response headers, DeepSeek direct connection-refused recovery, and standalone tools catalog routing and fixed successful-result fees. Defer hosted tools, forced requested-model presentation, correlated usage-error hydration and the source public docs page; exclude removed crypto exports.",
+    "evidence": "maintenance/notes/upstream-sync-20261027-v2239.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
+    "source_head": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
     "implemented_with_local_regression": [
+      "Formal v2.2.39 selective gateway privacy, terminal and standalone DeepSeek tool adaptations; see 2026-10-27 v2239 note for exact validation, exclusions and preserved local contracts.",
       "Formal v2.2.32 selected Sonnet 5.5 catalog/fallback cache-read price correction with explicit overrides retained, zero-as-unlimited tracked user slots and synchronized inflight account/group names. Local usage tabs and narrow-screen chart headers corrected separately. Live-wallet batching explicitly deferred; see 2026-10-26 v2232 note for verification and limits.",
       "Formal v2.2.30 selected cumulative Anthropic usage presence/final-zero and 5m/1h TTL fidelity adaptations; retain domestic aliases, pricing context and stronger local disconnect/no-replay handling. Formal v2.2.31 is reviewed but its removed crypto sweep fixes are excluded. See 2026-10-25 v2231 note for validation and limits.",
       "Formal v2.2.25-v2.2.29 selected video-task lookup and Anthropic cache conversion/policy adaptations; preserve current source credentials, ownership, final mapped-model and configured output limits. See 2026-10-25 note for exact validation and exclusions.",
@@ -98,6 +99,36 @@
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2233-forced-requested-model-presentation",
+      "upstream_commits": [
+        "3b3bdda698edc8d01190311cefc72e16ba9a70ea"
+      ],
+      "reason": "Opt-in cross-protocol output rewrite, auth cache and migration require a separate compatibility review. Source migration268 conflicts with immutable local ticket removal; source cache invalidation omits local mixed_provider_rate_multipliers. Existing mapped-model presentation remains."
+    },
+    {
+      "feature": "v2235-v2237-hosted-deepseek-search-fetch",
+      "upstream_commits": [
+        "237c4fc4a48161b0fbd83058b76cbd15bd3a98aa",
+        "bb9814a3e457316f57c389bf6abb6bd838c98f31",
+        "d2904c0b7cc774d5355477d03e60ccb766b77e8f"
+      ],
+      "reason": "Depends on separately deferred group search credentials and automatic execution. Multi-turn SSE identity/cancellation and legacy-emulation isolation need a complete feature adaptation. Standalone tool catalog routing and fixed successful-result fees adapted independently."
+    },
+    {
+      "feature": "v2238-correlated-usage-error-hydration",
+      "upstream_commits": [
+        "5a9e1f2442dcabe4601f1795905fb753b59c68a1"
+      ],
+      "reason": "Read-time Ops correlation can attach a neighboring error-only request to a successful usage when caller-controlled request IDs are reused. No durable delivery outcome; defer rather than label successful charges incorrectly."
+    },
+    {
+      "feature": "v2238-source-public-api-docs",
+      "upstream_commits": [
+        "b75d86ed8ba29b75bcc44a675d6b3ae0772c1d9c"
+      ],
+      "reason": "Source page advertises unavailable hosted tools and independent search credentials and assumes the removed observer role. Keep local UI and existing guides; any later docs must describe implemented capabilities only."
+    },
     {
       "feature": "v2232-ordered-live-wallet-outbox-batching",
       "upstream_commits": [
@@ -369,5 +400,27 @@
     "preserved": "All 66 pre-existing leaderboard changes; UI and prior removals; domestic-provider aliases, mapped model and repricing context, output limits, cache policy, TTL billing and no-replay boundaries.",
     "migration": "None; existing migrations and module dependencies unchanged.",
     "release_status": "Local only. No commit, push or deployment. Project VERSION remains 2.1.36."
+  },
+  "sync_20261027_v2239": {
+    "evidence": "maintenance/notes/upstream-sync-20261027-v2239.md",
+    "reviewed_release_tag": "v2.2.39",
+    "reviewed_release_commit": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
+    "history_rewrite": {
+      "old_checkpoint": "f72c80a72ef5a4fb45772ffd389e3fe58d1485ba",
+      "equivalent_new_checkpoint": "084790c5523fe810f68c47184a75a324d95d7557",
+      "identical_tree": "6733cb20779ba5fad483d2ff72adc255bd31e980"
+    },
+    "selected_commits": [
+      "b5d42a57452a61b13e316fda32e104da7142650c",
+      "2b87345eb3705f16ba380b1be040ed50051781fe",
+      "2849e8d92757f47cfc3d960b7e8531b0d545f4ef",
+      "edf3359ac26cde325c530f0e5ca5c8b6a646f5d8",
+      "75f65fd910a23af1d503d0b9feb048aa3b4f715a"
+    ],
+    "excluded_prerelease": "v2.2.34",
+    "excluded_scope": "Removed native crypto private-key export; upstream VERSION, observer and unrelated CI/UI changes.",
+    "preserved": "Local shadcn UI, removals, credential destinations, scoped routing, atomic financial/refusal handling, explicit zero prices, protocol created_at/sequence fields and no-replay guarantees.",
+    "migration": "None; existing migrations and module dependencies unchanged.",
+    "release_status": "Local only. No commit, push or deployment. Project VERSION remains 2.1.39."
   }
 }

@@ -928,7 +928,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesNonStreamingResponse(
 			contentType = upstreamType
 		}
 	}
-	c.Data(resp.StatusCode, contentType, body)
+	c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 
 	usage, _ := extractOpenAIUsageFromJSONBytes(body)
 	return usage, extractOpenAIImageCountFromJSONBytes(body), collectOpenAIResponseImageOutputSizesFromJSONBytes(body), nil
@@ -945,7 +945,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 		contentType = "text/event-stream"
 	}
 	c.Status(resp.StatusCode)
-	c.Header("Content-Type", contentType)
+	c.Header("Content-Type", responseheaders.ContentType(contentType, "text/event-stream"))
 
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {

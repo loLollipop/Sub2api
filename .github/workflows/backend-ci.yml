@@ -83,6 +83,11 @@ jobs:
       - name: Public probes, DeepSeek tools and moderation queue concurrency regression
         working-directory: backend
         run: go test -race -p 1 -tags=unit ./internal/handler ./internal/service ./internal/repository -run 'Test(ParseDeepSeekTools|DeepSeekTools|ForwardDeepSeekTools|ContentModeration|AccountTest.*(Target|Security)|PublicProbe|SMTP)' -count=1
+      - name: Client privacy, terminal errors and DeepSeek recovery regression
+        working-directory: backend
+        run: |
+          go test -race ./internal/util/clientprivacy ./internal/util/responseheaders -count=1
+          go test -race -p 1 -parallel 1 -tags=unit ./internal/service ./internal/handler -run 'Test(ClientErrorPrivacy|.*ClientErrorPrivacy|GatewayService_AnthropicAPIKeyPassthrough|AnthropicPassthrough|AnthropicStreamError|GatewayHandlerMessagesPassthroughStreamFailure|UpstreamErrorFrame|V2239|DeepSeekDirectTransportCooldown|PrepareDeepSeekToolsRouting|ParseDeepSeekTools|DeepSeekTools|ForwardDeepSeekTools|ToUserErrorRequest|UpdateSourceCheckpoints|WrapUpstreamError|OpenAINonStreamingContentType|PluginRequestSentErrorDoesNotFailOver)' -count=1
       - name: Chat role and simple-mode group regression
         working-directory: backend
         run: go test -race -p 1 -tags=unit ./internal/service ./internal/handler/admin -run 'Test(RepairChatCompletion|ForwardAsRawChatCompletionsDeepSeekRepairsRole|HandleResponsePassthroughRepairsChatRole|AccountHandlerSimpleMode|AccountHandlerAdvancedMode|CalculateOpenAIRecordUsageCostWebSearchPerCall)' -count=1

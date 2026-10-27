@@ -556,13 +556,9 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	}
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
-		c.Writer.Header().Set("Content-Type", ct)
-	} else {
-		c.Writer.Header().Set("Content-Type", "application/json")
-	}
+	c.Writer.Header().Set("Content-Type", responseheaders.ContentType(resp.Header.Get("Content-Type"), "application/json"))
 	c.Writer.WriteHeader(http.StatusOK)
-	_, _ = c.Writer.Write(respBody)
+	_, _ = c.Writer.Write(sanitizeClientUpstreamErrorBody(resp.StatusCode, respBody))
 
 	return &OpenAIForwardResult{
 		RequestID:                     requestID,

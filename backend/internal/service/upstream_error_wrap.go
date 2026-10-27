@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/tidwall/gjson"
 )
 
@@ -67,5 +68,10 @@ func WrapUpstreamErrorForClient(statusCode int, body []byte) (status int, errTyp
 		status = 529
 	}
 	errCode = extractUpstreamErrorCode(body)
+	// All classification above uses the original evidence. Only this client
+	// presentation is sanitized; the caller still owns the raw upstream body.
+	errType = clientprivacy.Text(errType)
+	errCode = clientprivacy.Text(errCode)
+	message = clientprivacy.Text(message)
 	return
 }

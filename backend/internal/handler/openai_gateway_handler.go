@@ -21,6 +21,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -3482,7 +3483,7 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 	if failoverErr.Reason == service.GrokImageQualityUnsupportedReason {
 		message := service.SanitizeUpstreamErrorMessage(service.ExtractUpstreamErrorMessage(failoverErr.ResponseBody))
 		service.SetOpsUpstreamError(c, failoverErr.StatusCode, message, "")
-		h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", message, streamStarted)
+		h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", clientprivacy.Text(message), streamStarted)
 		return
 	}
 	if failoverErr.IsOpenAIRequestBodyTooLarge() {
@@ -3575,7 +3576,7 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 			}
 
 			defer service.GuardUpstreamFinancialError(c, respCode, []byte(msg))()
-			h.handleStreamingAwareError(c, respCode, "upstream_error", msg, streamStarted)
+			h.handleStreamingAwareError(c, respCode, "upstream_error", clientprivacy.Text(msg), streamStarted)
 			return
 		}
 	}

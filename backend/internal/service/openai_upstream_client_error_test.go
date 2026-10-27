@@ -224,7 +224,7 @@ func TestHandleErrorResponse_WrapsUpstreamStatusAndMessage(t *testing.T) {
 		{"unprocessable", http.StatusUnprocessableEntity, `{"error":{"message":"Invalid schema for field messages"}}`,
 			http.StatusUnprocessableEntity, "api_error", "Invalid schema for field messages"},
 		{"unauthorized", http.StatusUnauthorized, `{"error":{"message":"Incorrect API key provided: sk-abc"}}`,
-			http.StatusUnauthorized, "api_error", "Incorrect API key provided: sk-abc"},
+			http.StatusUnauthorized, "api_error", "Incorrect API key provided: [redacted]"},
 		{"forbidden", http.StatusForbidden, `{"error":{"message":"Your account is deactivated"}}`,
 			http.StatusForbidden, "api_error", "Your account is deactivated"},
 		{"rate_limited", http.StatusTooManyRequests, `{"error":{"message":"Rate limit reached"}}`,
@@ -357,12 +357,12 @@ func TestWriteOpenAIUpstreamClientError_PayloadShape(t *testing.T) {
 			wantMessage: openAIUpstreamClientErrorFallbackMessage,
 		},
 		{
-			// 调用方传入的 message 已脱敏，必须原样使用，不得回落读取原始 body。
+			// 调用方传入的 message 优先；最终边界可以规范掩码，不得回落读取原始 body。
 			name:        "sanitized_message_wins_over_raw_body",
 			body:        `{"error":{"message":"failed for key=secret123"}}`,
 			upstreamMsg: "failed for key=***",
 			wantType:    "invalid_request_error",
-			wantMessage: "failed for key=***",
+			wantMessage: "failed for key=[redacted]",
 		},
 	}
 

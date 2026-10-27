@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 
 	"github.com/gin-gonic/gin"
 )
@@ -393,7 +394,7 @@ func (s *GatewayService) handleBedrockNonStreamingResponse(
 	usage := parseClaudeUsageFromResponseBody(body)
 
 	c.Header("Content-Type", "application/json")
-	if v := resp.Header.Get("x-amzn-requestid"); v != "" {
+	if v := resp.Header.Get("x-amzn-requestid"); v != "" && responseheaders.SafeValue(v) {
 		c.Header("x-request-id", v)
 	}
 	c.Data(resp.StatusCode, "application/json", body)

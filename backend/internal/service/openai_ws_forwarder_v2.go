@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -483,6 +484,9 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		if clientDisconnected {
 			return
 		}
+		// Keep the upstream event intact for usage, account side effects and
+		// terminal classification; only the bytes written to the client change.
+		message = sanitizeClientUpstreamErrorBody(http.StatusOK, message)
 		frame := make([]byte, 0, len(message)+8)
 		frame = append(frame, "data: "...)
 		frame = append(frame, message...)
@@ -736,7 +740,9 @@ readLoop:
 				emitStreamMessage(message, true)
 			}
 			if !reqStream {
-				clientErrType := errType
+				// Log summaries are truncated; the API must retain the complete
+				// protocol error type before applying client-side redaction.
+				clientErrType := strings.TrimSpace(errTypeRaw)
 				if clientErrType == "" || clientErrType == "upstream_error" {
 					if statusCode < http.StatusInternalServerError {
 						clientErrType = openAIDeterministicClientErrorType(statusCode)
@@ -746,8 +752,8 @@ readLoop:
 				}
 				c.JSON(statusCode, gin.H{
 					"error": gin.H{
-						"type":    clientErrType,
-						"message": errMsg,
+						"type":    clientprivacy.Text(clientErrType),
+						"message": clientprivacy.Text(errMsg),
 					},
 				})
 			}
@@ -829,7 +835,7 @@ readLoop:
 			responseID = strings.TrimSpace(gjson.GetBytes(finalResponse, "id").String())
 		}
 
-		c.Data(http.StatusOK, "application/json", finalResponse)
+		c.Data(http.StatusOK, "application/json", sanitizeClientUpstreamErrorBody(http.StatusOK, finalResponse))
 	} else {
 		flushStreamWriter(true)
 	}

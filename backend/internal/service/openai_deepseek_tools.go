@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/tidwall/gjson"
 )
 
 const (
@@ -21,8 +23,8 @@ const (
 )
 
 // DeepSeekToolsReservationEstimator prices standalone tools using the same
-// per-search price and base user/group multiplier as final usage settlement.
-// Channel model prices and token peak multipliers do not apply to these calls.
+// per-search price as final usage settlement. Standalone tool fees are fixed;
+// user/group multipliers and token peak multipliers do not apply to these calls.
 type DeepSeekToolsReservationEstimator struct{ Gateway *OpenAIGatewayService }
 
 func (e DeepSeekToolsReservationEstimator) EstimateInflightReservation(ctx context.Context, key *APIKey, _ InflightEstimateRequest) (float64, bool) {
@@ -30,19 +32,12 @@ func (e DeepSeekToolsReservationEstimator) EstimateInflightReservation(ctx conte
 	if s == nil || s.billingService == nil || key == nil || key.User == nil {
 		return 0, false
 	}
-	rate := 1.0
-	if s.cfg != nil {
-		rate = s.cfg.Default.RateMultiplier
-	}
-	if key.GroupID != nil && key.Group != nil {
-		rate = s.ResolveUserGroupRateMultiplier(ctx, key.User.ID, *key.GroupID, key.Group.RateMultiplier)
-	}
-	cost := s.billingService.CalculateSearchCost(1, groupSearchPricePer1kFromAPIKey(key), rate)
+	cost := s.billingService.CalculateSearchCost(1, groupSearchPricePer1kFromAPIKey(key), 1)
 	return cost.ActualCost, true
 }
 
-// ForwardDeepSeekTools preserves the JSON wire payload. Only a successful 2xx
-// produces a billable result; account credentials never follow redirects.
+// ForwardDeepSeekTools preserves successful JSON wire payloads. Only HTTP 200
+// with actual results is billable; account credentials never follow redirects.
 func (s *OpenAIGatewayService) ForwardDeepSeekTools(ctx context.Context, c *gin.Context, account *Account, path string, body []byte) (*OpenAIForwardResult, error) {
 	if s == nil || c == nil || account == nil {
 		return nil, errors.New("service, context, and account are required")
@@ -109,7 +104,10 @@ func (s *OpenAIGatewayService) ForwardDeepSeekTools(ctx context.Context, c *gin.
 	if contentType == "" {
 		contentType = "application/json"
 	}
-	c.Data(resp.StatusCode, contentType, responseBody)
+	c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, responseBody))
+	if resp.StatusCode != http.StatusOK || !deepSeekToolsHasBillableResult(path, responseBody) {
+		return nil, nil
+	}
 	return &OpenAIForwardResult{
 		RequestID:        fmt.Sprintf("%s:%s", label, uuid.NewString()),
 		UpstreamHeaders:  resp.Header,
@@ -119,4 +117,19 @@ func (s *OpenAIGatewayService) ForwardDeepSeekTools(ctx context.Context, c *gin.
 		SearchOnly:       true,
 		SearchCount:      1,
 	}, nil
+}
+
+func deepSeekToolsHasBillableResult(path string, body []byte) bool {
+	if !gjson.ValidBytes(body) || !gjson.ParseBytes(body).IsObject() {
+		return false
+	}
+	if clientUpstreamBodyIsError(body) {
+		return false
+	}
+	if path == DeepSeekToolsPathSearch {
+		results := gjson.GetBytes(body, "results")
+		return results.IsArray() && len(results.Array()) > 0
+	}
+	content := gjson.GetBytes(body, "content")
+	return path == DeepSeekToolsPathFetch && content.Type == gjson.String && strings.TrimSpace(content.String()) != ""
 }

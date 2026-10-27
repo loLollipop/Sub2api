@@ -13,6 +13,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 )
 
@@ -439,7 +440,9 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 
 	requestID := resp.Header.Get("x-request-id")
 	if requestID != "" {
-		c.Header("x-request-id", requestID)
+		if responseheaders.SafeValue(requestID) {
+			c.Header("x-request-id", requestID)
+		}
 	}
 
 	var usage *ClaudeUsage

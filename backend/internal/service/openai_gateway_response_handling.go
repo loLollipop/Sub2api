@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -147,7 +148,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	// Pass through other headers
 	if !stageFirstOutput && resp.Header.Get("x-request-id") != "" {
 		v := resp.Header.Get("x-request-id")
-		c.Header("x-request-id", v)
+		if responseheaders.SafeValue(v) {
+			c.Header("x-request-id", v)
+		}
 	}
 	applyAttemptResponseHeaders := func() {
 		if !stageFirstOutput || len(attemptResponseHeaders) == 0 || c.Writer.Written() {
@@ -724,7 +727,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 							c.JSON(status, gin.H{
 								"error": gin.H{
 									"type":    errType,
-									"message": errMsg,
+									"message": clientprivacy.Text(errMsg),
 								},
 							})
 							streamEarlyErr = fmt.Errorf("upstream response failed: passthrough rule matched message=%s", errMsg)
@@ -1920,8 +1923,8 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	}
 
 	if !writeOpenAICompactSSEBridge(c, resp.StatusCode, body) {
-		c.Writer.Header().Set("Content-Type", contentType)
-		c.Data(resp.StatusCode, contentType, body)
+		c.Writer.Header().Set("Content-Type", responseheaders.ContentType(contentType, "application/json"))
+		c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 	}
 
 	return &openaiNonStreamingResult{
@@ -2029,8 +2032,8 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 		}
 	}
 	if !writeOpenAICompactSSEBridge(c, resp.StatusCode, body) {
-		c.Writer.Header().Set("Content-Type", contentType)
-		c.Data(resp.StatusCode, contentType, body)
+		c.Writer.Header().Set("Content-Type", responseheaders.ContentType(contentType, "application/json"))
+		c.Data(resp.StatusCode, responseheaders.ContentType(contentType, "application/json"), sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 	}
 
 	return &openaiNonStreamingResult{
@@ -2134,19 +2137,33 @@ func buildOpenAIResponseFailedSSE(responseID, model string, createdAt int64, sou
 			`,"response":{"object":"response","created_at":` + strconv.FormatInt(createdAt, 10) +
 			`,"status":"failed","output":[],"error":{"code":"upstream_error","message":"Upstream response failed"}}}`)
 	}
-	return "event: response.failed\ndata: " + string(payload) + "\n\n"
+	return "event: response.failed\ndata: " + string(clientprivacy.JSON(payload)) + "\n\n"
 }
 
 func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string, clientOutputStarted bool) ([]byte, bool) {
 	eventType = strings.TrimSpace(eventType)
 	isFailedEvent := eventType == "response.failed"
-	if (!isFailedEvent && eventType != "error") || len(payload) == 0 || !gjson.ValidBytes(payload) {
+	if !isFailedEvent && eventType != "error" {
+		// Conflicting duplicate envelope fields must not hide private error
+		// diagnostics behind a successful event name. Classification still uses
+		// the original payload owned by the caller.
+		if clientUpstreamBodyIsError(payload) {
+			updated := clientprivacy.JSON(payload)
+			return updated, !bytes.Equal(updated, payload)
+		}
 		return payload, false
+	}
+	if !gjson.ValidBytes(payload) {
+		if isFailedEvent {
+			wire := buildOpenAIResponseFailedSSE("", "", 0, nil, "Upstream returned an invalid error event")
+			return []byte(strings.TrimSuffix(strings.TrimPrefix(wire, "event: response.failed\ndata: "), "\n\n")), true
+		}
+		return []byte(`{"type":"error","error":{"type":"upstream_error","message":"Upstream returned an invalid error event"}}`), true
 	}
 	if IsUpstreamFinancialError(0, payload) {
 		return redactUpstreamFinancialEvent(payload, eventType), true
 	}
-	updated := payload
+	updated := clientprivacy.JSON(payload)
 	if openAIStreamHasUpstream524(payload) {
 		for _, path := range []string{"response.error.message", "error.message", "message"} {
 			if gjson.GetBytes(updated, path).Exists() {
@@ -2177,12 +2194,12 @@ func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string
 		if errorPath != "" {
 			next, err := sjson.SetBytes(updated, errorPath+".type", "invalid_request_error")
 			if err != nil {
-				return payload, false
+				return updated, !bytes.Equal(updated, payload)
 			}
 			updated = next
 			next, err = sjson.SetBytes(updated, errorPath+".code", "context_length_exceeded")
 			if err != nil {
-				return payload, false
+				return updated, !bytes.Equal(updated, payload)
 			}
 			updated = next
 		}
@@ -2206,7 +2223,7 @@ func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string
 	} {
 		next, err := sjson.DeleteBytes(updated, path)
 		if err != nil {
-			return payload, false
+			return updated, !bytes.Equal(updated, payload)
 		}
 		updated = next
 	}
@@ -2232,7 +2249,7 @@ func (s *OpenAIGatewayService) writeOpenAINonStreamingProtocolError(resp *http.R
 	c.JSON(http.StatusBadGateway, gin.H{
 		"error": gin.H{
 			"type":    "upstream_error",
-			"message": message,
+			"message": clientprivacy.Text(message),
 		},
 	})
 	return fmt.Errorf("non-streaming openai protocol error: %s", message)

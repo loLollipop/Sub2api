@@ -474,7 +474,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		usageLog.LongContextBillingApplied = cost.LongContextBillingApplied
 	}
 	if result.SearchOnly {
-		usageLog.RateMultiplier = baseMultiplier
+		usageLog.RateMultiplier = 1
 	} else if isVideoUsage && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = videoMultiplier
 	} else if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
@@ -651,7 +651,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	modelLongContextExempt := len(modelLongContextExemptions) > 0 && modelLongContextExemptions[0]
 	billingModel := firstUsageBillingModel(billingModels)
 	if result != nil && result.SearchOnly {
-		return s.billingService.CalculateSearchCost(result.SearchCount, groupSearchPricePer1kFromAPIKey(apiKey), webSearchMultiplier), nil
+		return s.billingService.CalculateSearchCost(result.SearchCount, groupSearchPricePer1kFromAPIKey(apiKey), 1), nil
 	}
 	if result != nil && result.WebSearchCalls > 0 {
 		// Codex alpha/search 网页搜索按次计费：上游不返回 usage/token 字段，单价只取

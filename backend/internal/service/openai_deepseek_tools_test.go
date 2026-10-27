@@ -50,12 +50,16 @@ func TestForwardDeepSeekToolsPreservesWireAndSecuresTransport(t *testing.T) {
 	for _, path := range []string{DeepSeekToolsPathSearch, DeepSeekToolsPathFetch} {
 		t.Run(path, func(t *testing.T) {
 			a := deepSeekToolsTestAccount()
+			successBody := `{"results":[{"url":"https://example.com"}]}`
+			if path == DeepSeekToolsPathFetch {
+				successBody = `{"content":"Article https://example.com"}`
+			}
 			proxyID := int64(3)
 			a.ProxyID, a.Proxy = &proxyID, &Proxy{Protocol: "http", Host: "proxy.invalid", Port: 3128, Username: "u", Password: "p"}
 			body := []byte(" {\n\"query\":\"q\",\"url\":\"https://example.com\",\"future\":{\"keep\":true}} ")
 			upstream := &httpUpstreamRecorder{responses: []*http.Response{
-				{StatusCode: 200, Header: http.Header{"X-Request-Id": []string{"reused"}}, Body: io.NopCloser(strings.NewReader(`{"result":"first"}`))},
-				{StatusCode: 201, Header: http.Header{"X-Request-Id": []string{"reused"}}, Body: io.NopCloser(strings.NewReader(`{"result":"second"}`))},
+				{StatusCode: 200, Header: http.Header{"X-Request-Id": []string{"reused"}}, Body: io.NopCloser(strings.NewReader(successBody))},
+				{StatusCode: 200, Header: http.Header{"X-Request-Id": []string{"reused"}}, Body: io.NopCloser(strings.NewReader(successBody))},
 			}}
 			svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
 			var ids []string
@@ -82,7 +86,7 @@ func TestForwardDeepSeekToolsPreservesWireAndSecuresTransport(t *testing.T) {
 				require.Equal(t, body, upstream.lastBody)
 				require.True(t, HTTPUpstreamPublicHostsOnly(upstream.lastReq.Context()))
 				require.True(t, HTTPUpstreamRedirectsDisabled(upstream.lastReq.Context()))
-				require.Contains(t, w.Body.String(), `"result"`)
+				require.Equal(t, successBody, w.Body.String())
 			}
 			require.NotEqual(t, ids[0], ids[1], "a reused upstream ID must not merge independent paid calls")
 		})
@@ -136,13 +140,17 @@ func TestDeepSeekToolsReservationEqualsSettlement(t *testing.T) {
 	for _, tc := range []struct {
 		price      *float64
 		multiplier float64
+		userRate   *float64
 	}{
-		{nil, 1.7}, {floatPtr(5), 1.7}, {floatPtr(13), 1.7}, {floatPtr(0), 1.7}, {floatPtr(5), 0.15},
+		{nil, 1.7, nil}, {floatPtr(5), 1.7, nil}, {floatPtr(13), 1.7, nil}, {floatPtr(0), 1.7, nil},
+		{floatPtr(5), 0.1248, nil}, {floatPtr(5), 0, nil}, {floatPtr(5), 3, nil},
+		{floatPtr(5), 3, floatPtr(0)}, {floatPtr(5), 3, floatPtr(0.1248)}, {floatPtr(5), 0.1248, floatPtr(3)},
 	} {
 		for _, label := range []string{DeepSeekToolsLabelSearch, DeepSeekToolsLabelFetch} {
 			logs := &openAIRecordUsageLogRepoStub{inserted: true}
 			users := &openAIRecordUsageUserRepoStub{}
 			svc := newOpenAIRecordUsageServiceForTest(logs, users, &openAIRecordUsageSubRepoStub{}, nil)
+			svc.userGroupRateResolver = newUserGroupRateResolver(&userGroupRateResolverRepoStub{rate: tc.userRate}, nil, time.Minute, nil, "service.test")
 			gid := int64(8)
 			key := &APIKey{ID: 2, UserID: 1, User: &User{ID: 1}, GroupID: &gid, Group: &Group{ID: gid, Platform: PlatformDeepseek, RateMultiplier: tc.multiplier, SearchPricePer1k: tc.price}}
 			estimate, priced := (DeepSeekToolsReservationEstimator{Gateway: svc}).EstimateInflightReservation(context.Background(), key, InflightEstimateRequest{Model: label, SearchCalls: 1})
@@ -155,7 +163,8 @@ func TestDeepSeekToolsReservationEqualsSettlement(t *testing.T) {
 			require.InDelta(t, estimate, logs.lastLog.ActualCost, 1e-12)
 			require.Equal(t, result.RequestID, logs.lastLog.RequestID)
 			require.Equal(t, label, logs.lastLog.Model)
-			expected := svc.billingService.CalculateSearchCost(1, tc.price, tc.multiplier)
+			require.Equal(t, 1.0, logs.lastLog.RateMultiplier)
+			expected := svc.billingService.CalculateSearchCost(1, tc.price, 1)
 			require.InDelta(t, expected.ActualCost, logs.lastLog.ActualCost, 1e-12)
 		}
 	}
@@ -172,14 +181,54 @@ func TestDeepSeekToolsSearchOnlyDoesNotMaskOrdinaryTokenPricingFailure(t *testin
 	require.InDelta(t, 0.005, cost.ActualCost, 1e-12)
 }
 
-func TestDeepSeekToolsSearchOnlyUsesPerThousandPriceAndBaseMultiplier(t *testing.T) {
+func TestDeepSeekToolsSearchOnlyUsesFixedPerThousandPrice(t *testing.T) {
 	svc := &OpenAIGatewayService{billingService: NewBillingService(&config.Config{}, nil)}
 	apiKey := &APIKey{Group: &Group{Platform: PlatformDeepseek, SearchPricePer1k: floatPtr(5), WebSearchPricePerCall: floatPtr(99)}}
 	// Standalone tools must price before token lookup, even with nonzero tokens
-	// and an unpriced model. The base multiplier, including values below 1, wins.
+	// and an unpriced model. Fixed tool fees ignore model and base multipliers.
 	result := &OpenAIForwardResult{Model: "unpriced-model-for-tools-regression", SearchOnly: true, SearchCount: 2}
 	cost, err := svc.calculateOpenAIRecordUsageCost(context.Background(), result, apiKey, []string{result.Model}, 3, 1, 1, 0.15, UsageTokens{InputTokens: 100, OutputTokens: 10}, "", nil, time.Time{})
 	require.NoError(t, err)
 	require.InDelta(t, 0.01, cost.TotalCost, 1e-12)
-	require.InDelta(t, 0.0015, cost.ActualCost, 1e-12)
+	require.InDelta(t, 0.01, cost.ActualCost, 1e-12)
+}
+
+func TestForwardDeepSeekToolsOnlyBillsActualSuccessfulResults(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, body string
+		status           int
+		billable         bool
+	}{
+		{"search", DeepSeekToolsPathSearch, `{"results":[{"url":"https://example.com"}]}`, 200, true},
+		{"fetch", DeepSeekToolsPathFetch, `{"content":"article https://example.com"}`, 200, true},
+		{"empty search", DeepSeekToolsPathSearch, `{"results":[]}`, 200, false},
+		{"empty fetch", DeepSeekToolsPathFetch, `{"content":"  "}`, 200, false},
+		{"unknown shape", DeepSeekToolsPathSearch, `{"future":"value"}`, 200, false},
+		{"invalid JSON", DeepSeekToolsPathSearch, `{"results":[`, 200, false},
+		{"created search", DeepSeekToolsPathSearch, `{"results":["ok"]}`, 201, false},
+		{"no content", DeepSeekToolsPathFetch, ``, 204, false},
+		{"error with results", DeepSeekToolsPathSearch, `{"error":{"message":"failed"},"results":["stale"]}`, 200, false},
+		{"failed status", DeepSeekToolsPathFetch, `{"status":"failed","content":"stale"}`, 200, false},
+		{"nested failed search", DeepSeekToolsPathSearch, `{"response":{"status":"failed"},"results":["stale"]}`, 200, false},
+		{"nested failed fetch", DeepSeekToolsPathFetch, `{"response":{"status":"failed"},"content":"stale"}`, 200, false},
+		{"duplicate error", DeepSeekToolsPathSearch, `{"error":null,"error":{"message":"failed"},"results":[{}]}`, 200, false},
+		{"duplicate status", DeepSeekToolsPathSearch, `{"status":"completed","status":"failed","results":[{}]}`, 200, false},
+		{"duplicate response", DeepSeekToolsPathFetch, `{"response":{},"response":{"status":"failed"},"content":"stale"}`, 200, false},
+		{"duplicate nested status", DeepSeekToolsPathFetch, `{"response":{"status":"completed","status":"failed"},"content":"stale"}`, 200, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: tc.status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(tc.body))}}
+			svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, tc.path, nil)
+			result, err := svc.ForwardDeepSeekTools(t.Context(), c, deepSeekToolsTestAccount(), tc.path, nil)
+			require.NoError(t, err)
+			require.Equal(t, tc.billable, result != nil)
+			require.Equal(t, tc.status, w.Code)
+			if tc.billable {
+				require.Equal(t, tc.body, w.Body.String(), "successful source URLs and tool output remain unchanged")
+			}
+		})
+	}
 }

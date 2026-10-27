@@ -13,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/gemini"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 )
 
@@ -189,7 +190,7 @@ func (s *GeminiMessagesCompatService) ForwardGetModel(ctx context.Context, accou
 		if err != nil {
 			return nil, err
 		}
-		if res.StatusCode == http.StatusOK && model != upstreamModel {
+		if res.StatusCode == http.StatusOK && !clientprivacy.IsErrorJSON(res.Body) && model != upstreamModel {
 			var metadata map[string]json.RawMessage
 			if json.Unmarshal(res.Body, &metadata) != nil || metadata == nil {
 				return nil, errors.New("invalid model metadata")
@@ -334,11 +335,7 @@ func (s *GeminiMessagesCompatService) doGeminiModelsGET(req *http.Request, accou
 	if int64(len(body)) > bodyLimit {
 		return nil, fmt.Errorf("upstream model list response exceeds %d bytes", bodyLimit)
 	}
-	wwwAuthenticate := resp.Header.Get("Www-Authenticate")
 	filteredHeaders := responseheaders.FilterHeaders(resp.Header, s.responseHeaderFilter)
-	if wwwAuthenticate != "" {
-		filteredHeaders.Set("Www-Authenticate", wwwAuthenticate)
-	}
 	return &UpstreamHTTPResult{
 		StatusCode: resp.StatusCode,
 		Headers:    filteredHeaders,
@@ -379,7 +376,7 @@ func configuredGeminiModelIDs(account *Account) []string {
 // generation, preserving every unknown envelope/metadata field. A mapping is
 // not proof of existence when an upstream catalog is available.
 func projectGeminiAccountCatalog(ctx context.Context, res *UpstreamHTTPResult, account *Account) (*UpstreamHTTPResult, error) {
-	if res == nil || res.StatusCode != http.StatusOK {
+	if res == nil || res.StatusCode != http.StatusOK || clientprivacy.IsErrorJSON(res.Body) {
 		return res, nil
 	}
 	if len(account.GetModelMapping()) == 0 {

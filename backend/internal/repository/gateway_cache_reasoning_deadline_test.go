@@ -108,7 +108,7 @@ func stalledReasoningRedis(t *testing.T, phase string) (string, <-chan struct{})
 			workers.Add(1)
 			go func() {
 				defer workers.Done()
-				defer conn.Close()
+				defer func() { _ = conn.Close() }()
 				closed := make(chan struct{})
 				go func() {
 					select {
@@ -137,9 +137,10 @@ func stalledReasoningRedis(t *testing.T, phase string) (string, <-chan struct{})
 						return
 					}
 					response := "+OK\r\n"
-					if cmd == "hello" {
+					switch cmd {
+					case "hello":
 						response = "-ERR unknown command 'hello'\r\n"
-					} else if cmd == "ping" {
+					case "ping":
 						response = "+PONG\r\n"
 					}
 					if _, err := io.WriteString(conn, response); err != nil {

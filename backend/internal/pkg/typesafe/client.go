@@ -42,7 +42,13 @@ type Usage struct {
 }
 
 func NewSystemOneRequest(ctx context.Context, baseURL, key string, body []byte) (*http.Request, error) {
-	endpoint, err := url.JoinPath(strings.TrimRight(baseURL, "/"), SystemOnePath)
+	baseURL = strings.TrimRight(baseURL, "/")
+	path := SystemOnePath
+	if parsed, parseErr := url.Parse(baseURL); parseErr == nil && strings.HasSuffix(strings.TrimRight(parsed.Path, "/"), "/v1") {
+		// Accept versioned API bases without duplicating /v1, including relay prefixes.
+		path = "systemone"
+	}
+	endpoint, err := url.JoinPath(baseURL, path)
 	if err != nil {
 		return nil, errors.New("typesafe invalid endpoint")
 	}

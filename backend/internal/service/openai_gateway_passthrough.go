@@ -2114,6 +2114,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 	originalModel string,
 	mappedModel string,
 ) (*openaiStreamingResultPassthrough, error) {
+	reasoningRecorder := s.newDeepSeekNativeReasoningRecorder(c, account)
 	// Join the header-stage heartbeat before accessing Gin or the writer. Body
 	// heartbeats below share the event loop with all response writes.
 	StopOpenAICompactSSEKeepaliveCommitted(c)
@@ -2389,6 +2390,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			upstreamUsageData := dataBytes
 			trimmedData := strings.TrimSpace(data)
 			frame := parseOpenAISSEDataFrame(dataBytes, pendingSSEEventType)
+			reasoningRecorder.ObserveFrame(frame)
 			authoritativeTerminalDataPending = frame.validJSON && frame.payloadEventType != "" &&
 				frame.payloadEventType != "error" && openAIStreamEventTypeIsTerminal(frame.payloadEventType)
 			rawEventType := frame.eventType
@@ -2812,6 +2814,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	if err != nil {
 		return nil, err
 	}
+	s.cacheDeepSeekNativeReasoningBody(c, account, body)
 	if upstreamFinancialFailureEnvelope(body) {
 		defer GuardUpstreamFinancialError(c, 0, body)()
 	}

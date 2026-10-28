@@ -28,6 +28,25 @@ func InitRedis(cfg *config.Config) *redis.Client {
 	return client
 }
 
+// ReasoningRedisClient owns a separate pool for best-effort reasoning replay.
+// Its caller deadlines must bound socket I/O as well as pool acquisition,
+// without changing timeout behavior for billing, locks, or other caches.
+type ReasoningRedisClient struct {
+	*redis.Client
+}
+
+func ProvideReasoningRedis(cfg *config.Config) *ReasoningRedisClient {
+	opts := buildRedisOptions(cfg)
+	opts.ContextTimeoutEnabled = true
+	// Replay is optional; do not prewarm a second set of idle connections.
+	opts.MinIdleConns = 0
+	client := redis.NewClient(opts)
+	if cfg.Server.EnableServerTiming {
+		client.AddHook(serverTimingRedisHook{})
+	}
+	return &ReasoningRedisClient{Client: client}
+}
+
 // buildRedisOptions 构建 Redis 连接选项
 // 从配置文件读取连接池和超时参数，支持生产环境调优
 func buildRedisOptions(cfg *config.Config) *redis.Options {

@@ -70,4 +70,4 @@
 
 用户随后授权提交 GitHub 并更新部署。本次发行版本设为 v2.1.41；运维和采集等上述延期模块继续不做。最终发布、CI、制品身份与现网验收以独立发布记录为准。
 
-发布前额外核验发现，现有共享 go-redis 客户端未开启 ContextTimeoutEnabled，新增缓存 context 的两秒预算不能保证覆盖 socket I/O。此次为 reasoning 读写接入独立、由 Wire 和退出清理管理的 Redis 连接池，在创建前开启 deadline 支持并取消空闲预热；其他缓存、计费与锁继续使用原共享客户端。TLS 连接建立同样使用可取消的 DialContext。新增真实 go-redis 与本地卡住 socket 的握手、读、写、TLS 和连接池等待回归；最终结果及修复前复现见本地发布证据。没有异步遗留写入或修改共享 Options。
+发布前额外核验发现，现有共享 go-redis 客户端未开启 ContextTimeoutEnabled，新增缓存 context 的两秒预算不能保证覆盖 socket I/O。此次为 reasoning 读写接入独立、由 Wire 和退出清理管理的 Redis 连接池，在创建前开启 deadline 支持并取消空闲预热；其他缓存、计费与锁继续使用原共享客户端。TLS 故障测试确认调用方按预算返回；go-redis 内部后台 TLS 拨号仍可能继续到配置的 DialTimeout，未声称握手同步终止，也没有应用层异步写入。新增真实 go-redis 与本地卡住 socket 的握手、读、写、TLS 和连接池等待回归；最终结果及修复前复现见本地发布证据。没有异步遗留写入或修改共享 Options。

@@ -19,11 +19,18 @@ const openAIResponsesSessionWindowPrefix = "openai_responses_session_window:"
 const liveCallPrefix = "live:call:"
 
 type gatewayCache struct {
-	rdb *redis.Client
+	rdb          *redis.Client
+	reasoningRdb *redis.Client
 }
 
+// NewGatewayCache uses the supplied client for every cache operation. The caller
+// owns its lifecycle and timeout options; production uses ProvideGatewayCache.
 func NewGatewayCache(rdb *redis.Client) service.GatewayCache {
-	return &gatewayCache{rdb: rdb}
+	return &gatewayCache{rdb: rdb, reasoningRdb: rdb}
+}
+
+func ProvideGatewayCache(rdb *redis.Client, reasoning *ReasoningRedisClient) service.GatewayCache {
+	return &gatewayCache{rdb: rdb, reasoningRdb: reasoning.Client}
 }
 
 // buildSessionKey 构建 session key，包含 groupID 实现分组隔离
@@ -282,7 +289,7 @@ const reasoningContentDefaultTTL = 7 * 24 * time.Hour
 // SetReasoningContent 按 reasoning item id 缓存 reasoning 全文。
 // itemID 或 content 为空时直接返回 nil（无可缓存内容，属正常情况而非错误）。
 func (c *gatewayCache) SetReasoningContent(ctx context.Context, itemID string, content string, ttl time.Duration) error {
-	if c == nil || c.rdb == nil {
+	if c == nil || c.reasoningRdb == nil {
 		return errors.New("gateway cache unavailable")
 	}
 	itemID = strings.TrimSpace(itemID)
@@ -292,20 +299,20 @@ func (c *gatewayCache) SetReasoningContent(ctx context.Context, itemID string, c
 	if ttl <= 0 {
 		ttl = reasoningContentDefaultTTL
 	}
-	return c.rdb.Set(ctx, reasoningContentPrefix+itemID, content, ttl).Err()
+	return c.reasoningRdb.Set(ctx, reasoningContentPrefix+itemID, content, ttl).Err()
 }
 
 // GetReasoningContent 返回缓存的 reasoning 全文；未命中返回
 // service.ErrReasoningContentNotFound。
 func (c *gatewayCache) GetReasoningContent(ctx context.Context, itemID string) (string, error) {
-	if c == nil || c.rdb == nil {
+	if c == nil || c.reasoningRdb == nil {
 		return "", errors.New("gateway cache unavailable")
 	}
 	itemID = strings.TrimSpace(itemID)
 	if itemID == "" {
 		return "", service.ErrReasoningContentNotFound
 	}
-	val, err := c.rdb.Get(ctx, reasoningContentPrefix+itemID).Result()
+	val, err := c.reasoningRdb.Get(ctx, reasoningContentPrefix+itemID).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return "", service.ErrReasoningContentNotFound

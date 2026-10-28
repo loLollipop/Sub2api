@@ -58,6 +58,7 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 }
 
 func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, startTime time.Time, originalModel, mappedModel, reasoningEffort string) (*openaiStreamingResult, error) {
+	reasoningRecorder := s.newDeepSeekNativeReasoningRecorder(c, account)
 	// detachUpstreamContext deliberately keeps billing/failover work independent.
 	// A canceled client still gets a bounded window for the terminal usage frame.
 	watchCtx := ctx
@@ -600,6 +601,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		if data, ok := extractOpenAISSEDataLine(line); ok {
 			dataBytes := []byte(data)
 			frame := parseOpenAISSEDataFrame(dataBytes, pendingSSEEventType)
+			reasoningRecorder.ObserveFrame(frame)
 			eventType := frame.eventType
 			// Account for this frame before staging or any early error return.
 			// The frame that exceeds the stage limit can itself report usage.
@@ -1816,6 +1818,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	if err != nil {
 		return nil, err
 	}
+	s.cacheDeepSeekNativeReasoningBody(c, account, body)
 	if upstreamFinancialFailureEnvelope(body) {
 		defer GuardUpstreamFinancialError(c, 0, body)()
 	}

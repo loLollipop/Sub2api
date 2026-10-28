@@ -82,6 +82,7 @@ func providePluginHostInfo(buildInfo handler.BuildInfo) service.PluginHostInfo {
 func provideCleanup(
 	entClient *ent.Client,
 	rdb *redis.Client,
+	reasoningRedis *repository.ReasoningRedisClient,
 	opsMetricsCollector *service.OpsMetricsCollector,
 	opsAggregation *service.OpsAggregationService,
 	opsAlertEvaluator *service.OpsAlertEvaluatorService,
@@ -401,6 +402,12 @@ func provideCleanup(
 		}
 
 		infraSteps := []cleanupStep{
+			{"ReasoningRedis", func() error {
+				if reasoningRedis == nil {
+					return nil
+				}
+				return reasoningRedis.Close()
+			}},
 			{"Redis", func() error {
 				if rdb == nil {
 					return nil

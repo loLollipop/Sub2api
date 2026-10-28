@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.39",
-  "imported_commit": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
-  "personal_baseline_commit": "c77f1e67cee2ee0a909a6767ccb192dc177b7844",
-  "latest_observed_version": "2.2.39",
-  "latest_observed_release_commit": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
-  "latest_observed_main_commit": "bad13f1767ee8791878c9986a0b9b8c7bc1fe6f7",
+  "imported_version": "2.2.42",
+  "imported_commit": "9aedba768005a6f6c0aa52f78a1fb931fee61587",
+  "personal_baseline_commit": "b7e35af65cb1d4c7020030e7b363c7c4db8b72f1",
+  "latest_observed_version": "2.2.42",
+  "latest_observed_release_commit": "9aedba768005a6f6c0aa52f78a1fb931fee61587",
+  "latest_observed_main_commit": "0ff60acabffe06a8de2d82f8b0ba657f5551512f",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.39",
-  "reviewed_release_commit": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
+  "reviewed_release_tag": "v2.2.42",
+  "reviewed_release_commit": "9aedba768005a6f6c0aa52f78a1fb931fee61587",
   "observed_delta_review": {
-    "from_commit": "084790c5523fe810f68c47184a75a324d95d7557",
-    "to_commit": "bad13f1767ee8791878c9986a0b9b8c7bc1fe6f7",
-    "status": "selective_formal_v2239_adapted_and_locally_verified_with_explicit_deferrals",
-    "scope": "Formal v2.2.33-v2.2.39 reviewed after equivalent-tree upstream history rewrite. Adapt Anthropic terminal failures and bounded error frames, client-facing upstream error privacy and safe response headers, DeepSeek direct connection-refused recovery, and standalone tools catalog routing and fixed successful-result fees. Defer hosted tools, forced requested-model presentation, correlated usage-error hydration and the source public docs page; exclude removed crypto exports.",
-    "evidence": "maintenance/notes/upstream-sync-20261027-v2239.md"
+    "from_commit": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
+    "to_commit": "9aedba768005a6f6c0aa52f78a1fb931fee61587",
+    "status": "selective_formal_v2242_adapted_and_locally_verified_with_explicit_deferrals",
+    "scope": "Formal v2.2.40-v2.2.42 module and dependency applicability review; selected native DeepSeek Responses reasoning replay, TypeSafe versioned base joining, Google HTTP503 UNAVAILABLE and compatible x/net dependency updates. Defer new operations, diagnostics, capture, key queues, cache lifecycle and specialty providers; do not import source migrations or restore removed modules.",
+    "evidence": "maintenance/notes/upstream-sync-20261028-v2242.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "75f65fd910a23af1d503d0b9feb048aa3b4f715a",
+    "source_head": "9aedba768005a6f6c0aa52f78a1fb931fee61587",
     "implemented_with_local_regression": [
+      "Formal v2.2.42 selected native DeepSeek reasoning replay, TypeSafe versioned endpoint and Gemini503 protocol fixes plus compatible Go dependency updates. Module classification and explicit deferrals recorded in 2026-10-28 v2242 note; final local validation recorded separately.",
       "Formal v2.2.39 selective gateway privacy, terminal and standalone DeepSeek tool adaptations; see 2026-10-27 v2239 note for exact validation, exclusions and preserved local contracts.",
       "Formal v2.2.32 selected Sonnet 5.5 catalog/fallback cache-read price correction with explicit overrides retained, zero-as-unlimited tracked user slots and synchronized inflight account/group names. Local usage tabs and narrow-screen chart headers corrected separately. Live-wallet batching explicitly deferred; see 2026-10-26 v2232 note for verification and limits.",
       "Formal v2.2.30 selected cumulative Anthropic usage presence/final-zero and 5m/1h TTL fidelity adaptations; retain domestic aliases, pricing context and stronger local disconnect/no-replay handling. Formal v2.2.31 is reviewed but its removed crypto sweep fixes are excluded. See 2026-10-25 v2231 note for validation and limits.",
@@ -99,6 +100,31 @@
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2240-deepseek-api-key-tool-injection",
+      "upstream_commits": [
+        "0a4efb87737c8294f5d6c416dedbfd32d9b505b2"
+      ],
+      "reason": "Depends on deferred Hosted tools; standalone Search/Fetch have no automatic injection to disable. Source migration269 conflicts with local immutable history; do not add an inert key field."
+    },
+    {
+      "feature": "v2241-operations-diagnostics-provider-expansion",
+      "upstream_commits": [
+        "e9fd49756252698b2f7b8993e31f3fe3d65c6445",
+        "2d485132c",
+        "67f0ca5ad",
+        "9260a11998ceaa575b8b753a73e75450ca5ee40d",
+        "175212d5bd7827542938ded859228a87a0b32540"
+      ],
+      "reason": "New request/ID1 captures, timing/traffic, key admission queues, explicit-cache lifecycle/recovery, operations/timers/notifications, Mihomo/credential inspection, region routing, automation/OAuth and specialist providers require separate complete adaptation. Thirty source migrations and schema/history overlap prevent wholesale import; retain local UI, privacy, billing, leases and endpoint identity. Group cache UI uses real paid requests and is deferred too."
+    },
+    {
+      "feature": "v2242-request-capture-json-shape-hotfix",
+      "upstream_commits": [
+        "3e4cdaa8b300648744b2e4da74fbf4c63dc3f9e3"
+      ],
+      "reason": "Applicable only to deferred requestcapture module; local tree has no such persistence/search path. Any later module import must use the corrected array guard and PostgreSQL regressions from v2.2.42."
+    },
     {
       "feature": "v2233-forced-requested-model-presentation",
       "upstream_commits": [
@@ -422,5 +448,22 @@
     "preserved": "Local shadcn UI, removals, credential destinations, scoped routing, atomic financial/refusal handling, explicit zero prices, protocol created_at/sequence fields and no-replay guarantees.",
     "migration": "None; existing migrations and module dependencies unchanged.",
     "release_status": "Local only. No commit, push or deployment. Project VERSION remains 2.1.39."
+  },
+  "sync_20261028_v2242": {
+    "evidence": "maintenance/notes/upstream-sync-20261028-v2242.md",
+    "reviewed_release_tag": "v2.2.42",
+    "reviewed_release_commit": "9aedba768005a6f6c0aa52f78a1fb931fee61587",
+    "selected_commits": [
+      "f25abe49c4aea37cd8f38f704e81ea006b28d160",
+      "1afa00814b8ec17c2a7c6f5180b8d7a60a6fab8d",
+      "a019acb42b1f77c0d8ed98f465975f16b39fe045",
+      "d4ad8277ff24d303928cdaf539513071eb8ed773",
+      "1b3ee6b947c8266ff6052be6197e912aa12588fb"
+    ],
+    "selected_scope": "Bounded key/conversation/requested-model scoped native DeepSeek reasoning continuation; no Hosted recursion. TypeSafe versioned base URL and Gemini503 mapping; compatible Go dependency updates. Dedicated lifecycle-managed, context-aware reasoning Redis pool enforces bounded cache I/O without changing shared-client behavior.",
+    "excluded_scope": "Source VERSION and unrelated UI/CI, removed modules, alias syntax rejection and constructors used only by deferred admission. No new specialty provider or capture module.",
+    "preserved": "Local shadcn UI, native forwarding, billing/refusal and zero prices, client error privacy, scoped routing, disconnect draining and no-replay handling.",
+    "migration": "None; existing migrations unchanged. Compatible x/net dependency upgrade and checksums only.",
+    "release_status": "User authorized GitHub submission and deployment on 2026-10-28. Prepare v2.1.41; CI, immutable artifact/GHCR identity and production acceptance recorded separately. Operations and capture modules remain deferred by user request."
   }
 }

@@ -110,7 +110,7 @@ var ProviderSet = wire.NewSet(
 	NewUserPlatformQuotaServiceAdapter, // T14: adapter → service.UserPlatformQuotaRepository
 
 	// Cache implementations
-	NewGatewayCache,
+	ProvideGatewayCache,
 	NewBillingCache,
 	NewAPIKeyCache,
 	NewTempUnschedCache,
@@ -172,6 +172,7 @@ var ProviderSet = wire.NewSet(
 	ProvideEnt,
 	ProvideSQLDB,
 	ProvideRedis,
+	ProvideReasoningRedis,
 )
 
 // ProvideEnt 为依赖注入提供 Ent 客户端。

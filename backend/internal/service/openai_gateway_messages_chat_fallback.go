@@ -52,9 +52,10 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	clientStream := anthropicReq.Stream
 
 	// 2. Anthropic → Chat Completions (direct, no Responses intermediary)
-	chatReq, err := apicompat.AnthropicToChatCompletionsRequestWithMinOutputTokens(
+	chatReq, err := apicompat.AnthropicToChatCompletionsRequestWithOptions(
 		&anthropicReq,
 		configuredMinOutputTokens(s.cfg),
+		&apicompat.AnthropicToChatCompletionsOptions{PreserveThinking: account != nil && account.Platform == PlatformDeepseek},
 	)
 	if err != nil {
 		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())

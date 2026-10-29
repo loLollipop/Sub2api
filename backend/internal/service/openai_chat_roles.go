@@ -5,9 +5,11 @@ import (
 	"errors"
 	"net/url"
 	"strings"
+
+	"github.com/tidwall/gjson"
 )
 
-func requiresSystemChatRole(account *Account, targetURL string) bool {
+func requiresSystemChatRole(account *Account, targetURL, upstreamModel string) bool {
 	if account == nil || account.Type != AccountTypeAPIKey {
 		return false
 	}
@@ -24,6 +26,10 @@ func requiresSystemChatRole(account *Account, targetURL string) bool {
 	switch strings.ToLower(u.Hostname()) {
 	case "api.deepseek.com", "api.kimi.com", "api.moonshot.cn", "api.moonshot.ai", "open.bigmodel.cn", "api.z.ai":
 		return true
+	case "opencode.ai":
+		// OpenCode is configured through existing OpenAI-compatible accounts.
+		// Only the final selected DeepSeek model needs this role adaptation.
+		return strings.HasPrefix(strings.ToLower(codexProviderQualifiedModelID(upstreamModel)), "deepseek-")
 	}
 	return false
 }
@@ -34,7 +40,7 @@ func requiresSystemChatRole(account *Account, targetURL string) bool {
 // RawMessage preserves unknown fields and numeric precision. The input remains
 // untouched so a retry on another account sees the original developer roles.
 func normalizeStrictChatDeveloperRoles(account *Account, targetURL string, body []byte) ([]byte, error) {
-	if !requiresSystemChatRole(account, targetURL) {
+	if !requiresSystemChatRole(account, targetURL, gjson.GetBytes(body, "model").String()) {
 		return body, nil
 	}
 	var root map[string]json.RawMessage

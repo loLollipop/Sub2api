@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -309,6 +310,9 @@ func parseOpsOpenAITokenStatsFilter(c *gin.Context) (*service.OpsOpenAITokenStat
 		filter.PageSize = pageSize
 	}
 	filter.PageSize = response.ClampPageSize(c, filter.PageSize)
+	if filter.Page > math.MaxInt/filter.PageSize {
+		return nil, fmt.Errorf("invalid page")
+	}
 	return filter, nil
 }
 

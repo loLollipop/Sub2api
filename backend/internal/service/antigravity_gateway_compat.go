@@ -421,7 +421,7 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatResponse(
 		}
 	}
 	streamResult, err := s.consumeAntigravityCompatSuccess(c, call, resp)
-	if err != nil {
+	if err != nil && (streamResult == nil || !errors.Is(err, antigravity.ErrMalformedFunctionCall)) {
 		return nil, err
 	}
 	if streamResult.usage == nil {
@@ -441,7 +441,7 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatResponse(
 		FirstTokenMs:                  streamResult.firstTokenMs,
 		ReasoningEffort:               call.request.reasoningEffort,
 		ClientDisconnect:              streamResult.clientDisconnect,
-	}, nil
+	}, err
 }
 
 func (s *AntigravityGatewayService) consumeAntigravityCompatSuccess(
@@ -593,7 +593,7 @@ func (s *AntigravityGatewayService) handleChatCompletionsNonStreamingFromAntigra
 ) (*antigravityStreamResult, error) {
 	claudeResponse, result, err := s.collectClaudeStreamResponse(c, resp, startTime, originalModel)
 	if err != nil {
-		return nil, s.mapAntigravityCompatCollectionError(c, err)
+		return result, s.mapAntigravityCompatCollectionError(c, err)
 	}
 	var anthropicResponse apicompat.AnthropicResponse
 	if json.Unmarshal(claudeResponse, &anthropicResponse) != nil {
@@ -613,7 +613,7 @@ func (s *AntigravityGatewayService) handleResponsesNonStreamingFromAntigravity(
 ) (*antigravityStreamResult, error) {
 	claudeResponse, result, err := s.collectClaudeStreamResponse(c, resp, startTime, originalModel)
 	if err != nil {
-		return nil, s.mapAntigravityCompatCollectionError(c, err)
+		return result, s.mapAntigravityCompatCollectionError(c, err)
 	}
 	var anthropicResponse apicompat.AnthropicResponse
 	if json.Unmarshal(claudeResponse, &anthropicResponse) != nil {
@@ -643,6 +643,10 @@ func (s *AntigravityGatewayService) mapAntigravityCompatCollectionError(c *gin.C
 		return err
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	if errors.Is(err, antigravity.ErrMalformedFunctionCall) {
+		_ = s.writeAntigravityCompatError(c, http.StatusBadGateway, "malformed_function_call", antigravity.ErrMalformedFunctionCall.Error())
 		return err
 	}
 	if strings.Contains(err.Error(), "stream data interval timeout") {

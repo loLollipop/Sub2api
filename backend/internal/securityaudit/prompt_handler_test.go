@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -217,6 +219,24 @@ func TestPromptAdminRejectsInvalidEventIDsTimesAndPagination(t *testing.T) {
 		require.Equalf(t, http.StatusBadRequest, response.Code, "%s %s", tc.method, tc.path)
 		require.Contains(t, response.Body.String(), tc.reason)
 	}
+}
+
+func TestPromptAdminRejectsPaginationOffsetOverflow(t *testing.T) {
+	called := false
+	svc := &fakePromptAdminService{list: func(_ context.Context, _ EventFilter, page, pageSize int) (*EventPage, error) {
+		called = true
+		require.GreaterOrEqual(t, (page-1)*pageSize, 0)
+		require.LessOrEqual(t, (page-1)*pageSize, math.MaxInt-pageSize)
+		return &EventPage{}, nil
+	}}
+	router := promptAdminRouter(svc)
+	response := promptAdminRequest(t, router, http.MethodGet, "/admin/prompt-audit/events?page="+strconv.Itoa(math.MaxInt/20+1)+"&page_size=20", nil)
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.Contains(t, response.Body.String(), "prompt_audit_invalid_pagination")
+	require.False(t, called)
+	response = promptAdminRequest(t, router, http.MethodGet, "/admin/prompt-audit/events?page="+strconv.Itoa(math.MaxInt/20)+"&page_size=20", nil)
+	require.Equal(t, http.StatusOK, response.Code)
+	require.True(t, called)
 }
 
 func validHandlerUpdateRequest(token string) UpdateConfigRequest {

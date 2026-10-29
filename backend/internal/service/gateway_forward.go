@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 
@@ -271,6 +272,14 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	// 保证真实 Claude Code 客户端注入的指纹同样被清洗。
 	if next, ok := s.normalizeClientDatelineIfEnabled(ctx, account, body); ok {
 		if err := replaceBody(next); err != nil {
+			return nil, err
+		}
+	}
+
+	// Expand native Anthropic automatic caching after configured marker rewrites,
+	// before the shared breakpoint limit and TTL normalization.
+	if account.Platform == PlatformAnthropic {
+		if err := replaceBody(apicompat.ApplyAutomaticCacheControl(body)); err != nil {
 			return nil, err
 		}
 	}

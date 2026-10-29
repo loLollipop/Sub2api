@@ -53,6 +53,13 @@ func TestParsePaginationRejectsOffsetOverflow(t *testing.T) {
 	require.Equal(t, 50, size)
 }
 
+func TestParsePaginationRejectsOffsetPlusLimitOverflow(t *testing.T) {
+	_, c := newContextWithQuery("page=" + strconv.Itoa(math.MaxInt/50+1) + "&page_size=50")
+	page, size := ParsePagination(c)
+	require.Equal(t, 1, page)
+	require.Equal(t, 50, size)
+}
+
 func TestPaginationLimitsIgnoreInvalidContextTypes(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

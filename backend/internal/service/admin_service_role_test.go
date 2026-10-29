@@ -4,8 +4,10 @@ package service
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/stretchr/testify/require"
 )
@@ -106,8 +108,30 @@ func TestAdminService_UpdateUser_DemoteLastAdminRejected(t *testing.T) {
 	_, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{Role: RoleUser, TotpDemotionApproved: true})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "last admin")
+	require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
+	require.Equal(t, "LAST_ADMIN_DEMOTE_FORBIDDEN", infraerrors.Reason(err))
 	require.Nil(t, repo.lastUpdated, "最后一个管理员不应被降级持久化")
 	require.Equal(t, 1, repo.listCalls, "降级路径应触发管理员计数")
+}
+
+func TestAdminService_ProtectedAdminChangesAreBadRequests(t *testing.T) {
+	for _, operation := range []string{"disable", "delete"} {
+		t.Run(operation, func(t *testing.T) {
+			repo := &rpmUserRepoStub{userRepoStub: &userRepoStub{user: &User{ID: 42, Role: RoleAdmin}}}
+			svc := &adminServiceImpl{userRepo: repo}
+			var err error
+			reason := "ADMIN_DELETE_FORBIDDEN"
+			if operation == "disable" {
+				_, err = svc.UpdateUser(context.Background(), 42, &UpdateUserInput{Status: "disabled"})
+				reason = "ADMIN_DISABLE_FORBIDDEN"
+			} else {
+				err = svc.DeleteUser(context.Background(), 42)
+			}
+			require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
+			require.Equal(t, reason, infraerrors.Reason(err))
+			require.Nil(t, repo.lastUpdated)
+		})
+	}
 }
 
 func TestAdminService_UpdateUser_DemoteAdminAllowedWhenOthersExist(t *testing.T) {

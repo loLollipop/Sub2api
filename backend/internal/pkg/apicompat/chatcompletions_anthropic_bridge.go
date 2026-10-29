@@ -46,16 +46,30 @@ func AnthropicToChatCompletionsRequest(req *AnthropicRequest) (*ChatCompletionsR
 // AnthropicToChatCompletionsRequestWithMinOutputTokens converts an Anthropic
 // Messages request using the supplied max_completion_tokens floor.
 func AnthropicToChatCompletionsRequestWithMinOutputTokens(req *AnthropicRequest, minOutputTokens int) (*ChatCompletionsRequest, error) {
+	return AnthropicToChatCompletionsRequestWithOptions(req, minOutputTokens, nil)
+}
+
+// AnthropicToChatCompletionsOptions enables provider-specific reasoning replay.
+// The default only replays thinking on assistant tool-call messages.
+type AnthropicToChatCompletionsOptions struct {
+	PreserveThinking bool
+}
+
+// AnthropicToChatCompletionsRequestWithOptions preserves the configured token
+// floor while allowing providers such as DeepSeek to replay plain assistant thinking.
+func AnthropicToChatCompletionsRequestWithOptions(req *AnthropicRequest, minOutputTokens int, opts *AnthropicToChatCompletionsOptions) (*ChatCompletionsRequest, error) {
 	if req == nil {
 		return nil, fmt.Errorf("anthropic request is nil")
 	}
 
-	messages, err := anthropicToChatMessages(req.System, req.Messages)
+	messages, err := anthropicToChatMessagesWithOptions(req.System, req.Messages, opts != nil && opts.PreserveThinking)
 	if err != nil {
 		return nil, err
 	}
 
 	out := &ChatCompletionsRequest{
+		// Anthropic's top-level cache_control is not part of Chat Completions.
+		// Native Anthropic forwarding preserves it separately.
 		Model:    req.Model,
 		Messages: messages,
 		Stream:   req.Stream,
@@ -119,10 +133,10 @@ func AnthropicToChatCompletionsRequestWithMinOutputTokens(req *AnthropicRequest,
 	return out, nil
 }
 
-// anthropicToChatMessages converts the Anthropic system field + message list
+// anthropicToChatMessagesWithOptions converts the Anthropic system field + message list
 // into Chat Completions messages. It mirrors convertAnthropicToResponsesInput +
 // responsesInputToChatMessages but produces ChatMessage directly.
-func anthropicToChatMessages(system json.RawMessage, msgs []AnthropicMessage) ([]ChatMessage, error) {
+func anthropicToChatMessagesWithOptions(system json.RawMessage, msgs []AnthropicMessage, preserveThinking bool) ([]ChatMessage, error) {
 	var messages []ChatMessage
 
 	// System prompt → system message. parseAnthropicSystemContentParts handles
@@ -142,7 +156,7 @@ func anthropicToChatMessages(system json.RawMessage, msgs []AnthropicMessage) ([
 	}
 
 	for _, m := range msgs {
-		converted, err := anthropicMsgToChatMessages(m)
+		converted, err := anthropicMsgToChatMessagesWithOptions(m, preserveThinking)
 		if err != nil {
 			return nil, err
 		}
@@ -152,14 +166,14 @@ func anthropicToChatMessages(system json.RawMessage, msgs []AnthropicMessage) ([
 	return normalizeChatMessages(messages), nil
 }
 
-// anthropicMsgToChatMessages converts one Anthropic message into one or more
+// anthropicMsgToChatMessagesWithOptions converts one Anthropic message into one or more
 // Chat messages. tool_result blocks become standalone "tool" role messages
 // (the Chat Completions convention); text/image blocks stay in a user message;
 // assistant tool_use blocks become tool_calls on the assistant message.
-func anthropicMsgToChatMessages(m AnthropicMessage) ([]ChatMessage, error) {
+func anthropicMsgToChatMessagesWithOptions(m AnthropicMessage, preserveThinking bool) ([]ChatMessage, error) {
 	switch m.Role {
 	case "assistant":
-		return anthropicAssistantToChatMessages(m.Content)
+		return anthropicAssistantToChatMessagesWithOptions(m.Content, preserveThinking)
 	default: // "user" and any unknown role
 		return anthropicUserToChatMessages(m.Content)
 	}
@@ -255,9 +269,13 @@ func anthropicUserToChatMessages(raw json.RawMessage) ([]ChatMessage, error) {
 
 // anthropicAssistantToChatMessages handles an Anthropic assistant message.
 // Text content → assistant message content; tool_use blocks → tool_calls on the
-// same assistant message; thinking blocks → reasoning_content, but only on a
-// message that carries tool calls (see anthropicThinkingToReasoningContent).
+// same assistant message. The generic entry only replays thinking with tool calls;
+// provider-specific options can also preserve it on plain assistant turns.
 func anthropicAssistantToChatMessages(raw json.RawMessage) ([]ChatMessage, error) {
+	return anthropicAssistantToChatMessagesWithOptions(raw, false)
+}
+
+func anthropicAssistantToChatMessagesWithOptions(raw json.RawMessage, preserveThinking bool) ([]ChatMessage, error) {
 	// Plain string → single assistant message.
 	var s string
 	if err := json.Unmarshal(raw, &s); err == nil {
@@ -295,7 +313,7 @@ func anthropicAssistantToChatMessages(raw json.RawMessage) ([]ChatMessage, error
 		})
 	}
 
-	msg.ReasoningContent = anthropicThinkingToReasoningContent(blocks, len(msg.ToolCalls) > 0)
+	msg.ReasoningContent = anthropicThinkingToReasoningContent(blocks, len(msg.ToolCalls) > 0 || preserveThinking)
 
 	return []ChatMessage{msg}, nil
 }
@@ -310,14 +328,14 @@ func anthropicAssistantToChatMessages(raw json.RawMessage) ([]ChatMessage, error
 // produced a tool call to be replayed on that assistant message and answers
 // 400 otherwise, which is why buildChatMessagesFromItems already carries
 // pendingReasoning onto assistant tool-call messages in the Responses→Chat
-// bridge. hasToolCalls keeps the scope identical to that sibling: reasoning
-// rides along with tool calls only, never on a plain assistant text turn.
+// bridge. Replay is enabled for tool calls, or explicitly by a provider that
+// also requires reasoning on plain assistant turns.
 //
 // redacted_thinking blocks and signature-only placeholders carry no plaintext
 // and contribute nothing. Multiple blocks join with "\n", matching
 // extractResponsesReasoningText.
-func anthropicThinkingToReasoningContent(blocks []AnthropicContentBlock, hasToolCalls bool) string {
-	if !hasToolCalls {
+func anthropicThinkingToReasoningContent(blocks []AnthropicContentBlock, replay bool) string {
+	if !replay {
 		return ""
 	}
 	var parts []string

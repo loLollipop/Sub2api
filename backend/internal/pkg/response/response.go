@@ -190,9 +190,8 @@ func ParsePagination(c *gin.Context) (page, pageSize int) {
 	}
 
 	pageSize = ClampPageSize(c, pageSize)
-	// Pagination repositories calculate (page-1)*pageSize. Reject values that
-	// would overflow int before they reach an offset calculation.
-	if page > 1 && page-1 > math.MaxInt/pageSize {
+	// Keep offset and offset+pageSize within int, including in-memory slices.
+	if page > math.MaxInt/pageSize {
 		page = 1
 	}
 	return page, pageSize

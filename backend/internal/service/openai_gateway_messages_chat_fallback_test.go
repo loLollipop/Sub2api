@@ -481,3 +481,32 @@ func TestForwardAsAnthropic_ResponsesSupportedAccountStillUsesResponsesEndpoint(
 	require.Empty(t, upstream.lastReq.Header.Get("OpenAI-Beta"))
 	require.Equal(t, "ok", gjson.Get(rec.Body.String(), "content.0.text").String())
 }
+
+func TestMessagesChatThinkingReplayProviderIsolationAndFloor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, platform := range []string{PlatformDeepseek, PlatformOpenAI, PlatformKimi, PlatformZhipu, PlatformCommandCode} {
+		t.Run(platform, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			body := []byte(`{"model":"deepseek-v4-pro","max_tokens":16,"cache_control":{"type":"ephemeral","ttl":"1h"},"messages":[{"role":"user","content":"q"},{"role":"assistant","content":[{"type":"thinking","thinking":"saved reasoning"}]},{"role":"user","content":"next"}]}`)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
+			upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"id":"a","choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`))}}
+			cfg := rawChatCompletionsTestConfig()
+			cfg.Gateway.MinOutputTokens = 256
+			svc := &OpenAIGatewayService{cfg: cfg, httpUpstream: upstream}
+			account := forceChatMessagesFallbackAccount()
+			account.Platform = platform
+			account.Type = AccountTypeAPIKey
+			account.Credentials["api_key"] = "test-key"
+			_, err := svc.forwardAnthropicViaRawChatCompletions(context.Background(), c, account, body, "")
+			require.NoError(t, err)
+			require.Equal(t, int64(256), gjson.GetBytes(upstream.lastBody, "max_completion_tokens").Int())
+			require.False(t, gjson.GetBytes(upstream.lastBody, "cache_control").Exists(), "do not leak Anthropic-only top-level caching into a Chat endpoint")
+			if platform == PlatformDeepseek {
+				require.Equal(t, "saved reasoning", gjson.GetBytes(upstream.lastBody, "messages.1.reasoning_content").String())
+			} else {
+				require.False(t, gjson.GetBytes(upstream.lastBody, "messages.1.reasoning_content").Exists())
+			}
+		})
+	}
+}

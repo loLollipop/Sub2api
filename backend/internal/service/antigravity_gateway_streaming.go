@@ -766,6 +766,11 @@ func (s *AntigravityGatewayService) collectClaudeStreamResponse(c *gin.Context, 
 	var lastWithParts map[string]any
 	var collectedParts []map[string]any // 收集所有 parts（包括 text、thinking、functionCall、inlineData 等）
 	var meaningfulResponse bool
+	var malformedFunctionCall bool
+	usage := &ClaudeUsage{}
+	partialResult := func() *antigravityStreamResult {
+		return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}
+	}
 
 	type scanEvent struct {
 		line string
@@ -827,6 +832,9 @@ func (s *AntigravityGatewayService) collectClaudeStreamResponse(c *gin.Context, 
 				if errors.Is(ev.err, bufio.ErrTooLong) {
 					logger.LegacyPrintf("service.antigravity_gateway", "SSE line too long (antigravity claude non-stream): max_size=%d error=%v", maxLineSize, ev.err)
 				}
+				if malformedFunctionCall {
+					return nil, partialResult(), errors.Join(antigravity.ErrMalformedFunctionCall, ev.err)
+				}
 				return nil, nil, ev.err
 			}
 
@@ -854,6 +862,15 @@ func (s *AntigravityGatewayService) collectClaudeStreamResponse(c *gin.Context, 
 				continue
 			}
 
+			if observed := extractGeminiUsage(inner); observed != nil {
+				usage = observed
+			}
+			// Keep the terminal error while draining later usage frames. This is
+			// never a failover: the upstream has already handled the request.
+			if extractGeminiFinishReason(parsed) == "MALFORMED_FUNCTION_CALL" {
+				malformedFunctionCall = true
+			}
+
 			last = parsed
 
 			// 保留最后一个有 parts 的响应，并收集所有 parts
@@ -878,11 +895,17 @@ func (s *AntigravityGatewayService) collectClaudeStreamResponse(c *gin.Context, 
 				continue
 			}
 			logger.LegacyPrintf("service.antigravity_gateway", "Stream data interval timeout (antigravity claude non-stream)")
+			if malformedFunctionCall {
+				return nil, partialResult(), antigravity.ErrMalformedFunctionCall
+			}
 			return nil, nil, fmt.Errorf("stream data interval timeout")
 		}
 	}
 
 returnResponse:
+	if malformedFunctionCall {
+		return nil, partialResult(), antigravity.ErrMalformedFunctionCall
+	}
 	// 处理空响应情况 — 触发同账号重试 + failover 切换账号
 	if !meaningfulResponse {
 		logger.LegacyPrintf("service.antigravity_gateway", "[antigravity-Forward] warning: empty stream response (claude non-stream), triggering failover")
@@ -915,7 +938,7 @@ returnResponse:
 	}
 
 	// 转换为 service.ClaudeUsage
-	usage := &ClaudeUsage{
+	usage = &ClaudeUsage{
 		InputTokens:              agUsage.InputTokens,
 		OutputTokens:             agUsage.OutputTokens,
 		CacheCreationInputTokens: agUsage.CacheCreationInputTokens,
@@ -931,6 +954,10 @@ returnResponse:
 func (s *AntigravityGatewayService) handleClaudeStreamToNonStreaming(c *gin.Context, resp *http.Response, startTime time.Time, originalModel string) (*antigravityStreamResult, error) {
 	claudeResp, streamRes, err := s.collectClaudeStreamResponse(c, resp, startTime, originalModel)
 	if err != nil {
+		if errors.Is(err, antigravity.ErrMalformedFunctionCall) {
+			_ = s.writeClaudeError(c, http.StatusBadGateway, "malformed_function_call", antigravity.ErrMalformedFunctionCall.Error())
+			return streamRes, err
+		}
 		var failoverErr *UpstreamFailoverError
 		if errors.As(err, &failoverErr) {
 			return nil, err
@@ -1165,7 +1192,7 @@ func (s *AntigravityGatewayService) extractImageInputSize(body []byte) string {
 }
 
 // isImageGenerationModel 判断模型是否为图片生成模型
-// 支持的模型：gemini-3.1-flash-image, gemini-3-pro-image, gemini-2.5-flash-image 等
+// 支持的模型：gemini-3.1-flash-image, gemini-3.1-flash-lite-image, gemini-3-pro-image, gemini-2.5-flash-image 等
 func isImageGenerationModel(model string) bool {
 	modelLower := strings.ToLower(model)
 	// 移除 models/ 前缀
@@ -1175,6 +1202,8 @@ func isImageGenerationModel(model string) bool {
 	return modelLower == "gemini-3.1-flash-image" ||
 		modelLower == "gemini-3.1-flash-image-preview" ||
 		strings.HasPrefix(modelLower, "gemini-3.1-flash-image-") ||
+		modelLower == "gemini-3.1-flash-lite-image" ||
+		strings.HasPrefix(modelLower, "gemini-3.1-flash-lite-image-") ||
 		modelLower == "gemini-3-pro-image" ||
 		modelLower == "gemini-3-pro-image-preview" ||
 		strings.HasPrefix(modelLower, "gemini-3-pro-image-") ||

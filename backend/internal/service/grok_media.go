@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -263,7 +264,9 @@ func parseGrokMediaMultipartRequest(contentType string, body []byte, info *GrokM
 			_ = part.Close()
 			continue
 		}
-		data, err := io.ReadAll(io.LimitReader(part, openAIImageMaxUploadPartSize))
+		// The gateway has already bounded body. Read the complete part so media
+		// conversion and moderation see the same bytes as the submitted upload.
+		data, err := io.ReadAll(part)
 		_ = part.Close()
 		if err != nil {
 			return
@@ -736,26 +739,46 @@ func StableGrokVideoBillingRequestID(taskRequestID string) string {
 // Request may include resolution ("480p"|"720p"|"1080p"); completed status does not
 // document a resolution field — bill resolution from the create-time request snapshot.
 
-// IsGrokVideoStatusBillable matches official success: status == "done" AND non-empty video.url.
-// pending / expired / failed, or done without a video URL, are not billable.
+// IsGrokVideoStatusBillable requires terminal success and a delivered asset.
 func IsGrokVideoStatusBillable(statusBody []byte) bool {
-	if len(statusBody) == 0 || !gjson.ValidBytes(statusBody) {
+	if !gjson.ValidBytes(statusBody) {
 		return false
 	}
-	if !isOfficialGrokVideoStatusDone(statusBody) {
+	switch strings.ToLower(strings.TrimSpace(gjson.GetBytes(statusBody, "status").String())) {
+	case "done", "succeeded", "success", "completed", "finished":
+		return grokVideoStatusURL(statusBody) != ""
+	default:
 		return false
 	}
-	return strings.TrimSpace(gjson.GetBytes(statusBody, "video.url").String()) != ""
 }
 
-func isOfficialGrokVideoStatusDone(statusBody []byte) bool {
-	// Official enum: pending | done | expired | failed.
-	return strings.EqualFold(strings.TrimSpace(gjson.GetBytes(statusBody, "status").String()), "done")
+func grokVideoStatusURL(statusBody []byte) string {
+	for _, path := range []string{"video.url", "data.url", "url", "output.url"} {
+		if value := gjson.GetBytes(statusBody, path); value.Type == gjson.String {
+			if u := strings.TrimSpace(value.String()); u != "" {
+				return u
+			}
+		}
+	}
+	for _, path := range []string{"data", "output"} {
+		items := gjson.GetBytes(statusBody, path)
+		if !items.IsArray() {
+			continue
+		}
+		for _, item := range items.Array() {
+			if value := item.Get("url"); value.Type == gjson.String {
+				if u := strings.TrimSpace(value.String()); u != "" {
+					return u
+				}
+			}
+		}
+	}
+	return ""
 }
 
-// ExtractGrokVideoBillingFromStatusBody builds usage units from an official done status.
-// Field priority (official docs):
-//   - duration: video.duration (seconds)
+// ExtractGrokVideoBillingFromStatusBody builds usage units from delivered videos.
+// Field priority:
+//   - duration: video.duration, relay seconds/duration, create-time snapshot
 //   - model: top-level model
 //   - resolution: not in status response → create-time pending snapshot → default 480p
 func ExtractGrokVideoBillingFromStatusBody(statusBody []byte, pending *GrokVideoPendingBilling, requestID string) *OpenAIForwardResult {
@@ -771,12 +794,19 @@ func ExtractGrokVideoBillingFromStatusBody(statusBody []byte, pending *GrokVideo
 	if gjson.ValidBytes(statusBody) {
 		// Official: top-level model.
 		model = strings.TrimSpace(gjson.GetBytes(statusBody, "model").String())
-		// Official: video.duration (number of seconds).
-		if v := gjson.GetBytes(statusBody, "video.duration"); v.Exists() && v.Type == gjson.Number {
-			durationSeconds = int(v.Int())
-			if durationSeconds == 0 && v.Float() > 0 {
-				// Sub-second values are unexpected for this API; still accept truncated int path above.
-				durationSeconds = int(v.Float())
+		// Official nested duration takes precedence over relay seconds/duration.
+		for _, path := range []string{"video.duration", "seconds", "duration"} {
+			v := gjson.GetBytes(statusBody, path)
+			if v.Type != gjson.Number {
+				continue
+			}
+			duration := v.Float()
+			if duration <= 0 || math.IsNaN(duration) || math.IsInf(duration, 0) || duration >= float64(int(^uint(0)>>1)) {
+				continue
+			}
+			if seconds := int(duration); seconds > 0 {
+				durationSeconds = seconds
+				break
 			}
 		}
 	}

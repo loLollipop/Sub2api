@@ -1073,3 +1073,104 @@ describe('admin UsageTable deleted-user badge', () => {
   expect(wrapper.emitted('requestIdClick')).toEqual([['client:UUID'], ['up%_stream']])
   wrapper.unmount()
  })
+
+
+describe('admin UsageTable responsive detail panels', () => {
+  const mountTooltip = () => mount(UsageTable, {
+    props: { data: [{ ...baseImageRow, billing_mode: 'token', image_count: 0, input_tokens: 10, output_tokens: 5 }], loading: false, columns: [] },
+    global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
+  })
+
+  it.each([20, 970])('clamps the detail panel for a trigger at x=%s', async (left) => {
+    vi.stubGlobal('innerWidth', 1024)
+    vi.stubGlobal('innerHeight', 768)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('usage-detail-tooltip')
+        ? { width: 360, height: 400 } as DOMRect
+        : { left, right: left + 20, top: 740, height: 20 } as DOMRect
+    })
+    const wrapper = mountTooltip()
+    await wrapper.findAll('.group.relative').at(-1)!.trigger('mouseenter')
+    await nextTick()
+    const panel = wrapper.get('.usage-cost-tooltip').element as HTMLElement
+    expect(parseFloat(panel.style.left)).toBeGreaterThanOrEqual(12)
+    expect(parseFloat(panel.style.left) + 360).toBeLessThanOrEqual(1012)
+    expect(parseFloat(panel.style.top) + 400).toBeLessThanOrEqual(756)
+    wrapper.unmount()
+    vi.unstubAllGlobals()
+  })
+
+  it.each([[320, 'cost'], [375, 'cost'], [320, 'token'], [375, 'token']] as const)('opens at width %s for %s and supports toggle, close, Escape and outside click', async (width, kind) => {
+    vi.stubGlobal('innerWidth', width)
+    const wrapper = mountTooltip()
+    const trigger = wrapper.get(`[role="button"][aria-label="${kind === 'token' ? 'usage.tokenDetails' : 'Cost Breakdown'}"]`)
+    await trigger.trigger('click')
+    await trigger.trigger('mouseleave')
+    expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(true)
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    const panel = wrapper.get('.usage-detail-tooltip').element as HTMLElement
+    expect(panel.style.left).toBe('12px')
+    expect(panel.style.bottom).toBe('12px')
+    expect(panel.style.width).toBe('calc(100vw - 24px)')
+    expect(panel.style.maxHeight).toBe('min(75dvh, calc(100dvh - 24px))')
+    expect(panel.style.overflowY).toBe('auto')
+    await trigger.trigger('click')
+    expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(false)
+    await trigger.trigger('keydown', { key: 'Enter' })
+    await wrapper.get('.usage-detail-tooltip button').trigger('click')
+    expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(false)
+    await trigger.trigger('click')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await nextTick()
+    expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(false)
+    await trigger.trigger('click')
+    document.body.click()
+    await nextTick()
+    expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(false)
+    wrapper.unmount()
+    vi.unstubAllGlobals()
+  })
+
+  it('switches a pinned detail to a different row on the first click', async () => {
+    const wrapper = mountTooltip()
+    await wrapper.setProps({ data: [baseImageRow, { ...baseImageRow, request_id: 'second-row', rate_multiplier: 7 }] })
+    const triggers = wrapper.findAll('[role="button"][aria-label="Cost Breakdown"]')
+    await triggers[0].trigger('click')
+    expect(triggers[0].attributes('aria-expanded')).toBe('true')
+    expect(triggers[1].attributes('aria-expanded')).toBe('false')
+    await triggers[1].trigger('click')
+    expect(wrapper.get('.usage-cost-tooltip').text()).toContain('7.00x')
+    expect(triggers[0].attributes('aria-expanded')).toBe('false')
+    expect(triggers[1].attributes('aria-expanded')).toBe('true')
+    wrapper.unmount()
+  })
+
+  it('preserves internal scrolling and closes on viewport resize or page scroll', async () => {
+    vi.stubGlobal('innerWidth', 320)
+    vi.stubGlobal('innerHeight', 240)
+    const wrapper = mountTooltip()
+    await wrapper.setProps({ data: [{ ...baseImageRow, billing_mode: 'token', image_count: 0,
+      input_tokens: 1000, output_tokens: 500, input_cost: 0.1, output_cost: 0.2,
+      image_input_tokens: 200, image_input_cost: 0.02, image_output_tokens: 300, image_output_cost: 0.03,
+      cache_creation_cost: 0.05, cache_read_cost: 0.04, cache_creation_tokens: 20, cache_read_tokens: 40,
+    }] })
+    const trigger = wrapper.findAll('.group.relative').at(-1)!
+    await trigger.trigger('click')
+    const panel = wrapper.get('.usage-detail-tooltip')
+    expect(panel.text()).toContain('Cache Creation Cost')
+    expect(panel.text()).toContain('Cache Read Cost')
+    expect((panel.element as HTMLElement).style.overflowY).toBe('auto')
+    expect((panel.element as HTMLElement).style.maxHeight).toContain('75dvh')
+    await panel.trigger('scroll')
+    expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(true)
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+    expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(false)
+    await trigger.trigger('click')
+    window.dispatchEvent(new Event('scroll'))
+    await nextTick()
+    expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(false)
+    wrapper.unmount()
+    vi.unstubAllGlobals()
+  })
+})

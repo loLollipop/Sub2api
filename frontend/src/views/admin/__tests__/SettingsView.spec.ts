@@ -2012,4 +2012,43 @@ describe("admin SettingsView platform quota matrix", () => {
     // 不管输入是什么，提交值应为 null（而非 "" 或 NaN）
     expect(quotas["anthropic"]?.["daily"]).toBe(null);
   });
+
+  it("preserves legacy endpoint visibility and saves explicit zero and edited thresholds", async () => {
+    getSettings.mockResolvedValue({ ...baseSettingsResponse, custom_endpoints: [
+      { name: "legacy", endpoint: "https://legacy.example", description: "" },
+      { name: "public", endpoint: "https://public.example", description: "", min_recharge: 0 },
+    ] });
+    const wrapper = mountView();
+    await flushPromises();
+    expect((wrapper.get('#endpoint-recharge-0').element as HTMLInputElement).value).toBe('1000');
+    expect((wrapper.get('#endpoint-recharge-1').element as HTMLInputElement).value).toBe('0');
+    await wrapper.get('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings.mock.calls.at(-1)?.[0].custom_endpoints[0].min_recharge).toBeUndefined();
+    expect(updateSettings.mock.calls.at(-1)?.[0].custom_endpoints[1].min_recharge).toBe(0);
+    await wrapper.get('#endpoint-recharge-0').setValue('500.5');
+    await wrapper.get('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings.mock.calls.at(-1)?.[0].custom_endpoints[0].min_recharge).toBe(500.5);
+    await wrapper.get('#endpoint-recharge-0').setValue('');
+    await wrapper.get('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings.mock.calls.at(-1)?.[0].custom_endpoints[0].min_recharge).toBeNull();
+    wrapper.unmount();
+  });
+
+  it.each(['-1', '10000001'])("rejects invalid endpoint recharge %s before saving", async (value) => {
+    getSettings.mockResolvedValue({ ...baseSettingsResponse, custom_endpoints: [
+      { name: "test", endpoint: "https://example.com", description: "" },
+    ] });
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('#endpoint-recharge-0').setValue(value);
+    await wrapper.get('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledWith('admin.settings.site.customEndpoints.invalidMinRecharge');
+    wrapper.unmount();
+  });
+
 });

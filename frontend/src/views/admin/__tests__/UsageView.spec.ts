@@ -1034,4 +1034,18 @@ describe('admin UsageView refresh window', () => {
     expect(list).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
+
+  it('includes both error request identifiers in the column selector and table props', async () => {
+    const wrapper = mountWithSlider(sliderDateRangeStub(null))
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { errAllColumns: { key: string }[]; errVisibleColumnKeys: string[] }
+    const keys = vm.errAllColumns.map(column => column.key)
+    const message = keys.indexOf('message')
+    expect(keys.slice(message, message + 4)).toEqual(['message', 'request_id', 'upstream_request_id', 'created_at'])
+    expect(vm.errVisibleColumnKeys).toContain('request_id')
+    expect(vm.errVisibleColumnKeys).toContain('upstream_request_id')
+    wrapper.unmount()
+  })
+
 })

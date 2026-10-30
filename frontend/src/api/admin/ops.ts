@@ -934,6 +934,7 @@ export interface OpsErrorLog {
 
   client_request_id: string
   request_id: string
+  upstream_request_id?: string
   message: string
 
   user_id?: number | null

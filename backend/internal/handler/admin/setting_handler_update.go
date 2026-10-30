@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -1382,6 +1383,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 				response.BadRequest(c, "Custom endpoint description is too long (max 200 characters)")
 				return
 			}
+			if !validCustomEndpointMinRecharge(ep.MinRecharge) {
+				response.BadRequest(c, "Custom endpoint minimum recharge must be a finite number between 0 and 10000000")
+				return
+			}
 		}
 		endpointBytes, err := json.Marshal(endpoints)
 		if err != nil {
@@ -2437,4 +2442,8 @@ func (h *SettingHandler) ensureUserAttributeDefinition(ctx context.Context, key,
 		return
 	}
 	slog.Info("dingtalk: created user attribute definition", "key", key, "name", name, "type", attrType)
+}
+
+func validCustomEndpointMinRecharge(value *float64) bool {
+	return value == nil || (!math.IsNaN(*value) && !math.IsInf(*value, 0) && *value >= 0 && *value <= 10000000)
 }

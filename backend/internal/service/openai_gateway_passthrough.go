@@ -250,6 +250,14 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		body = adaptedBody
 		setOpenAIResponsesClientToolMapping(c, mapping)
 	}
+	if account != nil && !isOpenAIResponsesCompactPath(c) &&
+		(account.IsOpenAI() || (account.Platform == PlatformDeepseek && account.usesNativeResponsesUpstream())) {
+		repairedBody, _, repairErr := repairOpenAIResponsesMissingToolOutputs(body, account.IsOpenAI())
+		if repairErr != nil {
+			return nil, fmt.Errorf("repair passthrough Responses missing tool outputs: %w", repairErr)
+		}
+		body = repairedBody
+	}
 
 	sanitizedBody, sanitized, err := sanitizeEmptyBase64InputImagesInOpenAIBody(body)
 	if err != nil {

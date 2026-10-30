@@ -194,7 +194,14 @@
             <div
               class="group relative"
               @mouseenter="showTokenTooltip($event, row)"
-              @mouseleave="hideTokenTooltip"
+              @mouseleave="scheduleTooltipHide('token')"
+              role="button"
+              tabindex="0"
+              :aria-label="t('usage.tokenDetails')"
+              :aria-expanded="tokenTooltipVisible && tokenTooltipData === row"
+              @click.stop="toggleTooltip($event, row, 'token')"
+              @keydown.enter.prevent="toggleTooltip($event, row, 'token')"
+              @keydown.space.prevent="toggleTooltip($event, row, 'token')"
             >
               <div class="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-100 transition-colors group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900/50">
                 <Icon name="infoCircle" size="xs" class="text-gray-400 group-hover:text-blue-500 dark:text-gray-500 dark:group-hover:text-blue-400" />
@@ -230,7 +237,14 @@
                 v-else
                 class="group relative"
                 @mouseenter="showTooltip($event, row)"
-                @mouseleave="hideTooltip"
+                @mouseleave="scheduleTooltipHide('cost')"
+                role="button"
+                tabindex="0"
+                :aria-label="t('usage.costDetails')"
+                :aria-expanded="tooltipVisible && tooltipData === row"
+                @click.stop="toggleTooltip($event, row, 'cost')"
+                @keydown.enter.prevent="toggleTooltip($event, row, 'cost')"
+                @keydown.space.prevent="toggleTooltip($event, row, 'cost')"
               >
                 <div class="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-100 transition-colors group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900/50">
                   <Icon name="infoCircle" size="xs" class="text-gray-400 group-hover:text-blue-500 dark:text-gray-500 dark:group-hover:text-blue-400" />
@@ -332,13 +346,15 @@
   <Teleport to="body">
     <div
       v-if="tokenTooltipVisible"
-      class="fixed z-[9999] pointer-events-none -translate-y-1/2"
-      :style="{
-        left: tokenTooltipPosition.x + 'px',
-        top: tokenTooltipPosition.y + 'px'
-      }"
+      ref="tokenTooltipElement"
+      class="usage-detail-tooltip usage-token-tooltip fixed z-[9999]"
+      role="dialog"
+      :aria-label="t('usage.tokenDetails')"
+      @mouseenter="cancelTooltipHide"
+      @mouseleave="scheduleTooltipHide('token')"
+      :style="tooltipStyle(tokenTooltipPosition)"
     >
-      <div class="whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
+      <div class="usage-tooltip-content rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
         <div class="space-y-1.5">
           <div>
             <div class="text-xs font-semibold text-gray-300 mb-1">{{ t('usage.tokenDetails') }}</div>
@@ -407,7 +423,7 @@
             <span class="font-semibold text-blue-400">{{ ((tokenTooltipData?.input_tokens || 0) + (tokenTooltipData?.output_tokens || 0) + (tokenTooltipData?.cache_creation_tokens || 0) + (tokenTooltipData?.cache_read_tokens || 0)).toLocaleString() }}</span>
           </div>
         </div>
-        <div class="absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-r-gray-900 border-t-transparent dark:border-r-gray-800"></div>
+        <button type="button" class="mt-3 w-full rounded border border-gray-600 px-3 py-1.5 text-center font-medium hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400" @click="hideTokenTooltip">{{ t('common.close') }}</button>
       </div>
     </div>
   </Teleport>
@@ -416,13 +432,15 @@
   <Teleport to="body">
     <div
       v-if="tooltipVisible"
-      class="fixed z-[9999] pointer-events-none -translate-y-1/2"
-      :style="{
-        left: tooltipPosition.x + 'px',
-        top: tooltipPosition.y + 'px'
-      }"
+      ref="costTooltipElement"
+      class="usage-detail-tooltip usage-cost-tooltip fixed z-[9999]"
+      role="dialog"
+      :aria-label="t('usage.costDetails')"
+      @mouseenter="cancelTooltipHide"
+      @mouseleave="scheduleTooltipHide('cost')"
+      :style="tooltipStyle(tooltipPosition)"
     >
-      <div class="whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
+      <div class="usage-tooltip-content rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
         <div class="space-y-1.5">
           <!-- Cost Breakdown -->
           <div class="mb-2 border-b border-gray-700 pb-1.5">
@@ -544,14 +562,14 @@
             </div>
           </template>
         </div>
-        <div class="absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-r-gray-900 border-t-transparent dark:border-r-gray-800"></div>
+        <button type="button" class="mt-3 w-full rounded border border-gray-600 px-3 py-1.5 text-center font-medium hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400" @click="hideTooltip">{{ t('common.close') }}</button>
       </div>
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
 import { formatDateTime, formatReasoningEffort, reasoningEffortValuesEqual } from '@/utils/format'
@@ -787,38 +805,131 @@ const formatOutputRate = (
   return `${outputRate.toFixed(1)} t/s`
 }
 
-// Cost tooltip functions
-const showTooltip = (event: MouseEvent, row: AdminUsageLog) => {
-  const target = event.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
-  tooltipData.value = row
-  tooltipPosition.value.x = rect.right + 8
-  tooltipPosition.value.y = rect.top + rect.height / 2
-  tooltipVisible.value = true
-}
+type TooltipKind = 'cost' | 'token'
+const mobileTooltip = ref(false)
+const tooltipStyle = (position: { x: number; y: number }) => ({
+  left: mobileTooltip.value ? '12px' : position.x + 'px',
+  top: mobileTooltip.value ? 'auto' : position.y + 'px',
+  bottom: mobileTooltip.value ? '12px' : undefined,
+  width: mobileTooltip.value ? 'calc(100vw - 24px)' : 'min(360px, calc(100vw - 24px))',
+  maxHeight: mobileTooltip.value ? 'min(75dvh, calc(100dvh - 24px))' : 'calc(100dvh - 24px)',
+  overflowY: 'auto' as const,
+})
+const costTooltipElement = ref<HTMLElement | null>(null)
+const tokenTooltipElement = ref<HTMLElement | null>(null)
+let pinnedTooltip: TooltipKind | null = null
+let pinnedTooltipRow: AdminUsageLog | null = null
+let hideTimer: ReturnType<typeof setTimeout> | undefined
 
+const cancelTooltipHide = () => {
+  clearTimeout(hideTimer)
+  hideTimer = undefined
+}
 const hideTooltip = () => {
+  cancelTooltipHide()
   tooltipVisible.value = false
   tooltipData.value = null
+  if (pinnedTooltip === 'cost') {
+    pinnedTooltip = null
+    pinnedTooltipRow = null
+  }
 }
-
-// Token tooltip functions
-const showTokenTooltip = (event: MouseEvent, row: AdminUsageLog) => {
-  const target = event.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
-  tokenTooltipData.value = row
-  tokenTooltipPosition.value.x = rect.right + 8
-  tokenTooltipPosition.value.y = rect.top + rect.height / 2
-  tokenTooltipVisible.value = true
-}
-
 const hideTokenTooltip = () => {
+  cancelTooltipHide()
   tokenTooltipVisible.value = false
   tokenTooltipData.value = null
+  if (pinnedTooltip === 'token') {
+    pinnedTooltip = null
+    pinnedTooltipRow = null
+  }
 }
+const hideAllTooltips = () => {
+  hideTooltip()
+  hideTokenTooltip()
+}
+const scheduleTooltipHide = (kind: TooltipKind) => {
+  cancelTooltipHide()
+  if (pinnedTooltip === kind) return
+  hideTimer = setTimeout(kind === 'cost' ? hideTooltip : hideTokenTooltip, 120)
+}
+
+const openTooltip = async (event: MouseEvent | KeyboardEvent, row: AdminUsageLog, kind: TooltipKind) => {
+  cancelTooltipHide()
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  mobileTooltip.value = window.innerWidth <= 640
+  if (kind === 'cost') {
+    hideTokenTooltip()
+    tooltipData.value = row
+    tooltipVisible.value = true
+  } else {
+    hideTooltip()
+    tokenTooltipData.value = row
+    tokenTooltipVisible.value = true
+  }
+  await nextTick()
+  const panel = kind === 'cost' ? costTooltipElement.value : tokenTooltipElement.value
+  if (!panel) return
+  const bounds = panel.getBoundingClientRect()
+  const margin = 12
+  const maxX = Math.max(margin, window.innerWidth - bounds.width - margin)
+  const preferredX = rect.right + 8 + bounds.width <= window.innerWidth - margin
+    ? rect.right + 8 : rect.left - bounds.width - 8
+  const position = {
+    x: Math.max(margin, Math.min(preferredX, maxX)),
+    y: Math.max(margin, Math.min(rect.top + rect.height / 2 - bounds.height / 2, window.innerHeight - bounds.height - margin)),
+  }
+  if (kind === 'cost') tooltipPosition.value = position
+  else tokenTooltipPosition.value = position
+}
+const showTooltip = (event: MouseEvent, row: AdminUsageLog) => openTooltip(event, row, 'cost')
+const showTokenTooltip = (event: MouseEvent, row: AdminUsageLog) => openTooltip(event, row, 'token')
+const toggleTooltip = (event: MouseEvent | KeyboardEvent, row: AdminUsageLog, kind: TooltipKind) => {
+  if (pinnedTooltip === kind && pinnedTooltipRow === row) {
+    hideAllTooltips()
+    return
+  }
+  void openTooltip(event, row, kind)
+  pinnedTooltip = kind
+  pinnedTooltipRow = row
+}
+const closeOnOutsideClick = (event: MouseEvent) => {
+  if (!(event.target instanceof Element) || !event.target.closest('.usage-detail-tooltip')) hideAllTooltips()
+}
+const closeOnEscape = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') hideAllTooltips()
+}
+const closeOnPageScroll = (event: Event) => {
+  if (event.target instanceof Element && event.target.closest('.usage-detail-tooltip')) return
+  hideAllTooltips()
+}
+onMounted(() => {
+  window.addEventListener('resize', hideAllTooltips)
+  window.addEventListener('scroll', closeOnPageScroll, true)
+  document.addEventListener('click', closeOnOutsideClick)
+  document.addEventListener('keydown', closeOnEscape)
+})
+onBeforeUnmount(() => {
+  cancelTooltipHide()
+  window.removeEventListener('resize', hideAllTooltips)
+  window.removeEventListener('scroll', closeOnPageScroll, true)
+  document.removeEventListener('click', closeOnOutsideClick)
+  document.removeEventListener('keydown', closeOnEscape)
+})
+
 </script>
 
 <style scoped>
+.usage-detail-tooltip {
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+}
+.usage-tooltip-content {
+  min-width: 0;
+}
+.usage-tooltip-content :deep(span) {
+  min-width: 0;
+}
+
 .usage-table {
   min-width: 0;
   width: 100%;

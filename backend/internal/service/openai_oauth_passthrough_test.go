@@ -580,7 +580,8 @@ func TestOpenAIGatewayService_OAuthPassthrough_PreservesNamespaceRequest(t *test
 	require.Equal(t, "collaboration", gjson.GetBytes(upstream.lastBody, "input.0.namespace").String())
 	require.Equal(t, "spawn_agent", gjson.GetBytes(upstream.lastBody, "input.0.name").String())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "input.1.namespace").Exists())
-	require.Equal(t, "nested", gjson.GetBytes(upstream.lastBody, "input.1.content.0.namespace").String())
+	require.Equal(t, "function_call_output", gjson.GetBytes(upstream.lastBody, "input.1.type").String())
+	require.Equal(t, "nested", gjson.GetBytes(upstream.lastBody, "input.2.content.0.namespace").String())
 	require.NotContains(t, string(upstream.lastBody), "collaboration__spawn_agent")
 
 	// 未摊平即无需回程还原，上游事件原样下发。
@@ -654,7 +655,8 @@ func TestOpenAIGatewayService_OAuthPassthrough_FlattenEnabledNamespaceRequestAnd
 	require.Equal(t, "collaboration__spawn_agent", gjson.GetBytes(upstream.lastBody, "input.0.name").String())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "input.0.namespace").Exists())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "input.1.namespace").Exists())
-	require.Equal(t, "nested", gjson.GetBytes(upstream.lastBody, "input.1.content.0.namespace").String())
+	require.Equal(t, "function_call_output", gjson.GetBytes(upstream.lastBody, "input.1.type").String())
+	require.Equal(t, "nested", gjson.GetBytes(upstream.lastBody, "input.2.content.0.namespace").String())
 	require.Len(t, upstream.bodies, 1)
 
 	downstream := rec.Body.String()

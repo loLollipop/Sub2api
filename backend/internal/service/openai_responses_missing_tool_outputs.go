@@ -59,14 +59,14 @@ func repairOpenAIResponsesMissingToolOutputs(body []byte, allowStoredContinuatio
 
 	var repaired bytes.Buffer
 	repaired.Grow(len(input.Raw))
-	repaired.WriteByte('[')
+	_ = repaired.WriteByte('[')
 	first := true
 	appendItem := func(raw string) {
 		if !first {
-			repaired.WriteByte(',')
+			_ = repaired.WriteByte(',')
 		}
 		first = false
-		repaired.WriteString(raw)
+		_, _ = repaired.WriteString(raw)
 	}
 	pending := make([]outputKey, 0, len(missing))
 	flush := func() error {
@@ -103,7 +103,7 @@ func repairOpenAIResponsesMissingToolOutputs(body []byte, allowStoredContinuatio
 	if err := flush(); err != nil {
 		return body, false, err
 	}
-	repaired.WriteByte(']')
+	_ = repaired.WriteByte(']')
 	next, err := sjson.SetRawBytes(body, "input", repaired.Bytes())
 	if err != nil {
 		return body, false, err

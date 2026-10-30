@@ -201,6 +201,25 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	case APIProtocolChatCompletions:
 		return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
 	}
+	// Passthrough repairs after its client-tool lowering, so native shell and
+	// search items cannot be changed to function calls after pairing.
+	if !passthroughEnabled && !compactPath && (account.IsOpenAI() || nativeDeepSeekResponses) {
+		// Legacy OAuth HTTP drops previous_response_id below, whereas API-key,
+		// passthrough and WebSocket paths retain server-side continuations.
+		allowStoredContinuation := account.IsOpenAI() && (account.IsOpenAIApiKey() ||
+			wsDecision.Transport == OpenAIUpstreamTransportResponsesWebsocketV2)
+		repairedBody, changed, repairErr := repairOpenAIResponsesMissingToolOutputs(body, allowStoredContinuation)
+		if repairErr != nil {
+			return nil, fmt.Errorf("repair Responses missing tool outputs: %w", repairErr)
+		}
+		if changed {
+			body = repairedBody
+			originalBody = repairedBody
+			requestView = newOpenAIRequestView(repairedBody)
+			reqModel, reqStream, promptCacheKey = requestView.Model, requestView.Stream, requestView.PromptCacheKey
+			originalModel = reqModel
+		}
+	}
 	if account.IsOpenAI() && (account.IsOpenAIApiKey() || account.IsOpenAIOAuthLike()) {
 		normalizedReasoningBody, reasoningChanged, reasoningErr := normalizeOpenAIResponsesReasoningContentReplay(body)
 		if reasoningErr != nil {

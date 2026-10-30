@@ -320,6 +320,13 @@ func rewriteClientToolHistory(value any, adapter *ResponsesClientToolMapping) (b
 				}
 			case "local_shell_call_output":
 				if len(adapter.LocalShellTools) > 0 {
+					// Native local shell outputs correlate via id. Preserve that
+					// reference before function item-ID normalization removes it.
+					if strings.TrimSpace(stringValue(typed["call_id"])) == "" {
+						if id, ok := typed["id"].(string); ok && id != "" {
+							typed["call_id"] = id
+						}
+					}
 					typed["type"] = "function_call_output"
 					normalizeLoweredFunctionItemID(typed)
 					normalizeClientToolOutput(typed)

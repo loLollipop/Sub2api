@@ -773,6 +773,25 @@ func TestAdaptResponsesClientTools_LowersLocalShell(t *testing.T) {
 	require.Equal(t, "function_call_output", output["type"])
 }
 
+func TestAdaptResponsesClientTools_LocalShellOutputNativeID(t *testing.T) {
+	req := map[string]any{
+		"tools": []any{map[string]any{"type": "local_shell"}},
+		"input": []any{
+			map[string]any{"type": "local_shell_call", "id": "fc_shell", "call_id": "shell_1", "action": map[string]any{"type": "exec", "command": []string{"pwd"}}},
+			map[string]any{"type": "local_shell_call_output", "id": "shell_1", "output": `{"stdout":"/tmp"}`},
+		},
+	}
+	_, changed, err := AdaptResponsesClientTools(req)
+	require.NoError(t, err)
+	require.True(t, changed)
+	items := requireResponsesClientToolValue[[]any](t, req["input"])
+	output := requireResponsesClientToolValue[map[string]any](t, items[1])
+	require.Equal(t, "function_call_output", output["type"])
+	require.Equal(t, "shell_1", output["call_id"])
+	require.NotContains(t, output, "id")
+	require.Equal(t, `{"stdout":"/tmp"}`, output["output"])
+}
+
 func TestAdaptResponsesClientTools_RejectsLocalShellNameConflict(t *testing.T) {
 	_, _, err := AdaptResponsesClientTools(map[string]any{
 		"tools": []any{map[string]any{"type": "local_shell"}, map[string]any{"type": "function", "name": "local_shell"}},

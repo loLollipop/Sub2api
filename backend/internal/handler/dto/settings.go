@@ -24,6 +24,8 @@ type CustomEndpoint struct {
 	Name        string `json:"name"`
 	Endpoint    string `json:"endpoint"`
 	Description string `json:"description"`
+	// Nil preserves the legacy 1000 lifetime recharge threshold; zero is public.
+	MinRecharge *float64 `json:"min_recharge,omitempty"`
 }
 
 // SystemSettings represents the admin settings API response payload.

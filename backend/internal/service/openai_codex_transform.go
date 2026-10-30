@@ -1696,6 +1696,20 @@ func filterCodexInputWithOptions(input []any, opts codexInputFilterOptions) []an
 			copied = true
 		}
 
+		if typ == "local_shell_call_output" {
+			// Native shell output.id references local_shell_call.call_id; it
+			// is not a replay item ID. Apply the same normalization policy as
+			// the call and retain it even when item references are stripped.
+			if id, ok := m["id"].(string); ok {
+				if fixedID := fixCallIDPrefix(id); fixedID != id {
+					ensureCopy()
+					newItem["id"] = fixedID
+				}
+			}
+			filtered = append(filtered, newItem)
+			continue
+		}
+
 		if isCodexToolCallItemType(typ) {
 			callID, ok := m["call_id"].(string)
 			if !ok || strings.TrimSpace(callID) == "" {

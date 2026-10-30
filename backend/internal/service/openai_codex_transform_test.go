@@ -279,6 +279,37 @@ func TestApplyCodexOAuthTransform_ToolSearchOutputPreservesCallID(t *testing.T) 
 	require.Equal(t, "tsc_1", first["call_id"])
 }
 
+func TestFilterCodexInput_NativeShellOutputCorrelation(t *testing.T) {
+	for _, callID := range []string{"call_shell", "fc_shell", "call_" + strings.Repeat("x", 59), "call_" + strings.Repeat("x", 70)} {
+		for _, preserveReferences := range []bool{false, true} {
+			for _, preserveCallIDs := range []bool{false, true} {
+				t.Run(fmt.Sprintf("id=%s/references=%t/callIDs=%t", callID, preserveReferences, preserveCallIDs), func(t *testing.T) {
+					call := map[string]any{"type": "local_shell_call", "call_id": callID, "action": map[string]any{"type": "exec", "command": []any{"pwd"}}}
+					output := map[string]any{"type": "local_shell_call_output", "id": callID, "output": `{"stdout":"/tmp","exit_code":0}`, "namespace": "client.shell", "unknown": map[string]any{"keep": true}}
+					input := []any{call, output}
+					original, err := json.Marshal(input)
+					require.NoError(t, err)
+					filtered := filterCodexInputWithOptions(input, codexInputFilterOptions{PreserveReferences: preserveReferences, PreserveCallIDs: preserveCallIDs})
+					require.Len(t, filtered, 2)
+					fixedCall, ok := filtered[0].(map[string]any)
+					require.True(t, ok)
+					fixedOutput, ok := filtered[1].(map[string]any)
+					require.True(t, ok)
+					expectedID := normalizeCodexFilterCallID("local_shell_call", callID, preserveCallIDs)
+					require.Equal(t, expectedID, fixedCall["call_id"])
+					require.Equal(t, expectedID, fixedOutput["id"])
+					require.LessOrEqual(t, len(expectedID), codexCallIDMaxLength)
+					require.Equal(t, map[string]any{"type": "local_shell_call_output", "id": expectedID, "output": output["output"], "namespace": "client.shell", "unknown": output["unknown"]}, fixedOutput)
+					after, err := json.Marshal(input)
+					require.NoError(t, err)
+					require.Equal(t, original, after, "normalization must not mutate the caller's native history")
+					require.Equal(t, filtered, filterCodexInputWithOptions(filtered, codexInputFilterOptions{PreserveReferences: preserveReferences, PreserveCallIDs: preserveCallIDs}), "native shell correlation normalization must be idempotent")
+				})
+			}
+		}
+	}
+}
+
 func TestApplyCodexOAuthTransform_CustomAndMCPToolOutputsPreserveCallID(t *testing.T) {
 	reqBody := map[string]any{
 		"model": "gpt-5.2",

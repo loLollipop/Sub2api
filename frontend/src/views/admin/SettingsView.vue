@@ -5150,6 +5150,23 @@
                           "
                         />
                       </div>
+                      <div class="sm:col-span-2 rounded-lg border border-primary-200 bg-primary-50/50 p-3 dark:border-primary-800 dark:bg-primary-950/20">
+                        <label :for="`endpoint-recharge-${index}`" class="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-200">
+                          {{ t("admin.settings.site.customEndpoints.visibilityTitle") }}
+                        </label>
+                        <div class="mb-2 flex flex-wrap gap-2">
+                          <button type="button" class="btn btn-sm" :class="ep.min_recharge === 0 ? 'btn-primary' : 'btn-secondary'" :aria-pressed="ep.min_recharge === 0" @click="ep.min_recharge = 0">
+                            {{ t("admin.settings.site.customEndpoints.visibilityEveryone") }}
+                          </button>
+                          <button type="button" class="btn btn-sm" :class="ep.min_recharge !== 0 ? 'btn-primary' : 'btn-secondary'" :aria-pressed="ep.min_recharge !== 0" @click="ep.min_recharge = ep.min_recharge && ep.min_recharge > 0 ? ep.min_recharge : 1000">
+                            {{ t("admin.settings.site.customEndpoints.visibilityThreshold") }}
+                          </button>
+                        </div>
+                        <input :id="`endpoint-recharge-${index}`" :value="ep.min_recharge ?? 1000" type="number" min="0" max="10000000" step="any" class="input text-sm" :aria-describedby="`endpoint-recharge-hint-${index}`" @input="updateEndpointThreshold(ep, $event)" />
+                        <p :id="`endpoint-recharge-hint-${index}`" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                          {{ t("admin.settings.site.customEndpoints.visibilityHint") }}
+                        </p>
+                      </div>
                       <div class="sm:col-span-2">
                         <label
                           class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
@@ -7281,6 +7298,7 @@ const form = reactive<SettingsForm>({
     name: string;
     endpoint: string;
     description: string;
+    min_recharge?: number | null;
   }>,
   frontend_url: "",
   smtp_host: "",
@@ -8305,8 +8323,13 @@ function moveMenuItem(index: number, direction: -1 | 1) {
 }
 
 // Custom endpoint management
+function updateEndpointThreshold(ep: { min_recharge?: number | null }, event: Event) {
+  const input = event.target as HTMLInputElement;
+  ep.min_recharge = input.value === "" && !input.validity.badInput ? null : input.valueAsNumber;
+}
+
 function addEndpoint() {
-  form.custom_endpoints.push({ name: "", endpoint: "", description: "" });
+  form.custom_endpoints.push({ name: "", endpoint: "", description: "", min_recharge: 1000 });
 }
 
 function removeEndpoint(index: number) {
@@ -8776,6 +8799,10 @@ function safePurchaseProductUrl(raw: string): string {
 }
 
 async function saveSettings() {
+  if (form.custom_endpoints.some((ep) => ep.min_recharge != null && (!Number.isFinite(ep.min_recharge) || ep.min_recharge < 0 || ep.min_recharge > 10000000))) {
+    appStore.showError(t("admin.settings.site.customEndpoints.invalidMinRecharge"));
+    return;
+  }
   saving.value = true;
   try {
     const purchaseProducts: Record<string, string> = {};

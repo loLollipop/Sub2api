@@ -122,3 +122,26 @@ describe('OpsErrorLogTable i18n keys exist in the errorLog namespace', () => {
     })
   }
 })
+
+
+describe('OpsErrorLogTable request identifiers', () => {
+  it('places request identifiers after the response content and keeps full IDs in titles', () => {
+    const upstream = 'upstream-' + 'x'.repeat(300)
+    const wrapper = mountTable({ request_id: 'req-local', upstream_request_id: upstream })
+    const headers = wrapper.findAll('thead th').map(header => header.text())
+    const message = headers.indexOf('admin.ops.errorLog.message')
+    expect(headers.slice(message, message + 4)).toEqual([
+      'admin.ops.errorLog.message', 'admin.usage.requestId', 'admin.usage.upstreamRequestId', 'admin.ops.errorLog.time',
+    ])
+    expect(wrapper.get('[title="req-local"]').classes()).toContain('truncate')
+    expect(wrapper.get(`[title="${upstream}"]`).text()).toBe(upstream)
+    wrapper.unmount()
+  })
+
+  it('shows a dash for missing identifiers and respects column visibility', async () => {
+    const wrapper = mountTable({ request_id: '', upstream_request_id: '' })
+    await wrapper.setProps({ visibleColumnKeys: ['request_id', 'upstream_request_id'] })
+    expect(wrapper.findAll('tbody td').map(cell => cell.text())).toEqual(['-', '-'])
+    wrapper.unmount()
+  })
+})

@@ -64,11 +64,11 @@ func TestOpenAIGatewayService_APIKeyPassthrough_StripsInvalidInputItemIDs(t *tes
 	require.Equal(t, "fc_valid", gjson.GetBytes(forwarded, "input.3.id").String())
 	require.False(t, gjson.GetBytes(forwarded, "input.4.id").Exists())
 	require.Equal(t, "ctc_valid", gjson.GetBytes(forwarded, "input.5.id").String())
-	require.False(t, gjson.GetBytes(forwarded, "input.6.id").Exists())
-	require.Equal(t, "tsc_valid", gjson.GetBytes(forwarded, "input.7.id").String())
-	require.Equal(t, "item_output", gjson.GetBytes(forwarded, "input.8.id").String())
-	require.Equal(t, "call_123", gjson.GetBytes(forwarded, "input.8.call_id").String())
-	require.False(t, gjson.GetBytes(forwarded, "input.9.id").Exists())
+	require.False(t, gjson.GetBytes(forwarded, `input.#(call_id=="call_search_1").id`).Exists())
+	require.Equal(t, "tsc_valid", gjson.GetBytes(forwarded, `input.#(call_id=="call_search_2").id`).String())
+	require.Equal(t, "item_output", gjson.GetBytes(forwarded, `input.#(id=="item_output").id`).String())
+	require.Equal(t, "call_123", gjson.GetBytes(forwarded, `input.#(id=="item_output").call_id`).String())
+	require.False(t, gjson.GetBytes(forwarded, `input.#(type=="web_search_call").id`).Exists())
 }
 
 func TestOpenAIGatewayService_OAuthPassthrough_SanitizesNativeToolItemIDs(t *testing.T) {
@@ -111,8 +111,8 @@ func TestOpenAIGatewayService_OAuthPassthrough_SanitizesNativeToolItemIDs(t *tes
 			require.Equal(t, "https://chatgpt.com/backend-api/codex/responses", upstream.lastReq.URL.String())
 			require.False(t, gjson.GetBytes(upstream.lastBody, "input.0.id").Exists())
 			require.Equal(t, "ctc_valid", gjson.GetBytes(upstream.lastBody, "input.1.id").String())
-			require.False(t, gjson.GetBytes(upstream.lastBody, "input.2.id").Exists())
-			require.Equal(t, "tsc_valid", gjson.GetBytes(upstream.lastBody, "input.3.id").String())
+			require.False(t, gjson.GetBytes(upstream.lastBody, `input.#(call_id=="call_search_1").id`).Exists())
+			require.Equal(t, "tsc_valid", gjson.GetBytes(upstream.lastBody, `input.#(call_id=="call_search_2").id`).String())
 		})
 	}
 }
@@ -155,7 +155,10 @@ func TestOpenAIGatewayService_SetupTokenLegacy_SanitizesAndTransforms(t *testing
 	require.Equal(t, "max", gjson.GetBytes(upstream.lastBody, "reasoning.effort").String())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "reasoning.mode").Exists())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "input.0.id").Exists())
-	require.Len(t, gjson.GetBytes(upstream.lastBody, "input").Array(), 1)
+	require.Len(t, gjson.GetBytes(upstream.lastBody, "input").Array(), 2)
+	require.Equal(t, "custom_tool_call_output", gjson.GetBytes(upstream.lastBody, "input.1.type").String())
+	require.Equal(t, gjson.GetBytes(upstream.lastBody, "input.0.call_id").String(), gjson.GetBytes(upstream.lastBody, "input.1.call_id").String())
+	require.Contains(t, gjson.GetBytes(upstream.lastBody, "input.1.output").String(), "tool_output_missing")
 }
 
 // TestOpenAIGatewayService_APIKeyPassthrough_StripsInvalidReasoningItemIDs

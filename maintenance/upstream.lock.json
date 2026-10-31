@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.60",
-  "imported_commit": "1edc1d3ed6f97981e7022fd3db3c5d1f396169ce",
+  "imported_version": "2.2.62",
+  "imported_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.2.60",
-  "latest_observed_release_commit": "1edc1d3ed6f97981e7022fd3db3c5d1f396169ce",
-  "latest_observed_main_commit": "b4dc02d5296195a230e21d04edbfee5d55753157",
+  "latest_observed_version": "2.2.62",
+  "latest_observed_release_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
+  "latest_observed_main_commit": "824414ca18d5e98a1b1f09e0ecbc8e74a357e5ee",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.60",
-  "reviewed_release_commit": "1edc1d3ed6f97981e7022fd3db3c5d1f396169ce",
+  "reviewed_release_tag": "v2.2.62",
+  "reviewed_release_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
   "observed_delta_review": {
-    "from_commit": "636250da69e9b9d66a9abf9945292e9ccfd76441",
-    "to_commit": "1edc1d3ed6f97981e7022fd3db3c5d1f396169ce",
-    "status": "selective_formal_v2260_adapted_with_explicit_deferrals",
-    "scope": "Native Responses interrupted tool outputs, viewport-safe usage details, endpoint minimum recharge visibility and existing error-log request IDs. Preserve reasoning isolation and financial policies; no role demotion, 404 refunds, new Ops/Hosted/Terra or source theme.",
-    "evidence": "maintenance/notes/upstream-sync-20261030-v2260.md"
+    "from_commit": "1edc1d3ed6f97981e7022fd3db3c5d1f396169ce",
+    "to_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
+    "status": "selective_formal_v2262_adapted_with_existing_deferrals",
+    "scope": "Recognize Chanshui partial/error/failed terminal audits in the existing opt-in runner; preserve evidence-based decisions, consent and per-plan pause ownership. The v2.2.61 upstream-ID NULL fallback is already implemented locally. No new modules, migrations or billing changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261031-v2262.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "1edc1d3ed6f97981e7022fd3db3c5d1f396169ce",
+    "source_head": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
     "implemented_with_local_regression": [
+      "Formal v2.2.61-v2.2.62: existing error-log NULL fallback confirmed; adapt partial/error/failed audit terminal states without enabling quality checks or importing deferred Ops/timers. See maintenance/notes/upstream-sync-20261031-v2262.md",
       "Formal v2.2.60 selected native Responses missing tool outputs, endpoint visibility, mobile usage details and error-log IDs; preserve scoped reasoning and uncertain media holds. See maintenance/notes/upstream-sync-20261030-v2260.md",
       "Formal v2.2.53 selective cache/reasoning, delivered video, batched window stats and virtual-row adaptations; vue-i18n upgraded to fixed 11.4.16 instead of importing an audit exception. Scope and final validation: maintenance/notes/upstream-sync-20261029.md",
       "Formal v2.2.42 selected native DeepSeek reasoning replay, TypeSafe versioned endpoint and Gemini503 protocol fixes plus compatible Go dependency updates. Module classification and explicit deferrals recorded in 2026-10-28 v2242 note; final local validation recorded separately.",
@@ -505,5 +506,21 @@
     "deferred": "Real assistant role demotion, unrecoverable reasoning deletion, Hosted synthetic history, 404/410 media auto-refunds, Terra, price comparison, Ops/capture/timers, removed tickets and source theme.",
     "migration": "None. Existing migrations, Ent, Go and frontend dependency files unchanged.",
     "release_status": "User authorized GitHub submission and deployment on 2026-10-30. Prepare personal v2.1.43; PR/CI, immutable Release/GHCR artifacts and production acceptance recorded separately. No migration or dependency changes."
+  },
+  "sync_20261031_v2262": {
+    "evidence": "maintenance/notes/upstream-sync-20261031-v2262.md",
+    "reviewed_release_tag": "v2.2.62",
+    "reviewed_release_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
+    "selected_commits": [
+      "b3ad123c16a0f24aa38849392141aceeaf763bf1"
+    ],
+    "already_covered_commits": [
+      "fc624b76917908362cf07dd00e1811374c83a322"
+    ],
+    "selected_scope": "Only the existing opt-in Chanshui runner: evaluate done/partial with the unchanged evidence policy and config hash; record error/failed as unknown with a redacted report. Recognize terminal create responses while preserving the existing persisted-ID and GET lifecycle. Retain malformed-status rejection.",
+    "preserved": "Default-off quality checks, send-time consent, same-origin polling, no repeated submission after ambiguous acceptance, durable-result-before-state-change ordering, per-plan pause ownership, local UI, billing and all prior explicit exclusions.",
+    "migration": "None. Existing migrations, Ent and Go dependencies remain unchanged.",
+    "release_dependency_fix": "Upgrade frontend follow-redirects from 1.16.1 to the patched 1.16.2 for newly disclosed GHSA-mrwp-f3q8-3g9p; retain the existing SheetJS integrity and all other dependency resolutions. No audit exemption.",
+    "release_status": "User authorized code review, GitHub submission, deployment and local cache cleanup on 2026-10-31. Prepare personal v2.1.44 via PR/CI, own GHCR and the verified controlled updater; source/artifact/runtime acceptance evidence is recorded separately."
   }
 }

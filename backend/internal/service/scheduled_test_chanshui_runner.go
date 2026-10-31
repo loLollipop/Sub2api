@@ -44,7 +44,8 @@ func (s *ScheduledTestRunnerService) runChanshuiPlan(ctx context.Context, plan *
 			report["verdict"] = data["verdict"]
 			report["probes"] = data["probes"]
 			report["audit_status"] = data["status"]
-			if data["status"] == "done" {
+			auditStatus, _ := data["status"].(string)
+			if auditStatus == "done" || auditStatus == "partial" {
 				decision := ChanshuiDecision{Status: "unknown", Reason: "检测期间配置发生变化，下一轮按当前停止条件重新判断"}
 				if state != nil && state.DecisionConfigHash != "" && state.DecisionConfigHash == chanshuiDecisionConfigHash(plan) {
 					decision = chanshui.EvaluateStopCondition(plan.ModelID, plan.QualityConfig, data)
@@ -96,10 +97,10 @@ func (s *ScheduledTestRunnerService) runChanshuiPlan(ctx context.Context, plan *
 		}
 		id, _ := data["id"].(string)
 		status, _ := data["status"].(string)
-		if id != state.ID || (status != "queued" && status != "running" && status != "done") {
+		if id != state.ID || !chanshuiPollStatusKnown(status) {
 			return finish("unknown", "掺水返回了无法识别的任务状态。", nil, "")
 		}
-		if status != "done" {
+		if status == "queued" || status == "running" {
 			state.Status = status
 			if err := repo.SetChanshuiAudit(ctx, plan.ID, state); err != nil {
 				return nil, 0, fmt.Errorf("cannot persist audit progress")
@@ -111,6 +112,9 @@ func (s *ScheduledTestRunnerService) runChanshuiPlan(ctx context.Context, plan *
 			if a, e := s.accountTestSvc.accountRepo.GetByID(ctx, plan.AccountID); e == nil && a != nil {
 				secret = a.GetCredential("api_key")
 			}
+		}
+		if status == "error" || status == "failed" {
+			return finish("unknown", "掺水检测失败，保持当前调度状态。", data, secret)
 		}
 		return finish("completed", "掺水检测完成。", data, secret)
 	}
@@ -180,7 +184,7 @@ func (s *ScheduledTestRunnerService) runChanshuiPlan(ctx context.Context, plan *
 	expires, _ := data["expires_at"].(float64)
 	status, _ := data["status"].(string)
 	pollURL, err := chanshui.PollURL(copyPlan.QualityConfig.BaseURL, poll, id)
-	if err != nil || expires <= float64(now.Unix()) || (status != "queued" && status != "running" && status != "done") {
+	if err != nil || expires <= float64(now.Unix()) || !chanshuiPollStatusKnown(status) {
 		return finish("unknown", "掺水创建响应缺少有效的检测编号、轮询地址、状态或有效期；本轮不重复提交。", nil, key)
 	}
 	state = &ChanshuiAuditState{ID: id, PollURL: pollURL, ServiceURL: copyPlan.QualityConfig.BaseURL, StartedAt: now, ExpiresAt: int64(expires), KeyFingerprint: chanshui.Fingerprint(key), Status: status, Skipped: chanshui.Redact(data["skipped"], key, ""), DecisionConfigHash: chanshuiDecisionConfigHash(&copyPlan)}
@@ -188,6 +192,17 @@ func (s *ScheduledTestRunnerService) runChanshuiPlan(ctx context.Context, plan *
 		return finish("unknown", "掺水已接受任务，但本地保存轮询状态失败；本轮不重复提交。", nil, key)
 	}
 	return nil, time.Minute, nil
+}
+
+// partial contains a final report even if some probes failed. error/failed also
+// finish the audit; only queued/running should continue polling.
+func chanshuiPollStatusKnown(status string) bool {
+	switch status {
+	case "queued", "running", "done", "partial", "error", "failed":
+		return true
+	default:
+		return false
+	}
 }
 
 // Re-read consent at the external request boundary. A disabled/deleted plan or

@@ -46,4 +46,10 @@ Release API 确认为非草稿、非预发布，tag 以独立远端 release refs
 
 证据位于工作区 `development/diagnostics/upstream-v2262-20261031/`：`baseline.json`、正式 release JSON、完整增量、`backend-before.jsonl`、`backend-final.jsonl` 及对应 summary、`backend-build.log`、`preservation.json`、`sensitive-scan.log` 和独立审查记录。不提交环境证据或构建产物；验证用可执行文件 `server-validation.exe` 留在该目录并记录哈希，供后续统一清理。
 
-发布阶段仅追加个人 VERSION 及本版发行说明；不扩展上述同步范围。既有本地检查结果为同步阶段证据，v2.1.44 的最终提交、PR/main CI、Release/GHCR 二进制一致性、备份实际恢复、受控部署及缓存清理，以 `development/diagnostics/sub2api-release-v2144-20261031/` 及对应清理记录为准。
+发布阶段追加个人 VERSION、本版发行说明及下述 CI 发现的依赖安全修复。既有本地检查结果为同步阶段证据，v2.1.44 的最终提交、PR/main CI、Release/GHCR 二进制一致性、备份实际恢复、受控部署及缓存清理，以 `development/diagnostics/sub2api-release-v2144-20261031/` 及对应清理记录为准。
+
+## 发布前依赖安全修复
+
+初始 PR/push Security Scan 命中新披露的 GHSA-mrwp-f3q8-3g9p：follow-redirects 1.16.0–1.16.1 的跨 realm 数组识别可能丢弃自定义敏感头名单。安全检查未通过时没有合并、发版或部署。将最小安全覆盖调整为 `<1.16.2 → >=1.16.2`，锁文件仅将该包及 Axios 的引用从 1.16.1 更新为 1.16.2；其他依赖与既有 SheetJS integrity 保持不变，不添加安全豁免。此项发生在同步阶段之后，不把此前无依赖变更的验证记录当作最终依赖验收。
+
+修复后的生产依赖审计为 0 漏洞；与 CI 一样使用 `--prod`，不声称开发工具的完整依赖树无漏洞。双本机 HTTP 服务验证安装的 1.16.2 在普通数组与 `node:vm` 跨 realm 数组下均移除自定义敏感头，并保留无害头。前端全量 3,156 项通过、1 项跳过、0 失败；TypeScript、全量 ESLint、生产构建和资源校验通过。

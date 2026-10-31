@@ -519,7 +519,8 @@
     ],
     "selected_scope": "Only the existing opt-in Chanshui runner: evaluate done/partial with the unchanged evidence policy and config hash; record error/failed as unknown with a redacted report. Recognize terminal create responses while preserving the existing persisted-ID and GET lifecycle. Retain malformed-status rejection.",
     "preserved": "Default-off quality checks, send-time consent, same-origin polling, no repeated submission after ambiguous acceptance, durable-result-before-state-change ordering, per-plan pause ownership, local UI, billing and all prior explicit exclusions.",
-    "migration": "None. Existing migrations, Ent and Go/frontend dependencies remain unchanged.",
+    "migration": "None. Existing migrations, Ent and Go dependencies remain unchanged.",
+    "release_dependency_fix": "Upgrade frontend follow-redirects from 1.16.1 to the patched 1.16.2 for newly disclosed GHSA-mrwp-f3q8-3g9p; retain the existing SheetJS integrity and all other dependency resolutions. No audit exemption.",
     "release_status": "User authorized code review, GitHub submission, deployment and local cache cleanup on 2026-10-31. Prepare personal v2.1.44 via PR/CI, own GHCR and the verified controlled updater; source/artifact/runtime acceptance evidence is recorded separately."
   }
 }

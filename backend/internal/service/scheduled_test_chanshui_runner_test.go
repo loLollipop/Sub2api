@@ -304,3 +304,85 @@ func TestChanshuiPersistFailureCannotChangeScheduling(t *testing.T) {
 	require.True(t, account.Schedulable)
 	require.Zero(t, accounts.changes)
 }
+
+func TestChanshuiTerminalReportsUseOnlyValidEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name, status, model, probeStatus, want string
+		paused, changedConfig, wantSchedulable bool
+	}{
+		{name: "partial match recovers own pause", status: "partial", model: "gpt-test", probeStatus: "done", want: "audit_pass", paused: true, wantSchedulable: true},
+		{name: "partial mismatch pauses", status: "partial", model: "different-model", probeStatus: "done", want: "audit_fail"},
+		{name: "partial failed probe cannot recover", status: "partial", model: "gpt-test", probeStatus: "error", want: "unknown", paused: true},
+		{name: "partial missing evidence cannot recover", status: "partial", probeStatus: "done", want: "unknown", paused: true},
+		{name: "partial changed policy cannot recover", status: "partial", model: "gpt-test", probeStatus: "done", want: "unknown", paused: true, changedConfig: true},
+		{name: "error cannot recover", status: "error", model: "gpt-test", probeStatus: "done", want: "unknown", paused: true},
+		{name: "failed cannot recover", status: "failed", model: "gpt-test", probeStatus: "done", want: "unknown", paused: true},
+		{name: "error cannot pause", status: "error", model: "different-model", probeStatus: "done", want: "unknown", wantSchedulable: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gets := 0
+			runner, repo, results, plan, accounts := newChanshuiTestRunner(func(req *http.Request) (*http.Response, error) {
+				require.Equal(t, http.MethodGet, req.Method, "terminal audits must not trigger a new submission")
+				gets++
+				body := fmt.Sprintf(`{"id":"terminal-fixture","status":%q,"probes":[{"id":"fingerprint","status":%q},{"id":"iq","status":"error","error":"fixture-upstream-key"}],"verdict":{"fingerprint":{"top_model":%q}}}`, tc.status, tc.probeStatus, tc.model)
+				return chanshuiTestResponse(200, body), nil
+			})
+			if tc.paused {
+				accounts.account.Schedulable = false
+				accounts.account.Extra = map[string]any{ChanshuiQualityPausesExtraKey: map[string]any{"1": true}}
+			}
+			repo.state = &ChanshuiAuditState{ID: "terminal-fixture", PollURL: "https://audit.example/api/v1/audits/terminal-fixture", ServiceURL: "https://audit.example", StartedAt: time.Now(), ExpiresAt: time.Now().Add(time.Hour).Unix(), DecisionConfigHash: chanshuiDecisionConfigHash(plan)}
+			if tc.changedConfig {
+				plan.ModelID = "changed-model"
+			}
+			runner.runOnePlan(context.Background(), plan)
+			require.Equal(t, 1, gets)
+			require.Zero(t, repo.reserves)
+			require.Empty(t, repo.deferred, "terminal reports must finish this run")
+			require.Nil(t, repo.state)
+			require.Len(t, results.results, 1)
+			result := results.results[0]
+			require.Equal(t, tc.want, result.Status)
+			require.Equal(t, tc.wantSchedulable, accounts.account.Schedulable)
+			var report map[string]any
+			require.NoError(t, json.Unmarshal([]byte(result.ResponseText), &report))
+			require.Equal(t, tc.status, report["audit_status"])
+			require.Contains(t, report, "probes")
+			require.NotContains(t, result.ResponseText, "fixture-upstream-key")
+			require.NotContains(t, result.ErrorMessage, "无法识别")
+		})
+	}
+}
+
+func TestChanshuiTerminalCreateResponsesAreRetainedAndPolled(t *testing.T) {
+	for _, status := range []string{"done", "partial", "error", "failed"} {
+		t.Run(status, func(t *testing.T) {
+			posts, gets := 0, 0
+			runner, repo, results, plan, _ := newChanshuiTestRunner(func(req *http.Request) (*http.Response, error) {
+				if req.Method == http.MethodPost {
+					posts++
+					return chanshuiTestResponse(202, fmt.Sprintf(`{"id":"created-fixture","status":%q,"poll_url":"/api/v1/audits/created-fixture","expires_at":%d}`, status, time.Now().Add(time.Hour).Unix())), nil
+				}
+				require.Equal(t, http.MethodGet, req.Method)
+				gets++
+				return chanshuiTestResponse(200, fmt.Sprintf(`{"id":"created-fixture","status":%q,"verdict":{"fingerprint":{"top_model":"gpt-test"}}}`, status)), nil
+			})
+			runner.runOnePlan(context.Background(), plan)
+			require.Empty(t, results.results)
+			require.NotNil(t, repo.state)
+			require.Equal(t, status, repo.state.Status)
+			require.Equal(t, "created-fixture", repo.state.ID)
+			runner.runOnePlan(context.Background(), plan)
+			require.Equal(t, 1, posts)
+			require.Equal(t, 1, gets)
+			require.Equal(t, 1, repo.reserves)
+			require.Nil(t, repo.state)
+			require.Len(t, results.results, 1)
+			if status == "error" || status == "failed" {
+				require.Equal(t, "unknown", results.results[0].Status)
+			} else {
+				require.Equal(t, "audit_pass", results.results[0].Status)
+			}
+		})
+	}
+}

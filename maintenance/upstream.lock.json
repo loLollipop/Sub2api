@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.62",
-  "imported_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
+  "imported_version": "2.2.66",
+  "imported_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.2.62",
-  "latest_observed_release_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
-  "latest_observed_main_commit": "824414ca18d5e98a1b1f09e0ecbc8e74a357e5ee",
+  "latest_observed_version": "2.2.66",
+  "latest_observed_release_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
+  "latest_observed_main_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.62",
-  "reviewed_release_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
+  "reviewed_release_tag": "v2.2.66",
+  "reviewed_release_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
   "observed_delta_review": {
-    "from_commit": "1edc1d3ed6f97981e7022fd3db3c5d1f396169ce",
-    "to_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
-    "status": "selective_formal_v2262_adapted_with_existing_deferrals",
-    "scope": "Recognize Chanshui partial/error/failed terminal audits in the existing opt-in runner; preserve evidence-based decisions, consent and per-plan pause ownership. The v2.2.61 upstream-ID NULL fallback is already implemented locally. No new modules, migrations or billing changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261031-v2262.md"
+    "from_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
+    "to_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
+    "status": "selective_formal_v2266_adapted_with_existing_deferrals",
+    "scope": "Cap positive Gemini Flash thinking budgets in the existing Antigravity converter, using the final mapped model. Preserve dynamic and non-Flash budgets, standalone DeepSeek tools, local UI and payment removals. No Hosted execution, migrations, billing or dependency changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261101-v2266.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
+    "source_head": "bbb057ebf308d983cc3201fd3441793691a9af54",
     "implemented_with_local_regression": [
+      "Formal v2.2.63-v2.2.66: cap explicit Gemini Flash thinking budgets across model generations; preserve mapped-model selection and existing exclusions. See maintenance/notes/upstream-sync-20261101-v2266.md",
       "Formal v2.2.61-v2.2.62: existing error-log NULL fallback confirmed; adapt partial/error/failed audit terminal states without enabling quality checks or importing deferred Ops/timers. See maintenance/notes/upstream-sync-20261031-v2262.md",
       "Formal v2.2.60 selected native Responses missing tool outputs, endpoint visibility, mobile usage details and error-log IDs; preserve scoped reasoning and uncertain media holds. See maintenance/notes/upstream-sync-20261030-v2260.md",
       "Formal v2.2.53 selective cache/reasoning, delivered video, batched window stats and virtual-row adaptations; vue-i18n upgraded to fixed 11.4.16 instead of importing an audit exception. Scope and final validation: maintenance/notes/upstream-sync-20261029.md",
@@ -522,5 +523,19 @@
     "migration": "None. Existing migrations, Ent and Go dependencies remain unchanged.",
     "release_dependency_fix": "Upgrade frontend follow-redirects from 1.16.1 to the patched 1.16.2 for newly disclosed GHSA-mrwp-f3q8-3g9p; retain the existing SheetJS integrity and all other dependency resolutions. No audit exemption.",
     "release_status": "User authorized code review, GitHub submission, deployment and local cache cleanup on 2026-10-31. Prepare personal v2.1.44 via PR/CI, own GHCR and the verified controlled updater; source/artifact/runtime acceptance evidence is recorded separately."
+  },
+  "sync_20261101_v2266": {
+    "evidence": "maintenance/notes/upstream-sync-20261101-v2266.md",
+    "reviewed_release_tag": "v2.2.66",
+    "reviewed_release_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
+    "selected_commits": [
+      "0f4db7fcc733ea471afcb91528070c9889e2c4ff"
+    ],
+    "selected_scope": "Only the existing Antigravity generation-config converter: apply the 24576 explicit thinking-budget cap to Gemini Flash generations using the already-selected final mapped model. Keep smaller explicit budgets, dynamic -1, Pro and Claude behavior and caller immutability.",
+    "already_covered": "The checked Chanshui status assertion from 21bd7341d and patched follow-redirects 1.16.2 were already applied in personal v2.1.44; do not import an audit exception.",
+    "deferred": "Hosted DeepSeek search-tool injection/execution, removed native/crypto payments and sweep reconciliation, source ink-sakura/Nuxt-like themes and source-only asset-check relaxation.",
+    "preserved": "Local shadcn UI, grouped model plaza, native routing and reasoning isolation, standalone Search/Fetch, billing and refund contracts, Grok refusal/session policies and existing feature removals.",
+    "migration": "None. Existing migrations, Ent and both Go/frontend dependency manifests unchanged.",
+    "release_status": "User authorized GitHub submission and deployment on 2026-11-01. Prepare personal v2.1.45 via PR/CI, own GHCR and the verified controlled updater; final source/artifact/runtime acceptance evidence is recorded separately. No frontend, dependency or migration changes."
   }
 }

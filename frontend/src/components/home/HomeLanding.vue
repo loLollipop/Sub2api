@@ -1,5 +1,6 @@
 <template>
   <div class="home-landing" :class="{ 'home-landing--dark': isDark }" data-testid="default-home">
+    <GGBondBackdrop variant="home" />
     <header class="landing-header">
       <nav class="landing-nav landing-container" :aria-label="t('home.landing.navigation')">
         <router-link to="/" class="landing-brand" :title="siteName">
@@ -84,7 +85,6 @@
         <div class="landing-footer__bottom">
           <p>&copy; {{ new Date().getFullYear() }} {{ siteName }}</p>
           <LegalFooterLinks />
-          <a :href="githubUrl" target="_blank" rel="noopener noreferrer">GitHub <Icon name="arrowUpRight" size="xs" aria-hidden="true" /></a>
         </div>
         <p class="landing-footer__risk">{{ t('home.footer.riskStrip') }}</p>
       </div>
@@ -103,6 +103,7 @@ import PlazaProviderIcon from '@/components/modelPlaza/PlazaProviderIcon.vue'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import HomeApiPreview from './HomeApiPreview.vue'
 import HomeModelOrbit from './HomeModelOrbit.vue'
+import GGBondBackdrop from '@/components/common/GGBondBackdrop.vue'
 
 const props = defineProps<{
   siteName: string
@@ -110,7 +111,6 @@ const props = defineProps<{
   siteSubtitle: string
   docUrl: string
   apiBaseUrl: string
-  githubUrl: string
   isDark: boolean
   isAuthenticated: boolean
   dashboardPath: string
@@ -143,7 +143,7 @@ const brands = [
   font-display: swap;
 }
 .home-landing {
-  --home-bg: #faf9f6;
+  --home-bg: #f8f4ed;
   --home-panel: #fffefa;
   --home-code-bg: #f4f2ee;
   --home-ink: #302d29;
@@ -167,6 +167,8 @@ const brands = [
   --syntax-placeholder: #536885;
   --signal-text: var(--home-ink);
   display: flex;
+  position: relative;
+  isolation: isolate;
   flex-direction: column;
   min-height: 100svh;
   background: var(--home-bg);
@@ -174,23 +176,23 @@ const brands = [
   -webkit-font-smoothing: antialiased;
 }
 .home-landing--dark {
-  --home-bg: #171816;
-  --home-panel: #21221f;
-  --home-code-bg: #292a25;
-  --home-ink: #ede9e1;
-  --home-muted: #b0aaa0;
-  --home-line: #383930;
-  --home-accent: #eea06c;
-  --home-accent-soft: #382c23;
-  --home-on-accent: #2a1c12;
+  --home-bg: #111318;
+  --home-panel: #1b1e24;
+  --home-code-bg: #15181d;
+  --home-ink: #f3f4f6;
+  --home-muted: #a7aeb9;
+  --home-line: #343943;
+  --home-accent: #fb923c;
+  --home-accent-soft: #3b291c;
+  --home-on-accent: #25160c;
   --home-shadow: #00000090;
-  --home-orbit-line: #bd936640;
+  --home-orbit-line: #c5a47726;
   --home-orbit-point: #d49663;
   --home-orbit-halo: #d4966310;
-  --home-brand-line: #4b453a;
-  --home-brand-surface: #252620ad;
-  --home-glow: #b16a2e1a;
-  --home-sage: #87987714;
+  --home-brand-line: #343943;
+  --home-brand-surface: #1b1e24ad;
+  --home-glow: #b65e2608;
+  --home-sage: transparent;
   --syntax-command: #d6a7ff;
   --syntax-url: #eea06c;
   --syntax-key: #edb477;
@@ -257,9 +259,8 @@ const brands = [
 .landing-doc-link { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin-top: 22px; color: var(--home-accent); font-size: 12px; }
 .landing-doc-link:hover { text-decoration: underline; text-underline-offset: 5px; }
 .landing-footer { padding-block: 22px; border-top: 1px solid var(--home-line); color: var(--home-muted); }
-.landing-footer__bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; font-size: 11px; }
+.landing-footer__bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px 28px; font-size: 11px; }
 .landing-footer__bottom > p { overflow-wrap: anywhere; }
-.landing-footer__bottom > a { display: inline-flex; justify-self: end; align-items: center; gap: 5px; min-height: 30px; }
 .landing-footer__risk { max-width: 850px; margin: 10px auto 0; text-align: center; font-size: 10px; line-height: 1.8; }
 .home-landing :is(a, button):focus-visible { outline: 2px solid var(--home-accent); outline-offset: 4px; }
 @media (max-width: 1100px) {
@@ -313,8 +314,8 @@ const brands = [
   .landing-integration__description { font-size: 12px; }
   .landing-features { gap: 20px; margin-top: 26px; }
   .landing-doc-link { margin-top: 16px; }
-  .landing-footer__bottom { grid-template-columns: 1fr auto; gap: 8px 16px; }
-  .landing-footer__bottom :deep(.legal-footer-links) { grid-column: 1 / -1; grid-row: 2; }
+  .landing-footer__bottom { justify-content: center; gap: 12px; }
+  .landing-footer__bottom :deep(.legal-footer-links) { width: 100%; }
   .landing-footer__risk { font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {

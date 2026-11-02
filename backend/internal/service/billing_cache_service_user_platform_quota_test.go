@@ -859,3 +859,7 @@ func TestUserPlatformQuotaRequestStateReusesPreflightForPostBillingGuard(t *test
 		t.Fatalf("expected one Redis quota read across preflight and post-billing guard, got %d", got)
 	}
 }
+
+func (s *fakeQuotaRepo) ListByUsers(context.Context, []int64) (map[int64][]UserPlatformQuotaRecord, error) {
+	return nil, nil
+}

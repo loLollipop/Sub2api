@@ -12,7 +12,8 @@ const {
   getAllGroups,
   getBatchUsersUsage,
   listEnabledDefinitions,
-  getBatchUserAttributes
+  getBatchUserAttributes,
+  getPlatformQuotas
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
   deleteUser: vi.fn(),
@@ -21,7 +22,8 @@ const {
   getAllGroups: vi.fn(),
   getBatchUsersUsage: vi.fn(),
   listEnabledDefinitions: vi.fn(),
-  getBatchUserAttributes: vi.fn()
+  getBatchUserAttributes: vi.fn(),
+  getPlatformQuotas: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -29,7 +31,8 @@ vi.mock('@/api/admin', () => ({
     users: {
       list: listUsers,
       toggleStatus: vi.fn(),
-      delete: deleteUser
+      delete: deleteUser,
+      getPlatformQuotas
     },
     groups: {
       getAll: getAllGroups
@@ -105,6 +108,7 @@ const DataTableStub = {
       </template>
       <div v-for="row in data" :key="row.id">
         <slot name="cell-last_used_at" :value="row.last_used_at" :row="row" />
+        <slot name="cell-balance_platform_quota" :row="row" />
       </div>
     </div>
   `
@@ -177,6 +181,7 @@ describe('admin UsersView', () => {
     getBatchUsersUsage.mockReset()
     listEnabledDefinitions.mockReset()
     getBatchUserAttributes.mockReset()
+    getPlatformQuotas.mockReset()
 
     listUsers.mockResolvedValue({
       items: [createAdminUser()],
@@ -494,4 +499,77 @@ describe('admin UsersView', () => {
     expect(wrapper.find('[data-test="bulk-edit-limits"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="selected-keys"]').text()).toBe('')
   })
+  function showQuotaColumn() {
+    localStorage.setItem('user-column-settings-version', '3')
+    localStorage.setItem('user-hidden-columns', JSON.stringify([
+      'notes', 'groups', 'subscriptions', 'usage', 'concurrency',
+      'usage_anthropic', 'usage_openai', 'usage_gemini', 'usage_antigravity'
+    ]))
+  }
+
+  const quotaItem = (usage: number) => ({ platform: 'anthropic', daily_limit_usd: 5,
+    weekly_limit_usd: null, monthly_limit_usd: null, daily_usage_usd: usage,
+    weekly_usage_usd: 0, monthly_usage_usd: 0 })
+
+  it('requests inline quotas only for a visible column and avoids per-user requests', async () => {
+    showQuotaColumn()
+    listUsers.mockResolvedValue({ items: [createAdminUser({ platform_quotas: [quotaItem(1)] })],
+      total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    expect(listUsers).toHaveBeenLastCalledWith(1, 20,
+      expect.objectContaining({ include_platform_quotas: true, include_subscriptions: true }), expect.any(Object))
+    expect(wrapper.text()).toContain('1/5')
+    expect(getPlatformQuotas).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('does not request inline quotas when the quota column is hidden', async () => {
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    expect(listUsers).toHaveBeenLastCalledWith(1, 20,
+      expect.objectContaining({ include_platform_quotas: false }), expect.any(Object))
+    expect(getPlatformQuotas).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('distinguishes an unavailable quota batch from successfully unconfigured quotas', async () => {
+    showQuotaColumn()
+    listUsers.mockResolvedValue({ items: [createAdminUser()], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    expect(wrapper.find('[title="admin.users.platformQuota.cellUnavailable"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('admin.users.platformQuota.cellNotConfigured')
+    listUsers.mockResolvedValue({ items: [createAdminUser({ platform_quotas: [] })], total: 1, page: 1, page_size: 20, pages: 1 })
+    await wrapper.get('[data-test="next-page"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.users.platformQuota.cellNotConfigured')
+    wrapper.unmount()
+  })
+
+  it('rejects late list quota data and refreshes quotas after editing', async () => {
+    showQuotaColumn()
+    let resolveFirst!: (value: unknown) => void
+    listUsers.mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve }))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    const firstSignal = listUsers.mock.calls[0][3].signal as AbortSignal
+    listUsers.mockResolvedValue({ items: [createAdminUser({ platform_quotas: [quotaItem(2)] })],
+      total: 1, page: 1, page_size: 20, pages: 1 })
+    await wrapper.get('[data-test="sort-last-used"]').trigger('click')
+    await flushPromises()
+    expect(firstSignal.aborted).toBe(true)
+    resolveFirst({ items: [createAdminUser({ platform_quotas: [quotaItem(4)] })],
+      total: 1, page: 1, page_size: 20, pages: 1 })
+    await flushPromises()
+    expect(wrapper.text()).toContain('2/5')
+    expect(wrapper.text()).not.toContain('4/5')
+    listUsers.mockResolvedValue({ items: [createAdminUser({ platform_quotas: [quotaItem(3)] })],
+      total: 1, page: 1, page_size: 20, pages: 1 })
+    wrapper.findComponent({ name: 'UserPlatformQuotaModal' }).vm.$emit('success')
+    await flushPromises()
+    expect(wrapper.text()).toContain('3/5')
+    wrapper.unmount()
+  })
+
 })

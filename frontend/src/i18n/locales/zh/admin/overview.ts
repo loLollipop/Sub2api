@@ -791,6 +791,7 @@ export default {
         windowDaily: '日',
         windowWeekly: '周',
         windowMonthly: '月',
+        cellUnavailable: '配额数据暂不可用',
         cellNotConfigured: '未配置',
         cellColumnTooltip: '仅展示已设限额的平台',
         subscriptionWarning: '此用户有活跃订阅，平台限额仅在余额（标准）模式下生效，订阅模式请求不受此限额约束。',
@@ -800,6 +801,8 @@ export default {
 
     // Groups Management
     groups: {
+      capacityRuntimeHint: '实时用量来自运行缓存；总容量为配置限额。',
+      capacityUnknownHint: '实时用量暂不可用；仍显示配置的总容量。',
       title: '分组管理',
       description: '管理 API 密钥分组和费率配置',
       searchGroups: '搜索分组...',

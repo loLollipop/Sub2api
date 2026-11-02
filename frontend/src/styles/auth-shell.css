@@ -1,15 +1,12 @@
 /* Public account flows share the console's quiet surfaces and warm accent. */
 :is(.auth-shell, body:has(.auth-shell) > .modal-overlay) {
-  --auth-bg: #f8f9fb;
+  --auth-bg: #f7f4ef;
   --auth-panel: #ffffffc9;
   --auth-inset: #f3f4f680;
   --auth-edge: #e5e7eb;
   --auth-text: #1f2937;
   --auth-muted: #6b7280;
   --auth-accent: #c2410c;
-  --auth-warm: #edcdb96b;
-  --auth-cool: #bbd7e77a;
-  --auth-low: #d3e6df73;
 }
 .dark :is(.auth-shell, body:has(.auth-shell) > .modal-overlay) {
   --auth-bg: #111318;
@@ -19,12 +16,8 @@
   --auth-text: #f3f4f6;
   --auth-muted: #a7aeb9;
   --auth-accent: #fb923c;
-  --auth-warm: #73513b3d;
-  --auth-cool: #34567759;
-  --auth-low: #304f4b40;
 }
 .auth-shell { position: relative; isolation: isolate; min-height: 100dvh; padding: 116px 24px 32px; background: var(--auth-bg); color: var(--auth-text); font-size: 13px; line-height: 1.6; }
-.auth-shell::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 72vw 68vh at 0 0, var(--auth-warm), transparent 78%), radial-gradient(ellipse 70vw 80vh at 100% 8%, var(--auth-cool), transparent 76%), radial-gradient(ellipse 70vw 60vh at 36% 100%, var(--auth-low), transparent 80%); }
 .auth-content { width: 100%; max-width: 440px; min-width: 0; margin-inline: auto; }
 .auth-brand-block { position: absolute; top: 28px; left: 32px; right: 32px; }
 .auth-brand { display: inline-flex; align-items: center; max-width: 100%; gap: 10px; border-radius: 8px; color: var(--auth-text); }

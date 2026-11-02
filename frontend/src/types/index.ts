@@ -2,6 +2,8 @@
  * Core Type Definitions for Sub2API Frontend
  */
 
+import type { PlatformQuotaItem } from '@/api/admin/users'
+
 // ==================== Common Types ====================
 
 export interface SelectOption {
@@ -102,6 +104,8 @@ export interface User {
 }
 
 export interface AdminUser extends User {
+  // Present (including []) on a successful opt-in batch read; absent if unavailable.
+  platform_quotas?: PlatformQuotaItem[]
   // 管理员备注（普通用户接口不返回）
   notes: string
   last_used_at?: string | null

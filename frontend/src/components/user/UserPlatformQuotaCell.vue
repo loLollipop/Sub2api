@@ -1,5 +1,6 @@
 <template>
-  <span v-if="props.quotas === undefined" class="text-xs text-gray-400 dark:text-gray-500">…</span>
+  <span v-if="props.unavailable" class="text-xs text-gray-400 dark:text-gray-500" :title="t('admin.users.platformQuota.cellUnavailable')">—</span>
+  <span v-else-if="props.quotas === undefined" class="text-xs text-gray-400 dark:text-gray-500">…</span>
   <span v-else-if="configured.length === 0" class="text-xs text-gray-400 dark:text-gray-500">
     {{ t('admin.users.platformQuota.cellNotConfigured') }}
   </span>
@@ -32,7 +33,7 @@ import { useI18n } from 'vue-i18n'
 import type { PlatformQuotaItem } from '@/api/admin/users'
 import { listPlatformIds } from '@/constants/platformCatalog'
 
-const props = defineProps<{ quotas?: PlatformQuotaItem[] }>()
+const props = defineProps<{ quotas?: PlatformQuotaItem[]; unavailable?: boolean }>()
 const { t } = useI18n()
 
 function platformRank(platform: string): number {

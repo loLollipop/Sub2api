@@ -16,6 +16,7 @@ import {
   batchUpdateLimits,
   bindUserAuthIdentity,
   getUserApiKeys,
+  list,
   type AdminBindAuthIdentityRequest,
   type AdminBoundAuthIdentity,
   type BatchUpdateUserLimitsRequest,
@@ -167,5 +168,19 @@ describe('admin user API key pagination', () => {
     get.mockResolvedValue({ data: { items: [], total: 0, page: 1, page_size: 20, pages: 0 } })
     await getUserApiKeys(9)
     expect(get).toHaveBeenCalledWith('/admin/users/9/api-keys', { params: { page: 1, page_size: 20 } })
+  })
+})
+
+
+describe('admin users opt-in inline platform quotas', () => {
+  beforeEach(() => get.mockReset())
+  it.each([20, 50, 100])('forwards pagination and quota option (%i rows)', async (pageSize) => {
+    const response = { items: [], total: 0, page: 1, page_size: pageSize, pages: 1 }
+    const signal = new AbortController().signal
+    get.mockResolvedValue({ data: response })
+    await expect(list(1, pageSize, { include_platform_quotas: true }, { signal })).resolves.toEqual(response)
+    expect(get).toHaveBeenCalledWith('/admin/users', { params: expect.objectContaining({
+      page_size: pageSize, include_platform_quotas: true
+    }), signal })
   })
 })

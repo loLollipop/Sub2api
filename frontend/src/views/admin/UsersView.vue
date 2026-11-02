@@ -462,7 +462,7 @@
               :title="t('admin.users.platformQuota.cellColumnTooltip')"
               @click="handlePlatformQuota(row)"
             >
-              <UserPlatformQuotaCell :quotas="platformQuotaStats[row.id]" />
+              <UserPlatformQuotaCell :quotas="platformQuotaStats[row.id]" :unavailable="!loading && platformQuotaStats[row.id] === undefined" />
             </button>
           </template>
 
@@ -971,7 +971,9 @@ const toggleColumn = (key: string) => {
     hiddenColumns.add(key)
   }
   saveColumnsToStorage()
-  if (wasHidden && (key === 'usage' || key.startsWith('usage_') || key.startsWith('attr_') || key === 'balance_platform_quota')) {
+  if (wasHidden && key === 'balance_platform_quota') {
+    loadUsers()
+  } else if (wasHidden && (key === 'usage' || key.startsWith('usage_') || key.startsWith('attr_'))) {
     refreshCurrentPageSecondaryData()
   }
   if (key === 'subscriptions') {
@@ -1380,37 +1382,6 @@ const loadUsersSecondaryData = async (
     )
   }
 
-  if (hasVisiblePlatformQuotaColumn.value) {
-    tasks.push(
-      (async () => {
-        try {
-          // 无批量端点：对当前页用户逐个拉取，分块并发（每批 6），批间检查中止条件，避免大 pageSize 时请求洪峰
-          const CHUNK = 6
-          for (let i = 0; i < userIds.length; i += CHUNK) {
-            if (signal?.aborted) return
-            if (typeof expectedSeq === 'number' && expectedSeq !== secondaryDataSeq) return
-            const chunk = userIds.slice(i, i + CHUNK)
-            const results = await Promise.allSettled(
-              chunk.map((id) => adminAPI.users.getPlatformQuotas(id))
-            )
-            if (signal?.aborted) return
-            if (typeof expectedSeq === 'number' && expectedSeq !== secondaryDataSeq) return
-            const merged = { ...platformQuotaStats.value }
-            results.forEach((r, idx) => {
-              if (r.status === 'fulfilled') {
-                merged[chunk[idx]] = r.value.platform_quotas || []
-              }
-            })
-            platformQuotaStats.value = merged
-          }
-        } catch (e) {
-          if (signal?.aborted) return
-          console.error('Failed to load platform quotas:', e)
-        }
-      })()
-    )
-  }
-
   if (tasks.length > 0) {
     await Promise.allSettled(tasks)
   }
@@ -1420,7 +1391,7 @@ const refreshCurrentPageSecondaryData = () => {
   const userIds = users.value.map((u) => u.id)
   if (userIds.length === 0) return
   const seq = ++secondaryDataSeq
-  void loadUsersSecondaryData(userIds, undefined, seq)
+  void loadUsersSecondaryData(userIds, abortController?.signal, seq)
 }
 
 // Action Menu State
@@ -1562,6 +1533,8 @@ const loadUsers = async () => {
   abortController = currentAbortController
   const { signal } = currentAbortController
   loading.value = true
+  ++secondaryDataSeq
+  platformQuotaStats.value = {}
   try {
     // Build attribute filters from active filters
     const attrFilters: Record<number, string> = {}
@@ -1583,6 +1556,7 @@ const loadUsers = async () => {
         attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
         // 始终请求 subscriptions：列隐藏时仍需用于 UserPlatformQuotaModal 的 active-subscription 警示 banner
         include_subscriptions: true,
+        include_platform_quotas: hasVisiblePlatformQuotaColumn.value,
         sort_by: sortState.sort_by,
         sort_order: sortState.sort_order
       },
@@ -1596,7 +1570,14 @@ const loadUsers = async () => {
     pagination.pages = response.pages
     usageStats.value = {}
     userAttributeValues.value = {}
-    platformQuotaStats.value = {}
+    const quotas: Record<number, PlatformQuotaItem[]> = {}
+    if (hasVisiblePlatformQuotaColumn.value) {
+      for (const user of response.items) {
+        // An omitted field means unavailable; [] means successfully read, unconfigured.
+        if (Array.isArray(user.platform_quotas)) quotas[user.id] = user.platform_quotas
+      }
+    }
+    platformQuotaStats.value = quotas
 
     // Defer heavy secondary data so table can render first.
     if (response.items.length > 0) {

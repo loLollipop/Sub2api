@@ -194,3 +194,7 @@ func TestResolveSignupGrantPlan_DisabledAuthSourceStillCarriesGlobalQuota(t *tes
 		t.Error("P1 violated: disabled auth source path dropped global platform quota")
 	}
 }
+
+func (s *fakeInsertRecorder) ListByUsers(context.Context, []int64) (map[int64][]UserPlatformQuotaRecord, error) {
+	return nil, nil
+}

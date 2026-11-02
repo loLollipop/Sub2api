@@ -1,5 +1,6 @@
 <template>
   <div class="auth-shell">
+    <GGBondBackdrop variant="auth" />
     <div class="auth-brand-block">
       <RouterLink v-if="settingsLoaded" to="/" class="auth-brand">
         <span class="auth-logo">
@@ -36,6 +37,7 @@
 import { computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores'
 import LegalFooterLinks from '@/components/legal/LegalFooterLinks.vue'
+import GGBondBackdrop from '@/components/common/GGBondBackdrop.vue'
 import { sanitizeUrl } from '@/utils/url'
 import '@/styles/auth-shell.css'
 

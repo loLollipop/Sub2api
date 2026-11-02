@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -76,37 +77,7 @@ func (a *userPlatformQuotaServiceAdapter) ListByUser(ctx context.Context, userID
 		if quota == nil {
 			continue
 		}
-		now := time.Now()
-		d, w, m := quota.Current(now)
-		if d > 0 {
-			day := timezone.StartOfDay(now)
-			if rec.DailyWindowStart == nil || rec.DailyWindowStart.Before(day) {
-				rec.DailyUsageUSD = 0
-			}
-			rec.DailyUsageUSD = service.QuantizeUsageBillingAmount(rec.DailyUsageUSD + d)
-			rec.DailyWindowStart = &day
-		}
-		if w > 0 {
-			week := timezone.StartOfWeek(now)
-			if rec.WeeklyWindowStart == nil || rec.WeeklyWindowStart.Before(week) {
-				rec.WeeklyUsageUSD = 0
-			}
-			rec.WeeklyUsageUSD = service.QuantizeUsageBillingAmount(rec.WeeklyUsageUSD + w)
-			rec.WeeklyWindowStart = &week
-		}
-		if m > 0 {
-			if rec.MonthlyWindowStart == nil || now.Sub(*rec.MonthlyWindowStart) >= 30*24*time.Hour {
-				rec.MonthlyUsageUSD = 0
-			}
-			limit := rec.MonthlyUsageUSD + m + 1
-			if rec.MonthlyLimitUSD != nil {
-				limit = *rec.MonthlyLimitUSD
-			}
-			resetAt := quota.MonthlyResetAt(rec.MonthlyUsageUSD, rec.MonthlyWindowStart, limit, now)
-			start := resetAt.Add(-30 * 24 * time.Hour)
-			rec.MonthlyWindowStart = &start
-			rec.MonthlyUsageUSD = service.QuantizeUsageBillingAmount(rec.MonthlyUsageUSD + m)
-		}
+		mergeGrokRefusalQuotaUsage(rec, quota, time.Now())
 	}
 	return out, nil
 }
@@ -296,4 +267,79 @@ func toRepoRecords(records []service.UserPlatformQuotaRecord) []UserPlatformQuot
 		}
 	}
 	return out
+}
+
+func mergeGrokRefusalQuotaUsage(rec *service.UserPlatformQuotaRecord, quota *service.GrokRefusalQuotaUsage, now time.Time) {
+	d, w, m := quota.Current(now)
+	if d > 0 {
+		day := timezone.StartOfDay(now)
+		if rec.DailyWindowStart == nil || rec.DailyWindowStart.Before(day) {
+			rec.DailyUsageUSD = 0
+		}
+		rec.DailyUsageUSD = service.QuantizeUsageBillingAmount(rec.DailyUsageUSD + d)
+		rec.DailyWindowStart = &day
+	}
+	if w > 0 {
+		week := timezone.StartOfWeek(now)
+		if rec.WeeklyWindowStart == nil || rec.WeeklyWindowStart.Before(week) {
+			rec.WeeklyUsageUSD = 0
+		}
+		rec.WeeklyUsageUSD = service.QuantizeUsageBillingAmount(rec.WeeklyUsageUSD + w)
+		rec.WeeklyWindowStart = &week
+	}
+	if m > 0 {
+		if rec.MonthlyWindowStart == nil || now.Sub(*rec.MonthlyWindowStart) >= 30*24*time.Hour {
+			rec.MonthlyUsageUSD = 0
+		}
+		limit := rec.MonthlyUsageUSD + m + 1
+		if rec.MonthlyLimitUSD != nil {
+			limit = *rec.MonthlyLimitUSD
+		}
+		resetAt := quota.MonthlyResetAt(rec.MonthlyUsageUSD, rec.MonthlyWindowStart, limit, now)
+		start := resetAt.Add(-30 * 24 * time.Hour)
+		rec.MonthlyWindowStart = &start
+		rec.MonthlyUsageUSD = service.QuantizeUsageBillingAmount(rec.MonthlyUsageUSD + m)
+	}
+}
+
+// ListByUsers loads a page in batches and preserves API-facing Grok refusal usage.
+func (a *userPlatformQuotaServiceAdapter) ListByUsers(ctx context.Context, userIDs []int64) (map[int64][]service.UserPlatformQuotaRecord, error) {
+	grouped, err := a.inner.ListByUsers(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	return toServiceRecordMap(grouped)
+}
+
+// ListByUsers loads a page in batches and preserves API-facing Grok refusal usage.
+func (a *genericUserPlatformQuotaAdapter) ListByUsers(ctx context.Context, userIDs []int64) (map[int64][]service.UserPlatformQuotaRecord, error) {
+	grouped, err := a.inner.ListByUsers(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	return toServiceRecordMap(grouped)
+}
+
+func toServiceRecordMap(grouped map[int64][]UserPlatformQuotaRecord) (map[int64][]service.UserPlatformQuotaRecord, error) {
+	out := make(map[int64][]service.UserPlatformQuotaRecord, len(grouped))
+	now := time.Now()
+	for userID, rows := range grouped {
+		converted := make([]service.UserPlatformQuotaRecord, len(rows))
+		for i := range rows {
+			converted[i] = *toServiceRecord(&rows[i])
+			if rows[i].Platform == service.PlatformGrok && len(rows[i].GrokRefusalUsage) > 0 {
+				raw, err := json.Marshal(rows[i].GrokRefusalUsage)
+				if err != nil {
+					return nil, err
+				}
+				var quota service.GrokRefusalQuotaUsage
+				if err := json.Unmarshal(raw, &quota); err != nil {
+					return nil, err
+				}
+				mergeGrokRefusalQuotaUsage(&converted[i], &quota, now)
+			}
+		}
+		out[userID] = converted
+	}
+	return out, nil
 }

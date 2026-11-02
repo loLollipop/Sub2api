@@ -794,6 +794,7 @@ export default {
         windowDaily: 'daily',
         windowWeekly: 'weekly',
         windowMonthly: 'monthly',
+        cellUnavailable: 'Quota data unavailable',
         cellNotConfigured: 'Not configured',
         cellColumnTooltip: 'Only platforms with a limit are shown',
         subscriptionWarning: 'This user has an active subscription. Platform quotas only apply to balance (standard) mode requests; subscription mode requests are not subject to these limits.',
@@ -803,6 +804,8 @@ export default {
 
     // Groups
     groups: {
+      capacityRuntimeHint: 'Runtime usage is read from the live cache; totals reflect configured limits.',
+      capacityUnknownHint: 'Runtime usage is unavailable; configured limits remain visible.',
       title: 'Group Management',
       description: 'Manage API key groups and rate multipliers',
       searchGroups: 'Search groups...',

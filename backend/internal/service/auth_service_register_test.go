@@ -1000,3 +1000,7 @@ func TestCanBypassRegistrationDisabledForOAuth(t *testing.T) {
 		})
 	}
 }
+
+func (s *userPlatformQuotaRepoStub) ListByUsers(context.Context, []int64) (map[int64][]UserPlatformQuotaRecord, error) {
+	return nil, nil
+}

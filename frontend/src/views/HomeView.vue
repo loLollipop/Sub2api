@@ -16,8 +16,9 @@
   <div
     v-else-if="compactHomeEnabled"
     data-testid="compact-home"
-    class="flex min-h-screen flex-col bg-gray-50 text-gray-900 dark:bg-dark-950 dark:text-white"
+    class="compact-home-theme flex min-h-screen flex-col text-gray-900 dark:text-white"
   >
+    <GGBondBackdrop variant="home" />
     <header class="border-b border-gray-200 px-4 py-4 sm:px-6 dark:border-dark-800">
       <nav class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div class="flex min-w-0 flex-1 items-center gap-3">
@@ -94,7 +95,6 @@
     :site-subtitle="siteSubtitle"
     :doc-url="docUrl"
     :api-base-url="apiBaseUrl"
-    :github-url="githubUrl"
     :is-dark="isDark"
     :is-authenticated="isAuthenticated"
     :dashboard-path="dashboardPath"
@@ -111,6 +111,7 @@ import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import HomeLanding from '@/components/home/HomeLanding.vue'
 import LegalFooterLinks from '@/components/legal/LegalFooterLinks.vue'
+import GGBondBackdrop from '@/components/common/GGBondBackdrop.vue'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
@@ -141,9 +142,6 @@ const isDark = ref(document.documentElement.classList.contains('dark'))
 useMutationObserver(document.documentElement, () => {
   isDark.value = document.documentElement.classList.contains('dark')
 }, { attributes: true, attributeFilter: ['class'] })
-
-// GitHub URL
-const githubUrl = 'https://github.com/loLollipop/Sub2api'
 
 // Auth state
 const isAuthenticated = computed(() => authStore.isAuthenticated)
@@ -184,3 +182,8 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.compact-home-theme { position: relative; isolation: isolate; background: #f7f4ef; }
+.dark .compact-home-theme { background: #111318; }
+</style>

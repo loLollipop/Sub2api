@@ -1,11 +1,8 @@
-/* Soft ambient light behind translucent surfaces; data keeps a quiet backdrop. */
+/* Pig-hero parchment and warm translucent surfaces; data keeps a quiet backdrop. */
 .console-signal.top-layout {
   --shell-height: 56px;
   --signal-nav-size: 232px;
   --signal-nav-motion: 260ms cubic-bezier(.22, 1, .36, 1);
-  --shell-light-warm: #edcdb96b;
-  --shell-light-cool: #bbd7e77a;
-  --shell-light-low: #d3e6df73;
   --shell-workspace: #ffffff52;
   --shell-card: #ffffffc9;
   --shell-edge: #ffffffb3;
@@ -15,24 +12,10 @@
   background: var(--signal-bg);
 }
 .dark .console-signal.top-layout {
-  --shell-light-warm: #73513b3d;
-  --shell-light-cool: #34567759;
-  --shell-light-low: #304f4b40;
   --shell-workspace: #171c254d;
   --shell-card: #1b1e24cf;
   --shell-edge: #ffffff12;
   --shell-shadow: 0 8px 32px #0000000d, inset 0 1px 0 #ffffff05;
-}
-.console-signal.top-layout::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 72vw 68vh at 0% 0%, var(--shell-light-warm), transparent 78%),
-    radial-gradient(ellipse 70vw 80vh at 100% 8%, var(--shell-light-cool), transparent 76%),
-    radial-gradient(ellipse 70vw 60vh at 36% 100%, var(--shell-light-low), transparent 80%);
 }
 .console-signal.top-layout.signal-nav-collapsed { --signal-nav-size: 56px; }
 .top-layout .top-header-spacer { height: var(--shell-height); }

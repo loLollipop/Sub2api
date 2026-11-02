@@ -472,3 +472,25 @@ func TestBatchSnapshotUsage_InsertOverwriteMultiKey(t *testing.T) {
 	require.InDelta(t, 18.8, rec2After.WeeklyUsageUSD, 1e-9, "user2 weekly must be overwritten to 18.8")
 	require.InDelta(t, 28.8, rec2After.MonthlyUsageUSD, 1e-9, "user2 monthly must be overwritten to 28.8")
 }
+
+func TestUserPlatformQuotaRepository_ListByUsersExcludesDeletedAndOtherUsers(t *testing.T) {
+	ctx := context.Background()
+	client := testEntClient(t)
+	repo := NewUserPlatformQuotaRepository(client)
+	userA, userB, userC := mustCreateUserForQuota(t, client), mustCreateUserForQuota(t, client), mustCreateUserForQuota(t, client)
+	limit := 5.0
+	require.NoError(t, repo.UpsertForUser(ctx, userA, []UserPlatformQuotaRecord{{Platform: service.PlatformOpenAI, DailyLimitUSD: &limit}, {Platform: service.PlatformAnthropic, DailyLimitUSD: &limit}}))
+	require.NoError(t, repo.UpsertForUser(ctx, userA, []UserPlatformQuotaRecord{{Platform: service.PlatformOpenAI, DailyLimitUSD: &limit}}))
+	require.NoError(t, repo.UpsertForUser(ctx, userB, []UserPlatformQuotaRecord{{Platform: service.PlatformOpenAI, DailyLimitUSD: &limit}}))
+	require.NoError(t, repo.UpsertForUser(ctx, userC, []UserPlatformQuotaRecord{{Platform: service.PlatformOpenAI, DailyLimitUSD: &limit}}))
+	rows, err := repo.ListByUsers(ctx, []int64{userA, userB})
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	require.Len(t, rows[userA], 1)
+	require.Equal(t, service.PlatformOpenAI, rows[userA][0].Platform)
+	require.Len(t, rows[userB], 1)
+	require.NotContains(t, rows, userC)
+	empty, err := repo.ListByUsers(ctx, nil)
+	require.NoError(t, err)
+	require.Empty(t, empty)
+}

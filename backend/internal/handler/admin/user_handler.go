@@ -23,6 +23,8 @@ import (
 type UserWithConcurrency struct {
 	dto.AdminUser
 	CurrentConcurrency int `json:"current_concurrency"`
+	// nil omits the field on opt-out/failure; a successful empty query returns [].
+	PlatformQuotas *[]map[string]any `json:"platform_quotas,omitempty"`
 }
 
 // UserHandler handles admin user management
@@ -151,6 +153,8 @@ func (h *UserHandler) List(c *gin.Context) {
 		filters.IncludeSubscriptions = &includeSubscriptions
 	}
 
+	includePlatformQuotas := parseBoolQueryWithDefault(c.Query("include_platform_quotas"), false)
+
 	users, total, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, filters, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -181,7 +185,39 @@ func (h *UserHandler) List(c *gin.Context) {
 		}
 	}
 
+	attachPlatformQuotas(c, h, out, includePlatformQuotas)
+
 	response.Paginated(c, out, total, page, pageSize)
+}
+
+// attachPlatformQuotas batches the visible page. Omitted quotas mean unavailable, not unconfigured.
+func attachPlatformQuotas(c *gin.Context, h *UserHandler, out []UserWithConcurrency, enabled bool) {
+	if !enabled || h.userPlatformQuotaRepo == nil || len(out) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(out))
+	seen := make(map[int64]struct{}, len(out))
+	for i := range out {
+		id := out[i].ID
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	quotas, err := h.userPlatformQuotaRepo.ListByUsers(c.Request.Context(), ids)
+	if err != nil {
+		return
+	}
+	now := time.Now().UTC()
+	for i := range out {
+		records := quotas[out[i].ID]
+		list := make([]map[string]any, 0, len(records))
+		for _, record := range records {
+			list = append(list, quotaview.LazyZeroQuotaForResponse(record, now, true))
+		}
+		out[i].PlatformQuotas = &list
+	}
 }
 
 // parseAttributeFilters extracts attribute filters from query params

@@ -3,6 +3,7 @@
     class="min-h-screen top-layout"
     :class="[isConsoleSignal ? 'console-signal' : 'bg-gray-50 dark:bg-dark-950', { 'signal-admin': isAdminSignal, 'signal-nav-collapsed': sidebarCollapsed, 'consumer-layout': !isAdmin, 'browse-layout': isBrowse }]"
   >
+    <GGBondBackdrop v-if="isConsoleSignal" />
     <!-- Background Decoration -->
     <div v-if="!isConsoleSignal" class="pointer-events-none fixed inset-0 bg-mesh-gradient"></div>
 
@@ -39,6 +40,7 @@ import { useConsoleSignal } from '@/composables/useConsoleSignal'
 import { useConsoleWorkspace } from '@/composables/useConsoleWorkspace'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
+import GGBondBackdrop from '@/components/common/GGBondBackdrop.vue'
 
 const props = defineProps<{ publicBrowse?: boolean }>()
 const appStore = useAppStore()

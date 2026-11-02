@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.2.66",
-  "imported_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
+  "imported_version": "2.3.0",
+  "imported_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.2.66",
-  "latest_observed_release_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
-  "latest_observed_main_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
+  "latest_observed_version": "2.3.0",
+  "latest_observed_release_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
+  "latest_observed_main_commit": "185dfaf184c1f24fc910a07ad21702fdbd5bb55e",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.2.66",
-  "reviewed_release_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
+  "reviewed_release_tag": "v2.3.0",
+  "reviewed_release_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
   "observed_delta_review": {
-    "from_commit": "b459e8662bc2c7cfeb6cc70a7610570c59a6e20a",
-    "to_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
-    "status": "selective_formal_v2266_adapted_with_existing_deferrals",
-    "scope": "Cap positive Gemini Flash thinking budgets in the existing Antigravity converter, using the final mapped model. Preserve dynamic and non-Flash budgets, standalone DeepSeek tools, local UI and payment removals. No Hosted execution, migrations, billing or dependency changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261101-v2266.md"
+    "from_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
+    "to_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
+    "status": "selective_formal_v2300_adapted_with_explicit_deferrals",
+    "scope": "Preserve native DeepSeek reasoning effort, distinguish unknown group runtime capacity, and load visible user platform quotas in batches. Keep local Vue/shadcn UI; adapt an original pig-hero backdrop and remove the home footer GitHub link. Nuxt SSR, source theme settings, compact usage/announcement payload changes and removed payments are excluded or deferred. No migrations or dependency changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261102-v2300.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "bbb057ebf308d983cc3201fd3441793691a9af54",
+    "source_head": "bc7a99214368d9107d3262680244a4d2eee48dfb",
     "implemented_with_local_regression": [
+      "Formal v2.2.67-v2.3.0 selected native DeepSeek effort preservation, unknown capacity state and batched on-demand user platform quotas. Retain Vue SPA, native protocols and existing feature removals. Local original pig-hero theme/footer refinement recorded separately in maintenance/notes/upstream-sync-20261102-v2300.md",
       "Formal v2.2.63-v2.2.66: cap explicit Gemini Flash thinking budgets across model generations; preserve mapped-model selection and existing exclusions. See maintenance/notes/upstream-sync-20261101-v2266.md",
       "Formal v2.2.61-v2.2.62: existing error-log NULL fallback confirmed; adapt partial/error/failed audit terminal states without enabling quality checks or importing deferred Ops/timers. See maintenance/notes/upstream-sync-20261031-v2262.md",
       "Formal v2.2.60 selected native Responses missing tool outputs, endpoint visibility, mobile usage details and error-log IDs; preserve scoped reasoning and uncertain media holds. See maintenance/notes/upstream-sync-20261030-v2260.md",
@@ -104,6 +105,22 @@
   ],
   "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2300-compact-usage-and-lazy-announcements",
+      "upstream_commits": [
+        "ce7a129fe",
+        "7d1249b10"
+      ],
+      "reason": "Optional payload optimization. Compact usage replaces association response contracts; local SPA already batches usage hydration. Announcement summaries/popups/detail must preserve visibility, existing unread state and session isolation as a separate complete adaptation; source summary still loads full announcements and duplicates reads for popups. Retain compatible current APIs and full local functionality."
+    },
+    {
+      "feature": "v2300-nuxt-ssr-and-source-theme-settings",
+      "upstream_commits": [
+        "ce7a129fe",
+        "c0b45261a"
+      ],
+      "reason": "Nuxt/Nitro SSR adds a Node runtime, BFF and distinct build/deployment route; source configurable themes depend on that UI. Preserve the existing Vite Vue/shadcn SPA and deployment. Original local pig-hero decoration needs no new settings API."
+    },
     {
       "feature": "v2240-deepseek-api-key-tool-injection",
       "upstream_commits": [
@@ -537,5 +554,20 @@
     "preserved": "Local shadcn UI, grouped model plaza, native routing and reasoning isolation, standalone Search/Fetch, billing and refund contracts, Grok refusal/session policies and existing feature removals.",
     "migration": "None. Existing migrations, Ent and both Go/frontend dependency manifests unchanged.",
     "release_status": "User authorized GitHub submission and deployment on 2026-11-01. Prepare personal v2.1.45 via PR/CI, own GHCR and the verified controlled updater; final source/artifact/runtime acceptance evidence is recorded separately. No frontend, dependency or migration changes."
+  },
+  "sync_20261102_v2300": {
+    "evidence": "maintenance/notes/upstream-sync-20261102-v2300.md",
+    "reviewed_release_tag": "v2.3.0",
+    "reviewed_release_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
+    "selected_commits": [
+      "290c26c53",
+      "ce7a129fe"
+    ],
+    "selected_scope": "DeepSeek native Responses effort guards only; group capacity runtime-known backend/frontend; visible user platform quota batch API chain and local table consumers. No wholesale source-file replacement.",
+    "local_ui": "Original inline SVG pig-hero crest, red/gold energy tracery and cream light background. Dark background uses neutral charcoal with low-opacity tracery after user feedback. Home footer GitHub link removed; legal links remain.",
+    "deferred": "Nuxt/SSR, source theme settings, compact usage and lazy announcement payload refactors. Source BSC scan changes are excluded because native payments were removed. Unreleased main commits remain outside the formal-release-only policy.",
+    "preserved": "Local shadcn UI and grouped model plaza; native providers and scoped reasoning; existing billing, refusal and disconnect handling; removed tickets/canvas/native payments and previously deferred Ops/capture/Hosted.",
+    "migration": "None. Existing migrations, Ent and both Go/frontend dependencies unchanged.",
+    "release_status": "User authorized GitHub submission and deployment on 2026-11-02. Prepare personal v2.1.46 via PR/CI, own GHCR and the controlled updater; exact source/artifact/runtime acceptance recorded separately. No migration or dependency changes."
   }
 }

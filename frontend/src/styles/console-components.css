@@ -59,17 +59,17 @@
 /* Named toolbars retain their own grids, wrapping rules and filter visibility. */
 .console-signal.top-layout .signal-main :is(.users-command-bar, .groups-command-bar, .accounts-command-bar, .signal-log-filters) {
   min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--console-edge);
-  border-radius: 12px;
-  background: var(--console-panel);
-  box-shadow: var(--console-panel-shadow);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .console-signal.top-layout .signal-main .layout-filters > .flex {
-  padding: 12px;
-  border: 1px solid var(--console-edge);
-  border-radius: 12px;
-  background: var(--console-panel);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .console-signal.top-layout .signal-main .table-page-layout { gap: 14px; }
 .console-signal.top-layout .signal-main .users-filter-row:empty { display: none; }
@@ -86,7 +86,7 @@
 }
 .console-signal.top-layout .signal-main .table-wrapper { border: 1px solid var(--console-edge); border-radius: 12px; background: var(--signal-surface); }
 .console-signal.top-layout .signal-main :is(.table-scroll-container, .accounts-table-stage) .table-wrapper { border: 0; border-radius: 0; }
-.console-signal.top-layout .signal-main .table-wrapper :is(th, td) { padding-block: 11px; font-size: 13px; }
+.console-signal.top-layout .signal-main .table-wrapper :is(th, td) { padding-block: 9px; font-size: 13px; }
 .console-signal.top-layout .signal-main .table-wrapper .table-header :is(th, .sticky-header-cell) {
   background: var(--signal-inset);
   color: var(--signal-muted);
@@ -103,6 +103,31 @@
 .console-signal.top-layout .signal-main .table-pagination button:not(.btn) { min-height: 32px; min-width: 32px; border-radius: 7px; font-size: 12px; }
 .console-signal.top-layout .signal-main .table-pagination button[aria-current='page'] { border-color: var(--signal-line); background: var(--signal-accent-soft); box-shadow: none; }
 .console-signal.top-layout .signal-main .layout-pagination:last-child { border-top: 0; }
+
+/* Common actions keep the primary task visible without stretching every row. */
+.workspace-row-actions { display: flex; align-items: center; gap: 4px; }
+.workspace-row-edit { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 5px 8px; border-radius: 7px; color: var(--signal-muted); font-size: 12px; white-space: nowrap; }
+.workspace-row-edit:hover { background: var(--signal-hover); color: var(--signal-accent); }
+.workspace-row-edit:focus-visible, .row-actions-trigger:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 2px; }
+.row-actions-trigger { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 7px; color: var(--signal-muted); }
+.row-actions-trigger:hover { background: var(--signal-hover); color: var(--signal-text); }
+.console-signal.top-layout .signal-main .btn-primary { background-image: none; box-shadow: none; }
+.console-signal.top-layout .signal-main .btn-secondary { background: var(--signal-surface); box-shadow: none; }
+.console-signal.top-layout .signal-main .table-body tr:hover { background: var(--signal-hover); }
+.usage-analysis-disclosure { min-width: 0; border: 1px solid var(--signal-line); border-radius: 12px; background: var(--console-panel); }
+.usage-analysis-disclosure > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 12px 16px; color: var(--signal-muted); font-size: 13px; font-weight: 500; cursor: pointer; list-style: none; }
+.usage-analysis-disclosure > summary::-webkit-details-marker { display: none; }
+.usage-analysis-disclosure > summary > svg:last-child { margin-left: auto; }
+.usage-analysis-disclosure[open] > summary > svg:last-child { transform: rotate(180deg); }
+.usage-analysis-disclosure > summary:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 2px; border-radius: 10px; }
+.usage-analysis-disclosure > :is(.usage-chart-grid, .signal-usage-chart-grid) { padding: 0 14px 14px; }
+@media (min-width: 1280px) {
+  .usage-analysis-disclosure > :is(.usage-chart-grid, .signal-usage-chart-grid) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 639px) {
+  .workspace-row-edit, .row-actions-trigger { min-height: 40px; }
+  .row-actions-trigger { width: 40px; }
+}
 
 /* Segmented tabs stay distinguishable by fill as well as text color. */
 .console-signal.top-layout .signal-main :is(.tabs, .console-tabs) {
@@ -177,7 +202,7 @@ body:has(.console-signal.top-layout) > .select-dropdown-portal .select-option { 
 
 @media (max-width: 1023px) {
   .console-signal.top-layout .signal-main .table-page-layout.mobile-mode .table-scroll-container { border: 0; background: transparent; overflow: visible; }
-  .console-signal.top-layout .signal-main :is(.users-command-bar, .groups-command-bar, .accounts-command-bar, .signal-log-filters) { padding: 12px; }
+  .console-signal.top-layout .signal-main :is(.users-command-bar, .groups-command-bar, .accounts-command-bar, .signal-log-filters) { padding: 0; }
   .console-signal.top-layout .signal-main :is(.input:not(textarea), .select-trigger) { min-height: 40px; }
 }
 @media (max-width: 639px) {

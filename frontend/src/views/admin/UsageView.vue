@@ -1,6 +1,7 @@
 <template>
   <AppLayout>
     <div class="admin-usage-workbench">
+      <PageHeader :title="t('admin.usage.title')" />
       <section class="usage-summary-strip">
         <UsageStatsCards :stats="usageStats" />
       </section>
@@ -26,47 +27,49 @@
             </div>
           </div>
         </div>
-        <div class="usage-chart-grid">
-          <ModelDistributionChart
-            v-model:source="modelDistributionSource"
-            v-model:metric="modelDistributionMetric"
-            :model-stats="requestedModelStats"
-            :upstream-model-stats="upstreamModelStats"
-            :mapping-model-stats="mappingModelStats"
-            :loading="modelStatsLoading"
-            :show-source-toggle="true"
-            :show-metric-toggle="true"
-            :start-date="startDate"
-            :end-date="endDate"
-            :filters="breakdownFilters"
-          />
-          <GroupDistributionChart
-            v-model:metric="groupDistributionMetric"
-            :group-stats="groupStats"
-            :loading="chartsLoading"
-            :show-metric-toggle="true"
-            :start-date="startDate"
-            :end-date="endDate"
-            :filters="breakdownFilters"
-          />
-        </div>
-        <div class="usage-chart-grid">
-          <EndpointDistributionChart
-            v-model:source="endpointDistributionSource"
-            v-model:metric="endpointDistributionMetric"
-            :endpoint-stats="inboundEndpointStats"
-            :upstream-endpoint-stats="upstreamEndpointStats"
-            :endpoint-path-stats="endpointPathStats"
-            :loading="endpointStatsLoading"
-            :show-source-toggle="true"
-            :show-metric-toggle="true"
-            :title="t('usage.endpointDistribution')"
-            :start-date="startDate"
-            :end-date="endDate"
-            :filters="breakdownFilters"
-          />
-          <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
-        </div>
+        <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+        <details class="usage-analysis-disclosure">
+          <summary><Icon name="chart" size="sm" /><span>{{ t('usage.distributionAnalysis') }}</span><Icon name="chevronDown" size="sm" /></summary>
+          <div class="usage-chart-grid">
+            <ModelDistributionChart
+              v-model:source="modelDistributionSource"
+              v-model:metric="modelDistributionMetric"
+              :model-stats="requestedModelStats"
+              :upstream-model-stats="upstreamModelStats"
+              :mapping-model-stats="mappingModelStats"
+              :loading="modelStatsLoading"
+              :show-source-toggle="true"
+              :show-metric-toggle="true"
+              :start-date="startDate"
+              :end-date="endDate"
+              :filters="breakdownFilters"
+            />
+            <GroupDistributionChart
+              v-model:metric="groupDistributionMetric"
+              :group-stats="groupStats"
+              :loading="chartsLoading"
+              :show-metric-toggle="true"
+              :start-date="startDate"
+              :end-date="endDate"
+              :filters="breakdownFilters"
+            />
+
+            <EndpointDistributionChart
+              v-model:source="endpointDistributionSource"
+              v-model:metric="endpointDistributionMetric"
+              :endpoint-stats="inboundEndpointStats"
+              :upstream-endpoint-stats="upstreamEndpointStats"
+              :endpoint-path-stats="endpointPathStats"
+              :loading="endpointStatsLoading"
+              :show-source-toggle="true"
+              :show-metric-toggle="true"
+              :title="t('usage.endpointDistribution')"
+              :start-date="startDate"
+              :end-date="endDate"
+              :filters="breakdownFilters"
+            />
+          </div>
+        </details>
       </section>
       <!-- 明细区：tab 栏 + 筛选 + 内容收进同一张卡片，消除割裂感 -->
       <section class="card usage-detail-workspace">
@@ -216,7 +219,8 @@ import { useAppStore } from '@/stores/app'; import { adminAPI } from '@/api/admi
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
-import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'; import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageExportProgress from '@/components/admin/usage/UsageExportProgress.vue'
 import UserTokenRanking from '@/components/admin/usage/UserTokenRanking.vue'
@@ -1038,25 +1042,23 @@ defineExpose({ requestedModelStats, refreshData })
 
 .usage-summary-strip :deep(.card) {
   border-color: var(--signal-line);
-  border-radius: 8px;
-  box-shadow: inset 0 1px color-mix(in srgb, var(--signal-text) 6%, transparent);
+  border-radius: 12px;
+  box-shadow: none;
 }
 
 .usage-analysis-workspace {
   display: grid;
   min-width: 0;
   gap: 14px;
-  padding: 14px 0 18px;
-  border-top: 1px solid var(--signal-line);
-  border-bottom: 1px solid var(--signal-line);
+  padding: 0;
 }
 
 .usage-range-toolbar {
   padding: 12px 14px;
   border: 1px solid var(--signal-line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--signal-surface);
-  box-shadow: inset 0 1px color-mix(in srgb, var(--signal-text) 6%, transparent);
+  box-shadow: none;
 }
 
 .usage-range-controls,
@@ -1092,23 +1094,23 @@ defineExpose({ requestedModelStats, refreshData })
 .usage-chart-grid :deep(.card) {
   min-width: 0;
   border-color: var(--signal-line);
-  border-radius: 8px;
-  box-shadow: inset 0 1px color-mix(in srgb, var(--signal-text) 5%, transparent);
+  border-radius: 12px;
+  box-shadow: none;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .usage-chart-grid :deep(.card:hover) {
   border-color: var(--signal-control-line);
-  box-shadow: inset 0 1px color-mix(in srgb, var(--signal-accent) 16%, transparent);
+  box-shadow: none;
 }
 
 .usage-detail-workspace {
   min-width: 0;
   overflow: visible;
   border: 1px solid var(--signal-line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--signal-surface);
-  box-shadow: inset 0 1px color-mix(in srgb, var(--signal-text) 6%, transparent);
+  box-shadow: none;
 }
 
 .usage-detail-tabs {

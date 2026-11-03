@@ -352,6 +352,7 @@ export default {
 
   // Usage
   usage: {
+    distributionAnalysis: '分布分析',
     moreFilters: '更多筛选',
     fewerFilters: '收起筛选',
     title: '使用记录',

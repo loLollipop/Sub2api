@@ -1,6 +1,7 @@
 <template>
   <AppLayout>
     <TablePageLayout class="groups-workspace">
+      <template #header><PageHeader :title="t('admin.groups.title')" :count="pagination.total" /></template>
       <template #filters>
         <div class="groups-command-bar">
           <div class="groups-search-row">
@@ -403,75 +404,78 @@
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1">
+            <div class="workspace-row-actions">
               <button
                 @click="handleEdit(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
+                class="workspace-row-edit"
               >
                 <Icon name="edit" size="sm" />
                 <span class="text-xs">{{ t("common.edit") }}</span>
               </button>
-              <button
-                v-if="!authStore.isSimpleMode"
-                data-testid="group-duplicate"
-                :title="
-                  duplicatingGroupIds.has(row.id)
-                    ? t('admin.groups.duplicating')
-                    : t('admin.groups.duplicate')
-                "
-                :disabled="duplicatingGroupIds.has(row.id)"
-                @click="handleDuplicate(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-dark-700 dark:hover:text-primary-400"
-              >
-                <Icon name="copy" size="sm" />
-                <span class="text-xs">
-                  {{
+              <RowActions>
+                <button
+                  v-if="!authStore.isSimpleMode"
+                  data-testid="group-duplicate"
+                  :title="
                     duplicatingGroupIds.has(row.id)
-                      ? t("admin.groups.duplicating")
-                      : t("admin.groups.duplicate")
-                  }}
-                </span>
-              </button>
-              <button
-                v-if="!authStore.isSimpleMode && row.platform === 'composite'"
-                data-testid="group-composite-routes"
-                @click="handleCompositeRoutes(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-cyan-600 dark:hover:bg-dark-700 dark:hover:text-cyan-400"
-              >
-                <Icon name="swap" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.compositeRoutes.action")
-                }}</span>
-              </button>
-              <button
-                v-if="!authStore.isSimpleMode"
-                data-testid="group-rate-multipliers"
-                @click="handleRateMultipliers(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
-              >
-                <Icon name="dollar" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rateMultipliers")
-                }}</span>
-              </button>
-              <button
-                v-if="!authStore.isSimpleMode"
-                data-testid="group-rpm-overrides"
-                @click="handleRPMOverrides(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-dark-700 dark:hover:text-orange-400"
-              >
-                <Icon name="bolt" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rpmOverrides")
-                }}</span>
-              </button>
-              <button
-                @click="handleDelete(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-              >
-                <Icon name="trash" size="sm" />
-                <span class="text-xs">{{ t("common.delete") }}</span>
-              </button>
+                      ? t('admin.groups.duplicating')
+                      : t('admin.groups.duplicate')
+                  "
+                  :disabled="duplicatingGroupIds.has(row.id)"
+                  @click="handleDuplicate(row)"
+
+                >
+                  <Icon name="copy" size="sm" />
+                  <span class="text-xs">
+                    {{
+                      duplicatingGroupIds.has(row.id)
+                        ? t("admin.groups.duplicating")
+                        : t("admin.groups.duplicate")
+                    }}
+                  </span>
+                </button>
+                <button
+                  v-if="!authStore.isSimpleMode && row.platform === 'composite'"
+                  data-testid="group-composite-routes"
+                  @click="handleCompositeRoutes(row)"
+
+                >
+                  <Icon name="swap" size="sm" />
+                  <span class="text-xs">{{
+                    t("admin.groups.compositeRoutes.action")
+                  }}</span>
+                </button>
+                <button
+                  v-if="!authStore.isSimpleMode"
+                  data-testid="group-rate-multipliers"
+                  @click="handleRateMultipliers(row)"
+
+                >
+                  <Icon name="dollar" size="sm" />
+                  <span class="text-xs">{{
+                    t("admin.groups.rateMultipliers")
+                  }}</span>
+                </button>
+                <button
+                  v-if="!authStore.isSimpleMode"
+                  data-testid="group-rpm-overrides"
+                  @click="handleRPMOverrides(row)"
+
+                >
+                  <Icon name="bolt" size="sm" />
+                  <span class="text-xs">{{
+                    t("admin.groups.rpmOverrides")
+                  }}</span>
+                </button>
+                <button
+                  data-danger
+                  @click="handleDelete(row)"
+
+                >
+                  <Icon name="trash" size="sm" />
+                  <span class="text-xs">{{ t("common.delete") }}</span>
+                </button>
+              </RowActions>
             </div>
           </template>
 
@@ -4394,6 +4398,8 @@ import {
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
+import PageHeader from "@/components/layout/PageHeader.vue";
+import RowActions from "@/components/common/RowActions.vue";
 import DataTable from "@/components/common/DataTable.vue";
 import Pagination from "@/components/common/Pagination.vue";
 import Toggle from "@/components/common/Toggle.vue";

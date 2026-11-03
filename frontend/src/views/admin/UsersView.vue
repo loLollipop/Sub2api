@@ -1,6 +1,7 @@
 <template>
   <AppLayout>
     <TablePageLayout class="admin-users-workbench">
+      <template #header><PageHeader :title="t('admin.users.title')" :count="pagination.total" /></template>
       <!-- Search, filters, view tools, and primary actions -->
       <template #filters>
         <div class="users-command-bar">
@@ -783,6 +784,7 @@ import type { Column } from '@/components/common/types'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'

@@ -1,5 +1,6 @@
 <template>
   <div class="table-page-layout" :class="{ 'mobile-mode': isMobile }">
+    <div v-if="$slots.header" class="layout-section-fixed layout-heading"><slot name="header" /></div>
     <!-- 固定区域：操作按钮 -->
     <div v-if="$slots.actions" class="layout-section-fixed layout-actions">
       <slot name="actions" />

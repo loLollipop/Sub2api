@@ -1,13 +1,9 @@
 <template>
   <AppLayout>
     <div class="signal-usage space-y-6">
-      <header class="signal-workspace-heading">
-        <div class="signal-workspace-title">
-          <p class="signal-workspace-index" aria-hidden="true">03 / USAGE</p>
-          <h1>{{ t('usage.title') }}</h1>
-        </div>
-        <p class="signal-period"><Icon name="calendar" size="sm" />{{ startDate }} / {{ endDate }}</p>
-      </header>
+      <PageHeader :title="t('usage.title')">
+        <template #actions><p class="signal-period"><Icon name="calendar" size="sm" />{{ startDate }} / {{ endDate }}</p></template>
+      </PageHeader>
       <UsageStatsCards class="signal-usage-metrics" :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
 
       <div class="space-y-4">
@@ -31,50 +27,51 @@
           </div>
         </div>
 
-        <div class="signal-usage-chart-grid grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ModelDistributionChart
-            v-model:metric="modelDistributionMetric"
-            :model-stats="requestedModelStats"
-            :animation-duration="chartAnimationDuration"
-            :loading="modelStatsLoading"
-            :show-source-toggle="false"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :show-account-cost="false"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-          <GroupDistributionChart
-            v-model:metric="groupDistributionMetric"
-            :group-stats="groupStats"
-            :animation-duration="chartAnimationDuration"
-            :loading="chartsLoading"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :show-account-cost="false"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-        </div>
+        <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" :animation-duration="chartAnimationDuration" />
+        <details class="usage-analysis-disclosure">
+          <summary><Icon name="chart" size="sm" /><span>{{ t('usage.distributionAnalysis') }}</span><Icon name="chevronDown" size="sm" /></summary>
+          <div class="signal-usage-chart-grid grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ModelDistributionChart
+              v-model:metric="modelDistributionMetric"
+              :model-stats="requestedModelStats"
+              :animation-duration="chartAnimationDuration"
+              :loading="modelStatsLoading"
+              :show-source-toggle="false"
+              :show-metric-toggle="true"
+              :enable-breakdown="false"
+              :show-account-cost="false"
+              :start-date="startDate"
+              :end-date="endDate"
+            />
+            <GroupDistributionChart
+              v-model:metric="groupDistributionMetric"
+              :group-stats="groupStats"
+              :animation-duration="chartAnimationDuration"
+              :loading="chartsLoading"
+              :show-metric-toggle="true"
+              :enable-breakdown="false"
+              :show-account-cost="false"
+              :start-date="startDate"
+              :end-date="endDate"
+            />
 
-        <div class="signal-usage-chart-grid grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <EndpointDistributionChart
-            v-model:source="endpointDistributionSource"
-            v-model:metric="endpointDistributionMetric"
-            :endpoint-stats="inboundEndpointStats"
-            :animation-duration="chartAnimationDuration"
-            :upstream-endpoint-stats="upstreamEndpointStats"
-            :endpoint-path-stats="endpointPathStats"
-            :loading="endpointStatsLoading"
-            :show-source-toggle="false"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :title="t('usage.endpointDistribution')"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-          <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" :animation-duration="chartAnimationDuration" />
-        </div>
+            <EndpointDistributionChart
+              v-model:source="endpointDistributionSource"
+              v-model:metric="endpointDistributionMetric"
+              :endpoint-stats="inboundEndpointStats"
+              :animation-duration="chartAnimationDuration"
+              :upstream-endpoint-stats="upstreamEndpointStats"
+              :endpoint-path-stats="endpointPathStats"
+              :loading="endpointStatsLoading"
+              :show-source-toggle="false"
+              :show-metric-toggle="true"
+              :enable-breakdown="false"
+              :title="t('usage.endpointDistribution')"
+              :start-date="startDate"
+              :end-date="endDate"
+            />
+          </div>
+        </details>
       </div>
 
       <div class="signal-log-filters">
@@ -283,6 +280,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'

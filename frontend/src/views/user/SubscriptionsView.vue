@@ -1,16 +1,7 @@
 <template>
   <AppLayout>
     <div class="signal-subscriptions">
-      <header class="signal-subscriptions-heading">
-        <div class="signal-subscriptions-heading__icon" aria-hidden="true">
-          <Icon name="creditCard" size="lg" />
-        </div>
-        <div class="min-w-0">
-          <p aria-hidden="true">06 / SUBSCRIPTIONS</p>
-          <h1>{{ t('userSubscriptions.title') }}</h1>
-          <span>{{ t('userSubscriptions.description') }}</span>
-        </div>
-      </header>
+      <PageHeader :title="t('userSubscriptions.title')" :description="t('userSubscriptions.description')" />
       <!-- Loading State -->
       <div v-if="loading" class="flex justify-center py-12">
         <div
@@ -277,6 +268,7 @@ import { useAppStore } from '@/stores/app'
 import subscriptionsAPI from '@/api/subscriptions'
 import type { UserSubscription } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTimeToMinute } from '@/utils/format'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'

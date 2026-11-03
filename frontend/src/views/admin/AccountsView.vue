@@ -1,6 +1,7 @@
 <template>
   <AppLayout>
     <TablePageLayout class="accounts-workspace">
+      <template #header><PageHeader :title="t('admin.accounts.title')" :count="pagination.total" /></template>
       <template #filters>
         <div class="accounts-command-bar">
           <AccountTableFilters
@@ -18,6 +19,9 @@
                 @create="showCreate = true"
               >
                 <template #after>
+                  <button type="button" class="btn btn-secondary accounts-compact-action" @click="openBulkEditFiltered">
+                    <Icon name="edit" size="sm" /><span class="hidden md:inline">{{ t('admin.accounts.bulkEdit.submit') }}</span><span class="sr-only md:hidden">{{ t('admin.accounts.bulkEdit.submit') }}</span>
+                  </button>
               <!-- Auto Refresh Dropdown -->
               <div class="relative" ref="autoRefreshDropdownRef">
                 <button
@@ -468,19 +472,9 @@
             </div>
           </template>
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1">
-              <button @click="handleEdit(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
-                <Icon name="edit" size="none" class="h-4 w-4" :stroke-width="1.5" />
-                <span class="text-xs">{{ t('common.edit') }}</span>
-              </button>
-              <button @click="handleDelete(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400">
-                <Icon name="trash" size="none" class="h-4 w-4" :stroke-width="1.5" />
-                <span class="text-xs">{{ t('common.delete') }}</span>
-              </button>
-              <button @click="openMenu(row, $event)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white">
-                <Icon name="more" size="none" class="h-4 w-4" :stroke-width="1.5" />
-                <span class="text-xs">{{ t('common.more') }}</span>
-              </button>
+            <div class="workspace-row-actions">
+              <button type="button" @click="handleEdit(row)" class="workspace-row-edit"><Icon name="edit" size="sm" />{{ t('common.edit') }}</button>
+              <button type="button" @click="openMenu(row, $event)" @keydown.down.prevent="openMenu(row, $event)" class="row-actions-trigger" :aria-label="t('common.more')" :title="t('common.more')" aria-haspopup="menu" :aria-expanded="menu.show && menu.acc?.id === row.id"><Icon name="more" size="sm" /></button>
             </div>
           </template>
         </DataTable>
@@ -502,7 +496,7 @@
       @close="customUsageAccount = null"
       @saved="handleCustomUsageSaved"
     />
-    <AccountActionMenu @custom-usage="customUsageAccount = $event" :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
+    <AccountActionMenu @delete="handleDelete" @custom-usage="customUsageAccount = $event" :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
     <SyncFromCrsModal v-if="showSync" :show="showSync" @close="showSync = false" @synced="reload" />
     <ImportDataModal v-if="showImportData" :show="showImportData" @close="showImportData = false" @imported="handleDataImported" />
     <BulkEditAccountModal
@@ -556,6 +550,7 @@ import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import Pagination from '@/components/common/Pagination.vue'
@@ -1988,7 +1983,7 @@ const handleEdit = async (a: AccountListItem) => {
   edAcc.value = account
   showEdit.value = true
 }
-const openMenu = (a: Account, e: MouseEvent) => {
+const openMenu = (a: Account, e: MouseEvent | KeyboardEvent) => {
   menu.acc = a
   const target = e.currentTarget as HTMLElement
   menu.anchorRect = target.getBoundingClientRect()

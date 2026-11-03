@@ -6,7 +6,10 @@
       <div
         ref="menuRef"
         class="action-menu-content fixed z-[9999] w-52 overflow-y-auto overscroll-contain rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800"
+        role="menu"
+        :aria-label="t('common.more')"
         :style="menuStyle"
+        @click.capture="prepareAction"
         @click.stop
       >
         <div class="py-1">
@@ -59,6 +62,10 @@
               <Icon name="refresh" size="sm" />
               {{ t('admin.accounts.resetQuota') }}
             </button>
+            <div class="my-1 border-t border-gray-100 dark:border-dark-700"></div>
+            <button @click="$emit('delete', account); $emit('close')" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
+              <Icon name="trash" size="sm" />{{ t('common.delete') }}
+            </button>
           </template>
         </div>
       </div>
@@ -67,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { useResizeObserver, useWindowSize } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@/components/icons'
@@ -76,7 +83,7 @@ import { supportsAccountQuota } from '@/utils/accountQuota'
 import { supportsCustomUsage } from '@/utils/customUsage'
 
 const props = defineProps<{ show: boolean; account: Account | null; anchorRect: DOMRect | null }>()
-const emit = defineEmits(['custom-usage', 'close', 'test', 'stats', 'schedule', 'duplicate', 'reauth', 'refresh-token', 'recover-state', 'reset-quota', 'set-privacy', 'create-spark-shadow'])
+const emit = defineEmits(['delete', 'custom-usage', 'close', 'test', 'stats', 'schedule', 'duplicate', 'reauth', 'refresh-token', 'recover-state', 'reset-quota', 'set-privacy', 'create-spark-shadow'])
 const { t } = useI18n()
 const menuRef = ref<HTMLElement | null>(null)
 const { width: viewportWidth, height: viewportHeight } = useWindowSize()
@@ -148,17 +155,53 @@ const hasQuotaLimit = computed(() => {
   )
 })
 
+let returnFocus: HTMLElement | null = null
+const menuItems = () => Array.from(menuRef.value?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
+function prepareAction(event: MouseEvent) {
+  // Let a dialog opened by an action capture the durable row trigger as its return target.
+  if ((event.target as Element).closest('button:not(:disabled)')) returnFocus?.focus({ preventScroll: true })
+}
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape') emit('close')
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    emit('close')
+  } else if (menuRef.value?.contains(event.target as Node)) {
+    if (event.key === 'Tab') {
+      returnFocus?.focus({ preventScroll: true })
+      emit('close')
+    } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault()
+      const buttons = menuItems()
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
+      const target = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+        : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
+      buttons[target]?.focus()
+    }
+  }
 }
 
 watch(
   () => props.show,
-  (visible) => {
+  async (visible) => {
     if (visible) {
+      returnFocus = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement : null
       window.addEventListener('keydown', handleKeydown)
+      await nextTick()
+      if (!props.show) return
+      menuRef.value?.querySelectorAll('button').forEach(button => {
+        button.setAttribute('role', 'menuitem')
+        button.tabIndex = -1
+      })
+      menuItems()[0]?.focus({ preventScroll: true })
     } else {
       window.removeEventListener('keydown', handleKeydown)
+      await nextTick()
+      // An opened dialog owns focus; otherwise restore the menu's trigger.
+      if (document.activeElement === document.body && returnFocus?.isConnected) {
+        returnFocus.focus({ preventScroll: true })
+      }
     }
   },
   { immediate: true }

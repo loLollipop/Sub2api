@@ -36,12 +36,8 @@
       </template>
 
       <template #actions>
-        <div class="signal-workspace-heading">
-          <div class="signal-workspace-title">
-            <p class="signal-workspace-index" aria-hidden="true">02 / ACCESS</p>
-            <h1>{{ t('keys.title') }} <span class="signal-count">{{ pagination.total }}</span></h1>
-          </div>
-          <div class="signal-workspace-actions">
+        <PageHeader :title="t('keys.title')" :count="pagination.total">
+          <template #actions>
           <button
             @click="loadApiKeys"
             :disabled="loading"
@@ -86,8 +82,8 @@
             <Icon name="plus" size="md" class="mr-2" />
             {{ t('keys.createKey') }}
           </button>
-          </div>
-        </div>
+          </template>
+        </PageHeader>
       </template>
 
       <template #table>
@@ -1249,6 +1245,7 @@ const { t, locale } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI, endpointsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 	import DataTable from '@/components/common/DataTable.vue'
 	import Pagination from '@/components/common/Pagination.vue'
 	import BaseDialog from '@/components/common/BaseDialog.vue'

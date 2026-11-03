@@ -347,6 +347,7 @@ export default {
 
   // Usage
   usage: {
+    distributionAnalysis: 'Distribution analysis',
     moreFilters: 'More filters',
     fewerFilters: 'Fewer filters',
     title: 'Usage Records',

@@ -207,12 +207,16 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
     const models = [
       { model: 'first', total_tokens: 40 }, { model: 'second', total_tokens: 30 },
       { model: 'third', total_tokens: 20 }, { model: 'fourth', total_tokens: 10 },
+      { model: 'fifth', total_tokens: 8 }, { model: 'sixth', total_tokens: 7 },
+      { model: 'seventh', total_tokens: 5 },
     ] as any
     const wrapper = mount(Models, { props: { models, startDate: '2026-09-11', endDate: '2026-09-17', loading: false } })
     const doughnut = wrapper.getComponent({ name: 'Doughnut' })
-    expect(doughnut.props('data').datasets[0].data).toEqual([40, 30, 20, 10])
-    expect(wrapper.findAll('.signal-model-legend li')).toHaveLength(3)
-    expect(wrapper.findAll('.signal-model-legend li')[0].text()).toContain('40.0%')
+    expect(doughnut.props('data').datasets[0].data).toEqual([40, 30, 20, 10, 8, 7, 5])
+    expect(wrapper.findAll('.signal-model-legend li')).toHaveLength(6)
+    expect(wrapper.findAll('.signal-model-legend li')[0].text()).toContain('33.3%')
+    expect(wrapper.find('.signal-model-legend').text()).toContain('sixth')
+    expect(wrapper.find('.signal-model-legend').text()).not.toContain('seventh')
     expect(wrapper.get('.signal-model-period').text()).toContain('2026-09-11')
     preferredMotion.value = 'reduce'
     await flushPromises()
@@ -337,7 +341,7 @@ describe('User dashboard data loading', () => {
     charts.vm.$emit('dateRangeChange')
     await flushPromises()
     expect(queryUsage.mock.calls.at(-1)?.[0].start_date).toBe('2026-09-15')
-    await wrapper.get('.signal-overview-refresh').trigger('click')
+    await wrapper.get('button[aria-label="common.refresh"]').trigger('click')
     await flushPromises()
     expect(getDashboardStats).toHaveBeenCalledTimes(2)
     expect(queryUsage).toHaveBeenCalledTimes(3)

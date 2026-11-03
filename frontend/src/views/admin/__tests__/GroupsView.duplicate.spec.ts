@@ -166,6 +166,7 @@ function mountView() {
         Select: true,
         PlatformIcon: true,
         Icon: true,
+        RowActions: { template: '<div><slot /></div>' },
         GroupCapacityBadge: true,
         GroupRateMultipliersModal: true,
         GroupRPMOverridesModal: true,

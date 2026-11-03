@@ -123,7 +123,7 @@
 
 /* Softer cards and a deliberate content hierarchy retain the existing data. */
 .console-signal.top-layout :is(.signal-dashboard .signal-metric, .signal-actions, .signal-models, .signal-chart-panel, .card:not(:where(.signal-trend .card)), .plaza-group) { border-radius: 12px; }
-.console-signal.top-layout :is(.signal-dashboard .signal-metric, .signal-dashboard .signal-actions, .admin-metric-grid > .card) { background: var(--shell-card); border-color: color-mix(in srgb, var(--signal-line) 70%, transparent); box-shadow: 0 2px 8px #33415503, inset 0 1px 0 var(--shell-edge); }
+.console-signal.top-layout :is(.signal-dashboard .signal-metric, .admin-metric-grid > .card) { background: var(--shell-card); border-color: color-mix(in srgb, var(--signal-line) 70%, transparent); box-shadow: 0 2px 8px #33415503, inset 0 1px 0 var(--shell-edge); }
 .console-signal.top-layout :is(.signal-editorial-heading, .signal-editorial-heading.signal-masthead) { min-height: 62px; margin-bottom: 20px; }
 .console-signal.top-layout :is(.signal-editorial-heading h1, .signal-heading h1, .signal-workspace-heading h1, .signal-account-heading h1, .signal-channel-heading h1, .admin-overview-identity p) { font-size: 20px; line-height: 28px; font-weight: 600; }
 .console-signal.top-layout .signal-editorial-heading::after { width: 44px; }

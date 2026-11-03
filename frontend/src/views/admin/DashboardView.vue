@@ -1,15 +1,13 @@
 <template>
   <AppLayout>
     <div class="signal-admin-dashboard space-y-6">
-      <div class="admin-overview-toolbar">
-        <div class="admin-overview-identity">
-          <span class="admin-overview-mark"><Icon name="chart" size="lg" /></span>
-          <div><span class="admin-overview-label">OVERVIEW</span><p>{{ t('admin.dashboard.title') }}</p></div>
-        </div>
-        <button type="button" class="btn btn-secondary" :disabled="loading || chartsLoading" @click="loadDashboardStats">
-          <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading || chartsLoading }" />{{ t('common.refresh') }}
-        </button>
-      </div>
+      <PageHeader :title="t('admin.dashboard.title')">
+        <template #actions>
+          <button type="button" class="btn btn-secondary" :disabled="loading || chartsLoading" @click="loadDashboardStats">
+            <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading || chartsLoading }" />{{ t('common.refresh') }}
+          </button>
+        </template>
+      </PageHeader>
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-12">
         <LoadingSpinner />
@@ -372,6 +370,7 @@ import type {
   UserSpendingRankingItem
 } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Icon from '@/components/icons/Icon.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'

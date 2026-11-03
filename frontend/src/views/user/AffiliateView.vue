@@ -1,11 +1,7 @@
 <template>
   <AppLayout>
     <div class="signal-account-page signal-affiliate space-y-6">
-      <header class="signal-account-heading">
-        <span class="signal-account-index">PARTNERS</span>
-        <h1>{{ t('affiliate.title') }}</h1>
-        <p>{{ t('affiliate.description') }}</p>
-      </header>
+      <PageHeader :title="t('affiliate.title')" :description="t('affiliate.description')" />
       <div v-if="loading" class="flex justify-center py-12">
         <div
           class="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"
@@ -150,6 +146,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import Icon from '@/components/icons/Icon.vue'
 import userAPI from '@/api/user'
 import type { UserAffiliateDetail } from '@/types'

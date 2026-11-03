@@ -188,7 +188,7 @@ describe('admin AccountsView lite account list', () => {
     })
     const wrapper = mountView(false)
     await flushPromises()
-    await wrapper.findAll('button').find(button => button.text() === 'common.more')!.trigger('click')
+    await wrapper.get('button[aria-label="common.more"]').trigger('click')
     const menu = new DOMWrapper(document.body.querySelector('.action-menu-content')!)
     await menu.findAll('button').find(button => button.text() === 'admin.accounts.refreshToken')!.trigger('click')
     await flushPromises()
@@ -266,7 +266,7 @@ describe('admin AccountsView lite account list', () => {
     const wrapper = mountView(false)
     await flushPromises()
 
-    const trigger = wrapper.findAll('button').find(button => button.text() === 'common.more')!
+    const trigger = wrapper.get('button[aria-label="common.more"]')
     await trigger.trigger('click')
     const menu = new DOMWrapper(document.body.querySelector('.action-menu-content')!)
     menu.element.dispatchEvent(new Event('scroll'))

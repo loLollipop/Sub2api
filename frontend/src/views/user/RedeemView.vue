@@ -1,10 +1,7 @@
 <template>
   <AppLayout>
     <div class="signal-account-page signal-redeem mx-auto max-w-3xl space-y-6">
-      <header class="signal-account-heading">
-        <span class="signal-account-index">REDEEM</span>
-        <h1>{{ t('redeem.title') }}</h1>
-      </header>
+      <PageHeader :title="t('redeem.title')" />
       <section class="redeem-wallet">
         <div class="signal-balance-strip">
           <div>
@@ -343,6 +340,7 @@ import { useSubscriptionStore } from '@/stores/subscriptions'
 import { redeemAPI, authAPI, type RedeemHistoryItem } from '@/api'
 import type { RedeemCode } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTime } from '@/utils/format'
 

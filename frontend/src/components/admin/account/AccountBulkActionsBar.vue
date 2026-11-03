@@ -1,5 +1,5 @@
 <template>
-  <div class="account-bulk-bar" :class="{ 'account-bulk-bar-selected': selectedIds.length > 0 }">
+  <div v-if="selectedIds.length > 0 || selectingAll" class="account-bulk-bar" :class="{ 'account-bulk-bar-selected': selectedIds.length > 0 }">
     <div class="account-bulk-selection">
       <span v-if="allResultsSelected" class="text-sm font-medium text-primary-900 dark:text-primary-100">
         {{ t('admin.accounts.bulkActions.selectedAll', { count: selectedIds.length }) }}
@@ -44,13 +44,15 @@
     </div>
     <div class="account-bulk-commands">
       <template v-if="selectedIds.length > 0">
-        <button @click="$emit('delete')" class="btn btn-danger btn-sm">{{ t('admin.accounts.bulkActions.delete') }}</button>
-        <button @click="$emit('reset-status')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.resetStatus') }}</button>
-        <button @click="$emit('refresh-token')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.refreshToken') }}</button>
-        <button @click="$emit('probe-upstream-billing')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.probeUpstreamBilling') }}</button>
-        <button @click="$emit('test-models')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.testModels') }}</button>
-        <button @click="$emit('toggle-schedulable', true)" class="btn btn-success btn-sm">{{ t('admin.accounts.bulkActions.enableScheduling') }}</button>
-        <button @click="$emit('toggle-schedulable', false)" class="btn btn-warning btn-sm">{{ t('admin.accounts.bulkActions.disableScheduling') }}</button>
+        <RowActions>
+          <button @click="$emit('delete')" data-danger>{{ t('admin.accounts.bulkActions.delete') }}</button>
+          <button @click="$emit('reset-status')">{{ t('admin.accounts.bulkActions.resetStatus') }}</button>
+          <button @click="$emit('refresh-token')">{{ t('admin.accounts.bulkActions.refreshToken') }}</button>
+          <button @click="$emit('probe-upstream-billing')">{{ t('admin.accounts.bulkActions.probeUpstreamBilling') }}</button>
+          <button @click="$emit('test-models')">{{ t('admin.accounts.bulkActions.testModels') }}</button>
+          <button @click="$emit('toggle-schedulable', true)">{{ t('admin.accounts.bulkActions.enableScheduling') }}</button>
+          <button @click="$emit('toggle-schedulable', false)">{{ t('admin.accounts.bulkActions.disableScheduling') }}</button>
+        </RowActions>
         <button @click="$emit('edit-selected')" class="btn btn-primary btn-sm">{{ t('admin.accounts.bulkActions.edit') }}</button>
       </template>
       <button @click="$emit('edit-filtered')" class="btn btn-secondary btn-sm">
@@ -62,6 +64,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RowActions from '@/components/common/RowActions.vue'
 
 defineProps<{
   selectedIds: number[]

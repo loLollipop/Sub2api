@@ -1,5 +1,5 @@
 /* Neutral surfaces and an orange accent, shared by every console page. */
-:is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover, body:has(.console-signal) > .version-popover-header) {
+:is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover, body:has(.console-signal) > .version-popover-header, body:has(.console-signal) > .console-action-menu) {
   --signal-bg: #f7f4ef;
   --signal-surface: #ffffff;
   --signal-raised: #f3f4f6;
@@ -32,7 +32,7 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.dark :is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover, body:has(.console-signal) > .version-popover-header) {
+.dark :is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover, body:has(.console-signal) > .version-popover-header, body:has(.console-signal) > .console-action-menu) {
   --signal-bg: #111318;
   --signal-surface: #1b1e24;
   --signal-raised: #242830;
@@ -240,9 +240,11 @@ body:has(.console-signal) > .select-dropdown-portal {
 
 .console-signal .signal-dashboard .signal-stats { display: block; }
 .console-signal .signal-dashboard .signal-masthead { padding-bottom: 20px; border: 0; }
-.console-signal .signal-dashboard .signal-lead-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.7fr); gap: 14px; }
-.console-signal .signal-dashboard .signal-lead-grid--simple { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
-.console-signal .signal-dashboard .signal-stat-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 16px; border: 0; background: transparent; box-shadow: none; }
+.console-signal .signal-dashboard .signal-lead-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.console-signal .signal-dashboard .signal-lead-grid--simple { grid-template-columns: minmax(0, 1fr); }
+.console-signal .signal-dashboard .signal-stat-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--signal-line); border-radius: 12px; background: var(--signal-surface); box-shadow: none; }
+.console-signal.top-layout .signal-dashboard .signal-stat-strip > .signal-metric { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.console-signal.top-layout .signal-dashboard .signal-stat-strip > .signal-metric + .signal-metric { border-left: 1px solid var(--signal-line); }
 .console-signal .signal-dashboard .signal-stat-strip--models { grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(205px, 1.35fr); }
 .console-signal .signal-dashboard .signal-metric { display: flex; flex-direction: column; min-width: 0; padding: 18px; border: 1px solid var(--signal-line); border-radius: 8px; background: var(--signal-surface); overflow: hidden; box-shadow: none; }
 .console-signal .signal-dashboard .signal-lead-grid > .signal-metric { min-height: 164px; }
@@ -259,10 +261,10 @@ body:has(.console-signal) > .select-dropdown-portal {
 .console-signal .signal-dashboard .signal-token-split { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--signal-line); font-size: 11px; font-variant-numeric: tabular-nums; }
 .console-signal .signal-dashboard .signal-token-split dt { color: var(--signal-muted); }
 .console-signal .signal-dashboard .signal-token-split dd { margin-top: 5px; color: var(--signal-text); overflow-wrap: anywhere; }
-.console-signal .signal-dashboard .signal-actions { display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding: 18px; border: 1px solid var(--signal-line); border-radius: 8px; background: var(--signal-surface); }
-.console-signal .signal-dashboard .signal-actions-label { display: block; padding: 0; color: var(--signal-text); font-size: 14px; font-weight: 600; }
-.console-signal .signal-dashboard .signal-actions-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px 16px; }
-.console-signal .signal-dashboard .signal-actions button { display: flex; align-items: center; justify-content: flex-start; min-width: 0; min-height: 48px; gap: 10px; padding: 8px 0; border-radius: 0; border-bottom: 1px solid var(--signal-line); background: transparent; color: var(--signal-text); text-align: left; font-size: 12px; }
+.console-signal .signal-dashboard .signal-actions { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px 18px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.console-signal .signal-dashboard .signal-actions-label { display: block; padding: 0; color: var(--signal-muted); font-size: 12px; font-weight: 500; }
+.console-signal .signal-dashboard .signal-actions-list { display: flex; flex-wrap: wrap; width: auto; gap: 4px; }
+.console-signal .signal-dashboard .signal-actions button { display: flex; align-items: center; justify-content: flex-start; min-width: 0; min-height: 36px; gap: 8px; padding: 6px 10px; border-radius: 8px; border: 0; background: transparent; color: var(--signal-text); text-align: left; font-size: 12px; }
 .console-signal .signal-dashboard .signal-actions button span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .console-signal .signal-dashboard .signal-actions button svg { color: var(--signal-muted); flex-shrink: 0; }
 .console-signal .signal-dashboard .signal-actions button:hover { color: var(--signal-accent); border-color: var(--signal-control-line); }
@@ -275,9 +277,12 @@ body:has(.console-signal) > .select-dropdown-portal {
 
 @media (max-width: 1279px) {
   .console-signal .signal-dashboard .signal-lead-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .console-signal .signal-dashboard .signal-actions { grid-column: 1 / -1; padding: 16px; }
+  .console-signal .signal-dashboard .signal-lead-grid--simple { grid-template-columns: minmax(0, 1fr); }
+  .console-signal .signal-dashboard .signal-actions { grid-column: 1 / -1; padding: 0; }
   .console-signal .signal-dashboard .signal-actions-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .console-signal .signal-dashboard .signal-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .console-signal.top-layout .signal-dashboard .signal-stat-strip > .signal-metric:nth-child(odd) { border-left: 0; }
+  .console-signal.top-layout .signal-dashboard .signal-stat-strip > .signal-metric:nth-child(n+3) { border-top: 1px solid var(--signal-line); }
   .console-signal .signal-dashboard .signal-model-card { grid-column: 1 / -1; }
   .console-signal .signal-dashboard .signal-model-summary { max-width: 400px; }
 }

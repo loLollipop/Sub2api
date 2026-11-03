@@ -1,6 +1,11 @@
 <template>
   <AppLayout>
-    <div class="console-settings mx-auto max-w-6xl space-y-6">
+    <div class="console-settings mx-auto min-w-0 max-w-6xl space-y-6">
+      <PageHeader
+        :title="t('admin.settings.title')"
+        :description="t('admin.settings.description')"
+      />
+
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-12">
         <div
@@ -9,9 +14,9 @@
       </div>
 
       <!-- Settings Form -->
-      <form v-else @submit.prevent="saveSettings" class="space-y-6" novalidate>
+      <form v-else @submit.prevent="saveSettings" class="settings-form space-y-6" novalidate>
         <!-- Tab Navigation -->
-        <SettingsTabBar v-model="activeTab" />
+        <SettingsTabBar v-model="activeTab" class="settings-navigation" />
 
         <!-- Tab: Security — Admin API Key -->
         <div v-show="activeTab === 'security'" class="space-y-6">
@@ -43,9 +48,9 @@
         <!-- Tab: Security — Registration, Turnstile, LinuxDo -->
         <div v-show="activeTab === 'security'" class="space-y-6">
           <!-- Registration Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.registration.title") }}
@@ -54,9 +59,9 @@
                 {{ t("admin.settings.registration.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
+            <div class="settings-section-body space-y-5">
               <!-- Enable Registration -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
                     t("admin.settings.registration.enableRegistration")
@@ -72,7 +77,7 @@
 
               <!-- Email Verification -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -122,7 +127,7 @@
                     </span>
 
                     <div
-                      class="flex min-w-[220px] flex-1 items-center gap-1 rounded border border-transparent px-2 py-1 focus-within:border-primary-300 dark:focus-within:border-primary-700"
+                      class="flex min-w-0 flex-[1_1_220px] items-center gap-1 rounded border border-transparent px-2 py-1 focus-within:border-primary-300 dark:focus-within:border-primary-700"
                     >
                       <input
                         v-model="registrationEmailSuffixWhitelistDraft"
@@ -156,7 +161,7 @@
 
               <!-- Email Domain Quota -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -173,7 +178,7 @@
 
               <!-- Promo Code -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -188,7 +193,7 @@
 
               <!-- Invitation Code -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -203,7 +208,7 @@
               <!-- Password Reset - Only show when email verification is enabled -->
               <div
                 v-if="form.email_verify_enabled"
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -240,7 +245,7 @@
 
               <!-- TOTP 2FA -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -268,7 +273,7 @@
                 class="border-t border-gray-100 pt-4 dark:border-dark-700"
                 data-testid="passkey-settings"
               >
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start justify-between gap-4 settings-toggle-row">
                   <div>
                     <label class="font-medium text-gray-900 dark:text-white">{{
                       t("admin.settings.security.passkey")
@@ -324,7 +329,7 @@
 
               <!-- 敏感操作 step-up 2FA -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -339,7 +344,7 @@
 
               <!-- 会话 IP/UA 绑定 -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -375,9 +380,9 @@
           </div>
 
           <!-- API Key IP ACL Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.apiKeyAcl.title") }}
@@ -386,8 +391,8 @@
                 {{ t("admin.settings.apiKeyAcl.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
-              <div class="flex items-center justify-between gap-4">
+            <div class="settings-section-body space-y-5">
+              <div class="flex items-center justify-between gap-4 settings-toggle-row">
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">
                     {{ t("admin.settings.apiKeyAcl.trustForwardedIp") }}
@@ -438,7 +443,7 @@
                       </button>
                     </span>
                     <div
-                      class="flex min-w-[220px] flex-1 items-center gap-1 rounded border border-transparent px-2 py-1 focus-within:border-primary-300 dark:focus-within:border-primary-700"
+                      class="flex min-w-0 flex-[1_1_220px] items-center gap-1 rounded border border-transparent px-2 py-1 focus-within:border-primary-300 dark:focus-within:border-primary-700"
                     >
                       <input
                         id="forwarded-client-ip-headers"
@@ -462,9 +467,9 @@
           </div>
 
           <!-- Panel API Rate Limit Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <div class="flex items-center gap-2">
                 <Icon
@@ -480,7 +485,7 @@
                 {{ t("admin.settings.panelRateLimit.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
+            <div class="settings-section-body space-y-5">
               <div
                 v-if="panelRateLimitLoading"
                 class="flex items-center gap-2 text-gray-500"
@@ -508,7 +513,7 @@
                   </div>
                 </div>
 
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between settings-toggle-row">
                   <div>
                     <label class="font-medium text-gray-900 dark:text-white">{{
                       t("admin.settings.panelRateLimit.enabled")
@@ -597,7 +602,7 @@
                   </div>
 
                   <div
-                    class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                    class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
                   >
                     <div>
                       <label class="font-medium text-gray-900 dark:text-white">{{
@@ -653,9 +658,9 @@
           </div>
 
           <!-- 人机验证 Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.captcha.title") }}
@@ -664,9 +669,9 @@
                 {{ t("admin.settings.captcha.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
+            <div class="settings-section-body space-y-5">
               <!-- Enable Captcha -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
                     t("admin.settings.captcha.enable")
@@ -1057,9 +1062,9 @@
           </div>
 
           <!-- LinuxDo Connect OAuth 登录 -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.linuxdo.title") }}
@@ -1068,8 +1073,8 @@
                 {{ t("admin.settings.linuxdo.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
-              <div class="flex items-center justify-between">
+            <div class="settings-section-body space-y-5">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
                     t("admin.settings.linuxdo.enable")
@@ -1175,9 +1180,9 @@
           </div>
 
           <!-- GitHub / Google 邮箱快捷登录 -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ localText("邮箱快捷登录", "Email OAuth Sign-in") }}
@@ -1191,10 +1196,10 @@
                 }}
               </p>
             </div>
-            <div class="space-y-6 p-6">
-              <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-700">
-                  <div class="flex items-start justify-between gap-4">
+            <div class="settings-section-body space-y-6">
+              <div class="settings-provider-grid grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <div class="settings-provider">
+                  <div class="flex items-start justify-between gap-4 settings-toggle-row">
                     <div>
                       <h3 class="font-medium text-gray-900 dark:text-white">
                         GitHub
@@ -1303,8 +1308,8 @@
                   </div>
                 </div>
 
-                <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-700">
-                  <div class="flex items-start justify-between gap-4">
+                <div class="settings-provider">
+                  <div class="flex items-start justify-between gap-4 settings-toggle-row">
                     <div>
                       <h3 class="font-medium text-gray-900 dark:text-white">
                         Google
@@ -1401,9 +1406,9 @@
           </div>
 
           <!-- WeChat Connect OAuth 登录 -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.wechatConnect.title") }}
@@ -1412,8 +1417,8 @@
                 {{ t("admin.settings.wechatConnect.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
-              <div class="flex items-center justify-between">
+            <div class="settings-section-body space-y-5">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
                     t("admin.settings.wechatConnect.enabledLabel")
@@ -1436,7 +1441,7 @@
                   <div
                     class="rounded-lg border border-gray-200 p-4 dark:border-dark-700"
                   >
-                    <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start justify-between gap-4 settings-toggle-row">
                       <div>
                         <h3 class="font-medium text-gray-900 dark:text-white">
                           {{ localText("PC 应用", "PC App") }}
@@ -1509,7 +1514,7 @@
                   <div
                     class="rounded-lg border border-gray-200 p-4 dark:border-dark-700"
                   >
-                    <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start justify-between gap-4 settings-toggle-row">
                       <div>
                         <h3 class="font-medium text-gray-900 dark:text-white">
                           {{ localText("公众号", "Official Account") }}
@@ -1587,7 +1592,7 @@
                   <div
                     class="rounded-lg border border-gray-200 p-4 dark:border-dark-700"
                   >
-                    <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start justify-between gap-4 settings-toggle-row">
                       <div>
                         <h3 class="font-medium text-gray-900 dark:text-white">
                           {{ localText("移动应用", "Mobile App") }}
@@ -1743,9 +1748,9 @@
           </div>
 
           <!-- DingTalk Connect OAuth 登录 -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.dingtalk.title") }}
@@ -1754,8 +1759,8 @@
                 {{ t("admin.settings.dingtalk.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
-              <div class="flex items-center justify-between">
+            <div class="settings-section-body space-y-5">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
                     t("admin.settings.dingtalk.enable")
@@ -1876,7 +1881,7 @@
                   <!-- bypass_registration toggle（仅 internal_only 模式下可见可用） -->
                   <div
                     v-if="form.dingtalk_connect_corp_restriction_policy === 'internal_only'"
-                    class="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-dark-700"
+                    class="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-dark-700 settings-toggle-row"
                   >
                     <div>
                       <label class="font-medium text-gray-900 dark:text-white">{{
@@ -1894,7 +1899,7 @@
                     v-if="form.dingtalk_connect_corp_restriction_policy === 'internal_only'"
                     class="pt-4 border-t border-gray-100 dark:border-dark-700 space-y-2"
                   >
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between settings-toggle-row">
                       <div>
                         <label class="font-medium text-gray-900 dark:text-white">{{
                           t("admin.settings.dingtalk.syncDisplayName")
@@ -1937,7 +1942,7 @@
                     v-if="form.dingtalk_connect_corp_restriction_policy === 'internal_only'"
                     class="pt-4 border-t border-gray-100 dark:border-dark-700 space-y-2"
                   >
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between settings-toggle-row">
                       <div>
                         <label class="font-medium text-gray-900 dark:text-white">{{
                           t("admin.settings.dingtalk.syncCorpEmail")
@@ -1983,7 +1988,7 @@
                     v-if="form.dingtalk_connect_corp_restriction_policy === 'internal_only'"
                     class="pt-4 border-t border-gray-100 dark:border-dark-700 space-y-2"
                   >
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between settings-toggle-row">
                       <div>
                         <label class="font-medium text-gray-900 dark:text-white">{{
                           t("admin.settings.dingtalk.syncDept")
@@ -2031,9 +2036,9 @@
           </div>
 
           <!-- Generic OIDC OAuth 登录 -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.oidc.title") }}
@@ -2042,8 +2047,8 @@
                 {{ t("admin.settings.oidc.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
-              <div class="flex items-center justify-between">
+            <div class="settings-section-body space-y-5">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
                     t("admin.settings.oidc.enable")
@@ -2345,7 +2350,7 @@
 
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
                   <div
-                    class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700"
+                    class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700 settings-toggle-row"
                   >
                     <div>
                       <label class="font-medium text-gray-900 dark:text-white">
@@ -2359,7 +2364,7 @@
                   </div>
 
                   <div
-                    class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700"
+                    class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700 settings-toggle-row"
                   >
                     <div>
                       <label class="font-medium text-gray-900 dark:text-white">
@@ -2373,7 +2378,7 @@
                   </div>
 
                   <div
-                    class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700"
+                    class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700 settings-toggle-row"
                   >
                     <div>
                       <label class="font-medium text-gray-900 dark:text-white">
@@ -2444,9 +2449,9 @@
         <!-- Tab: Users -->
         <div v-show="activeTab === 'users'" class="space-y-6">
           <!-- Default Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.defaults.title") }}
@@ -2455,7 +2460,7 @@
                 {{ t("admin.settings.defaults.description") }}
               </p>
             </div>
-            <div class="space-y-6 p-6">
+            <div class="settings-section-body space-y-6">
               <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                   <label
@@ -2717,9 +2722,9 @@
             </div>
           </div>
 
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.authSourceDefaults.title") }}
@@ -2728,9 +2733,9 @@
                 {{ t("admin.settings.authSourceDefaults.description") }}
               </p>
             </div>
-            <div class="space-y-6 p-6">
+            <div class="settings-section-body space-y-6">
               <div
-                class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700"
+                class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">
@@ -2749,7 +2754,7 @@
                   :key="authSource.source"
                   class="rounded-xl border border-gray-200 p-4 dark:border-dark-700"
                 >
-                  <div class="flex items-center justify-between gap-4">
+                  <div class="flex items-center justify-between gap-4 settings-toggle-row">
                     <div>
                       <div class="font-medium text-gray-900 dark:text-white">
                         {{ authSource.title }}
@@ -2812,7 +2817,7 @@
                     </div>
 
                     <div
-                      class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700"
+                      class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700 settings-toggle-row"
                     >
                       <div>
                         <label
@@ -3060,9 +3065,9 @@
         <!-- Tab: Gateway — Claude Code, Scheduling -->
         <div v-show="activeTab === 'gateway'" class="space-y-6">
           <!-- Claude Code Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.claudeCode.title") }}
@@ -3071,7 +3076,7 @@
                 {{ t("admin.settings.claudeCode.description") }}
               </p>
             </div>
-            <div class="p-6">
+            <div class="settings-section-body">
               <div>
                 <label
                   class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -3112,17 +3117,17 @@
           </div>
 
           <!-- Codex Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.gatewayForwarding.codexHardeningTitle") }}
               </h2>
             </div>
-            <div class="p-6 space-y-4">
+            <div class="settings-section-body space-y-4">
                 <div class="rounded-lg border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/20">
-                  <div class="flex items-start justify-between gap-4">
+                  <div class="flex items-start justify-between gap-4 settings-toggle-row">
                     <div class="min-w-0">
                       <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                         {{ t("admin.settings.gatewayForwarding.codexOverdraftTitle") }}
@@ -3133,7 +3138,7 @@
                     </div>
                     <Toggle v-model="form.codex_quota_overdraft_enabled" data-testid="codex-quota-overdraft-toggle" />
                   </div>
-                  <div class="mt-4 flex items-start justify-between gap-4 border-t border-blue-200/70 pt-4 dark:border-blue-900/50">
+                  <div class="mt-4 flex items-start justify-between gap-4 border-t border-blue-200/70 pt-4 dark:border-blue-900/50 settings-toggle-row">
                     <div class="min-w-0">
                       <h4 class="text-sm font-medium text-gray-900 dark:text-white">
                         {{ t("admin.settings.gatewayForwarding.codexOverdraftBusinessInjection") }}
@@ -3149,7 +3154,7 @@
                     />
                   </div>
                 </div>
-                <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center justify-between gap-4 settings-toggle-row">
                   <div class="min-w-0">
                     <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                       {{ t("admin.settings.gatewayForwarding.codexTicketEnabled") }}
@@ -3279,7 +3284,7 @@
                   </p>
                 </div>
 
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between settings-toggle-row">
                   <div class="pr-4">
                     <label
                       class="block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -3424,9 +3429,9 @@
           </div>
 
           <!-- Upstream Billing Probe Settings -->
-          <div class="card" data-testid="upstream-billing-probe-settings">
+          <div class="card settings-section" data-testid="upstream-billing-probe-settings">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.upstreamBillingProbe.title") }}
@@ -3435,7 +3440,7 @@
                 {{ t("admin.settings.upstreamBillingProbe.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
+            <div class="settings-section-body space-y-5">
               <div
                 v-if="upstreamBillingProbeLoading"
                 class="flex items-center gap-2 text-gray-500"
@@ -3447,7 +3452,7 @@
               </div>
 
               <template v-else>
-                <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center justify-between gap-4 settings-toggle-row">
                   <div>
                     <label class="font-medium text-gray-900 dark:text-white">
                       {{ t("admin.settings.upstreamBillingProbe.enabled") }}
@@ -3510,8 +3515,8 @@
           </div>
 
           <!-- Ollama Cloud Usage Settings -->
-          <div class="card" data-testid="ollama-cloud-usage-global-settings">
-            <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+          <div class="card settings-section" data-testid="ollama-cloud-usage-global-settings">
+            <div class="settings-section-header">
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.ollamaCloudUsage.title") }}
               </h2>
@@ -3519,13 +3524,13 @@
                 {{ t("admin.settings.ollamaCloudUsage.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
+            <div class="settings-section-body space-y-5">
               <div v-if="ollamaCloudUsageLoading" class="flex items-center gap-2 text-gray-500">
                 <div class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary-600"></div>
                 {{ t("common.loading") }}
               </div>
               <template v-else>
-                <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center justify-between gap-4 settings-toggle-row">
                   <div>
                     <label class="font-medium text-gray-900 dark:text-white">
                       {{ t("admin.settings.ollamaCloudUsage.enabled") }}
@@ -3594,9 +3599,9 @@
           </div>
 
           <!-- Gateway Scheduling Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.scheduling.title") }}
@@ -3605,8 +3610,8 @@
                 {{ t("admin.settings.scheduling.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
-              <div class="flex items-center justify-between">
+            <div class="settings-section-body space-y-5">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -3694,7 +3699,7 @@
 
               <div
                 v-if="!form.openai_advanced_scheduler_enabled"
-                class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label
@@ -3746,7 +3751,7 @@
                 </div>
               </div>
 
-              <div class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700">
+              <div class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700 settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -3767,7 +3772,7 @@
 
               <div
                 v-if="form.openai_advanced_scheduler_enabled"
-                class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label
@@ -3786,7 +3791,7 @@
 
               <div
                 v-if="form.openai_advanced_scheduler_enabled"
-                class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label
@@ -3875,9 +3880,9 @@
           </div>
 
           <!-- Gateway Forwarding Behavior -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.gatewayForwarding.title") }}
@@ -3886,7 +3891,7 @@
                 {{ t("admin.settings.gatewayForwarding.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
+            <div class="settings-section-body space-y-5">
               <div class="grid gap-5 border-b border-gray-100 pb-5 dark:border-dark-700 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                 <div>
                   <label
@@ -3913,7 +3918,7 @@
                     {{ t("admin.settings.gatewayForwarding.grokDefaultTextModelHint") }}
                   </p>
                 </div>
-                <div class="flex items-center justify-between gap-5 md:min-w-72">
+                <div class="flex items-center justify-between gap-5 md:min-w-72 settings-toggle-row">
                   <div>
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                       {{ t("admin.settings.gatewayForwarding.grokCrossClientMap") }}
@@ -3979,7 +3984,7 @@
               </div>
 
               <!-- Fingerprint Unification -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4002,7 +4007,7 @@
               </div>
 
               <!-- Metadata Passthrough -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4023,7 +4028,7 @@
               </div>
 
               <!-- CCH Signing -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4038,7 +4043,7 @@
               </div>
 
               <!-- Claude OAuth System Prompt Injection -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4101,7 +4106,7 @@
                           {{ getClaudeOAuthPresetLabel(block.preset) }}
                         </div>
                       </div>
-                      <div class="flex items-center gap-2">
+                      <div class="flex items-center gap-2 settings-toggle-row">
                         <button
                           type="button"
                           class="btn btn-secondary btn-sm px-2"
@@ -4214,7 +4219,7 @@
                       <div
                         class="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]"
                       >
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center justify-between gap-4 settings-toggle-row">
                           <div>
                             <label
                               class="text-xs font-medium text-gray-600 dark:text-gray-300"
@@ -4269,7 +4274,7 @@
               </div>
 
               <!-- Anthropic Cache TTL 1h Injection -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4294,7 +4299,7 @@
               </div>
 
               <!-- 预扣费系统运行时开关：两套互相独立的提前占钱机制，默认都关 -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4318,7 +4323,7 @@
                 />
               </div>
 
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4341,7 +4346,7 @@
               </div>
 
               <!-- messages cache_control 改写 -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4364,7 +4369,7 @@
               </div>
 
               <!-- 客户端 dateline 归一化（仅 Anthropic OAuth/SetupToken） -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4479,7 +4484,7 @@
               </div>
 
               <!-- Codex 版本号自动同步 -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4511,9 +4516,9 @@
           </div>
 
           <!-- Web Search Emulation -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.webSearchEmulation.title") }}
@@ -4525,7 +4530,7 @@
             <div
               v-if="webSearchConfigLoadFailed"
               role="alert"
-              class="flex items-center justify-between gap-3 p-6 text-sm text-red-600 dark:text-red-400"
+              class="settings-section-body flex items-center justify-between gap-3 text-sm text-red-600 dark:text-red-400"
               data-testid="web-search-load-error"
             >
               <span>{{ localText(
@@ -4542,11 +4547,11 @@
             </div>
             <fieldset
               :disabled="!webSearchConfigLoaded || webSearchConfigLoading"
-              class="min-w-0 space-y-5 p-6"
+              class="settings-section-body min-w-0 space-y-5"
               data-testid="web-search-fields"
             >
               <!-- Global Toggle -->
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4915,8 +4920,8 @@
           </div>
 
         <!-- Usage Records Settings -->
-        <div class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+        <div class="card settings-section">
+          <div class="settings-section-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.usageRecords.title') }}
             </h2>
@@ -4924,7 +4929,7 @@
               {{ t('admin.settings.usageRecords.description') }}
             </p>
           </div>
-          <div class="space-y-4 p-6">
+          <div class="settings-section-body space-y-4">
             <!-- User error requests visibility -->
             <div class="flex items-center justify-between">
               <div>
@@ -4948,9 +4953,9 @@
         <!-- Tab: General -->
         <div v-show="activeTab === 'general'" class="space-y-6">
           <!-- Site Settings -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.site.title") }}
@@ -4959,10 +4964,10 @@
                 {{ t("admin.settings.site.description") }}
               </p>
             </div>
-            <div class="space-y-6 p-6">
+            <div class="settings-section-body space-y-6">
               <!-- Backend Mode -->
               <div
-                class="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
+                class="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20 settings-toggle-row"
               >
                 <div>
                   <h3 class="text-sm font-medium text-gray-900 dark:text-white">
@@ -5278,7 +5283,7 @@
               </div>
 
               <!-- Compact Home Page -->
-              <div class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700">
+              <div class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row">
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
                     t("admin.settings.site.compactHome")
@@ -5292,7 +5297,7 @@
 
               <!-- Hide CCS Import Button -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -5308,9 +5313,9 @@
           </div>
 
           <!-- Custom Menu Items -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.customMenu.title") }}
@@ -5319,7 +5324,7 @@
                 {{ t("admin.settings.customMenu.description") }}
               </p>
             </div>
-            <div class="space-y-4 p-6">
+            <div class="settings-section-body space-y-4">
               <!-- Existing menu items -->
               <div
                 v-for="(item, index) in form.custom_menu_items"
@@ -5465,8 +5470,8 @@
 
 	        <!-- Tab: Login Agreement -->
 	        <div v-show="activeTab === 'agreement'" class="space-y-6">
-	          <div class="card">
-	            <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+	          <div class="card settings-section">
+	            <div class="settings-section-header">
 	              <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 	                <div>
 	                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -5481,7 +5486,7 @@
 	                    }}
 	                  </p>
 	                </div>
-	                <div class="flex items-center gap-3">
+	                <div class="flex items-center gap-3 settings-toggle-row">
 	                  <span class="text-sm text-gray-600 dark:text-gray-300">
 	                    {{ form.login_agreement_enabled ? localText("已启用", "Enabled") : localText("未启用", "Disabled") }}
 	                  </span>
@@ -5490,7 +5495,7 @@
 	              </div>
 	            </div>
 
-	            <div class="space-y-6 p-6">
+	            <div class="settings-section-body space-y-6">
 	              <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
 	                <div>
 	                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -5677,8 +5682,8 @@
 	        <!-- Tab: Features (功能开关) -->
         <div v-show="activeTab === 'features'" class="space-y-6">
 
-        <div class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+        <div class="card settings-section">
+          <div class="settings-section-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.channelMonitor.title') }}
             </h2>
@@ -5695,8 +5700,8 @@
               </router-link>
             </p>
           </div>
-          <div class="space-y-5 p-6">
-            <div class="flex items-center justify-between">
+          <div class="settings-section-body space-y-5">
+            <div class="flex items-center justify-between settings-toggle-row">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.features.channelMonitor.enabled') }}
@@ -5769,7 +5774,7 @@
               </div>
 
               <div v-if="form.channel_monitor_mode === 'v2'" class="space-y-4">
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start justify-between gap-4 settings-toggle-row">
                   <div class="min-w-0">
                     <p class="text-sm font-medium text-gray-900 dark:text-white">
                       {{ t('admin.settings.features.channelMonitor.hideThroughput') }}
@@ -5780,7 +5785,7 @@
                   </div>
                   <Toggle v-model="form.channel_monitor_hide_throughput" />
                 </div>
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start justify-between gap-4 settings-toggle-row">
                   <div class="min-w-0">
                     <p class="text-sm font-medium text-gray-900 dark:text-white">
                       {{ t('admin.settings.features.channelMonitor.hideUserRanking') }}
@@ -5793,7 +5798,7 @@
                 </div>
               </div>
 
-              <div v-if="form.channel_monitor_mode === 'v1'" class="flex items-start justify-between gap-4">
+              <div v-if="form.channel_monitor_mode === 'v1'" class="flex items-start justify-between gap-4 settings-toggle-row">
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-gray-900 dark:text-white">
                     {{ t('admin.settings.features.channelMonitor.showQuota') }}
@@ -5808,8 +5813,8 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+        <div class="card settings-section">
+          <div class="settings-section-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.availableChannels.title') }}
             </h2>
@@ -5826,8 +5831,8 @@
               </router-link>
             </p>
           </div>
-          <div class="space-y-5 p-6">
-            <div class="flex items-center justify-between">
+          <div class="settings-section-body space-y-5">
+            <div class="flex items-center justify-between settings-toggle-row">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.features.availableChannels.enabled') }}
@@ -5841,8 +5846,8 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+        <div class="card settings-section">
+          <div class="settings-section-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.modelPlaza.title') }}
             </h2>
@@ -5850,8 +5855,8 @@
               {{ t('admin.settings.features.modelPlaza.description') }}
             </p>
           </div>
-          <div class="space-y-5 p-6">
-            <div class="flex items-center justify-between">
+          <div class="settings-section-body space-y-5">
+            <div class="flex items-center justify-between settings-toggle-row">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.features.modelPlaza.enabled') }}
@@ -5863,7 +5868,7 @@
               <Toggle v-model="form.model_plaza_enabled" />
             </div>
 
-            <div v-if="form.model_plaza_enabled" class="flex items-center justify-between">
+            <div v-if="form.model_plaza_enabled" class="flex items-center justify-between settings-toggle-row">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.features.modelPlaza.requireAuth') }}
@@ -5891,20 +5896,20 @@
           </div>
         </div>
 
-        <div class="card" data-testid="leaderboard-settings">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+        <div class="card settings-section" data-testid="leaderboard-settings">
+          <div class="settings-section-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('admin.settings.features.leaderboard.title') }}</h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.settings.features.leaderboard.description') }}</p>
           </div>
-          <div class="space-y-5 p-6">
-            <div class="flex items-center justify-between gap-4">
+          <div class="settings-section-body space-y-5">
+            <div class="flex items-center justify-between gap-4 settings-toggle-row">
               <div>
                 <label id="leaderboard-enabled-label" class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.settings.features.leaderboard.enabled') }}</label>
                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.features.leaderboard.enabledHint') }}</p>
               </div>
               <Toggle v-model="form.leaderboard_enabled" aria-labelledby="leaderboard-enabled-label" />
             </div>
-            <div v-if="form.leaderboard_enabled" class="flex items-center justify-between gap-4">
+            <div v-if="form.leaderboard_enabled" class="flex items-center justify-between gap-4 settings-toggle-row">
               <div>
                 <label id="leaderboard-auth-label" class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.settings.features.leaderboard.requireAuth') }}</label>
                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.features.leaderboard.requireAuthHint') }}</p>
@@ -5914,8 +5919,8 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+        <div class="card settings-section">
+          <div class="settings-section-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.pluginManagement.title') }}
             </h2>
@@ -5923,8 +5928,8 @@
               {{ t('admin.settings.features.pluginManagement.description') }}
             </p>
           </div>
-          <div class="space-y-5 p-6">
-            <div class="flex items-center justify-between gap-4">
+          <div class="settings-section-body space-y-5">
+            <div class="flex items-center justify-between gap-4 settings-toggle-row">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.features.pluginManagement.enabled') }}
@@ -5938,8 +5943,8 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+        <div class="card settings-section">
+          <div class="settings-section-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.riskControl.title') }}
             </h2>
@@ -5956,8 +5961,8 @@
               </router-link>
             </p>
           </div>
-          <div class="space-y-5 p-6">
-            <div class="flex items-center justify-between">
+          <div class="settings-section-body space-y-5">
+            <div class="flex items-center justify-between settings-toggle-row">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.features.riskControl.enabled') }}
@@ -5969,7 +5974,7 @@
               <Toggle v-model="form.risk_control_enabled" />
             </div>
 
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between settings-toggle-row">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.features.riskControl.cyberSessionBlock') }}
@@ -5997,8 +6002,8 @@
         </div>
 
         <!-- Affiliate (邀请返利) feature card -->
-        <div class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+        <div class="card settings-section">
+          <div class="settings-section-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.affiliate.title') }}
             </h2>
@@ -6006,8 +6011,8 @@
               {{ t('admin.settings.features.affiliate.description') }}
             </p>
           </div>
-          <div class="space-y-5 p-6">
-            <div class="flex items-center justify-between">
+          <div class="settings-section-body space-y-5">
+            <div class="flex items-center justify-between settings-toggle-row">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.features.affiliate.enabled') }}
@@ -6020,7 +6025,7 @@
             </div>
 
             <div v-if="form.affiliate_enabled" class="space-y-6">
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <div>
                   <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {{ t('admin.settings.features.affiliate.adminRechargeRebate') }}
@@ -6110,34 +6115,32 @@
 
         </div><!-- /Tab: Features -->
 
-        <!-- Tab: Email -->
         <!-- External shop -->
         <div v-show="activeTab === 'purchase'" class="space-y-6">
-          <div class="card p-6">
-              <section class="rounded-lg border border-gray-200 p-4 dark:border-dark-700" data-testid="external-shop-settings">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <h3 class="font-medium text-gray-900 dark:text-white">{{ t("admin.settings.purchase.title") }}</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.purchase.description") }}</p>
-                  </div>
-                  <Toggle v-model="form.purchase_subscription_enabled" data-testid="external-shop-toggle" :aria-label="t('admin.settings.purchase.enabled')" />
-                </div>
-                <div class="mt-4 space-y-3">
-                  <div v-for="tier in purchaseTiers" :key="tier">
-                    <label :for="`external-shop-url-${tier}`" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.purchase.tierUrl", { amount: tier }) }}</label>
-                    <input :id="`external-shop-url-${tier}`" v-model="form.purchase_subscription_products[tier]" type="url" class="input w-full" :placeholder="t('admin.settings.purchase.urlPlaceholder')" />
-                    <a v-if="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" :href="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block text-sm text-primary-500">{{ t("admin.settings.purchase.preview") }}</a>
-                  </div>
-                  <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.purchase.urlHint") }}</p>
-                </div>
-              </section>
-          </div>
+          <section class="card settings-section" data-testid="external-shop-settings">
+            <div class="settings-section-header flex items-center justify-between gap-4 settings-toggle-row">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t("admin.settings.purchase.title") }}</h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.purchase.description") }}</p>
+              </div>
+              <Toggle v-model="form.purchase_subscription_enabled" data-testid="external-shop-toggle" :aria-label="t('admin.settings.purchase.enabled')" />
+            </div>
+            <div class="settings-section-body space-y-5">
+              <div v-for="tier in purchaseTiers" :key="tier">
+                <label :for="`external-shop-url-${tier}`" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.purchase.tierUrl", { amount: tier }) }}</label>
+                <input :id="`external-shop-url-${tier}`" v-model="form.purchase_subscription_products[tier]" type="url" class="input w-full" :placeholder="t('admin.settings.purchase.urlPlaceholder')" />
+                <a v-if="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" :href="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block text-sm text-primary-500">{{ t("admin.settings.purchase.preview") }}</a>
+              </div>
+              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.purchase.urlHint") }}</p>
+            </div>
+          </section>
         </div>
 
+        <!-- Tab: Email -->
         <div v-show="activeTab === 'email'" class="space-y-6">
           <!-- Email disabled hint - show when email_verify_enabled is off -->
-          <div v-if="!form.email_verify_enabled" class="card">
-            <div class="p-6">
+          <div v-if="!form.email_verify_enabled" class="card settings-section">
+            <div class="settings-section-body">
               <div class="flex items-start gap-3">
                 <Icon
                   name="mail"
@@ -6157,9 +6160,9 @@
           </div>
 
           <!-- SMTP Settings - Only show when email verification is enabled -->
-          <div v-if="form.email_verify_enabled" class="card">
+          <div v-if="form.email_verify_enabled" class="card settings-section">
             <div
-              class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header flex items-center justify-between"
             >
               <div>
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -6202,7 +6205,7 @@
                 }}
               </button>
             </div>
-            <div class="space-y-6 p-6">
+            <div class="settings-section-body space-y-6">
               <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                   <label
@@ -6304,7 +6307,7 @@
 
               <!-- Use TLS Toggle -->
               <div
-                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700 settings-toggle-row"
               >
                 <div>
                   <label class="font-medium text-gray-900 dark:text-white">{{
@@ -6320,9 +6323,9 @@
           </div>
 
           <!-- Send Test Email - Only show when email verification is enabled -->
-          <div v-if="form.email_verify_enabled" class="card">
+          <div v-if="form.email_verify_enabled" class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ t("admin.settings.testEmail.title") }}
@@ -6331,9 +6334,9 @@
                 {{ t("admin.settings.testEmail.description") }}
               </p>
             </div>
-            <div class="p-6">
-              <div class="flex items-end gap-4">
-                <div class="flex-1">
+            <div class="settings-section-body">
+              <div class="settings-inline-action flex items-end gap-4">
+                <div class="min-w-0 flex-1">
                   <label
                     class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
@@ -6387,9 +6390,9 @@
           </div>
 
           <!-- 订阅到期提醒 -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h3 class="text-base font-medium text-gray-900 dark:text-white">
                 {{ t("admin.settings.subscriptionExpiryNotify.title") }}
@@ -6398,8 +6401,8 @@
                 {{ t("admin.settings.subscriptionExpiryNotify.description") }}
               </p>
             </div>
-            <div class="px-6 py-6">
-              <div class="flex items-center justify-between gap-4">
+            <div class="settings-section-body">
+              <div class="flex items-center justify-between gap-4 settings-toggle-row">
                 <div>
                   <label
                     class="mb-0 block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -6418,9 +6421,9 @@
           <EmailTemplateEditor />
 
           <!-- Balance Low Notification -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h3 class="text-base font-medium text-gray-900 dark:text-white">
                 {{ t("admin.settings.balanceNotify.title") }}
@@ -6429,8 +6432,8 @@
                 {{ t("admin.settings.balanceNotify.description") }}
               </p>
             </div>
-            <div class="px-6 py-6 space-y-4">
-              <div class="flex items-center justify-between">
+            <div class="settings-section-body space-y-4">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <label
                   class="mb-0 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >{{ t("admin.settings.balanceNotify.enabled") }}</label
@@ -6478,9 +6481,9 @@
           </div>
 
           <!-- Account Quota Notification -->
-          <div class="card">
+          <div class="card settings-section">
             <div
-              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+              class="settings-section-header"
             >
               <h3 class="text-base font-medium text-gray-900 dark:text-white">
                 {{ t("admin.settings.quotaNotify.title") }}
@@ -6489,8 +6492,8 @@
                 {{ t("admin.settings.quotaNotify.description") }}
               </p>
             </div>
-            <div class="px-6 py-6 space-y-4">
-              <div class="flex items-center justify-between">
+            <div class="settings-section-body space-y-4">
+              <div class="flex items-center justify-between settings-toggle-row">
                 <label
                   class="mb-0 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >{{ t("admin.settings.quotaNotify.enabled") }}</label
@@ -6560,12 +6563,13 @@
           <BackupSettings />
         </div>
 
-        <!-- Save Button -->
-        <div v-show="activeTab !== 'backup'" class="flex justify-end">
+        <!-- Save all settings -->
+        <div v-show="activeTab !== 'backup'" class="settings-save-bar">
+          <p class="settings-save-label">{{ t("admin.settings.title") }}</p>
           <button
             type="submit"
             :disabled="saving || loadFailed"
-            class="btn btn-primary"
+            class="btn btn-primary settings-save-button"
           >
             <svg
               v-if="saving"
@@ -6648,6 +6652,7 @@ import type {
   Proxy,
 } from "@/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
+import PageHeader from "@/components/layout/PageHeader.vue";
 import Icon from "@/components/icons/Icon.vue";
 import Select from "@/components/common/Select.vue";
 import GroupBadge from "@/components/common/GroupBadge.vue";
@@ -9612,6 +9617,151 @@ watch(
 </script>
 
 <style scoped>
+.settings-form,
+.settings-section {
+  min-width: 0;
+}
+
+.settings-section-header {
+  padding: 1.25rem 1.5rem 1rem;
+}
+
+.settings-section-header p {
+  max-width: 80ch;
+  line-height: 1.65;
+}
+
+.settings-section-body {
+  min-width: 0;
+  padding: 0 1.5rem 1.5rem;
+}
+
+.settings-section-body:first-child {
+  padding-top: 1.5rem;
+}
+
+.settings-section-header,
+.settings-toggle-row {
+  gap: 1.25rem;
+}
+
+.settings-toggle-row > :first-child {
+  min-width: 0;
+  flex: 1 1 0%;
+}
+
+.settings-toggle-row > :last-child {
+  flex-shrink: 0;
+}
+
+.settings-form .input,
+.settings-section-body > .grid > div {
+  min-width: 0;
+}
+
+.settings-section-header,
+.settings-toggle-row > :first-child {
+  overflow-wrap: anywhere;
+}
+
+.settings-navigation {
+  min-width: 0;
+  max-width: 100%;
+  scroll-margin-top: calc(var(--shell-height, 4rem) + 1rem);
+}
+
+.settings-navigation :deep(.settings-tabs-scroll) {
+  overscroll-behavior-x: contain;
+}
+
+.settings-navigation :deep(.settings-tab) {
+  scroll-margin-inline: 0.75rem;
+}
+
+.settings-navigation :deep(.settings-tab-icon) {
+  display: none;
+}
+
+.settings-provider {
+  min-width: 0;
+}
+
+.settings-provider + .settings-provider {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--console-edge, #e5e7eb);
+}
+
+@media (min-width: 1280px) {
+  .settings-provider-grid {
+    column-gap: 3rem;
+  }
+
+  .settings-provider + .settings-provider {
+    padding-top: 0;
+    padding-left: 1.5rem;
+    border-top: 0;
+    border-left: 1px solid var(--console-edge, #e5e7eb);
+  }
+}
+
+.settings-save-bar {
+  position: sticky;
+  z-index: 10;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--console-edge, #e5e7eb);
+  border-radius: 0.75rem;
+  background: var(--signal-surface, #fff);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.05);
+}
+
+.settings-save-label {
+  color: var(--signal-muted, #6b7280);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.settings-save-button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .settings-section-header {
+    padding: 1rem 1rem 0.875rem;
+  }
+
+  .settings-section-body {
+    padding: 0 1rem 1rem;
+  }
+
+  .settings-section-body:first-child {
+    padding-top: 1rem;
+  }
+
+  .settings-section-header.flex {
+    flex-wrap: wrap;
+  }
+
+  .settings-section-header,
+  .settings-toggle-row {
+    gap: 1rem;
+  }
+
+  .settings-save-bar {
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .settings-inline-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .default-sub-group-select :deep(.select-trigger) {
   @apply h-[42px];
 }

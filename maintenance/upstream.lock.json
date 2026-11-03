@@ -2,27 +2,30 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.4",
-  "imported_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
+  "imported_version": "2.3.5",
+  "imported_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.4",
-  "latest_observed_release_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
-  "latest_observed_main_commit": "c2d172150660e4416e8a49b80bbcff9ac2b09910",
+  "latest_observed_version": "2.3.5",
+  "latest_observed_release_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
+  "latest_observed_main_commit": "a0e9e0f3493667963319cf79bfb64592ea043cee",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.4",
-  "reviewed_release_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
+  "reviewed_release_tag": "v2.3.5",
+  "reviewed_release_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
   "observed_delta_review": {
-    "from_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
-    "to_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
-    "status": "selective_formal_v2304_adapted_with_explicit_deferrals",
-    "scope": "Selected DeepSeek native transparency, genuine reasoning and thinking-switch semantics; authenticated free model discovery with key limits preserved; group custom pricing references; route-aware API key group filtering and bounded Intl caches. Center the local home footer. Preserve Vue/shadcn, scoped replay and billing; exclude/defer Nuxt SSR, removed payments and automation. No migrations; only x/crypto GO-2026-5932 security fix and checksums. Personal v2.1.47 publication authorized after review.",
-    "evidence": "maintenance/notes/upstream-sync-20261103-v2304.md"
+    "from_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
+    "to_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
+    "status": "formal_v2305_reviewed_no_applicable_runtime_delta",
+    "scope": "All six formal-release paths reviewed. Unknown schedulable-timer confirmation and requestcapture diagnostic test fixes apply only to deferred modules absent locally. Advance review/monitoring checkpoints only; preserve local schedulable toggles, quality plans, UI and billing. No migration or dependency changes. Unreleased main remains outside the checkpoint. User subsequently authorized reviewed personal v2.1.49 publication and controlled deployment.",
+    "evidence": "maintenance/notes/upstream-sync-20261103-v2305.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "65db90acee6ea7983611ef1b9e248cf8c7663235",
+    "source_head": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
+    "reviewed_without_runtime_changes": [
+      "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
+    ],
     "implemented_with_local_regression": [
       "Formal v2.3.1-v2.3.4 selected DeepSeek native/request-reasoning semantics, free authenticated discovery, custom group references, route-aware key filtering and Intl caches; home footer centered. Preserve local replay scope/UI/billing; see maintenance/notes/upstream-sync-20261103-v2304.md for explicit exclusions and verification limits.",
       "Formal v2.2.67-v2.3.0 selected native DeepSeek effort preservation, unknown capacity state and batched on-demand user platform quotas. Retain Vue SPA, native protocols and existing feature removals. Local original pig-hero theme/footer refinement recorded separately in maintenance/notes/upstream-sync-20261102-v2300.md",
@@ -106,6 +109,15 @@
   ],
   "selected_deepseek_fix": "Formal v2304 native DeepSeek bypasses legacy call-ID/request-state rewriting and rejected-field retries; genuine reasoning and thinking-switch options are provider-gated. Existing legacy conversion empty-shell repair remains scoped. Preserve local key/conversation/requested-model replay isolation, native protocols and distinct IDs; no cache-key weakening, Hosted execution, DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2305-schedulable-timer-and-requestcapture-fixes",
+      "upstream_commits": [
+        "2ef7fa0b3d430cb572b46163c33dbbf617e40c73",
+        "c2d172150660e4416e8a49b80bbcff9ac2b09910",
+        "51748099a2b82dbb16eb8f080cf92efe4a2722b2"
+      ],
+      "reason": "No local schedulable-timer state/override API or requestcapture module. Existing immediate schedulable toggles do not cancel such timers; scheduled quality-test plans are separate and retained. Keep these fixes with their deferred modules: any later import must preserve confirmation for unknown timer state and include asynchronous startup/session-drain regressions."
+    },
     {
       "feature": "v2304-source-runtime-and-optional-admin-expansion",
       "upstream_commits": [
@@ -588,6 +600,21 @@
     "preserved": "Local shadcn UI and grouped model plaza; native providers and scoped reasoning; existing billing, refusal and disconnect handling; removed tickets/canvas/native payments and previously deferred Ops/capture/Hosted.",
     "migration": "None. Existing migrations, Ent and both Go/frontend dependencies unchanged.",
     "release_status": "User authorized GitHub submission and deployment on 2026-11-02. Prepare personal v2.1.46 via PR/CI, own GHCR and the controlled updater; exact source/artifact/runtime acceptance recorded separately. No migration or dependency changes."
+  },
+  "sync_20261103_v2305": {
+    "evidence": "maintenance/notes/upstream-sync-20261103-v2305.md",
+    "reviewed_release_tag": "v2.3.5",
+    "reviewed_release_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
+    "selected_commits": [],
+    "reviewed_not_applicable_commits": [
+      "2ef7fa0b3d430cb572b46163c33dbbf617e40c73",
+      "c2d172150660e4416e8a49b80bbcff9ac2b09910",
+      "51748099a2b82dbb16eb8f080cf92efe4a2722b2"
+    ],
+    "selected_scope": "Review/monitoring checkpoints only; no applicable runtime behavior to backport from this release. Source VERSION bookkeeping and upstream release notes are not personal version/release metadata.",
+    "preserved": "Local Vue/shadcn UI, immediate schedulable controls and independent scheduled quality tests, scoped native reasoning, billing/refunds and all previous module exclusions.",
+    "migration": "None. Existing migrations, Ent, dependencies and deployment configuration unchanged.",
+    "release_status": "User subsequently authorized review, GitHub submission and deployment on 2026-11-03. Prepare personal v2.1.49 via PR/CI, own GHCR and the existing controlled rollout. Source/artifact/runtime acceptance evidence recorded separately; no migration or dependency changes."
   },
   "sync_20261103_v2304": {
     "evidence": "maintenance/notes/upstream-sync-20261103-v2304.md",

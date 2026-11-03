@@ -15,7 +15,7 @@
     "from_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
     "to_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
     "status": "selective_formal_v2304_adapted_with_explicit_deferrals",
-    "scope": "Selected DeepSeek native transparency, genuine reasoning and thinking-switch semantics; authenticated free model discovery with key limits preserved; group custom pricing references; route-aware API key group filtering and bounded Intl caches. Center the local home footer. Preserve Vue/shadcn, scoped replay and billing; exclude/defer Nuxt SSR, removed payments and automation. No migrations or dependency changes; personal v2.1.47 publication authorized after review.",
+    "scope": "Selected DeepSeek native transparency, genuine reasoning and thinking-switch semantics; authenticated free model discovery with key limits preserved; group custom pricing references; route-aware API key group filtering and bounded Intl caches. Center the local home footer. Preserve Vue/shadcn, scoped replay and billing; exclude/defer Nuxt SSR, removed payments and automation. No migrations; only x/crypto GO-2026-5932 security fix and checksums. Personal v2.1.47 publication authorized after review.",
     "evidence": "maintenance/notes/upstream-sync-20261103-v2304.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
@@ -118,11 +118,11 @@
       "reason": "Preserve the local SPA and virtual-table/edit lifecycle. Defer automatic whitelist runner, Ops import, activity/rate history, new key summary dialog, table DOM/preload and timer-state UI. Adapt standalone Intl cache and route-filter behavior independently. Nuxt SSR release/cookie/session/theme contracts and removed crypto payments do not apply. Exact classifications are recorded in the v2304 note."
     },
     {
-      "feature": "v2304-totp-consumption-and-openpgp-module-split",
+      "feature": "v2304-totp-consumption",
       "upstream_commits": [
         "5991959d6"
       ],
-      "reason": "Source delayed TOTP consumption depends on its removed crypto-security replay store; the local verifier has no corresponding early-consumption bug. Any general atomic replay protection needs a separate auth design. x/crypto pseudo-version only extracts unused OpenPGP into a submodule; retain stable v0.58.0 and no audit exception."
+      "reason": "Source delayed TOTP consumption depends on its removed crypto-security replay store; the local verifier has no corresponding early-consumption bug. Any general atomic replay protection needs a separate auth design. The separately reviewed x/crypto OpenPGP module split is adopted for the GO-2026-5932 release security gate, without an audit exception."
     },
     {
       "feature": "v2300-compact-usage-and-lazy-announcements",
@@ -614,7 +614,8 @@
     "local_ui": "Home footer copyright/legal/risk centered with original pig-hero theme retained; group custom price references labelled accurately.",
     "deferred": "Nuxt SSR/BFF/session/theme/release chain, removed crypto payments, TOTP replay-store expansion, auto whitelist/Ops/capture/Hosted/timers/activity/history/new usage dialogs, source virtual-table/edit preload and optional UI reshaping. Main beyond formal tag remains outside reviewed checkpoint.",
     "preserved": "Key/conversation/requested-model native replay and opaque binding; native protocols, token floor/cache controls, local billing/refunds, Grok refusal and disconnect usage, all prior removed modules.",
-    "migration": "None. Existing migrations, Ent, Go/frontend dependency manifests and deployment configuration unchanged.",
-    "release_status": "User authorized code review, GitHub submission and deployment on 2026-11-03. Prepare personal v2.1.47 via PR/CI, own GHCR and the controlled updater; final source/artifact/runtime acceptance evidence is recorded separately. No migration or dependency changes."
+    "migration": "None. Existing migrations, Ent, frontend dependency manifests and deployment configuration unchanged.",
+    "release_dependency_fix": "Upgrade golang.org/x/crypto v0.58.0 to v0.58.1-0.20261009181718-2f1f834330b2 with checksums for GO-2026-5932. The single upstream change splits unused deprecated OpenPGP into a module; bcrypt, curve25519 and nacl/box sources are unchanged. No audit exemption.",
+    "release_status": "User authorized code review, GitHub submission and deployment on 2026-11-03. Prepare personal v2.1.47 via PR/CI, own GHCR and the controlled updater; final source/artifact/runtime acceptance evidence is recorded separately. No migration; only the explicitly reviewed x/crypto security dependency update."
   }
 }

@@ -51,12 +51,12 @@
 
 - Nuxt SSR/BFF、cookie 会话、passkey/OAuth SSR 绑定、客户端导航和源主题修复不直接导入；本地 SPA 认证、路由与 BaseDialog Teleport/dialogStack 继续使用现有实现。源 SSR 发行包、workflow 改动不适用于自有 Go/GHCR 发布流程。
 - `5991959d6` 的 TOTP 延后消费依赖源共享 replay store。该 store 随原生支付安全模块一并移除，本地 TOTP 验证没有该过早消费机制，因此不复制 VerifyLoginCode/ConsumeLoginCode，也不恢复支付耦合。现有代码不能据此宣称具备通用原子 TOTP 防重放；若增加该能力，需独立实现和验证并发消费、下游失败重试及成功后重放。
-- 同提交的 `x/crypto` 伪版本单独核对：v0.58.0 到 `2f1f834330b2` 只有一个上游提交，唯一变更为新增 `openpgp/go.mod`，拆分已弃用 OpenPGP 模块；本地仅直接使用 bcrypt、curve25519、nacl/box，未使用 OpenPGP。本轮保留稳定 v0.58.0，不引入没有运行时收益的伪版本或审计豁免。证据 `crypto-source-review.json`。
+- 同提交的 `x/crypto` 修复单独核对：v0.58.0 到 `2f1f834330b2` 只有一个上游提交，唯一变更为新增 `openpgp/go.mod`，拆分已弃用 OpenPGP 模块；本地仅直接使用 bcrypt、curve25519、nacl/box，未使用 OpenPGP。发布安全检查报告 GO-2026-5932，要求清除有修复版的模块级漏洞，因此采用 `v0.58.1-0.20261009181718-2f1f834330b2` 并更新校验和，不添加审计豁免。来源证据 `crypto-source-review.json`，发布验证另行记录。
 - 新 KeyUsageDialog/API 范围摘要、渠道/用户活跃信号及倍率历史需要本地 UI 消费与额外查询；现有 Key 批量用量和每日统计保留，本轮不加新入口。
 - 白名单自动同步 runner/JSONB CAS、运维、采集、Hosted、定时器状态、上游 Ops JSON 导入按既有模块边界延期。
 - DataTable 源 UTable DOM 同步、Groups 异步编辑和 Accounts 详情预取属于可独立适配的性能优化；本轮只移植格式化缓存，避免与本地虚拟表格、编辑竞态保护和弹窗加载契约混改。Keys 默认折叠和兑换结果弹窗是源 UI 选择，保留本地交互。
 - 原生/crypto 支付入账深度、充值默认标签、支付 forwarded origin 及归集修复均不适用，不恢复已移除模块。工单和无限画布保持移除。
-- 正式差异无迁移或 Ent schema 新增。本轮不改迁移、Ent、依赖、计费/退款、Grok 拒绝收费与永久会话封禁、断线用量排空或部署配置。
+- 正式差异无迁移或 Ent schema 新增。本轮依赖仅更新上述 `x/crypto` 安全修复及校验和；不改迁移、Ent、计费/退款、Grok 拒绝收费与永久会话封禁、断线用量排空或部署配置。
 
 ## 验证
 
@@ -65,7 +65,7 @@
 - 主代理目录权限、Key 查询回归 285 项 tests/subtests；模型广场、handler/可见性与更新检查点 64 项，共 349 项通过，无失败或跳过。Key 筛选使用真实 SQLite count/分页查询，既有 PostgreSQL ANY 路由 hydrate 不在此 SQLite 用例中执行。
 - 发布前完整 apicompat 包 858 项 tests/subtests、扩大协议回归 4504 项全部通过，无失败或跳过。扩大范围包括 DeepSeek、Responses/Chat/Anthropic 转换、Grok、原生 replay 隔离、opaque 绑定、断线用量排空及工具历史；新增事件顺序回归已先复现失败再修复。各套件有重叠，最终 JSONL 按 package/test 名去重为 5033 项，包含父测试与子测试，不能简单相加。
 - 前端最终 12 文件、170 测试通过；完整 vue-tsc、ESLint、Vite 生产构建和 console 资源检查通过。格式化工具全目录初轮 40 文件/309 测试中仅新增弹窗断言使用了错误容器，已改为检查 Teleport 真实 body，相关用例及最终套件重跑通过。
-- Go 服务含前端 embed 的验证构建通过，无依赖或迁移变更。
+- Go 服务含前端 embed 的初轮验证构建通过；发布阶段追加的 `x/crypto` 安全修复须重新验证认证、身份加密和构建，最终结果另存发布证据。无迁移变更。
 - 首页浏览器八场景通过，桌面/390px、明暗、中英文；版权、法律链接、风险说明中心偏差小于 1px，八法律链接完整，无 GitHub footer 链接、横向溢出或脚本错误。
 - 独立目录/定价/筛选/前端审查发现两项：参考次档误取实付阶梯、无官方目录价别名的测试误断言。已分别修正为复制官方次档、仅自定义参考必需非空，回归通过。
 - 协议独立复核发现的 item_id、晚到 thinking、工具参数交错和终态合成事件类型问题均已修正并补充回归。最终窄复核确认终态补全不再遗漏正文或签名，目标测试独立重复十轮通过，无未处理阻断；完整协议包和扩大协议回归由主代理重跑。

@@ -32,7 +32,7 @@
             class="border-l border-gray-100 pt-2 text-center dark:border-dark-700/60"
           >
             <div class="border-b border-gray-200 pb-2 text-gray-400 dark:border-dark-600 dark:text-dark-500">
-              {{ t('modelPlaza.table.officialPrice') }}
+              {{ t(models.some(m => m.official_pricing?.custom) ? 'modelPlaza.table.referencePrice' : 'modelPlaza.table.officialPrice') }}
               <span class="ml-1 normal-case font-normal text-gray-400 dark:text-dark-500">{{ t('modelPlaza.table.unitPerMillion') }}</span>
             </div>
           </th>
@@ -66,6 +66,9 @@
           <td class="border-r border-gray-100 py-2.5 pl-5 pr-4 align-middle dark:border-dark-700/60">
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="font-medium text-gray-900 dark:text-white">{{ m.name }}</span>
+              <span v-if="m.official_pricing?.custom" class="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-dark-700/70 dark:text-dark-300">
+                {{ t('modelPlaza.table.customPrice') }}
+              </span>
               <!-- 时段徽章紧跟模型名,其余徽章排在后面,空间不足时先换行的是它们 -->
               <span
                 v-if="period"

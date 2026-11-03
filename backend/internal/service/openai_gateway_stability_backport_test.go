@@ -99,6 +99,10 @@ func TestGatewayStabilityDeepSeekDedupeScopeUnchanged(t *testing.T) {
 			model = "deepseek-v3.2"
 		}
 		out := RewriteInboundDeepSeekCallIDs(platform, model, body)
+		if platform == PlatformDeepseek {
+			require.Equal(t, body, out, "native DeepSeek retains call IDs")
+			continue
+		}
 		require.Len(t, gjson.GetBytes(out, "messages").Array(), 2)
 		require.NotContains(t, string(out), "two")
 	}

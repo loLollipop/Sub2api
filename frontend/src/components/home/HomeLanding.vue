@@ -259,7 +259,7 @@ const brands = [
 .landing-doc-link { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin-top: 22px; color: var(--home-accent); font-size: 12px; }
 .landing-doc-link:hover { text-decoration: underline; text-underline-offset: 5px; }
 .landing-footer { padding-block: 22px; border-top: 1px solid var(--home-line); color: var(--home-muted); }
-.landing-footer__bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px 28px; font-size: 11px; }
+.landing-footer__bottom { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; font-size: 11px; }
 .landing-footer__bottom > p { overflow-wrap: anywhere; }
 .landing-footer__risk { max-width: 850px; margin: 10px auto 0; text-align: center; font-size: 10px; line-height: 1.8; }
 .home-landing :is(a, button):focus-visible { outline: 2px solid var(--home-accent); outline-offset: 4px; }
@@ -314,8 +314,6 @@ const brands = [
   .landing-integration__description { font-size: 12px; }
   .landing-features { gap: 20px; margin-top: 26px; }
   .landing-doc-link { margin-top: 16px; }
-  .landing-footer__bottom { justify-content: center; gap: 12px; }
-  .landing-footer__bottom :deep(.legal-footer-links) { width: 100%; }
   .landing-footer__risk { font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -57,6 +57,10 @@ func TestDeepSeekDedupeForwardRetainsArgumentsAndIdentity(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			require.NotNil(t, upstream.lastReq)
+			if mode == "responses" {
+				require.JSONEq(t, string(body), string(upstream.lastBody), "native DeepSeek owns call-ID validation")
+				return
+			}
 			require.NotContains(t, string(upstream.lastBody), "discarded")
 			if mode == "chat-fallback" {
 				require.Contains(t, upstream.lastReq.URL.Path, "/chat/completions")

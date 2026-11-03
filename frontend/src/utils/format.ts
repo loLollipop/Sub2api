@@ -5,6 +5,32 @@
 
 import { i18n, getLocale } from '@/i18n'
 
+// Tables repeatedly format the same locale/options. Bound retained formatters
+// so arbitrary currency and date options cannot grow the caches indefinitely.
+const FORMATTER_CACHE_LIMIT = 64
+const numberFormatCache = new Map<string, Intl.NumberFormat>()
+const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>()
+
+function cachedNumberFormat(key: string, create: () => Intl.NumberFormat): Intl.NumberFormat {
+  const cached = numberFormatCache.get(key)
+  if (cached) return cached
+  const formatter = create()
+  if (numberFormatCache.size >= FORMATTER_CACHE_LIMIT) numberFormatCache.clear()
+  numberFormatCache.set(key, formatter)
+  return formatter
+}
+
+function cachedDateTimeFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const sortedOptions = Object.keys(options).sort().map(key => [key, (options as Record<string, unknown>)[key]])
+  const key = JSON.stringify([locale, sortedOptions])
+  const cached = dateTimeFormatCache.get(key)
+  if (cached) return cached
+  const formatter = new Intl.DateTimeFormat(locale, options)
+  if (dateTimeFormatCache.size >= FORMATTER_CACHE_LIMIT) dateTimeFormatCache.clear()
+  dateTimeFormatCache.set(key, formatter)
+  return formatter
+}
+
 /**
  * 格式化相对时间
  * @param date 日期字符串或 Date 对象
@@ -40,14 +66,14 @@ export function formatNumber(num: number | null | undefined): string {
   if (num === null || num === undefined) return '0'
 
   const locale = getLocale()
-  const absNum = Math.abs(num)
+  const notation = Math.abs(num) >= 10000 ? 'compact' : 'standard'
 
   // Use Intl.NumberFormat for compact notation if supported and needed
   // Note: Compact notation in 'zh' uses '万/亿', which is appropriate for Chinese
-  const formatter = new Intl.NumberFormat(locale, {
-    notation: absNum >= 10000 ? 'compact' : 'standard',
+  const formatter = cachedNumberFormat(`${locale}|number|${notation}`, () => new Intl.NumberFormat(locale, {
+    notation,
     maximumFractionDigits: 1
-  })
+  }))
 
   return formatter.format(num)
 }
@@ -66,12 +92,12 @@ export function formatCurrency(amount: number | null | undefined, currency: stri
   // For very small amounts, show more decimals
   const fractionDigits = amount > 0 && amount < 0.01 ? 6 : 2
 
-  return new Intl.NumberFormat(locale, {
+  return cachedNumberFormat(`${locale}|currency|${currency}|${fractionDigits}`, () => new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits
-  }).format(amount)
+  })).format(amount)
 }
 
 /**
@@ -118,7 +144,7 @@ export function formatDate(
   if (isNaN(d.getTime())) return ''
 
   const locale = localeOverride ?? getLocale()
-  return new Intl.DateTimeFormat(locale, options).format(d)
+  return cachedDateTimeFormat(locale, options).format(d)
 }
 
 /**

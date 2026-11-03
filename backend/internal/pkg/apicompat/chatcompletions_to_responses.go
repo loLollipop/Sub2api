@@ -13,6 +13,16 @@ type chatMessageContent struct {
 	Parts []ChatContentPart
 }
 
+// ChatCompletionsToResponsesOptions is enabled only after resolving the target
+// provider. Client model aliases do not establish a reasoning replay contract.
+type ChatCompletionsToResponsesOptions struct {
+	PreserveReasoningContent bool
+}
+
+func ChatCompletionsToResponsesWithOptions(req *ChatCompletionsRequest, opts *ChatCompletionsToResponsesOptions) (*ResponsesRequest, error) {
+	return ChatCompletionsToResponsesWithMinOutputTokens(req, DefaultMinMaxOutputTokens, opts)
+}
+
 // ChatCompletionsToResponses converts a Chat Completions request into a
 // Responses API request. The upstream always streams, so Stream is forced to
 // true. store is always false and reasoning.encrypted_content is always
@@ -23,22 +33,23 @@ func ChatCompletionsToResponses(req *ChatCompletionsRequest) (*ResponsesRequest,
 
 // ChatCompletionsToResponsesWithMinOutputTokens converts a Chat Completions
 // request using the supplied max_output_tokens floor.
-func ChatCompletionsToResponsesWithMinOutputTokens(req *ChatCompletionsRequest, minOutputTokens int) (*ResponsesRequest, error) {
-	return chatCompletionsToResponses(req, minOutputTokens, false)
+func ChatCompletionsToResponsesWithMinOutputTokens(req *ChatCompletionsRequest, minOutputTokens int, options ...*ChatCompletionsToResponsesOptions) (*ResponsesRequest, error) {
+	return chatCompletionsToResponses(req, minOutputTokens, false, options...)
 }
 
 // ChatCompletionsToResponsesForAnthropic preserves Anthropic cache extensions
 // for the chained conversion while allowing callers to resolve the final model
 // before ResponsesToAnthropicRequest and retain their configured token floor.
-func ChatCompletionsToResponsesForAnthropic(req *ChatCompletionsRequest, minOutputTokens int) (*ResponsesRequest, error) {
-	return chatCompletionsToResponses(req, minOutputTokens, true)
+func ChatCompletionsToResponsesForAnthropic(req *ChatCompletionsRequest, minOutputTokens int, options ...*ChatCompletionsToResponsesOptions) (*ResponsesRequest, error) {
+	return chatCompletionsToResponses(req, minOutputTokens, true, options...)
 }
 
-func chatCompletionsToResponses(req *ChatCompletionsRequest, minOutputTokens int, anthropic bool) (*ResponsesRequest, error) {
+func chatCompletionsToResponses(req *ChatCompletionsRequest, minOutputTokens int, anthropic bool, options ...*ChatCompletionsToResponsesOptions) (*ResponsesRequest, error) {
 	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, req.ReasoningEffort); err != nil {
 		return nil, err
 	}
-	input, err := convertChatMessagesToResponsesInputWithCache(req.Messages, anthropic)
+	preserveReasoning := len(options) > 0 && options[0] != nil && options[0].PreserveReasoningContent
+	input, err := convertChatMessagesToResponsesInputWithCache(req.Messages, anthropic, preserveReasoning)
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +104,9 @@ func chatCompletionsToResponses(req *ChatCompletionsRequest, minOutputTokens int
 			Summary: "auto",
 		}
 	}
+	if preserveReasoning && req.Thinking != nil && req.Thinking.Type == "disabled" {
+		out.Reasoning = &ResponsesReasoning{Effort: "none"}
+	}
 
 	if format := chatResponseFormatToResponsesTextFormat(req.ResponseFormat); len(format) > 0 {
 		if out.Text == nil {
@@ -129,7 +143,7 @@ func convertChatMessagesToResponsesInput(msgs []ChatMessage) ([]ResponsesInputIt
 	return convertChatMessagesToResponsesInputWithCache(msgs, false)
 }
 
-func convertChatMessagesToResponsesInputWithCache(msgs []ChatMessage, anthropic bool) ([]ResponsesInputItem, error) {
+func convertChatMessagesToResponsesInputWithCache(msgs []ChatMessage, anthropic bool, preserveReasoning ...bool) ([]ResponsesInputItem, error) {
 	var out []ResponsesInputItem
 	legacyIDs := legacyFunctionCallIDs{msgs: msgs}
 	for _, m := range msgs {
@@ -143,7 +157,7 @@ func convertChatMessagesToResponsesInputWithCache(msgs []ChatMessage, anthropic 
 		case m.Role == "function" && m.ToolCallID == "":
 			m.ToolCallID = legacyIDs.claim(m.Name)
 		}
-		items, err := chatMessageToResponsesItems(m, anthropic)
+		items, err := chatMessageToResponsesItems(m, anthropic, preserveReasoning...)
 		if err != nil {
 			return nil, err
 		}
@@ -202,14 +216,14 @@ func (ids *legacyFunctionCallIDs) claim(name string) string {
 
 // chatMessageToResponsesItems converts a single ChatMessage into one or more
 // ResponsesInputItem values.
-func chatMessageToResponsesItems(m ChatMessage, anthropic bool) ([]ResponsesInputItem, error) {
+func chatMessageToResponsesItems(m ChatMessage, anthropic bool, preserveReasoning ...bool) ([]ResponsesInputItem, error) {
 	switch m.Role {
 	case "system", "developer":
 		return chatSystemToResponses(m, anthropic)
 	case "user":
 		return chatUserToResponses(m, anthropic)
 	case "assistant":
-		return chatAssistantToResponses(m, anthropic)
+		return chatAssistantToResponses(m, anthropic, preserveReasoning...)
 	case "tool":
 		return chatToolToResponses(m, anthropic)
 	case "function":
@@ -250,8 +264,43 @@ func chatUserToResponses(m ChatMessage, anthropic bool) ([]ResponsesInputItem, e
 // text content and tool_calls, the text is emitted as an assistant message
 // first, then each tool_call becomes a function_call item. If the content is
 // empty/nil and there are tool_calls, only function_call items are emitted.
-func chatAssistantToResponses(m ChatMessage, anthropic bool) ([]ResponsesInputItem, error) {
+func chatAssistantToResponses(m ChatMessage, anthropic bool, preserveReasoning ...bool) ([]ResponsesInputItem, error) {
 	var items []ResponsesInputItem
+	if len(preserveReasoning) > 0 && preserveReasoning[0] {
+		// Reuse the ordinary assistant/tool converter after removing only the
+		// genuine reasoning fields. This retains local cache and tool semantics.
+		thinking := m.ReasoningContent
+		m.ReasoningContent = ""
+		var parts []json.RawMessage
+		if json.Unmarshal(m.Content, &parts) == nil && len(parts) > 0 {
+			kept := parts[:0]
+			for _, rawPart := range parts {
+				var part struct {
+					Type     string `json:"type"`
+					Text     string `json:"text"`
+					Thinking string `json:"thinking"`
+				}
+				if err := json.Unmarshal(rawPart, &part); err != nil {
+					return nil, err
+				}
+				if part.Type == "thinking" || part.Type == "reasoning" {
+					text := part.Thinking
+					if text == "" {
+						text = part.Text
+					}
+					thinking += text
+					continue
+				}
+				kept = append(kept, rawPart)
+			}
+			m.Content, _ = json.Marshal(kept)
+		}
+		if content, ok := responsesReasoningContentJSON(thinking); ok {
+			items = append(items, ResponsesInputItem{Type: "reasoning", Content: content})
+		}
+		rest, err := chatAssistantToResponses(m, anthropic)
+		return append(items, rest...), err
+	}
 	content := ""
 
 	if m.ReasoningContent != "" {

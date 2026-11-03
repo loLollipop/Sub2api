@@ -64,13 +64,24 @@ func buildOpenAIResponsesURLForPlatform(platform string, base string) string {
 	return buildOpenAIResponsesURL(base)
 }
 
+func isNativeDeepSeekResponsesAccount(account *Account) bool {
+	return account != nil && account.Platform == PlatformDeepseek && account.UsesNativeCNResponses()
+}
+
+func normalizeOpenAIResponsesRejectedFieldRetryBodyForAccount(account *Account, status int, body, response []byte) ([]byte, string, bool, error) {
+	if isNativeDeepSeekResponsesAccount(account) {
+		return body, "", false, nil
+	}
+	return normalizeOpenAIResponsesRejectedFieldRetryBody(status, body, response)
+}
+
 func shouldPreserveOpenAIResponsesNoneReasoningEffort(account *Account) bool {
 	if account == nil {
 		return false
 	}
 	// DeepSeek native Responses accepts none as an explicit thinking switch.
 	// Omitting it enables thinking and can make a forced function call invalid.
-	if account.Platform == PlatformDeepseek && account.UsesNativeCNResponses() {
+	if account.Platform == PlatformDeepseek {
 		return true
 	}
 	if account.IsOpenAIPassthroughEnabled() {
@@ -135,11 +146,12 @@ func deleteOpenAIResponsesNoneReasoningEffortFromObject(account *Account, body m
 	}
 }
 
-// normalizeDeepSeekResponsesRequestBody 适配无状态 CN Responses 端点：
-// 强制 store=false 并清除 previous_response_id（DeepSeek / Kimi 官方
-// Responses 均不支持服务端状态存储，携带这些字段会被拒绝）。
-// 非原生 Responses 协议账号保留状态字段；DeepSeek 请求仍去除重复工具调用。
+// normalizeDeepSeekResponsesRequestBody retains native DeepSeek request semantics.
+// Legacy compatible providers keep their existing stateless and call-ID normalization.
 func normalizeDeepSeekResponsesRequestBody(account *Account, body []byte) []byte {
+	if isNativeDeepSeekResponsesAccount(account) {
+		return body
+	}
 	native := account != nil && account.UsesNativeCNResponses()
 	dedupe := deepSeekDuplicateCallIDRewrite(account, body)
 	if !native && !dedupe {
@@ -219,6 +231,10 @@ func normalizeDeepSeekResponsesRequestBody(account *Account, body []byte) []byte
 // the first occurrence of each id in the inbound request. Outbound normalization
 // applies the same deduplication for the account that is actually selected.
 func RewriteInboundDeepSeekCallIDs(groupPlatform, model string, body []byte) []byte {
+	// Resolve provider semantics from the platform, not a client model alias.
+	if strings.EqualFold(strings.TrimSpace(groupPlatform), PlatformDeepseek) {
+		return body
+	}
 	if !deepSeekCallIDScope(groupPlatform, model) || len(body) == 0 {
 		return body
 	}

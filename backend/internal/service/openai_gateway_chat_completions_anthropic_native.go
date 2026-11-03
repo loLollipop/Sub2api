@@ -58,7 +58,7 @@ func (s *OpenAIGatewayService) forwardChatCompletionsViaNativeAnthropic(
 	includeUsage := ccReq.StreamOptions != nil && ccReq.StreamOptions.IncludeUsage
 
 	// 2. Convert CC → Responses → Anthropic (chained conversion)
-	responsesReq, err := chatCompletionsToResponsesForAnthropic(s.cfg, &ccReq)
+	responsesReq, err := apicompat.ChatCompletionsToResponsesForAnthropic(&ccReq, configuredMinOutputTokens(s.cfg), &apicompat.ChatCompletionsToResponsesOptions{PreserveReasoningContent: account.Platform == PlatformDeepseek})
 	if err != nil {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", "Failed to convert request")
 		return nil, fmt.Errorf("convert chat completions to responses: %w", err)
@@ -66,7 +66,7 @@ func (s *OpenAIGatewayService) forwardChatCompletionsViaNativeAnthropic(
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
 	responsesReq.Model = upstreamModel
-	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(responsesReq)
+	anthropicReq, err := apicompat.ResponsesToAnthropicRequestWithOptions(responsesReq, &apicompat.ResponsesToAnthropicOptions{PreserveReasoningText: account.Platform == PlatformDeepseek})
 	if err != nil {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", "Failed to convert request")
 		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
@@ -141,9 +141,9 @@ func (s *OpenAIGatewayService) forwardChatCompletionsViaNativeAnthropic(
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, forwardedBody, upstreamModel)
 
 	if clientStream {
-		return s.handleCCStreamingFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, includeUsage)
+		return s.handleCCStreamingFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, includeUsage, account.Platform == PlatformDeepseek)
 	}
-	return s.handleCCBufferedFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime)
+	return s.handleCCBufferedFromNativeAnthropic(resp, c, originalModel, billingModel, upstreamModel, reasoningEffort, startTime, account.Platform == PlatformDeepseek)
 }
 
 // handleCCBufferedFromNativeAnthropic reads Anthropic SSE events, assembles the
@@ -156,6 +156,7 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 	upstreamModel string,
 	reasoningEffort *string,
 	startTime time.Time,
+	requireReasoningContent ...bool,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
 
@@ -266,7 +267,7 @@ func (s *OpenAIGatewayService) handleCCBufferedFromNativeAnthropic(
 	finalResp.Usage = claudeUsageToAnthropicUsage(usage)
 
 	responsesResp := apicompat.AnthropicToResponsesResponse(finalResp, upstreamModel)
-	ccResp := apicompat.ResponsesToChatCompletions(responsesResp, originalModel)
+	ccResp := apicompat.ResponsesToChatCompletionsWithOptions(responsesResp, originalModel, len(requireReasoningContent) > 0 && requireReasoningContent[0])
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -305,6 +306,7 @@ func (s *OpenAIGatewayService) handleCCStreamingFromNativeAnthropic(
 	reasoningEffort *string,
 	startTime time.Time,
 	includeUsage bool,
+	requireReasoningContent ...bool,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
 
@@ -321,6 +323,7 @@ func (s *OpenAIGatewayService) handleCCStreamingFromNativeAnthropic(
 	anthState.Model = originalModel
 	anthState.PreserveThinkingSignatures = isClaude55SignedThinkingModel(upstreamModel)
 	ccState := apicompat.NewResponsesEventToChatState()
+	ccState.RequireReasoningContent = len(requireReasoningContent) > 0 && requireReasoningContent[0]
 	ccState.Model = originalModel
 	ccState.IncludeUsage = includeUsage
 

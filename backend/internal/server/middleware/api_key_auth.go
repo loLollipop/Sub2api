@@ -166,6 +166,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
 		c.Request = c.Request.WithContext(ctx)
 		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
+		modelDiscoveryRequest := isModelDiscoveryRequest(c.Request.Method, c.Request.URL.Path)
 		// Async image task polling only reads data that already belongs to the
 		// authenticated key and must remain available after the completed
 		// generation consumes the key's remaining balance.
@@ -194,7 +195,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 
 		// 倍率自省不需要订阅数据；/v1/usage 仍保留原有订阅读取行为。
-		if isSubscriptionType && subscriptionService != nil && !billingInfoRequest {
+		if isSubscriptionType && subscriptionService != nil && !billingInfoRequest && !modelDiscoveryRequest {
 			sub, subErr := subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
@@ -233,7 +234,11 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				abortWithAPIKeyQuotaError(c)
 				return
 			}
+		}
 
+		// Model discovery is free, but unlike usage/task reads it still requires
+		// an unexpired key with remaining key quota and all normal permissions.
+		if !skipBilling && !modelDiscoveryRequest {
 			// 订阅模式：验证订阅限额
 			if subscription != nil {
 				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
@@ -358,6 +363,27 @@ func isAsyncImageTaskRead(method, path string) bool {
 		return false
 	}
 	return strings.HasPrefix(path, "/v1/images/tasks/") || strings.HasPrefix(path, "/images/tasks/")
+}
+
+// Only registered read-only catalog shapes qualify. In particular Gemini
+// model actions and generation endpoints must retain normal admission.
+func isModelDiscoveryRequest(method, path string) bool {
+	if method != http.MethodGet {
+		return false
+	}
+	path = strings.TrimSuffix(path, "/")
+	if path == "/backend-api/codex/models" || path == "/antigravity/models" {
+		return true
+	}
+	for _, root := range []string{"/models", "/v1/models", "/openai/v1/models", "/v1beta/models", "/antigravity/v1/models", "/antigravity/v1beta/models"} {
+		if path == root {
+			return true
+		}
+		if model, ok := strings.CutPrefix(path, root+"/"); ok && model != "" && !strings.ContainsAny(model, "/:") {
+			return true
+		}
+	}
+	return false
 }
 
 // Only balance admission is deferred for these reads. The Grok handler must

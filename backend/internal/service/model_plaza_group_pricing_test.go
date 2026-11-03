@@ -90,6 +90,13 @@ func TestPlazaGroupPricing_TokenMetadataFollowsSelectedBillingCard(t *testing.T)
 				}
 				require.Equal(t, selected.MaxReasoningEffortMultiplier, model.Pricing.MaxReasoningEffortMultiplier)
 				require.Equal(t, selected.ImageInputPrice, model.Pricing.ImageInputPrice)
+				if groupCard {
+					require.NotNil(t, model.OfficialPricing)
+					require.True(t, model.OfficialPricing.Custom)
+					require.Equal(t, selected.InputPrice, model.OfficialPricing.InputPrice, "reference must follow the selected requested/mapped group card")
+				} else if model.OfficialPricing != nil {
+					require.False(t, model.OfficialPricing.Custom)
+				}
 			})
 		}
 	}
@@ -125,6 +132,9 @@ func TestPlazaGroupPricing_NonTokenAliasesRespectBillingSourceAndGroupCards(t *t
 					require.NoError(t, err)
 					model := plazaModelsByName(out[0].Models)["public-image"]
 					require.Equal(t, mode, model.Pricing.BillingMode)
+					if model.OfficialPricing != nil {
+						require.False(t, model.OfficialPricing.Custom, "non-token prices must not be marked as custom token references")
+					}
 					require.InDelta(t, want, *model.Pricing.PerRequestPrice, 1e-12)
 					if mode == BillingModeImage {
 						gateway := &OpenAIGatewayService{billingService: svc.billingService, resolver: svc.resolver}
@@ -159,4 +169,30 @@ func TestPlazaGroupPricing_UnpricedMappedModelFallsBackToPublicPrice(t *testing.
 	require.NotNil(t, model.Pricing)
 	require.InDelta(t, 0.8e-6, *model.Pricing.InputPrice, 1e-15)
 	require.Nil(t, model.OfficialPricing)
+}
+
+func TestPlazaGroupPricing_CustomReferenceDoesNotPolluteCatalogMemo(t *testing.T) {
+	for _, ladder := range []bool{false, true} {
+		t.Run(map[bool]string{false: "flat", true: "ladder"}[ladder], func(t *testing.T) {
+			channel := plazaPricedChannel(1, "gpt", []int64{10, 20}, PlatformOpenAI, "gpt-5.4")
+			groups := []Group{
+				{ID: 10, Name: "custom", Platform: PlatformOpenAI, RateMultiplier: 0.15, LongContextPricingEnabled: ladder,
+					ModelPricing: []ChannelModelPricing{{Models: []string{"gpt-5.4"}, InputPrice: testPtrFloat64(1e-6)}}},
+				{ID: 20, Name: "official", Platform: PlatformOpenAI, RateMultiplier: 1, LongContextPricingEnabled: true},
+			}
+			svc := newPlazaServiceWithBilling([]Channel{channel}, groups, map[int64]string{10: PlatformOpenAI, 20: PlatformOpenAI}, newStubPricingServiceFromJSON(t, openAILadderCatalogJSON))
+			out, err := svc.ListGroups(context.Background())
+			require.NoError(t, err)
+			require.Len(t, out, 2)
+			custom, official := out[0].Models[0].OfficialPricing, out[1].Models[0].OfficialPricing
+			require.True(t, custom.Custom)
+			require.InDelta(t, 1e-6, *custom.InputPrice, 1e-15, "reference is before group multiplier")
+			require.Len(t, custom.Intervals, 2)
+			require.InDelta(t, 1e-6, *custom.Intervals[0].InputPrice, 1e-15, "table renders intervals before the flat reference")
+			require.InDelta(t, 5e-6, *custom.Intervals[1].InputPrice, 1e-15)
+			require.False(t, official.Custom)
+			require.InDelta(t, 2.5e-6, *official.InputPrice, 1e-15)
+			require.InDelta(t, 2.5e-6, *official.Intervals[0].InputPrice, 1e-15)
+		})
+	}
 }

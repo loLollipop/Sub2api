@@ -56,12 +56,13 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	namespaceTools := apicompat.NamespaceToolNames(effectiveTools)
 	localShellTools := apicompat.LocalShellToolNames(effectiveTools)
 
-	// 自愈回写：历史里带明文 summary 的 reasoning item 刷新进缓存，覆盖 Redis
+	// 自愈回写：历史里带真实 reasoning_text 的 item 刷新进缓存，覆盖 Redis
 	// 被 flush / 跨实例漂移后同 id 的 encrypted-only 副本无法再取明文的情况。
 	s.recacheReasoningItemsFromInput(responsesReq.Input)
 
 	chatReq, err := apicompat.ResponsesToChatCompletionsRequestWithOptions(&responsesReq, &apicompat.ResponsesToChatOptions{
-		ReasoningContentByID: s.reasoningContentByID,
+		ReasoningContentByID:   s.reasoningContentByID,
+		PreserveThinkingSwitch: account.Platform == PlatformDeepseek,
 	})
 	if err != nil {
 		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
@@ -427,8 +428,8 @@ func (s *OpenAIGatewayService) reasoningContentByID(itemID string) string {
 	return content
 }
 
-// recacheReasoningItemsFromInput 把请求历史里带明文 summary 的 reasoning item
-// 重新写入缓存（best-effort）。Codex 多数时候会原样回传明文 summary，借机
+// recacheReasoningItemsFromInput 把请求历史里带真实 reasoning_text 的 item
+// 重新写入缓存（best-effort）。客户端回传真实推理内容时，借机
 // 刷新 TTL 并自愈 Redis 被 flush / 跨实例漂移造成的缓存缺失。
 func (s *OpenAIGatewayService) recacheReasoningItemsFromInput(inputRaw json.RawMessage) {
 	if s == nil || s.cache == nil {
@@ -475,9 +476,9 @@ func (s *OpenAIGatewayService) cacheReasoningItem(item *apicompat.ResponsesOutpu
 		return
 	}
 	var parts []string
-	for _, sum := range item.Summary {
-		if t := strings.TrimSpace(sum.Text); t != "" {
-			parts = append(parts, t)
+	for _, part := range item.Content {
+		if part.Type == "reasoning_text" && part.Text != "" {
+			parts = append(parts, part.Text)
 		}
 	}
 	if len(parts) == 0 {

@@ -10,6 +10,7 @@ import (
 // PlazaOfficialPricing 模型广场展示用的官方参考价（USD per token），与计费同源：
 // LiteLLM → 内置兜底价卡 → 模型策略。字段为 nil 表示该项缺失（0 视为未配置）。
 type PlazaOfficialPricing struct {
+	Custom            bool // 分组自定义参考价，非官方目录价。
 	InputPrice        *float64
 	OutputPrice       *float64
 	CacheWritePrice   *float64 // 5m 缓存写入（= LiteLLM cache_creation）
@@ -218,8 +219,12 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 				fillGlobalPricingFallback(s.pricingService, one)
 				pg.Models[j].Pricing = one[0].Pricing
 			}
-			pricingModel := s.fillDisplayPricing(ctx, &pg.Models[j], g)
-			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, pricingModel, officialMemo)
+			pricingModel, schedule, custom := s.fillDisplayPricing(ctx, &pg.Models[j], g)
+			reference := s.lookupOfficialPricing(ctx, pricingModel, officialMemo)
+			if custom {
+				reference = customReferencePricing(reference, schedule)
+			}
+			pg.Models[j].OfficialPricing = reference
 		}
 		out = append(out, *pg)
 	}
@@ -236,7 +241,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 // fillDisplayPricing 把模型的展示定价换成实收口径：
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
 // 图片/按次模型（或阶梯表不可用时）沿用渠道定价与分组图片档位价。
-func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) string {
+func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) (string, *ContextPricingSchedule, bool) {
 	if s.billingService != nil && s.resolver != nil {
 		for _, model := range s.plazaBillingModelCandidates(ctx, m, g) {
 			sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{
@@ -260,7 +265,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 					m.LongContextBasis = sched.Basis
 				}
 				m.TimePricing = sched.TimePricing
-				return model
+				return model, sched, resolved != nil && resolved.Source == PricingSourceGroup
 			}
 			// Non-token prices must follow the same selected billing identity too;
 			// SupportedModels' raw price may belong to the mapping target even when
@@ -274,12 +279,34 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 					display = plazaImageDisplayPricing(display, g)
 				}
 				m.Pricing = withDefaultMaxReasoningEffortMultiplier(display, model)
-				return model
+				return model, nil, false
 			}
 		}
 	}
 	m.Pricing = withDefaultMaxReasoningEffortMultiplier(plazaImageDisplayPricing(m.Pricing, g), m.Name)
-	return m.Name
+	return m.Name, nil, false
+}
+
+// Reference prices use the same selected billing identity as paid prices. Keep
+// catalog context tiers when the group disables them, but never leave the old
+// catalog base tier visible in place of the configured group reference price.
+// Copy the memoized reference instead of modifying another group's catalog.
+func customReferencePricing(official *PlazaOfficialPricing, schedule *ContextPricingSchedule) *PlazaOfficialPricing {
+	first := schedule.Tiers[0]
+	ref := &PlazaOfficialPricing{
+		Custom:     true,
+		InputPrice: first.Input, OutputPrice: first.Output,
+		CacheWritePrice: first.CacheWrite, CacheWrite1hPrice: first.CacheWrite1h, CacheReadPrice: first.CacheRead,
+	}
+	if official != nil && len(official.Intervals) > 1 {
+		ref.Intervals = append([]PricingInterval(nil), official.Intervals...)
+		ref.Intervals[0].InputPrice = first.Input
+		ref.Intervals[0].OutputPrice = first.Output
+		ref.Intervals[0].CacheWritePrice = first.CacheWrite
+		ref.Intervals[0].CacheWrite1hPrice = first.CacheWrite1h
+		ref.Intervals[0].CacheReadPrice = first.CacheRead
+	}
+	return ref
 }
 
 func plazaGroupID(g *Group) *int64 {

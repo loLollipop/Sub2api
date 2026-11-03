@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -17,6 +18,12 @@ import (
 // Completions response. Text output items are concatenated into
 // choices[0].message.content; function_call items become tool_calls.
 func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatCompletionsResponse {
+	return ResponsesToChatCompletionsWithOptions(resp, model, false)
+}
+
+// requireReasoningContent keeps display summaries out of replayable provider
+// reasoning_content on passback-required targets such as DeepSeek.
+func ResponsesToChatCompletionsWithOptions(resp *ResponsesResponse, model string, requireReasoningContent bool) *ChatCompletionsResponse {
 	id := resp.ID
 	if id == "" {
 		id = generateChatCmplID()
@@ -56,10 +63,10 @@ func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatComp
 				},
 			})
 		case "reasoning":
-			for _, s := range item.Summary {
-				if s.Type == "summary_text" && s.Text != "" {
-					reasoningText += s.Text
-				}
+			if requireReasoningContent {
+				reasoningText += responsesReasoningContentText(item.Content)
+			} else {
+				reasoningText += responsesReasoningText(item.Content, item.Summary)
 			}
 		case "web_search_call":
 			// silently consumed — results already incorporated into text output
@@ -120,31 +127,36 @@ func responsesStatusToChatFinishReason(status string, details *ResponsesIncomple
 // ResponsesEventToChatState tracks state for converting a sequence of Responses
 // SSE events into Chat Completions SSE chunks.
 type ResponsesEventToChatState struct {
-	ID                      string
-	Model                   string
-	Created                 int64
-	ServiceTier             string // upstream tier observed on response events; echoed on chunks
-	SentRole                bool
-	SawToolCall             bool
-	SawText                 bool
-	SawRefusal              bool
-	Finalized               bool        // true after finish chunk has been emitted
-	NextToolCallIndex       int         // next sequential tool_call index to assign
-	OutputIndexToToolIndex  map[int]int // Responses output_index → Chat tool_calls index
-	OutputIndexToArguments  map[int]string
-	ToolCallIDToOutputIndex map[string]int
-	IncludeUsage            bool
-	Usage                   *ChatUsage
+	ID                        string
+	Model                     string
+	Created                   int64
+	ServiceTier               string // upstream tier observed on response events; echoed on chunks
+	SentRole                  bool
+	SawToolCall               bool
+	SawText                   bool
+	SawRefusal                bool
+	SawReasoningByOutputIndex map[int]bool
+	RequireReasoningContent   bool
+	ReasoningPartsSeen        map[string]bool
+	ReasoningItemIndices      map[string]int
+	Finalized                 bool        // true after finish chunk has been emitted
+	NextToolCallIndex         int         // next sequential tool_call index to assign
+	OutputIndexToToolIndex    map[int]int // Responses output_index → Chat tool_calls index
+	OutputIndexToArguments    map[int]string
+	ToolCallIDToOutputIndex   map[string]int
+	IncludeUsage              bool
+	Usage                     *ChatUsage
 }
 
 // NewResponsesEventToChatState returns an initialised stream state.
 func NewResponsesEventToChatState() *ResponsesEventToChatState {
 	return &ResponsesEventToChatState{
-		ID:                      generateChatCmplID(),
-		Created:                 time.Now().Unix(),
-		OutputIndexToToolIndex:  make(map[int]int),
-		OutputIndexToArguments:  make(map[int]string),
-		ToolCallIDToOutputIndex: make(map[string]int),
+		ID:                        generateChatCmplID(),
+		Created:                   time.Now().Unix(),
+		OutputIndexToToolIndex:    make(map[int]int),
+		OutputIndexToArguments:    make(map[int]string),
+		ToolCallIDToOutputIndex:   make(map[string]int),
+		SawReasoningByOutputIndex: make(map[int]bool),
 	}
 }
 
@@ -153,6 +165,12 @@ func NewResponsesEventToChatState() *ResponsesEventToChatState {
 func ResponsesEventToChatChunks(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
 	if state.Finalized {
 		return nil
+	}
+	if itemID := responsesReasoningItemID(evt); itemID != "" {
+		if state.ReasoningItemIndices == nil {
+			state.ReasoningItemIndices = make(map[string]int)
+		}
+		state.ReasoningItemIndices[itemID] = evt.OutputIndex
 	}
 	switch evt.Type {
 	case "response.created":
@@ -164,7 +182,8 @@ func ResponsesEventToChatChunks(evt *ResponsesStreamEvent, state *ResponsesEvent
 	case "response.output_item.added":
 		return resToChatHandleOutputItemAdded(evt, state)
 	case "response.output_item.done":
-		return resToChatHandleToolSnapshot(evt, state)
+		chunks := resToChatHandleReasoningSnapshot(evt, state)
+		return append(chunks, resToChatHandleToolSnapshot(evt, state)...)
 	case "response.function_call_arguments.delta",
 		// custom/freeform 工具（如新版 apply_patch）的输入增量与 function_call 参数增量同形，
 		// 均按 OutputIndex 累加到对应工具调用。
@@ -177,8 +196,9 @@ func ResponsesEventToChatChunks(evt *ResponsesStreamEvent, state *ResponsesEvent
 		// 与 reasoning summary 一样映射为 reasoning_content。
 		"response.reasoning_text.delta":
 		return resToChatHandleReasoningDelta(evt, state)
-	case "response.reasoning_summary_text.done":
-		return nil
+	case "response.reasoning_summary_text.done",
+		"response.reasoning_text.done":
+		return resToChatHandleReasoningDone(evt, state)
 	// response.done 是 Realtime/WS 与项目透传路径使用的终止别名；
 	// 普通 Responses HTTP SSE 的公开终止事件仍以 response.completed 为主。
 	case "response.completed", "response.done", "response.incomplete", "response.failed", "response.cancelled", "response.canceled":
@@ -383,8 +403,72 @@ func resToChatHandleReasoningDelta(evt *ResponsesStreamEvent, state *ResponsesEv
 	if evt.Delta == "" {
 		return nil
 	}
+	if state.RequireReasoningContent && strings.Contains(evt.Type, "reasoning_summary") {
+		return nil
+	}
+	state.markReasoningPart(evt)
+	state.SawReasoningByOutputIndex[evt.OutputIndex] = true
 	reasoning := evt.Delta
 	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{ReasoningContent: &reasoning})}
+}
+
+func resToChatHandleReasoningDone(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
+	if evt.Text == "" || (state.RequireReasoningContent && strings.Contains(evt.Type, "reasoning_summary")) || state.reasoningPartSeen(evt) {
+		return nil
+	}
+	state.markReasoningPart(evt)
+	state.SawReasoningByOutputIndex[evt.OutputIndex] = true
+	reasoning := evt.Text
+	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{ReasoningContent: &reasoning})}
+}
+
+func resToChatHandleReasoningSnapshot(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
+	if evt.Item == nil || evt.Item.Type != "reasoning" {
+		return nil
+	}
+	if state.RequireReasoningContent {
+		var chunks []ChatCompletionsChunk
+		for index, part := range evt.Item.Content {
+			if part.Type != "reasoning_text" || part.Text == "" {
+				continue
+			}
+			chunks = append(chunks, resToChatHandleReasoningDone(&ResponsesStreamEvent{
+				Type: "response.reasoning_text.done", OutputIndex: evt.OutputIndex, ContentIndex: index, Text: part.Text,
+			}, state)...)
+		}
+		return chunks
+	}
+	if state.SawReasoningByOutputIndex[evt.OutputIndex] {
+		return nil
+	}
+	text := responsesReasoningText(evt.Item.Content, evt.Item.Summary)
+	if text == "" {
+		return nil
+	}
+	state.SawReasoningByOutputIndex[evt.OutputIndex] = true
+	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{ReasoningContent: &text})}
+}
+
+func (state *ResponsesEventToChatState) reasoningPartKey(evt *ResponsesStreamEvent) string {
+	kind, index := "content", evt.ContentIndex
+	if strings.Contains(evt.Type, "reasoning_summary") {
+		kind, index = "summary", evt.SummaryIndex
+	}
+	return fmt.Sprintf("%d:%s:%d", evt.OutputIndex, kind, index)
+}
+
+func (state *ResponsesEventToChatState) reasoningPartSeen(evt *ResponsesStreamEvent) bool {
+	return state.ReasoningPartsSeen[state.reasoningPartKey(evt)]
+}
+
+func (state *ResponsesEventToChatState) markReasoningPart(evt *ResponsesStreamEvent) {
+	if state.ReasoningPartsSeen == nil {
+		state.ReasoningPartsSeen = make(map[string]bool)
+	}
+	if state.SawReasoningByOutputIndex == nil {
+		state.SawReasoningByOutputIndex = make(map[int]bool)
+	}
+	state.ReasoningPartsSeen[state.reasoningPartKey(evt)] = true
 }
 
 func resToChatHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
@@ -392,6 +476,14 @@ func resToChatHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 	if evt.Response != nil && (evt.Type == "response.completed" || evt.Type == "response.done" || evt.Type == "response.incomplete") &&
 		(evt.Response.Status == "completed" || evt.Response.Status == "incomplete" || evt.Response.Status == "") {
 		for outputIndex := range evt.Response.Output {
+			item := &evt.Response.Output[outputIndex]
+			if item.Type == "reasoning" {
+				index := outputIndex
+				if known, ok := state.ReasoningItemIndices[item.ID]; ok {
+					index = known
+				}
+				chunks = append(chunks, resToChatHandleReasoningSnapshot(&ResponsesStreamEvent{OutputIndex: index, Item: item}, state)...)
+			}
 			// Terminal array positions can differ from streamed output indices.
 			// Existing calls match by call_id; reserve negative internal slots for
 			// newly recovered calls so they cannot overwrite a streamed sibling.
@@ -610,6 +702,11 @@ type bufferedFuncCall struct {
 	Args        strings.Builder
 }
 
+type bufferedReasoningContent struct {
+	ID    string
+	Parts map[int]*strings.Builder
+}
+
 // BufferedResponseAccumulator collects content from Responses SSE delta events
 // so that non-streaming handlers can reconstruct output when the terminal event
 // (response.completed / response.done) carries an empty output array.
@@ -617,6 +714,7 @@ type BufferedResponseAccumulator struct {
 	text                 strings.Builder
 	refusal              strings.Builder
 	reasoning            strings.Builder
+	reasoningContent     map[int]*bufferedReasoningContent
 	funcCalls            []*bufferedFuncCall // pointers keep strings.Builder from being copied on growth
 	outputIndexToFuncIdx map[int]int
 }
@@ -632,6 +730,7 @@ func NewBufferedResponseAccumulator() *BufferedResponseAccumulator {
 // content it carries. Only delta events that contribute to the final output
 // are handled; all other event types are silently ignored.
 func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) {
+	a.processReasoningContent(event)
 	switch event.Type {
 	case "response.output_text.delta":
 		if event.Delta != "" {
@@ -682,7 +781,7 @@ func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) 
 				_, _ = a.funcCalls[idx].Args.WriteString(completed)
 			}
 		}
-	case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
+	case "response.reasoning_summary_text.delta":
 		if event.Delta != "" {
 			_, _ = a.reasoning.WriteString(event.Delta)
 		}
@@ -691,7 +790,7 @@ func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) 
 
 // HasContent reports whether any content has been accumulated.
 func (a *BufferedResponseAccumulator) HasContent() bool {
-	return a.text.Len() > 0 || a.refusal.Len() > 0 || len(a.funcCalls) > 0 || a.reasoning.Len() > 0
+	return a.text.Len() > 0 || a.refusal.Len() > 0 || len(a.funcCalls) > 0 || a.reasoning.Len() > 0 || len(a.reasoningContent) > 0
 }
 
 // BuildOutput constructs a []ResponsesOutput from the accumulated delta
@@ -700,7 +799,16 @@ func (a *BufferedResponseAccumulator) HasContent() bool {
 func (a *BufferedResponseAccumulator) BuildOutput() []ResponsesOutput {
 	var out []ResponsesOutput
 
-	if a.reasoning.Len() > 0 {
+	if len(a.reasoningContent) > 0 {
+		for _, index := range a.reasoningIndices() {
+			item := a.reasoningContent[index]
+			if len(item.Parts) == 0 {
+				continue
+			}
+			out = append(out, ResponsesOutput{Type: "reasoning", ID: item.ID, Content: item.content()})
+		}
+	}
+	if len(out) == 0 && a.reasoning.Len() > 0 {
 		out = append(out, ResponsesOutput{
 			Type: "reasoning",
 			Summary: []ResponsesSummary{{
@@ -751,8 +859,22 @@ func (a *BufferedResponseAccumulator) SupplementResponseOutput(resp *ResponsesRe
 		return
 	}
 
+	matchedReasoning := make(map[int]bool)
+	reasoningIndices := a.reasoningIndices()
 	for outputIndex := range resp.Output {
 		item := &resp.Output[outputIndex]
+		if item.Type == "reasoning" {
+			for _, index := range reasoningIndices {
+				cached := a.reasoningContent[index]
+				if (item.ID != "" && item.ID == cached.ID) || ((cached.ID == "" || item.ID == "") && index == outputIndex) {
+					matchedReasoning[index] = true
+					if len(item.Content) == 0 {
+						item.Content = cached.content()
+					}
+					break
+				}
+			}
+		}
 		if item.Type != "function_call" || item.Arguments != "" {
 			continue
 		}
@@ -768,4 +890,70 @@ func (a *BufferedResponseAccumulator) SupplementResponseOutput(resp *ResponsesRe
 			break
 		}
 	}
+	for _, index := range reasoningIndices {
+		cached := a.reasoningContent[index]
+		if !matchedReasoning[index] && len(cached.Parts) > 0 {
+			resp.Output = append(resp.Output, ResponsesOutput{Type: "reasoning", ID: cached.ID, Content: cached.content()})
+		}
+	}
+}
+
+func (a *BufferedResponseAccumulator) processReasoningContent(event *ResponsesStreamEvent) {
+	if event.Type != "response.reasoning_text.delta" && event.Type != "response.reasoning_text.done" &&
+		!(event.Item != nil && event.Item.Type == "reasoning" && (event.Type == "response.output_item.added" || event.Type == "response.output_item.done")) {
+		return
+	}
+	if a.reasoningContent == nil {
+		a.reasoningContent = make(map[int]*bufferedReasoningContent)
+	}
+	item := a.reasoningContent[event.OutputIndex]
+	if item == nil {
+		item = &bufferedReasoningContent{Parts: make(map[int]*strings.Builder)}
+		a.reasoningContent[event.OutputIndex] = item
+	}
+	if itemID := responsesReasoningItemID(event); itemID != "" {
+		item.ID = itemID
+	}
+	if event.Item != nil {
+		for index, part := range event.Item.Content {
+			if part.Type == "reasoning_text" {
+				item.setPart(index, part.Text)
+			}
+		}
+	} else if event.Type == "response.reasoning_text.done" {
+		item.setPart(event.ContentIndex, event.Text)
+	} else {
+		if item.Parts[event.ContentIndex] == nil {
+			item.Parts[event.ContentIndex] = &strings.Builder{}
+		}
+		_, _ = item.Parts[event.ContentIndex].WriteString(event.Delta)
+	}
+}
+
+func (item *bufferedReasoningContent) setPart(index int, text string) {
+	part := &strings.Builder{}
+	_, _ = part.WriteString(text)
+	item.Parts[index] = part
+}
+
+func (a *BufferedResponseAccumulator) reasoningIndices() []int {
+	indices := make([]int, 0, len(a.reasoningContent))
+	for index := range a.reasoningContent {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+	return indices
+}
+
+func (item *bufferedReasoningContent) content() []ResponsesContentPart {
+	indices := make([]int, 0, len(item.Parts))
+	for index := range item.Parts {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+	var content []ResponsesContentPart
+	for _, index := range indices {
+		content = append(content, ResponsesContentPart{Type: "reasoning_text", Text: item.Parts[index].String()})
+	}
+	return content
 }

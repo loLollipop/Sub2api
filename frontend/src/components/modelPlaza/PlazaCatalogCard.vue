@@ -85,7 +85,7 @@
         <p v-if="peakWindow" class="catalog-notice">{{ t('modelPlaza.detail.peakNote', { window: peakWindow, multiplier: activeOffer.group.peak_rate_multiplier }) }}</p>
         <p v-if="longContextDisabled" class="catalog-notice">{{ t('modelPlaza.detail.longContextDisabledNote') }}</p>
         <p v-if="isVideo" class="catalog-notice">{{ t('modelPlaza.list.videoPricingUnavailable') }}</p>
-        <p v-else class="catalog-muted">{{ t('modelPlaza.list.officialReference') }}</p>
+        <p v-else class="catalog-muted">{{ t(activeOffer.model.official_pricing?.custom ? 'modelPlaza.list.customReference' : 'modelPlaza.list.officialReference') }}</p>
         <div v-if="!isVideo" class="catalog-table-scroll" role="region" :aria-label="t('modelPlaza.list.viewPricing', { model: entry.name })" tabindex="0">
           <PlazaModelPricingTable v-bind="pricingTableProps" />
         </div>

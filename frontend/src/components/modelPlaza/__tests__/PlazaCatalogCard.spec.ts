@@ -66,6 +66,18 @@ afterEach(() => {
 })
 
 describe('PlazaCatalogCard', () => {
+  it('updates the reference description when switching between custom and official group offers', async () => {
+    const custom = model()
+    custom.official_pricing = { ...custom.official_pricing!, custom: true }
+    const wrapper = mountCard(entry([{ group: group(), model: custom }, { group: group({ id: 2 }), model: model() }]))
+    await wrapper.get('.catalog-details').trigger('click')
+    expect(document.body.textContent).toContain('modelPlaza.list.customReference')
+    expect(document.body.textContent).not.toContain('modelPlaza.list.officialReference')
+    wrapper.findComponent(Select).vm.$emit('update:modelValue', 2)
+    await nextTick()
+    expect(document.body.textContent).toContain('modelPlaza.list.officialReference')
+    expect(document.body.textContent).not.toContain('modelPlaza.list.customReference')
+  })
   it('keeps same-name group prices and open details bound to refreshed original models', async () => {
     const firstModel = model({ name: 'deepseek-chat' })
     const secondModel = model({ name: 'deepseek-chat', pricing: { ...firstModel.pricing!, input_price: 7e-6 } })

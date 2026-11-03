@@ -156,6 +156,22 @@ func TestToModelPlazaOfficialPricing_NilPassthrough(t *testing.T) {
 	require.Nil(t, toModelPlazaOfficialPricing(nil))
 }
 
+func TestToModelPlazaOfficialPricing_CustomZeroReferenceIsExplicit(t *testing.T) {
+	for _, custom := range []bool{false, true} {
+		raw, err := json.Marshal(toModelPlazaOfficialPricing(&service.PlazaOfficialPricing{Custom: custom, InputPrice: testPtr(0)}))
+		require.NoError(t, err)
+		var decoded map[string]any
+		require.NoError(t, json.Unmarshal(raw, &decoded))
+		require.Equal(t, float64(0), decoded["input_price"])
+		require.Nil(t, decoded["output_price"])
+		if custom {
+			require.Equal(t, true, decoded["custom"], "the browser needs this flag to distinguish group and official prices")
+		} else {
+			require.NotContains(t, decoded, "custom")
+		}
+	}
+}
+
 func TestToModelPlazaGroupDTO_LongContextTiersAndBasis(t *testing.T) {
 	maxTokens := 272000
 	g := service.PlazaGroup{

@@ -31,7 +31,7 @@ func TestResponsesMissingToolOutputsForward(t *testing.T) {
 			account.Extra = map[string]any{"openai_passthrough": true}
 			body := []byte(`{"model":"actual","stream":false,"input":[{"role":"user","content":"hello"},{"type":"function_call","call_id":"interrupted","name":"lookup","arguments":"{}"},{"role":"user","content":"continue"}]}`)
 			if platform == PlatformDeepseek {
-				// Native DeepSeek discards this legacy field before sending upstream.
+				// Native DeepSeek owns continuation state and tool-history validation.
 				body = []byte(strings.Replace(string(body), `"stream":false`, `"stream":false,"previous_response_id":"stale"`, 1))
 			}
 			result, err := svc.Forward(context.Background(), c, account, body)
@@ -39,13 +39,15 @@ func TestResponsesMissingToolOutputsForward(t *testing.T) {
 			require.NotNil(t, result)
 			require.NotNil(t, upstream.lastReq)
 			require.Len(t, upstream.requests, 1, "repair must not execute tools or replay the request")
+			if platform == PlatformDeepseek {
+				require.JSONEq(t, string(body), string(upstream.lastBody), "native DeepSeek must not receive fabricated tool outputs")
+				require.Equal(t, "stale", gjson.GetBytes(upstream.lastBody, "previous_response_id").String())
+				return
+			}
 			require.Equal(t, "function_call_output", gjson.GetBytes(upstream.lastBody, "input.2.type").String())
 			require.Equal(t, "interrupted", gjson.GetBytes(upstream.lastBody, "input.2.call_id").String())
 			require.Contains(t, gjson.GetBytes(upstream.lastBody, "input.2.output").String(), "tool_output_missing")
 			require.Equal(t, "user", gjson.GetBytes(upstream.lastBody, "input.3.role").String())
-			if platform == PlatformDeepseek {
-				require.False(t, gjson.GetBytes(upstream.lastBody, "previous_response_id").Exists())
-			}
 		})
 	}
 }

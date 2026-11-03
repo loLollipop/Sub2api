@@ -445,6 +445,10 @@ func TestListGroups_GroupTokenCardOverridesChannelPricing(t *testing.T) {
 	require.InDelta(t, 1e-6, *m.Pricing.InputPrice, 1e-15, "分组价卡优先于渠道平价")
 	require.InDelta(t, 15e-6, *m.Pricing.OutputPrice, 1e-15, "卡未配置的项回落目录价")
 	require.Empty(t, m.Pricing.Intervals)
+	require.NotNil(t, m.OfficialPricing)
+	require.True(t, m.OfficialPricing.Custom)
+	require.InDelta(t, 1e-6, *m.OfficialPricing.InputPrice, 1e-15)
+	require.InDelta(t, 15e-6, *m.OfficialPricing.OutputPrice, 1e-15)
 }
 
 func TestListGroups_ImageModelKeepsTierSynthesisWithBilling(t *testing.T) {

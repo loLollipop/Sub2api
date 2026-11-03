@@ -10,15 +10,23 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 )
 
-// ResponsesToAnthropicRequest converts a Responses API request into an
-// Anthropic Messages request. This is the reverse of AnthropicToResponses and
-// enables Anthropic platform groups to accept OpenAI Responses API requests
-// by converting them to the native /v1/messages format before forwarding upstream.
+// ResponsesToAnthropicOptions requires a resolved provider; model aliases alone
+// must never enable unsigned thinking replay for ordinary Anthropic targets.
+type ResponsesToAnthropicOptions struct {
+	PreserveReasoningText bool
+}
+
+// ResponsesToAnthropicRequest converts a Responses request to Anthropic Messages.
 func ResponsesToAnthropicRequest(req *ResponsesRequest) (*AnthropicRequest, error) {
+	return ResponsesToAnthropicRequestWithOptions(req, nil)
+}
+
+func ResponsesToAnthropicRequestWithOptions(req *ResponsesRequest, opts *ResponsesToAnthropicOptions) (*AnthropicRequest, error) {
+	preserveReasoningText := opts != nil && opts.PreserveReasoningText
 	isOpus55 := claude.IsOpus55(req.Model)
 	isSonnet55 := claude.IsSonnet55(req.Model)
 	isHaiku55 := claude.IsHaiku55(req.Model)
-	system, messages, err := convertResponsesInputToAnthropic(req.Instructions, req.Input, isOpus55 || isSonnet55 || isHaiku55)
+	system, messages, err := convertResponsesInputToAnthropicWithReasoning(req.Instructions, req.Input, isOpus55 || isSonnet55 || isHaiku55, preserveReasoningText)
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +142,10 @@ func ResponsesToAnthropicRequest(req *ResponsesRequest) (*AnthropicRequest, erro
 
 	// reasoning.effort → output_config.effort + thinking
 	if req.Reasoning != nil && req.Reasoning.Effort != "" {
+		if preserveReasoningText && req.Reasoning.Effort == "none" {
+			out.Thinking = &AnthropicThinking{Type: "disabled"}
+			return out, nil
+		}
 		effort := mapResponsesEffortToAnthropic(req.Reasoning.Effort)
 		out.OutputConfig = &AnthropicOutputConfig{Effort: effort}
 		// Enable thinking for non-low efforts
@@ -183,6 +195,10 @@ func mapResponsesEffortToAnthropic(effort string) string {
 // (for Anthropic's polymorphic system field) and a list of Anthropic messages.
 func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMessage, signedThinking ...bool) (json.RawMessage, []AnthropicMessage, error) {
 	preserveThinking := len(signedThinking) > 0 && signedThinking[0]
+	return convertResponsesInputToAnthropicWithReasoning(instructions, inputRaw, preserveThinking, false)
+}
+
+func convertResponsesInputToAnthropicWithReasoning(instructions string, inputRaw json.RawMessage, preserveThinking, preserveReasoningText bool) (json.RawMessage, []AnthropicMessage, error) {
 	var systemParts []AnthropicContentBlock
 	preserveSystemBlocks := false
 	if strings.TrimSpace(instructions) != "" {
@@ -278,6 +294,13 @@ func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMess
 			})
 
 		case item.Type == "reasoning":
+			if preserveReasoningText {
+				if thinking := responsesInputReasoningContentText(item.Content); thinking != "" {
+					content, _ := json.Marshal([]AnthropicContentBlock{{Type: "thinking", Thinking: thinking}})
+					messages = append(messages, AnthropicMessage{Role: "assistant", Content: content})
+				}
+				continue
+			}
 			// Only decode marked Anthropic bridge envelopes, not arbitrary
 			// OpenAI ciphertext. The upstream remains responsible for signature validation.
 			if preserveThinking && strings.HasPrefix(item.EncryptedContent, anthropicThinkingEnvelopePrefix) {

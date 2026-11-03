@@ -79,6 +79,17 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	}
 	chatReq.Model = upstreamModel
 	chatReq.ReasoningEffort = openAICompatAnthropicReasoningEffort(&anthropicReq, upstreamModel, chatReq.ReasoningEffort)
+	if account.Platform == PlatformDeepseek {
+		if anthropicReq.OutputConfig != nil && anthropicReq.OutputConfig.Effort == "max" {
+			chatReq.ReasoningEffort = "max"
+		}
+		if anthropicReq.Thinking != nil {
+			chatReq.Thinking = &apicompat.AnthropicThinking{Type: anthropicReq.Thinking.Type}
+			if anthropicReq.Thinking.Type == "disabled" {
+				chatReq.ReasoningEffort = ""
+			}
+		}
+	}
 	chatReq.Stream = clientStream
 	if clientStream {
 		chatReq.StreamOptions = &apicompat.ChatStreamOptions{IncludeUsage: true}

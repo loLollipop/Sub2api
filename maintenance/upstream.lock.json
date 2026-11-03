@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.0",
-  "imported_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
+  "imported_version": "2.3.4",
+  "imported_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.0",
-  "latest_observed_release_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
-  "latest_observed_main_commit": "185dfaf184c1f24fc910a07ad21702fdbd5bb55e",
+  "latest_observed_version": "2.3.4",
+  "latest_observed_release_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
+  "latest_observed_main_commit": "c2d172150660e4416e8a49b80bbcff9ac2b09910",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.0",
-  "reviewed_release_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
+  "reviewed_release_tag": "v2.3.4",
+  "reviewed_release_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
   "observed_delta_review": {
-    "from_commit": "bbb057ebf308d983cc3201fd3441793691a9af54",
-    "to_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
-    "status": "selective_formal_v2300_adapted_with_explicit_deferrals",
-    "scope": "Preserve native DeepSeek reasoning effort, distinguish unknown group runtime capacity, and load visible user platform quotas in batches. Keep local Vue/shadcn UI; adapt an original pig-hero backdrop and remove the home footer GitHub link. Nuxt SSR, source theme settings, compact usage/announcement payload changes and removed payments are excluded or deferred. No migrations or dependency changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261102-v2300.md"
+    "from_commit": "bc7a99214368d9107d3262680244a4d2eee48dfb",
+    "to_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
+    "status": "selective_formal_v2304_adapted_with_explicit_deferrals",
+    "scope": "Selected DeepSeek native transparency, genuine reasoning and thinking-switch semantics; authenticated free model discovery with key limits preserved; group custom pricing references; route-aware API key group filtering and bounded Intl caches. Center the local home footer. Preserve Vue/shadcn, scoped replay and billing; exclude/defer Nuxt SSR, removed payments and automation. No migrations; only x/crypto GO-2026-5932 security fix and checksums. Personal v2.1.47 publication authorized after review.",
+    "evidence": "maintenance/notes/upstream-sync-20261103-v2304.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "bc7a99214368d9107d3262680244a4d2eee48dfb",
+    "source_head": "65db90acee6ea7983611ef1b9e248cf8c7663235",
     "implemented_with_local_regression": [
+      "Formal v2.3.1-v2.3.4 selected DeepSeek native/request-reasoning semantics, free authenticated discovery, custom group references, route-aware key filtering and Intl caches; home footer centered. Preserve local replay scope/UI/billing; see maintenance/notes/upstream-sync-20261103-v2304.md for explicit exclusions and verification limits.",
       "Formal v2.2.67-v2.3.0 selected native DeepSeek effort preservation, unknown capacity state and batched on-demand user platform quotas. Retain Vue SPA, native protocols and existing feature removals. Local original pig-hero theme/footer refinement recorded separately in maintenance/notes/upstream-sync-20261102-v2300.md",
       "Formal v2.2.63-v2.2.66: cap explicit Gemini Flash thinking budgets across model generations; preserve mapped-model selection and existing exclusions. See maintenance/notes/upstream-sync-20261101-v2266.md",
       "Formal v2.2.61-v2.2.62: existing error-log NULL fallback confirmed; adapt partial/error/failed audit terminal states without enabling quality checks or importing deferred Ops/timers. See maintenance/notes/upstream-sync-20261031-v2262.md",
@@ -103,8 +104,26 @@
     "9f728c580",
     "42f68aa31"
   ],
-  "selected_deepseek_fix": "Wire the existing normalizer before Responses-to-Chat conversion; selectively retain later real arguments for same-ID empty-shell function calls (b6251ba03). Preserve first item ID/order/output, native protocols, distinct IDs, existing origin/scope and dedupe-before-image-lifting. No DSML parser or live SSE ID rewrite.",
+  "selected_deepseek_fix": "Formal v2304 native DeepSeek bypasses legacy call-ID/request-state rewriting and rejected-field retries; genuine reasoning and thinking-switch options are provider-gated. Existing legacy conversion empty-shell repair remains scoped. Preserve local key/conversation/requested-model replay isolation, native protocols and distinct IDs; no cache-key weakening, Hosted execution, DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2304-source-runtime-and-optional-admin-expansion",
+      "upstream_commits": [
+        "68055013c",
+        "185dfaf18",
+        "7d9857173",
+        "85ec3769e",
+        "20e04988a"
+      ],
+      "reason": "Preserve the local SPA and virtual-table/edit lifecycle. Defer automatic whitelist runner, Ops import, activity/rate history, new key summary dialog, table DOM/preload and timer-state UI. Adapt standalone Intl cache and route-filter behavior independently. Nuxt SSR release/cookie/session/theme contracts and removed crypto payments do not apply. Exact classifications are recorded in the v2304 note."
+    },
+    {
+      "feature": "v2304-totp-consumption",
+      "upstream_commits": [
+        "5991959d6"
+      ],
+      "reason": "Source delayed TOTP consumption depends on its removed crypto-security replay store; the local verifier has no corresponding early-consumption bug. Any general atomic replay protection needs a separate auth design. The separately reviewed x/crypto OpenPGP module split is adopted for the GO-2026-5932 release security gate, without an audit exception."
+    },
     {
       "feature": "v2300-compact-usage-and-lazy-announcements",
       "upstream_commits": [
@@ -569,5 +588,34 @@
     "preserved": "Local shadcn UI and grouped model plaza; native providers and scoped reasoning; existing billing, refusal and disconnect handling; removed tickets/canvas/native payments and previously deferred Ops/capture/Hosted.",
     "migration": "None. Existing migrations, Ent and both Go/frontend dependencies unchanged.",
     "release_status": "User authorized GitHub submission and deployment on 2026-11-02. Prepare personal v2.1.46 via PR/CI, own GHCR and the controlled updater; exact source/artifact/runtime acceptance recorded separately. No migration or dependency changes."
+  },
+  "sync_20261103_v2304": {
+    "evidence": "maintenance/notes/upstream-sync-20261103-v2304.md",
+    "reviewed_release_tag": "v2.3.4",
+    "reviewed_release_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
+    "selected_commits": [
+      "cf3577f10",
+      "5a9055207",
+      "08789c3da",
+      "3e69d829e",
+      "221f25e05",
+      "567f2bf1c",
+      "2d65dd37d",
+      "8ade2685e",
+      "54c8f189d",
+      "5e4135c64",
+      "ed2f41765",
+      "c9c6edbae",
+      "68d46b607",
+      "e00e45fc9",
+      "85ec3769e"
+    ],
+    "selected_scope": "Native DeepSeek transparency/no 400 rewrite, genuine reasoning and none/max thinking conversion; free authorized model discovery preserving key expiry/quota; selected-identity custom references; server-side route-group key filters; bounded Intl formatter caches.",
+    "local_ui": "Home footer copyright/legal/risk centered with original pig-hero theme retained; group custom price references labelled accurately.",
+    "deferred": "Nuxt SSR/BFF/session/theme/release chain, removed crypto payments, TOTP replay-store expansion, auto whitelist/Ops/capture/Hosted/timers/activity/history/new usage dialogs, source virtual-table/edit preload and optional UI reshaping. Main beyond formal tag remains outside reviewed checkpoint.",
+    "preserved": "Key/conversation/requested-model native replay and opaque binding; native protocols, token floor/cache controls, local billing/refunds, Grok refusal and disconnect usage, all prior removed modules.",
+    "migration": "None. Existing migrations, Ent, frontend dependency manifests and deployment configuration unchanged.",
+    "release_dependency_fix": "Upgrade golang.org/x/crypto v0.58.0 to v0.58.1-0.20261009181718-2f1f834330b2 with checksums for GO-2026-5932. The single upstream change splits unused deprecated OpenPGP into a module; bcrypt, curve25519 and nacl/box sources are unchanged. No audit exemption.",
+    "release_status": "User authorized code review, GitHub submission and deployment on 2026-11-03. Prepare personal v2.1.47 via PR/CI, own GHCR and the controlled updater; final source/artifact/runtime acceptance evidence is recorded separately. No migration; only the explicitly reviewed x/crypto security dependency update."
   }
 }

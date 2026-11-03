@@ -857,8 +857,7 @@ func TestBuildOpenAIResponsesURLForPlatform(t *testing.T) {
 	require.Equal(t, "https://api.kimi.com/coding/v1/responses", buildOpenAIResponsesURLForPlatform(PlatformKimi, "https://api.kimi.com/coding/v1"))
 }
 
-// TestNormalizeDeepSeekResponsesRequestBody 无状态适配：强制 store=false、
-// 清除 previous_response_id；非原生 CN Responses 协议原样返回。
+// Native DeepSeek retains state and media; legacy CN providers keep normalization.
 func TestNormalizeDeepSeekResponsesRequestBody(t *testing.T) {
 	t.Parallel()
 
@@ -868,8 +867,7 @@ func TestNormalizeDeepSeekResponsesRequestBody(t *testing.T) {
 	}
 	body := []byte(`{"model":"deepseek-v4-pro","store":true,"previous_response_id":"resp_123","input":"hi"}`)
 	normalized := normalizeDeepSeekResponsesRequestBody(deepseekResponses, body)
-	require.False(t, gjson.GetBytes(normalized, "store").Bool())
-	require.False(t, gjson.GetBytes(normalized, "previous_response_id").Exists())
+	require.Equal(t, body, normalized)
 	require.Equal(t, "deepseek-v4-pro", gjson.GetBytes(normalized, "model").String())
 
 	deepseekAdaptive := &Account{
@@ -877,18 +875,11 @@ func TestNormalizeDeepSeekResponsesRequestBody(t *testing.T) {
 		Credentials: map[string]any{"api_protocol": APIProtocolAdaptive},
 	}
 	adaptiveNormalized := normalizeDeepSeekResponsesRequestBody(deepseekAdaptive, body)
-	require.False(t, gjson.GetBytes(adaptiveNormalized, "store").Bool())
-	require.False(t, gjson.GetBytes(adaptiveNormalized, "previous_response_id").Exists())
+	require.Equal(t, body, adaptiveNormalized)
 
 	mediaBody := []byte(`{"model":"deepseek-v4.1-flash","store":true,"input":[{"type":"function_call","call_id":"call_image","name":"view_image","arguments":"{}"},{"type":"function_call_output","call_id":"call_image","output":[{"type":"input_image","image_url":"data:image/png;base64,AQID"}]}]}`)
 	mediaNormalized := normalizeDeepSeekResponsesRequestBody(deepseekResponses, mediaBody)
-	require.False(t, gjson.GetBytes(mediaNormalized, "store").Bool())
-	require.Equal(t, gjson.String, gjson.GetBytes(mediaNormalized, "input.1.output").Type)
-	require.NotContains(t, gjson.GetBytes(mediaNormalized, "input.1.output").String(), "data:image/png")
-	require.Equal(t, "message", gjson.GetBytes(mediaNormalized, "input.2.type").String())
-	require.Equal(t, "user", gjson.GetBytes(mediaNormalized, "input.2.role").String())
-	require.Equal(t, "input_image", gjson.GetBytes(mediaNormalized, "input.2.content.1.type").String())
-	require.Equal(t, "data:image/png;base64,AQID", gjson.GetBytes(mediaNormalized, "input.2.content.1.image_url").String())
+	require.Equal(t, mediaBody, mediaNormalized)
 
 	// 非 responses 协议（deepseek CC 账号）原样返回
 	deepseekCC := &Account{Platform: PlatformDeepseek, Type: AccountTypeAPIKey}
@@ -927,15 +918,12 @@ func TestRewriteInboundDeepSeekCallIDsPreservesScopeAndNumbers(t *testing.T) {
 	require.Equal(t, string(invalid), string(RewriteInboundDeepSeekCallIDs(PlatformDeepseek, "alias", invalid)))
 }
 
-func TestNormalizeDeepSeekResponsesRequestBodyDropsDuplicateMediaBeforeLifting(t *testing.T) {
+func TestNormalizeDeepSeekResponsesRequestBodyPreservesNativeDuplicateMedia(t *testing.T) {
 	t.Parallel()
 	body := []byte(`{"model":"alias","input":[{"type":"function_call","call_id":"call_a","name":"view_image","arguments":"{}"},{"type":"function_call_output","call_id":"call_a","output":[{"type":"input_image","image_url":"data:image/png;base64,QQ=="}]},{"type":"function_call_output","call_id":"call_a","output":[{"type":"input_image","image_url":"data:image/png;base64,Qg=="}]}]}`)
 	account := &Account{Platform: PlatformDeepseek, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_protocol": APIProtocolResponses}}
 	normalized := normalizeDeepSeekResponsesRequestBody(account, body)
-	require.Len(t, gjson.GetBytes(normalized, "input").Array(), 3)
-	require.Equal(t, "function_call_output", gjson.GetBytes(normalized, "input.1.type").String())
-	require.Equal(t, "data:image/png;base64,QQ==", gjson.GetBytes(normalized, "input.2.content.1.image_url").String())
-	require.NotContains(t, string(normalized), "data:image/png;base64,Qg==")
+	require.Equal(t, body, normalized)
 }
 
 func TestNormalizeDeepSeekResponsesRequestBodyDropsDuplicateCallID(t *testing.T) {
@@ -946,11 +934,7 @@ func TestNormalizeDeepSeekResponsesRequestBodyDropsDuplicateCallID(t *testing.T)
 		Credentials: map[string]any{"api_protocol": APIProtocolResponses},
 	}
 	normalized := normalizeDeepSeekResponsesRequestBody(account, body)
-	require.Equal(t, 2, len(gjson.GetBytes(normalized, "input").Array()))
-	require.Equal(t, "call_00_Q5acE0gqo6rWTzjZrAce4855", gjson.GetBytes(normalized, "input.0.call_id").String())
-	require.Equal(t, "custom_tool_call", gjson.GetBytes(normalized, "input.0.type").String())
-	require.Equal(t, "ok", gjson.GetBytes(normalized, "input.1.output").String())
-	require.False(t, gjson.GetBytes(normalized, "input.2").Exists())
+	require.Equal(t, body, normalized)
 
 	byModel := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
 	modelBody := []byte(`{"model":"deepseek-v4.1-flash","input":[{"type":"function_call","call_id":"call_a","name":"do"},{"type":"function_call","call_id":"call_a","name":"do"},{"type":"function_call_output","call_id":"call_a","output":"1"}]}`)

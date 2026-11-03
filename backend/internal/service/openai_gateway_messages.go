@@ -164,7 +164,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 
 	// 3. Convert Anthropic → Responses after compatibility-only replay guard.
-	responsesReq, err := anthropicToResponses(s.cfg, &anthropicReq)
+	responsesReq, err := apicompat.AnthropicToResponsesWithMinOutputTokens(&anthropicReq, configuredMinOutputTokens(s.cfg), &apicompat.AnthropicToResponsesOptions{PreserveThinkingContent: account.Platform == PlatformDeepseek})
 	if err != nil {
 		return nil, fmt.Errorf("convert anthropic to responses: %w", err)
 	}
@@ -179,7 +179,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 
 	responsesReq.Model = upstreamModel
-	if responsesReq.Reasoning != nil {
+	if responsesReq.Reasoning != nil && account.Platform != PlatformDeepseek {
 		responsesReq.Reasoning.Effort = openAICompatAnthropicReasoningEffort(&anthropicReq, upstreamModel, responsesReq.Reasoning.Effort)
 	}
 	if previousResponseID != "" {
@@ -828,7 +828,7 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 		acc.SupplementResponseOutput(finalResponse)
 	}
 
-	anthropicResp := apicompat.ResponsesToAnthropic(finalResponse, originalModel)
+	anthropicResp := apicompat.ResponsesToAnthropicWithOptions(finalResponse, originalModel, account.Platform == PlatformDeepseek)
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -1093,6 +1093,7 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
 
 	state := apicompat.NewResponsesEventToAnthropicState()
+	state.RequireReasoningContent = account.Platform == PlatformDeepseek
 	state.Model = originalModel
 	var usage OpenAIUsage
 	responseID := ""

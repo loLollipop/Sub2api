@@ -16,6 +16,10 @@ import (
 // Anthropic Messages response. Reasoning output items are mapped to thinking
 // blocks; function_call items become tool_use blocks.
 func ResponsesToAnthropic(resp *ResponsesResponse, model string) *AnthropicResponse {
+	return ResponsesToAnthropicWithOptions(resp, model, false)
+}
+
+func ResponsesToAnthropicWithOptions(resp *ResponsesResponse, model string, requireReasoningContent bool) *AnthropicResponse {
 	out := &AnthropicResponse{
 		ID:    resp.ID,
 		Type:  "message",
@@ -28,19 +32,17 @@ func ResponsesToAnthropic(resp *ResponsesResponse, model string) *AnthropicRespo
 	for _, item := range resp.Output {
 		switch item.Type {
 		case "reasoning":
-			summaryText := ""
-			for _, s := range item.Summary {
-				if s.Type == "summary_text" && s.Text != "" {
-					summaryText += s.Text
-				}
+			thinkingText := responsesReasoningText(item.Content, item.Summary)
+			if requireReasoningContent {
+				thinkingText = responsesReasoningContentText(item.Content)
 			}
 			// Always surface encrypted_content as thinking.signature so Claude
 			// Code / multi-turn clients can send it back. Signature-only
-			// thinking blocks are valid when the model omits a visible summary.
-			if summaryText != "" || strings.TrimSpace(item.EncryptedContent) != "" {
+			// thinking blocks are valid when the model omits visible content.
+			if thinkingText != "" || strings.TrimSpace(item.EncryptedContent) != "" {
 				blocks = append(blocks, AnthropicContentBlock{
 					Type:      "thinking",
-					Thinking:  summaryText,
+					Thinking:  thinkingText,
 					Signature: item.EncryptedContent,
 				})
 			}
@@ -203,6 +205,11 @@ type ResponsesEventToAnthropicState struct {
 	// PendingThinkingSignature is filled from reasoning.encrypted_content and
 	// emitted as signature_delta before the thinking block is closed.
 	PendingThinkingSignature string
+	CurrentThinkingHadDelta  bool
+	RequireReasoningContent  bool
+	ReasoningPartsSeen       map[string]bool
+	ReasoningItemIndices     map[string]int
+	pendingReasoning         []ResponsesStreamEvent
 	HasToolCall              bool
 
 	// OutputIndexToBlockIdx maps Responses output_index → Anthropic content block index.
@@ -235,6 +242,20 @@ func ResponsesEventToAnthropicEvents(
 	evt *ResponsesStreamEvent,
 	state *ResponsesEventToAnthropicState,
 ) []AnthropicStreamEvent {
+	events := responsesEventToAnthropicEvents(evt, state)
+	if !state.RequireReasoningContent || (state.ContentBlockOpen && state.CurrentBlockType == "tool_use") {
+		return events
+	}
+	return append(events, resToAnthFlushPendingReasoning(state)...)
+}
+
+func responsesEventToAnthropicEvents(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if itemID := responsesReasoningItemID(evt); itemID != "" {
+		if state.ReasoningItemIndices == nil {
+			state.ReasoningItemIndices = make(map[string]int)
+		}
+		state.ReasoningItemIndices[itemID] = evt.OutputIndex
+	}
 	switch evt.Type {
 	case "response.created":
 		return resToAnthHandleCreated(evt, state)
@@ -256,11 +277,9 @@ func ResponsesEventToAnthropicEvents(
 		// 原始推理文本增量，与 reasoning summary 一样映射为 thinking。
 		"response.reasoning_text.delta":
 		return resToAnthHandleReasoningDelta(evt, state)
-	case "response.reasoning_summary_text.done":
-		// Keep the thinking block open until response.output_item.done.
-		// Grok/Codex attach encrypted_content on the finished reasoning item;
-		// closing early would drop signature_delta and break multi-turn cache.
-		return nil
+	case "response.reasoning_summary_text.done",
+		"response.reasoning_text.done":
+		return resToAnthHandleReasoningDone(evt, state)
 	// response.done 是 Realtime/WS 与项目透传路径使用的终止别名；
 	// 普通 Responses HTTP SSE 的公开终止事件仍以 response.completed 为主。
 	case "response.completed", "response.done", "response.incomplete", "response.failed", "response.cancelled", "response.canceled":
@@ -273,11 +292,13 @@ func ResponsesEventToAnthropicEvents(
 // FinalizeResponsesAnthropicStream emits synthetic termination events if the
 // stream ended without a proper completion event.
 func FinalizeResponsesAnthropicStream(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	if state.MessageStopSent || (!state.MessageStartSent && len(state.pendingLocalShell) == 0) {
+	if state.MessageStopSent || (!state.MessageStartSent && len(state.pendingLocalShell) == 0 && len(state.pendingReasoning) == 0) {
 		return nil
 	}
 
 	var events []AnthropicStreamEvent
+	events = append(events, closeCurrentBlock(state)...)
+	events = append(events, resToAnthFlushPendingReasoning(state)...)
 	events = append(events, closeCurrentBlock(state)...)
 	events = append(events, resToAnthFlushLocalShell(state)...)
 
@@ -389,6 +410,12 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 		return events
 
 	case "reasoning":
+		if evt.Item.ID != "" {
+			if state.ReasoningItemIndices == nil {
+				state.ReasoningItemIndices = make(map[string]int)
+			}
+			state.ReasoningItemIndices[evt.Item.ID] = evt.OutputIndex
+		}
 		var events []AnthropicStreamEvent
 		events = append(events, closeCurrentBlock(state)...)
 
@@ -397,6 +424,7 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 		state.ContentBlockOpen = true
 		state.CurrentBlockType = "thinking"
 		state.PendingThinkingSignature = strings.TrimSpace(evt.Item.EncryptedContent)
+		state.CurrentThinkingHadDelta = false
 
 		events = append(events, AnthropicStreamEvent{
 			Type:  "content_block_start",
@@ -487,7 +515,6 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 	if !ok {
 		return nil
 	}
-
 	return []AnthropicStreamEvent{{
 		Type:  "content_block_delta",
 		Index: &blockIdx,
@@ -544,24 +571,96 @@ func resToAnthHandleFuncArgsDone(evt *ResponsesStreamEvent, state *ResponsesEven
 	return events
 }
 
+// Late genuine content needs a new block when text has already closed
+// its original thinking block. Anthropic deltas must only target open blocks.
+func resToAnthEnsureReasoningBlock(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if !state.RequireReasoningContent {
+		return nil
+	}
+	events := resToAnthHandleCreated(evt, state)
+	if block, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]; ok &&
+		state.ContentBlockOpen && block == state.ContentBlockIndex && state.CurrentBlockType == "thinking" {
+		return events
+	}
+	return append(events, resToAnthHandleOutputItemAdded(&ResponsesStreamEvent{
+		OutputIndex: evt.OutputIndex, Item: &ResponsesOutput{Type: "reasoning", ID: responsesReasoningItemID(evt)},
+	}, state)...)
+}
+
+// A live tool block must retain its identity and parameter state until its
+// arguments finish. Delay interleaved reasoning rather than closing that block.
+func resToAnthDeferReasoningDuringTool(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) bool {
+	if !state.RequireReasoningContent || !state.ContentBlockOpen || state.CurrentBlockType != "tool_use" {
+		return false
+	}
+	state.pendingReasoning = append(state.pendingReasoning, *evt)
+	return true
+}
+
+func resToAnthFlushPendingReasoning(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	pending := state.pendingReasoning
+	state.pendingReasoning = nil
+	var events []AnthropicStreamEvent
+	for index := range pending {
+		events = append(events, responsesEventToAnthropicEvents(&pending[index], state)...)
+	}
+	return events
+}
+
 func resToAnthHandleReasoningDelta(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
 	if evt.Delta == "" {
 		return nil
 	}
+	if state.RequireReasoningContent && strings.Contains(evt.Type, "reasoning_summary") {
+		return nil
+	}
+	if resToAnthDeferReasoningDuringTool(evt, state) {
+		return nil
+	}
 
+	events := resToAnthEnsureReasoningBlock(evt, state)
 	blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]
 	if !ok {
 		return nil
 	}
+	state.markReasoningPart(evt)
+	state.CurrentThinkingHadDelta = true
 
-	return []AnthropicStreamEvent{{
+	return append(events, AnthropicStreamEvent{
 		Type:  "content_block_delta",
 		Index: &blockIdx,
 		Delta: &AnthropicDelta{
 			Type:     "thinking_delta",
 			Thinking: evt.Delta,
 		},
-	}}
+	})
+}
+
+// resToAnthHandleReasoningDone covers providers that send only a reasoning
+// done/text event without incremental deltas. It preserves the real
+// reasoning_text on the same thinking block as the delta path.
+func resToAnthHandleReasoningDone(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if evt.Text == "" || (state.RequireReasoningContent && strings.Contains(evt.Type, "reasoning_summary")) || state.reasoningPartSeen(evt) {
+		return nil
+	}
+	if resToAnthDeferReasoningDuringTool(evt, state) {
+		return nil
+	}
+	events := resToAnthEnsureReasoningBlock(evt, state)
+	blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]
+	if !ok || !state.ContentBlockOpen || blockIdx != state.ContentBlockIndex || state.CurrentBlockType != "thinking" {
+		return nil
+	}
+	state.markReasoningPart(evt)
+	state.CurrentThinkingHadDelta = true
+	return append(events, AnthropicStreamEvent{
+		Type:  "content_block_delta",
+		Index: &blockIdx,
+		Delta: &AnthropicDelta{
+			Type:     "thinking_delta",
+			Thinking: evt.Text,
+		},
+	})
 }
 
 func resToAnthHandleBlockDone(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
@@ -584,17 +683,85 @@ func resToAnthHandleOutputItemDone(evt *ResponsesStreamEvent, state *ResponsesEv
 		return resToAnthFinishLocalShell(evt, state)
 	}
 
-	// Capture encrypted_content on reasoning item done (often only present here).
 	if evt.Item.Type == "reasoning" {
+		var events []AnthropicStreamEvent
+		if state.RequireReasoningContent {
+			if resToAnthDeferReasoningDuringTool(evt, state) {
+				return nil
+			}
+			for index, part := range evt.Item.Content {
+				if part.Type != "reasoning_text" || part.Text == "" {
+					continue
+				}
+				events = append(events, resToAnthHandleReasoningDone(&ResponsesStreamEvent{
+					Type: "response.reasoning_text.done", OutputIndex: evt.OutputIndex, ItemID: evt.Item.ID, ContentIndex: index, Text: part.Text,
+				}, state)...)
+			}
+			if _, known := state.OutputIndexToBlockIdx[evt.OutputIndex]; !known && strings.TrimSpace(evt.Item.EncryptedContent) != "" {
+				events = append(events, resToAnthEnsureReasoningBlock(evt, state)...)
+			}
+			// Duplicate snapshots must not close an unrelated live text/tool block.
+			if block, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]; ok &&
+				state.ContentBlockOpen && block == state.ContentBlockIndex && state.CurrentBlockType == "thinking" {
+				if sig := strings.TrimSpace(evt.Item.EncryptedContent); sig != "" {
+					state.PendingThinkingSignature = sig
+				}
+				events = append(events, closeCurrentBlock(state)...)
+			}
+			return events
+		}
+		if _, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]; !ok {
+			events = append(events, resToAnthHandleOutputItemAdded(evt, state)...)
+		}
+		if !state.CurrentThinkingHadDelta && state.ContentBlockOpen && state.CurrentBlockType == "thinking" {
+			if text := responsesReasoningText(evt.Item.Content, evt.Item.Summary); text != "" {
+				if blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]; ok && blockIdx == state.ContentBlockIndex {
+					events = append(events, AnthropicStreamEvent{
+						Type:  "content_block_delta",
+						Index: &blockIdx,
+						Delta: &AnthropicDelta{Type: "thinking_delta", Thinking: text},
+					})
+					state.CurrentThinkingHadDelta = true
+				}
+			}
+		}
 		if sig := strings.TrimSpace(evt.Item.EncryptedContent); sig != "" {
 			state.PendingThinkingSignature = sig
 		}
+		if state.ContentBlockOpen {
+			events = append(events, closeCurrentBlock(state)...)
+		}
+		return events
 	}
 
+	if state.RequireReasoningContent && (evt.Item.Type == "function_call" || evt.Item.Type == "custom_tool_call") {
+		if block, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]; !ok || block != state.ContentBlockIndex || state.CurrentBlockType != "tool_use" {
+			return nil
+		}
+	}
 	if state.ContentBlockOpen {
 		return closeCurrentBlock(state)
 	}
 	return nil
+}
+
+func (state *ResponsesEventToAnthropicState) reasoningPartKey(evt *ResponsesStreamEvent) string {
+	kind, index := "content", evt.ContentIndex
+	if strings.Contains(evt.Type, "reasoning_summary") {
+		kind, index = "summary", evt.SummaryIndex
+	}
+	return fmt.Sprintf("%d:%s:%d", evt.OutputIndex, kind, index)
+}
+
+func (state *ResponsesEventToAnthropicState) reasoningPartSeen(evt *ResponsesStreamEvent) bool {
+	return state.ReasoningPartsSeen[state.reasoningPartKey(evt)]
+}
+
+func (state *ResponsesEventToAnthropicState) markReasoningPart(evt *ResponsesStreamEvent) {
+	if state.ReasoningPartsSeen == nil {
+		state.ReasoningPartsSeen = make(map[string]bool)
+	}
+	state.ReasoningPartsSeen[state.reasoningPartKey(evt)] = true
 }
 
 // resToAnthFinishLocalShell saves each completed action independently. Announcing
@@ -713,12 +880,28 @@ func resToAnthHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 	}
 
 	var events []AnthropicStreamEvent
+	if state.RequireReasoningContent && evt.Response != nil &&
+		(evt.Type == "response.completed" || evt.Type == "response.done" || evt.Type == "response.incomplete") {
+		for index := range evt.Response.Output {
+			item := &evt.Response.Output[index]
+			if item.Type != "reasoning" {
+				continue
+			}
+			if known, ok := state.ReasoningItemIndices[item.ID]; ok {
+				index = known
+			}
+			events = append(events, resToAnthHandleCreated(evt, state)...)
+			events = append(events, resToAnthHandleOutputItemDone(&ResponsesStreamEvent{Type: "response.output_item.done", OutputIndex: index, Item: item}, state)...)
+		}
+	}
 	if !state.SawText {
 		if text := responsesTerminalText(evt); text != "" {
 			events = append(events, resToAnthHandleCreated(evt, state)...)
 			events = append(events, resToAnthHandleTextDelta(&ResponsesStreamEvent{Delta: text}, state)...)
 		}
 	}
+	events = append(events, closeCurrentBlock(state)...)
+	events = append(events, resToAnthFlushPendingReasoning(state)...)
 	events = append(events, closeCurrentBlock(state)...)
 	events = append(events, resToAnthFlushLocalShell(state)...)
 

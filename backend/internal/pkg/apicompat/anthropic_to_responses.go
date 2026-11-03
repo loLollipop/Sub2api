@@ -16,13 +16,23 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 	return AnthropicToResponsesWithMinOutputTokens(req, DefaultMinMaxOutputTokens)
 }
 
-// AnthropicToResponsesWithMinOutputTokens converts an Anthropic request using
-// the supplied max_output_tokens floor.
-func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTokens int) (*ResponsesRequest, error) {
+// AnthropicToResponsesOptions preserves provider reasoning only when the caller
+// has resolved a compatible target platform.
+type AnthropicToResponsesOptions struct {
+	PreserveThinkingContent bool
+}
+
+func AnthropicToResponsesWithOptions(req *AnthropicRequest, opts *AnthropicToResponsesOptions) (*ResponsesRequest, error) {
+	return AnthropicToResponsesWithMinOutputTokens(req, DefaultMinMaxOutputTokens, opts)
+}
+
+// AnthropicToResponsesWithMinOutputTokens retains the configured token floor.
+func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTokens int, options ...*AnthropicToResponsesOptions) (*ResponsesRequest, error) {
 	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, anthropicReasoningEffort(req)); err != nil {
 		return nil, err
 	}
-	input, err := convertAnthropicToResponsesInput(req.System, req.Messages)
+	preserveThinking := len(options) > 0 && options[0] != nil && options[0].PreserveThinkingContent
+	input, err := convertAnthropicToResponsesInputWithThinking(req.System, req.Messages, preserveThinking)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +86,9 @@ func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTok
 	out.Reasoning = &ResponsesReasoning{
 		Effort: mapAnthropicEffortToResponses(effort),
 	}
+	if preserveThinking && effort == "max" {
+		out.Reasoning.Effort = "max"
+	}
 	if effort != "none" {
 		out.Reasoning.Summary = "auto"
 	}
@@ -125,9 +138,9 @@ func convertAnthropicToolChoiceToResponses(raw json.RawMessage) (json.RawMessage
 	}
 }
 
-// convertAnthropicToResponsesInput builds the Responses API input items array
+// convertAnthropicToResponsesInputWithThinking builds the Responses API input items array
 // from the Anthropic system field and message list.
-func convertAnthropicToResponsesInput(system json.RawMessage, msgs []AnthropicMessage) ([]ResponsesInputItem, error) {
+func convertAnthropicToResponsesInputWithThinking(system json.RawMessage, msgs []AnthropicMessage, preserveThinking bool) ([]ResponsesInputItem, error) {
 	var out []ResponsesInputItem
 
 	// System prompt → developer role input item. ChatGPT Codex SSE behaves like
@@ -149,7 +162,13 @@ func convertAnthropicToResponsesInput(system json.RawMessage, msgs []AnthropicMe
 	}
 
 	for _, m := range msgs {
-		items, err := anthropicMsgToResponsesItems(m)
+		var items []ResponsesInputItem
+		var err error
+		if preserveThinking && m.Role == "assistant" {
+			items, err = anthropicAssistantToResponsesWithThinking(m.Content, true)
+		} else {
+			items, err = anthropicMsgToResponsesItems(m)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -273,6 +292,10 @@ func anthropicUserToResponses(raw json.RawMessage) ([]ResponsesInputItem, error)
 // multi-turn Grok/Codex prompt cache can reuse prior reasoning prefixes.
 // thinking without signature remains ignored (not accepted as plain text input).
 func anthropicAssistantToResponses(raw json.RawMessage) ([]ResponsesInputItem, error) {
+	return anthropicAssistantToResponsesWithThinking(raw, false)
+}
+
+func anthropicAssistantToResponsesWithThinking(raw json.RawMessage, preserveThinking bool) ([]ResponsesInputItem, error) {
 	// Try plain string.
 	var s string
 	if err := json.Unmarshal(raw, &s); err == nil {
@@ -299,6 +322,11 @@ func anthropicAssistantToResponses(raw json.RawMessage) ([]ResponsesInputItem, e
 			continue
 		}
 		sig := strings.TrimSpace(b.Signature)
+		if preserveThinking && b.Thinking != "" {
+			content, _ := responsesReasoningContentJSON(b.Thinking)
+			items = append(items, ResponsesInputItem{Type: "reasoning", Content: content})
+			continue
+		}
 		// Only replay provider ciphertext. Skip GPT/Codex-style gAAAA blobs and
 		// empty placeholders — xAI returns 400 on decrypt for foreign signatures.
 		if sig == "" || strings.HasPrefix(sig, "gAAAA") {

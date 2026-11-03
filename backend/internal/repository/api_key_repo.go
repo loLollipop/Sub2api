@@ -466,7 +466,16 @@ func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service
 		if *filters.GroupID == 0 {
 			q = q.Where(apikey.GroupIDIsNil())
 		} else {
-			q = q.Where(apikey.GroupIDEQ(*filters.GroupID))
+			q = q.Where(func(s *entsql.Selector) {
+				routes := entsql.Table("api_key_group_routes")
+				s.Where(entsql.Or(
+					entsql.EQ(s.C(apikey.FieldGroupID), *filters.GroupID),
+					entsql.Exists(entsql.Select(routes.C("api_key_id")).From(routes).Where(entsql.And(
+						entsql.ColumnsEQ(routes.C("api_key_id"), s.C(apikey.FieldID)),
+						entsql.EQ(routes.C("group_id"), *filters.GroupID),
+					))),
+				))
+			})
 		}
 	}
 

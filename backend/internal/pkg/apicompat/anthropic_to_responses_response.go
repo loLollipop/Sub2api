@@ -68,8 +68,9 @@ func AnthropicToResponsesResponse(resp *AnthropicResponse, effectiveModel ...str
 			}
 			if block.Thinking != "" {
 				outputs = append(outputs, ResponsesOutput{
-					Type: "reasoning",
-					ID:   generateItemID(),
+					Type:    "reasoning",
+					ID:      generateItemID(),
+					Content: []ResponsesContentPart{{Type: "reasoning_text", Text: block.Thinking}},
 					Summary: []ResponsesSummary{{
 						Type: "summary_text",
 						Text: block.Thinking,
@@ -672,6 +673,7 @@ func closeCurrentResponsesItem(state *AnthropicEventToResponsesState) []Response
 			item.EncryptedContent = encodeAnthropicThinking(state.CurrentThinking)
 		}
 		if state.CurrentSummary != "" {
+			item.Content = []ResponsesContentPart{{Type: "reasoning_text", Text: state.CurrentSummary}}
 			item.Summary = []ResponsesSummary{{Type: "summary_text", Text: state.CurrentSummary}}
 		}
 	}

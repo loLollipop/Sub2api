@@ -58,6 +58,17 @@ function mountTable(
 
 describe('PlazaModelPricingTable', () => {
 
+  it('labels a group reference accurately and never applies the group rate to it', () => {
+    const custom = tokenModel()
+    custom.official_pricing = { ...custom.official_pricing!, custom: true, input_price: 1e-6 }
+    const wrapper = mountTable([custom], 0.15)
+    expect(wrapper.find('thead').text()).toContain('modelPlaza.table.referencePrice')
+    expect(wrapper.find('thead').text()).not.toContain('modelPlaza.table.officialPrice')
+    const cells = wrapper.find('tbody tr').findAll('td')
+    expect(cells[0].text()).toContain('modelPlaza.table.customPrice')
+    expect(cells[4].text()).toBe('$1.00')
+  })
+
   it('labels video billing without presenting a fallback price or ordinary group multiplier', () => {
     const video = tokenModel({ name: 'video-model', official_pricing: null })
     video.pricing = { ...video.pricing!, billing_mode: 'video', per_request_price: 0.37 }

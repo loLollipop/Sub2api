@@ -899,8 +899,13 @@ func (a *BufferedResponseAccumulator) SupplementResponseOutput(resp *ResponsesRe
 }
 
 func (a *BufferedResponseAccumulator) processReasoningContent(event *ResponsesStreamEvent) {
-	if event.Type != "response.reasoning_text.delta" && event.Type != "response.reasoning_text.done" &&
-		!(event.Item != nil && event.Item.Type == "reasoning" && (event.Type == "response.output_item.added" || event.Type == "response.output_item.done")) {
+	switch event.Type {
+	case "response.reasoning_text.delta", "response.reasoning_text.done":
+	case "response.output_item.added", "response.output_item.done":
+		if event.Item == nil || event.Item.Type != "reasoning" {
+			return
+		}
+	default:
 		return
 	}
 	if a.reasoningContent == nil {

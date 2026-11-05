@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import type { UserDashboardStats } from '@/api/usage'
 import type { PlatformQuotaItem, UsageLog } from '@/types'
 
 const preferredMotion = ref('no-preference')
 const canUseBatchImage = ref(false)
+const affiliateEnabled = ref<boolean | undefined>(false)
+const isSimpleMode = ref(false)
+const backendModeEnabled = ref(false)
 const push = vi.fn()
 const refreshBatchImageAccess = vi.fn()
 const refreshUser = vi.fn()
@@ -19,14 +23,14 @@ const getMyPlatformQuotas = vi.fn()
 vi.mock('vue-i18n', async (original) => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('@vueuse/core', async (original) => ({ ...await original<typeof import('@vueuse/core')>(), usePreferredReducedMotion: () => preferredMotion }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
+vi.mock('vue-router', async (original) => ({ ...await original<typeof import('vue-router')>(), useRouter: () => ({ push }) }))
 vi.mock('@/composables/useBatchImageAccess', () => ({
   useBatchImageAccess: () => ({ canUseBatchImage, refreshBatchImageAccess }),
 }))
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ user: { balance: 1234.567 }, isSimpleMode: false, refreshUser }),
+  useAuthStore: () => ({ user: { balance: 1234.567 }, get isSimpleMode() { return isSimpleMode.value }, refreshUser }),
 }))
-vi.mock('@/stores/app', () => ({ useAppStore: () => ({ siteName: 'example.com' }) }))
+vi.mock('@/stores/app', () => ({ useAppStore: () => ({ siteName: 'example.com', get cachedPublicSettings() { return { affiliate_enabled: affiliateEnabled.value } }, get backendModeEnabled() { return backendModeEnabled.value } }) }))
 vi.mock('@/api/usage', () => ({
   usageAPI: { getDashboardStats: (...args: unknown[]) => getDashboardStats(...args),
     getDashboardTrend: (...args: unknown[]) => getDashboardTrend(...args),
@@ -81,14 +85,17 @@ const log = (id = 1): UsageLog => ({
   actual_cost: 0.123456, total_cost: 0.234567,
 } as UsageLog)
 const chartStubs = {
-  DateRangePicker: { props: ['startDate', 'endDate'], template: '<div />' },
-  Select: { props: ['modelValue', 'options'], template: '<div />' },
+  DateRangePicker: { name: 'DateRangePicker', props: ['startDate', 'endDate'], template: '<div />' },
+  Select: { name: 'Select', props: ['modelValue', 'options'], template: '<div />' },
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   preferredMotion.value = 'no-preference'
   canUseBatchImage.value = false
+  affiliateEnabled.value = false
+  isSimpleMode.value = false
+  backendModeEnabled.value = false
   getDashboardStats.mockResolvedValue(stats)
   getDashboardTrend.mockResolvedValue({ trend: [] })
   getDashboardModels.mockResolvedValue({ models: [] })
@@ -100,14 +107,19 @@ beforeEach(() => {
 describe('SIGNAL dashboard accounting and access contracts', () => {
   it('keeps balance rounding, actual/standard costs and both cache sums', () => {
     const wrapper = mount(Stats, { props: { stats, balance: 1234.567, isSimple: false } })
-    expect(wrapper.find('.signal-metric--balance').text()).toContain('$1,234.57')
-    const cost = wrapper.find('.signal-metric--cost').text()
+    expect(wrapper.find('.overview-metric--balance').text()).toContain('$1,234.57')
+    const cost = wrapper.find('.overview-metric--cost').text()
     for (const value of ['$1.2345', '$2.3456']) expect(cost).toContain(value)
-    expect(wrapper.get('.signal-metric--balance').text()).toContain('$5.0000')
-    expect(wrapper.get('.signal-metric--balance').text()).toContain('$10.0000')
-    expect(wrapper.get('.signal-metric--tokens').text()).toContain('dashboard.cache 50')
-    expect(wrapper.get('.signal-token-split').text()).toContain('330')
-    const readings = wrapper.findAll('.signal-reading')
+    expect(wrapper.get('.overview-metric--balance').text()).toContain('$5.0000')
+    expect(wrapper.get('.overview-metric--balance').text()).toContain('$10.0000')
+    expect(wrapper.get('.overview-metric--tokens').text()).toContain('dashboard.cache 50')
+    expect(wrapper.get('.overview-token-split').text()).toContain('330')
+    expect(wrapper.findAll('.overview-stat-heading p').map(label => label.text())).toEqual([
+      'dashboard.balance USD', 'dashboard.todayCost', 'dashboard.todayTokens', 'dashboard.todayRequests',
+      'dashboard.recentTokens', 'dashboard.apiKeys', 'dashboard.performance', 'dashboard.avgResponse',
+    ])
+    expect(wrapper.findAll('.overview-stat')[5].get('.overview-stat-badge').text()).toBe('6 common.active')
+    const readings = wrapper.findAll('.overview-reading')
     expect(readings[0].text()).toContain('7 RPM')
     expect(readings[0].text()).toContain('1.5K TPM')
     expect(readings[1].text()).toContain('1.23s')
@@ -125,8 +137,8 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
     expect(platforms[1].find('.bg-amber-500').attributes('style')).toContain('76%')
     expect(platforms[1].text()).toContain('dashboard.platformQuota.resetsAt')
     expect(wrapper.find('.signal-platform--other').exists()).toBe(false)
-    expect(wrapper.get('.signal-metric--total').text()).toContain('dashboard.recentTokens')
-    expect(wrapper.get('.signal-metric--total').text()).not.toContain('dashboard.last30Days')
+    expect(wrapper.get('.overview-metric--total').text()).toContain('dashboard.recentTokens')
+    expect(wrapper.get('.overview-metric--total').text()).not.toContain('dashboard.last30Days')
     wrapper.unmount()
   })
 
@@ -143,10 +155,11 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
 
   it('hides balance and platform data in simple mode but preserves the other metrics', () => {
     const wrapper = mount(Stats, { props: { stats, balance: 1, isSimple: true, platformQuotas: [quota({})] } })
-    expect(wrapper.find('.signal-metric--balance').exists()).toBe(false)
+    expect(wrapper.find('.overview-metric--balance').exists()).toBe(false)
     expect(wrapper.find('.signal-platforms').exists()).toBe(false)
-    expect(wrapper.findAll('.signal-metric')).toHaveLength(5)
-    expect(wrapper.findAll('.signal-reading')).toHaveLength(2)
+    expect(wrapper.findAll('.overview-stat')).toHaveLength(7)
+    expect(wrapper.findAll('.overview-metric')).toHaveLength(5)
+    expect(wrapper.findAll('.overview-reading')).toHaveLength(2)
     wrapper.unmount()
   })
 
@@ -170,16 +183,34 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
     wrapper.unmount()
   })
 
-  it('keeps all destinations and the batch-image permission gate', async () => {
-    const wrapper = mount(Actions)
+  it('keeps all destinations and applies the existing affiliate and batch-image visibility gates', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: ['/', '/keys', '/usage', '/batch-image', '/affiliate', '/redeem'].map(path => ({ path, component: { template: '<div />' } })) })
+    const wrapper = mount(Actions, { global: { plugins: [router] } })
+    const destinations = () => wrapper.findAll('a').map(link => link.attributes('href'))
     expect(refreshBatchImageAccess).toHaveBeenCalledOnce()
-    expect(wrapper.findAll('button')).toHaveLength(3)
-    for (const button of wrapper.findAll('button')) await button.trigger('click')
-    expect(push.mock.calls.map(call => call[0])).toEqual(['/keys', '/usage', '/redeem'])
+    expect(destinations()).toEqual(['/keys', '/usage', '/redeem'])
+    expect(wrapper.findAll('button')).toHaveLength(0)
+    affiliateEnabled.value = true
+    await flushPromises()
+    expect(destinations()).toEqual(['/keys', '/usage', '/affiliate', '/redeem'])
+    expect(wrapper.get('a[href="/affiliate"]').text()).toBe('dashboard.inviteRecords')
     canUseBatchImage.value = true
     await flushPromises()
-    await wrapper.findAll('button')[2].trigger('click')
-    expect(push).toHaveBeenLastCalledWith('/batch-image')
+    expect(destinations()).toEqual(['/keys', '/usage', '/affiliate', '/redeem', '/batch-image'])
+    isSimpleMode.value = true
+    await flushPromises()
+    expect(destinations()).not.toContain('/affiliate')
+    isSimpleMode.value = false
+    backendModeEnabled.value = true
+    await flushPromises()
+    expect(destinations()).not.toContain('/affiliate')
+    backendModeEnabled.value = false
+    affiliateEnabled.value = undefined
+    await flushPromises()
+    expect(destinations()).not.toContain('/affiliate')
+    affiliateEnabled.value = false
+    await flushPromises()
+    expect(destinations()).not.toContain('/affiliate')
     wrapper.unmount()
   })
 
@@ -203,6 +234,19 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
     wrapper.unmount()
   })
 
+  it('summarizes only the selected chart points and hides the total during loading or failure', async () => {
+    const wrapper = mount(Charts, { props: { loading: false, trend: [
+      { date: '2026-11-04', total_tokens: 1234 }, { date: '2026-11-05', total_tokens: 2345 },
+    ] as import('@/types').TrendDataPoint[] } })
+    expect(wrapper.get('.signal-chart-total').text()).toBe('3.6K')
+    expect(wrapper.get('.signal-chart-total').attributes('title')).toBe('3,579')
+    await wrapper.setProps({ loading: true, trend: [] })
+    expect(wrapper.get('.signal-chart-total').text()).toBe('-')
+    await wrapper.setProps({ loading: false, error: true })
+    expect(wrapper.get('.signal-chart-total').text()).toBe('-')
+    wrapper.unmount()
+  })
+
   it('uses all returned model tokens for shares and distinguishes empty, loading and error states', async () => {
     const models = [
       { model: 'first', total_tokens: 40 }, { model: 'second', total_tokens: 30 },
@@ -213,10 +257,12 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
     const wrapper = mount(Models, { props: { models, startDate: '2026-09-11', endDate: '2026-09-17', loading: false } })
     const doughnut = wrapper.getComponent({ name: 'Doughnut' })
     expect(doughnut.props('data').datasets[0].data).toEqual([40, 30, 20, 10, 8, 7, 5])
-    expect(wrapper.findAll('.signal-model-legend li')).toHaveLength(6)
-    expect(wrapper.findAll('.signal-model-legend li')[0].text()).toContain('33.3%')
+    expect(wrapper.findAll('.signal-model-legend thead th').map(header => header.text())).toEqual(['dashboard.model', 'dashboard.tokens', 'dashboard.share'])
+    expect(wrapper.findAll('.signal-model-legend tbody tr')).toHaveLength(7)
+    expect(wrapper.findAll('.signal-model-legend tbody tr')[0].text()).toContain('33.3%')
+    expect(wrapper.findAll('.signal-model-legend tbody tr')[0].findAll('td')[1].text()).toBe('40')
     expect(wrapper.find('.signal-model-legend').text()).toContain('sixth')
-    expect(wrapper.find('.signal-model-legend').text()).not.toContain('seventh')
+    expect(wrapper.find('.signal-model-legend').text()).toContain('seventh')
     expect(wrapper.get('.signal-model-period').text()).toContain('2026-09-11')
     preferredMotion.value = 'reduce'
     await flushPromises()
@@ -233,7 +279,7 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
 
   it('renders an empty platform panel and keeps summary metrics out of platform mode', () => {
     const wrapper = mount(Stats, { props: { stats: { ...stats, total_actual_cost: 0, today_actual_cost: 0, by_platform: [] }, balance: 0, isSimple: false, section: 'platforms' } })
-    expect(wrapper.findAll('.signal-metric')).toHaveLength(0)
+    expect(wrapper.findAll('.overview-metric')).toHaveLength(0)
     expect(wrapper.text()).toContain('dashboard.platformBreakdownEmpty')
     wrapper.unmount()
   })
@@ -244,6 +290,7 @@ function renderDashboard() {
     AppLayout: { template: '<main><slot /></main>' },
     UserDashboardQuickActions: true, UserDashboardStats: true,
     UserDashboardCharts: true, UserDashboardModels: true, UserDashboardRecentUsage: true,
+    ...chartStubs,
   } } })
 }
 
@@ -317,8 +364,8 @@ describe('User dashboard data loading', () => {
     await flushPromises()
     const charts = wrapper.getComponent({ name: 'UserDashboardCharts' })
     getDashboardSnapshotV2.mockResolvedValueOnce({ trend: [{ date: 'new' }], models: [] })
-    charts.vm.$emit('update:startDate', '2026-09-16')
-    charts.vm.$emit('dateRangeChange')
+    wrapper.getComponent({ name: 'DateRangePicker' }).vm.$emit('update:startDate', '2026-09-16')
+    wrapper.getComponent({ name: 'DateRangePicker' }).vm.$emit('change')
     await flushPromises()
     expect(getDashboardSnapshotV2.mock.calls[0][1].signal.aborted).toBe(true)
     resolveOld({ trend: [{ date: 'old' }], models: [] })
@@ -332,13 +379,12 @@ describe('User dashboard data loading', () => {
   it('refreshes recent logs only when open and follows the chosen dates', async () => {
     const wrapper = renderDashboard()
     await flushPromises()
-    const charts = wrapper.getComponent({ name: 'UserDashboardCharts' })
-    charts.vm.$emit('dateRangeChange')
+    wrapper.getComponent({ name: 'DateRangePicker' }).vm.$emit('change')
     await flushPromises()
     expect(queryUsage).not.toHaveBeenCalled()
     await toggleDetail(wrapper, 'recent', true)
-    charts.vm.$emit('update:startDate', '2026-09-15')
-    charts.vm.$emit('dateRangeChange')
+    wrapper.getComponent({ name: 'DateRangePicker' }).vm.$emit('update:startDate', '2026-09-15')
+    wrapper.getComponent({ name: 'DateRangePicker' }).vm.$emit('change')
     await flushPromises()
     expect(queryUsage.mock.calls.at(-1)?.[0].start_date).toBe('2026-09-15')
     await wrapper.get('button[aria-label="common.refresh"]').trigger('click')
@@ -374,9 +420,8 @@ describe('User dashboard data loading', () => {
     await flushPromises()
     await toggleDetail(wrapper, 'recent', true)
     await toggleDetail(wrapper, 'recent', false)
-    const charts = wrapper.getComponent({ name: 'UserDashboardCharts' })
-    charts.vm.$emit('update:startDate', '2026-09-15')
-    charts.vm.$emit('dateRangeChange')
+    wrapper.getComponent({ name: 'DateRangePicker' }).vm.$emit('update:startDate', '2026-09-15')
+    wrapper.getComponent({ name: 'DateRangePicker' }).vm.$emit('change')
     await flushPromises()
     expect(queryUsage.mock.calls[0][1].signal.aborted).toBe(true)
     resolveOld({ items: [log(99)] })

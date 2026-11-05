@@ -37,6 +37,69 @@ async function openGroup() {
 
 describe('group rate multiplier request ownership', () => {
 
+  it('sets every draft rate to one value, preserves six decimal places and saves the override', async () => {
+    mocks.getGroupRateMultipliers.mockResolvedValue([...entries(1), ...entries(2)])
+    const wrapper = await openGroup()
+    await flushPromises()
+    const view = wrapper.vm as unknown as { localEntries: Array<{ rate_multiplier: number | null }>; batchSetValue: number | null }
+    view.localEntries[1].rate_multiplier = null
+    await wrapper.get('#group-batch-set-rate').setValue('0.123456')
+    await wrapper.findAll('button').find(button => button.text() === 'admin.groups.applySet')!.trigger('click')
+    expect(view.localEntries.map(entry => entry.rate_multiplier)).toEqual([0.123456, 0.123456])
+    expect(view.batchSetValue).toBeNull()
+    await wrapper.findAll('button').find(button => button.text() === 'common.save')!.trigger('click')
+    expect(mocks.batchSetGroupRateMultipliers).toHaveBeenCalledWith(1, [
+      { user_id: 1, rate_multiplier: 0.123456 }, { user_id: 2, rate_multiplier: 0.123456 },
+    ])
+  })
+
+  it.each([null, 0, -1, 1000000, Number.NaN, Infinity])('rejects invalid batch set value %s in both the control and handler', async rate => {
+    mocks.getGroupRateMultipliers.mockResolvedValue(entries(1))
+    const wrapper = await openGroup()
+    await flushPromises()
+    const view = wrapper.vm as unknown as { batchSetValue: number | null; applyBatchSet: () => void; localEntries: Array<{ rate_multiplier: number }> }
+    view.batchSetValue = rate
+    await flushPromises()
+    expect(wrapper.findAll('button').find(button => button.text() === 'admin.groups.applySet')!.attributes('disabled')).toBeDefined()
+    view.applyBatchSet()
+    expect(view.localEntries[0].rate_multiplier).toBe(2)
+    expect(mocks.batchSetGroupRateMultipliers).not.toHaveBeenCalled()
+  })
+
+  it('retains multiplication and clears the set input when reverting or closing', async () => {
+    mocks.getGroupRateMultipliers.mockResolvedValue(entries(1))
+    const wrapper = await openGroup()
+    await flushPromises()
+    const view = wrapper.vm as unknown as { batchFactor: number | null; batchSetValue: number | null; applyBatchFactor: () => void; handleCancel: () => void; handleClose: () => void; localEntries: Array<{ rate_multiplier: number }> }
+    view.batchFactor = 0.5
+    view.applyBatchFactor()
+    expect(view.localEntries[0].rate_multiplier).toBe(1)
+    view.batchSetValue = 4
+    view.handleCancel()
+    expect(view.localEntries[0].rate_multiplier).toBe(2)
+    expect(view.batchSetValue).toBeNull()
+    view.batchSetValue = 5
+    view.handleClose()
+    expect(view.batchSetValue).toBeNull()
+  })
+
+  it('blocks a batch set during loading and clears it when switching groups', async () => {
+    const pending = deferred()
+    mocks.getGroupRateMultipliers.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(entries(2))
+    const wrapper = await openGroup()
+    const view = wrapper.vm as unknown as { batchSetValue: number | null; applyBatchSet: () => void; localEntries: Array<{ rate_multiplier: number }> }
+    view.batchSetValue = 8
+    view.applyBatchSet()
+    expect(view.localEntries).toEqual([])
+    await wrapper.setProps({ group: group(2) })
+    await flushPromises()
+    pending.resolve(entries(1))
+    await flushPromises()
+    expect(view.batchSetValue).toBeNull()
+    expect(view.localEntries[0].rate_multiplier).toBe(2)
+    expect(wrapper.get('tbody').text()).toContain('user2@example.com')
+  })
+
   it.each([0, -1, 1000000, Number.NaN, Infinity])('blocks invalid ordinary rate %s before saving', async (rate) => {
     mocks.getGroupRateMultipliers.mockResolvedValue(entries(1))
     const wrapper = await openGroup()

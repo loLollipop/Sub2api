@@ -39,7 +39,7 @@ vi.mock("@/stores/onboarding", () => ({
 }));
 vi.mock("vue-i18n", async () => ({
   ...await vi.importActual<typeof import("vue-i18n")>("vue-i18n"),
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => params ? `${key}:${Object.values(params).join(",")}` : key }),
 }));
 
 const sourceGroup: AdminGroup = {
@@ -133,7 +133,7 @@ function mountView() {
 }
 
 interface EditState {
-  createForm: {name: string; platform: string; grok_moderation_refusal_price: number | null};
+  createForm: {name: string; platform: string; grok_moderation_refusal_price: number | null; rate_multiplier: number};
   showCreateModal: boolean;
   closeCreateModal: () => void;
   handleCreateGroup: () => Promise<void>;
@@ -159,6 +159,22 @@ describe("Grok refusal group pricing", () => {
     getAccount.mockResolvedValue({id:101,name:"account"});
     listGroups.mockResolvedValue({items:[],total:0,pages:1});
     createGroup.mockResolvedValue(sourceGroup); updateGroup.mockResolvedValue(sourceGroup);
+  });
+  it("previews default, zero and custom charges without multiplying the rate, and flags invalid negatives", async () => {
+    const wrapper = mountView(); await flushPromises(); const state = editState(wrapper);
+    state.createForm.platform = "grok"; state.createForm.rate_multiplier = 8; state.showCreateModal = true; await flushPromises();
+    const preview = () => wrapper.get('[data-testid="create-grok-moderation-refusal-effective"]').text();
+    expect(preview()).toContain("$0.1");
+    const input = wrapper.get('[data-testid="create-grok-moderation-refusal-price"]');
+    await input.setValue("0"); expect(preview()).toContain(":$0");
+    await input.setValue("0.37"); expect(preview()).toContain("$0.37"); expect(preview()).not.toContain("$2.96");
+    await input.setValue("0.00000001"); expect(preview()).not.toContain(":$0 "); expect(preview()).toContain("$1e-8");
+    await input.setValue("-1"); expect(preview()).toContain("admin.groups.imagePricing.notConfigured");
+    await state.handleEdit({ ...sourceGroup, platform: "grok", grok_moderation_refusal_price: null }); await flushPromises();
+    expect(wrapper.get('[data-testid="edit-grok-moderation-refusal-effective"]').text()).toContain("$0.1");
+    await wrapper.get('[data-testid="edit-grok-moderation-refusal-price"]').setValue("0.37");
+    expect(wrapper.get('[data-testid="edit-grok-moderation-refusal-effective"]').text()).toContain("$0.37");
+    wrapper.unmount();
   });
   it.each(["grok", "composite"])("edits %s price, zero and null independently", async (platform) => {
     const wrapper=mountView(); await flushPromises(); const state=editState(wrapper);

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -125,6 +125,29 @@ describe('AnnouncementPopup', () => {
 
     expect(dismissPopup).toHaveBeenCalledTimes(1)
     expect(wrapper.emitted('close')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('shows a failed confirmation and leaves the required popup available for retry', async () => {
+    const store = useAnnouncementStore()
+    store.currentPopup = announcement
+    vi.spyOn(store, 'dismissPopup').mockResolvedValueOnce(false).mockImplementationOnce(async () => {
+      store.currentPopup = null
+      return true
+    })
+    const wrapper = mount(AnnouncementPopup)
+    const confirm = () => document.body.querySelector<HTMLButtonElement>('[data-testid="announcement-popup-dismiss"]')!
+    confirm().click()
+    await flushPromises()
+    expect(document.body.querySelector('[role="alert"]')?.textContent).toBe('announcements.readFailed')
+    expect(store.currentPopup?.id).toBe(1)
+    expect(document.body.querySelector('.modal-header button')).toBeNull()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    expect(store.currentPopup?.id).toBe(1)
+    confirm().click()
+    await flushPromises()
+    expect(store.currentPopup).toBeNull()
     wrapper.unmount()
   })
 

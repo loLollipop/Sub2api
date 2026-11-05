@@ -51,6 +51,10 @@ type ContextPricingSchedule struct {
 	Basis       ContextPricingBasis
 	Tiers       []ContextPricingTier
 	TimePricing *TimePricingSchedule
+	Source      string // PricingSource*: preserves the selected billing identity for display.
+	// Includes explicit zero rates and interval-only overrides; comparing only
+	// the first tier cannot distinguish these from an unpriced channel entry.
+	HasPriceOverrides bool
 }
 
 // ContextPricingScheduleInput 阶梯表查询输入。
@@ -129,7 +133,14 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 	tiers = mergeEqualContextTiers(tiers)
 	applyContextTierLabels(tiers, plan)
 
-	return &ContextPricingSchedule{Basis: ContextPricingBasisWholeRequest, Tiers: tiers, TimePricing: resolvedTimePricingSchedule(resolved)}, nil
+	configured := resolved.channelPricing
+	hasOverrides := configured != nil && (configured.InputPrice != nil || configured.OutputPrice != nil ||
+		configured.CacheWritePrice != nil || configured.CacheWrite1hPrice != nil || configured.CacheReadPrice != nil ||
+		len(resolved.Intervals) > 0)
+	return &ContextPricingSchedule{
+		Basis: ContextPricingBasisWholeRequest, Tiers: tiers,
+		TimePricing: resolvedTimePricingSchedule(resolved), Source: resolved.Source, HasPriceOverrides: hasOverrides,
+	}, nil
 }
 
 // resolvedTimePricingSchedule 列出计费会生效的分时倍率时段。

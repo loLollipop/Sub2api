@@ -196,6 +196,9 @@ describe('admin UsageView route filters', () => {
   it('keeps latest completed logs when an older silent response arrives', async () => {
     const wrapper = mountRouteFilteredUsageView()
     await flushPromises()
+    expect(wrapper.find('.usage-analysis-disclosure').exists()).toBe(false)
+    expect(wrapper.get('.workspace-page-actions').find('date-range-picker-stub').exists()).toBe(true)
+    expect(Array.from(wrapper.get('.usage-chart-grid').element.children).map(child => child.tagName.toLowerCase())).toEqual(['model-distribution-chart-stub', 'group-distribution-chart-stub', 'endpoint-distribution-chart-stub', 'token-usage-trend-stub'])
     let resolveOld!: (value: unknown) => void
     let oldSignal!: AbortSignal
     list.mockImplementation((params, options) => {

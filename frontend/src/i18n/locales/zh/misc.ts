@@ -138,6 +138,8 @@ export default {
 
   // Announcements Page
   announcements: {
+    loadFailed: '公告加载失败，请重试',
+    readFailed: '未能标记已读，请重试。',
     title: '公告',
     description: '查看系统公告',
     unreadOnly: '仅显示未读',

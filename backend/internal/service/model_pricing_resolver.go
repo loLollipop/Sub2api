@@ -378,9 +378,12 @@ func intervalToModelPricing(iv *PricingInterval, base *ModelPricing, chPricing *
 	if iv.CacheReadPrice != nil {
 		pricing.CacheReadPricePerTokenPriority = channelTierOverridePrice(pricing.CacheReadPricePerToken, pricing.CacheReadPricePerTokenPriority, *iv.CacheReadPrice)
 		pricing.CacheReadPricePerToken = *iv.CacheReadPrice
+		pricing.ImageCacheReadPricePerToken = 0
+		pricing.ImageCacheReadPriceExplicit = false
 	} else if iv.CacheReadMultiplier != nil {
 		pricing.CacheReadPricePerToken = applyMultiplier(pricing.CacheReadPricePerToken, iv.CacheReadMultiplier)
 		pricing.CacheReadPricePerTokenPriority = applyMultiplier(pricing.CacheReadPricePerTokenPriority, iv.CacheReadMultiplier)
+		pricing.ImageCacheReadPricePerToken = applyMultiplier(pricing.ImageCacheReadPricePerToken, iv.CacheReadMultiplier)
 	}
 	// 渠道定价存在时，ImageOutputPrice 显式覆盖；图片输入价用渠道级配置
 	// （区间不携带图片输入价，与 image_output 一致）。

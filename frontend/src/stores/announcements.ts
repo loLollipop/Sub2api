@@ -9,6 +9,8 @@ export const useAnnouncementStore = defineStore('announcements', () => {
   // State
   const announcements = ref<UserAnnouncement[]>([])
   const loading = ref(false)
+  const fetchError = ref(false)
+  const dismissingPopup = ref(false)
   const lastFetchTime = ref(0)
   const popupQueue = ref<UserAnnouncement[]>([])
   const currentPopup = ref<UserAnnouncement | null>(null)
@@ -16,6 +18,7 @@ export const useAnnouncementStore = defineStore('announcements', () => {
   // Session-scoped dedup set — not reactive, used as plain lookup only
   let shownPopupIds = new Set<number>()
   let fetchGeneration = 0
+  let sessionGeneration = 0
 
   // Getters
   const unreadCount = computed(() =>
@@ -35,6 +38,7 @@ export const useAnnouncementStore = defineStore('announcements', () => {
 
     try {
       loading.value = true
+      fetchError.value = false
       const all = await announcementsAPI.list(false)
       if (generation !== fetchGeneration) return
       announcements.value = all.slice(0, 20)
@@ -43,6 +47,7 @@ export const useAnnouncementStore = defineStore('announcements', () => {
       if (generation !== fetchGeneration) return
       // Revert throttle timestamp on failure so retry is allowed
       lastFetchTime.value = 0
+      fetchError.value = true
       console.error('Failed to fetch announcements:', err)
     } finally {
       if (generation === fetchGeneration) loading.value = false
@@ -76,67 +81,81 @@ export const useAnnouncementStore = defineStore('announcements', () => {
   }
 
   async function dismissPopup() {
-    if (!currentPopup.value) return
+    if (!currentPopup.value || dismissingPopup.value) return
     const id = currentPopup.value.id
-    currentPopup.value = null
-
-    // Mark as read (fire-and-forget, UI already updated)
-    markAsRead(id)
-
-    // Show next popup after a short delay
-    if (popupQueue.value.length > 0) {
-      setTimeout(() => showNextPopup(), 300)
+    const session = sessionGeneration
+    dismissingPopup.value = true
+    try {
+      const marked = await markAsRead(id)
+      if (session !== sessionGeneration || currentPopup.value?.id !== id) return
+      if (!marked) return false
+      showNextPopup()
+      return true
+    } finally {
+      if (session === sessionGeneration) dismissingPopup.value = false
     }
   }
 
   async function markAsRead(id: number) {
+    const session = sessionGeneration
     try {
       await announcementsAPI.markRead(id)
+      if (session !== sessionGeneration) return
       const ann = announcements.value.find((a) => a.id === id)
       if (ann) {
         ann.read_at = new Date().toISOString()
       }
       return true
     } catch (err: any) {
+      if (session !== sessionGeneration) return
       console.error('Failed to mark announcement as read:', err)
       return false
     }
   }
 
   async function markAllAsRead() {
+    const session = sessionGeneration
     const unread = announcements.value.filter((a) => !a.read_at)
-    if (unread.length === 0) return
+    if (unread.length === 0) return true
 
     try {
       loading.value = true
       const results = await Promise.allSettled(unread.map(async (a) => {
         await announcementsAPI.markRead(a.id)
-        a.read_at = new Date().toISOString()
+        if (session === sessionGeneration) a.read_at = new Date().toISOString()
       }))
+      if (session !== sessionGeneration) return false
       const failure = results.find((result) => result.status === 'rejected')
       if (failure) throw failure.reason
+      return true
     } catch (err: any) {
+      if (session !== sessionGeneration) return false
       console.error('Failed to mark all as read:', err)
       throw err
     } finally {
-      loading.value = false
+      if (session === sessionGeneration) loading.value = false
     }
   }
 
   function reset() {
     fetchGeneration++
+    sessionGeneration++
     announcements.value = []
     lastFetchTime.value = 0
     shownPopupIds = new Set()
     popupQueue.value = []
     currentPopup.value = null
     loading.value = false
+    fetchError.value = false
+    dismissingPopup.value = false
   }
 
   return {
     // State
     announcements,
     loading,
+    fetchError,
+    dismissingPopup,
     currentPopup,
     // Getters
     unreadCount,

@@ -29,15 +29,14 @@ func TestPlazaGroupPricing_OpenAICompatibleAliasesKeepTheirBillingIdentity(t *te
 			require.Equal(t, PlatformOpenAI, model.Platform, "request platform must remain openai for channel price lookup")
 			require.NotNil(t, model.Pricing)
 			require.NotNil(t, model.OfficialPricing)
-			wantInput, wantOutput, officialName := 0.7e-6, 1.3e-6, "deepseek-v4-pro"
+			wantInput, wantOutput := 0.7e-6, 1.3e-6
 			if source == BillingModelSourceRequested {
-				wantInput, wantOutput, officialName = 9e-6, 19e-6, "gpt-5.4"
+				wantInput, wantOutput = 9e-6, 19e-6
 			}
 			require.InDelta(t, wantInput, *model.Pricing.InputPrice, 1e-15)
 			require.InDelta(t, wantOutput, *model.Pricing.OutputPrice, 1e-15)
-			official, err := svc.billingService.GetModelPricing(officialName)
-			require.NoError(t, err)
-			require.InDelta(t, official.InputPricePerToken, *model.OfficialPricing.InputPrice, 1e-15)
+			require.InDelta(t, wantInput, *model.OfficialPricing.InputPrice, 1e-15)
+			require.InDelta(t, wantOutput, *model.OfficialPricing.OutputPrice, 1e-15)
 			require.Equal(t, "gpt-5.4", model.Name, "keep the copyable public model ID")
 		})
 	}
@@ -55,14 +54,12 @@ func TestPlazaGroupPricing_SamePublicModelHasIndependentPricesAndReferences(t *t
 	require.Len(t, out, 2)
 	for _, group := range out {
 		model := plazaModelsByName(group.Models)["public-model"]
-		wantInput, officialName := 0.7e-6, "deepseek-v4-pro"
+		wantInput := 0.7e-6
 		if group.ID == 20 {
-			wantInput, officialName = 8e-6, "gpt-5.4"
+			wantInput = 8e-6
 		}
 		require.InDelta(t, wantInput, *model.Pricing.InputPrice, 1e-15)
-		official, err := svc.billingService.GetModelPricing(officialName)
-		require.NoError(t, err)
-		require.InDelta(t, official.InputPricePerToken, *model.OfficialPricing.InputPrice, 1e-15, "official price memo must not cross groups' mapped billing models")
+		require.InDelta(t, wantInput, *model.OfficialPricing.InputPrice, 1e-15, "reference prices must not cross groups' mapped billing models")
 	}
 }
 
@@ -168,13 +165,16 @@ func TestPlazaGroupPricing_UnpricedMappedModelFallsBackToPublicPrice(t *testing.
 	model := plazaModelsByName(out[0].Models)["public-model"]
 	require.NotNil(t, model.Pricing)
 	require.InDelta(t, 0.8e-6, *model.Pricing.InputPrice, 1e-15)
-	require.Nil(t, model.OfficialPricing)
+	require.NotNil(t, model.OfficialPricing)
+	require.InDelta(t, 0.8e-6, *model.OfficialPricing.InputPrice, 1e-15)
 }
 
 func TestPlazaGroupPricing_CustomReferenceDoesNotPolluteCatalogMemo(t *testing.T) {
 	for _, ladder := range []bool{false, true} {
 		t.Run(map[bool]string{false: "flat", true: "ladder"}[ladder], func(t *testing.T) {
 			channel := plazaPricedChannel(1, "gpt", []int64{10, 20}, PlatformOpenAI, "gpt-5.4")
+			channel.ModelPricing[0].InputPrice = nil
+			channel.ModelPricing[0].OutputPrice = nil
 			groups := []Group{
 				{ID: 10, Name: "custom", Platform: PlatformOpenAI, RateMultiplier: 0.15, LongContextPricingEnabled: ladder,
 					ModelPricing: []ChannelModelPricing{{Models: []string{"gpt-5.4"}, InputPrice: testPtrFloat64(1e-6)}}},
@@ -187,12 +187,18 @@ func TestPlazaGroupPricing_CustomReferenceDoesNotPolluteCatalogMemo(t *testing.T
 			custom, official := out[0].Models[0].OfficialPricing, out[1].Models[0].OfficialPricing
 			require.True(t, custom.Custom)
 			require.InDelta(t, 1e-6, *custom.InputPrice, 1e-15, "reference is before group multiplier")
-			require.Len(t, custom.Intervals, 2)
-			require.InDelta(t, 1e-6, *custom.Intervals[0].InputPrice, 1e-15, "table renders intervals before the flat reference")
-			require.InDelta(t, 5e-6, *custom.Intervals[1].InputPrice, 1e-15)
+			if ladder {
+				require.Len(t, custom.Intervals, 2)
+				require.InDelta(t, 1e-6, *custom.Intervals[0].InputPrice, 1e-15, "table renders intervals before the flat reference")
+				require.InDelta(t, 2e-6, *custom.Intervals[1].InputPrice, 1e-15)
+				require.Equal(t, out[0].Models[0].Pricing.Intervals, custom.Intervals, "configured reference follows actual billing tiers before multipliers")
+			} else {
+				require.Empty(t, custom.Intervals, "configured reference follows the disabled billing ladder")
+			}
 			require.False(t, official.Custom)
 			require.InDelta(t, 2.5e-6, *official.InputPrice, 1e-15)
 			require.InDelta(t, 2.5e-6, *official.Intervals[0].InputPrice, 1e-15)
+			require.InDelta(t, 5e-6, *official.Intervals[1].InputPrice, 1e-15)
 		})
 	}
 }

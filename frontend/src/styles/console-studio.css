@@ -240,62 +240,9 @@ body:has(.console-signal) > .select-dropdown-portal {
 
 .console-signal .signal-dashboard .signal-stats { display: block; }
 .console-signal .signal-dashboard .signal-masthead { padding-bottom: 20px; border: 0; }
-.console-signal .signal-dashboard .signal-lead-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.console-signal .signal-dashboard .signal-lead-grid--simple { grid-template-columns: minmax(0, 1fr); }
-.console-signal .signal-dashboard .signal-stat-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--signal-line); border-radius: 12px; background: var(--signal-surface); box-shadow: none; }
-.console-signal.top-layout .signal-dashboard .signal-stat-strip > .signal-metric { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.console-signal.top-layout .signal-dashboard .signal-stat-strip > .signal-metric + .signal-metric { border-left: 1px solid var(--signal-line); }
-.console-signal .signal-dashboard .signal-stat-strip--models { grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(205px, 1.35fr); }
-.console-signal .signal-dashboard .signal-metric { display: flex; flex-direction: column; min-width: 0; padding: 18px; border: 1px solid var(--signal-line); border-radius: 8px; background: var(--signal-surface); overflow: hidden; box-shadow: none; }
-.console-signal .signal-dashboard .signal-lead-grid > .signal-metric { min-height: 164px; }
-.console-signal .signal-dashboard .signal-value { margin: 12px 0 0; color: var(--signal-text); font-size: 25px; font-weight: 600; line-height: 32px; }
-.console-signal .signal-dashboard .signal-lead-grid .signal-value { font-size: 28px; line-height: 36px; }
-.console-signal .signal-dashboard .signal-metric--balance .signal-value { color: var(--signal-text); }
-.console-signal .signal-dashboard .signal-value small { font-size: 14px; font-weight: 400; color: var(--signal-muted); }
-.console-signal .signal-dashboard .signal-metric--cost .signal-value { color: var(--signal-amber); }
-.console-signal .signal-dashboard .signal-label { font-size: 12px; }
-.console-signal .signal-dashboard .signal-label > svg { display: none; }
-.console-signal .signal-dashboard .signal-metric-foot { display: flex; flex-direction: column; gap: 3px; min-height: 54px; margin: auto -18px -18px; padding: 11px 18px; border-top: 1px solid var(--signal-line); background: transparent; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--signal-muted); overflow-wrap: anywhere; }
-.console-signal .signal-dashboard .signal-metric-foot strong { font-size: 12px; font-weight: 500; color: var(--signal-text); }
-.console-signal .signal-dashboard .signal-metric .signal-value { padding-bottom: 18px; }
-.console-signal .signal-dashboard .signal-token-split { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--signal-line); font-size: 11px; font-variant-numeric: tabular-nums; }
-.console-signal .signal-dashboard .signal-token-split dt { color: var(--signal-muted); }
-.console-signal .signal-dashboard .signal-token-split dd { margin-top: 5px; color: var(--signal-text); overflow-wrap: anywhere; }
-.console-signal .signal-dashboard .signal-actions { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px 18px; padding: 0; border: 0; border-radius: 0; background: transparent; }
-.console-signal .signal-dashboard .signal-actions-label { display: block; padding: 0; color: var(--signal-muted); font-size: 12px; font-weight: 500; }
-.console-signal .signal-dashboard .signal-actions-list { display: flex; flex-wrap: wrap; width: auto; gap: 4px; }
-.console-signal .signal-dashboard .signal-actions button { display: flex; align-items: center; justify-content: flex-start; min-width: 0; min-height: 36px; gap: 8px; padding: 6px 10px; border-radius: 8px; border: 0; background: transparent; color: var(--signal-text); text-align: left; font-size: 12px; }
-.console-signal .signal-dashboard .signal-actions button span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.console-signal .signal-dashboard .signal-actions button svg { color: var(--signal-muted); flex-shrink: 0; }
-.console-signal .signal-dashboard .signal-actions button:hover { color: var(--signal-accent); border-color: var(--signal-control-line); }
-.console-signal .signal-dashboard .signal-telemetry { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px 24px; margin-top: 12px; padding: 0; border: 0; }
-.console-signal .signal-dashboard .signal-telemetry .signal-reading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; padding: 0; border: 0; }
-.console-signal .signal-dashboard .signal-reading-value { margin: 0; font-size: 12px; font-weight: 500; }
 .console-signal .signal-dashboard .signal-platform-grid { gap: 12px; padding-block: 12px 20px; }
 .console-signal .signal-dashboard .signal-platform { padding: 16px; border: 1px solid var(--signal-line); border-radius: 8px; background: var(--signal-surface); }
 .console-signal .signal-dashboard .signal-platform-heading { margin-bottom: 14px; }
-
-@media (max-width: 1279px) {
-  .console-signal .signal-dashboard .signal-lead-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .console-signal .signal-dashboard .signal-lead-grid--simple { grid-template-columns: minmax(0, 1fr); }
-  .console-signal .signal-dashboard .signal-actions { grid-column: 1 / -1; padding: 0; }
-  .console-signal .signal-dashboard .signal-actions-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .console-signal .signal-dashboard .signal-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .console-signal.top-layout .signal-dashboard .signal-stat-strip > .signal-metric:nth-child(odd) { border-left: 0; }
-  .console-signal.top-layout .signal-dashboard .signal-stat-strip > .signal-metric:nth-child(n+3) { border-top: 1px solid var(--signal-line); }
-  .console-signal .signal-dashboard .signal-model-card { grid-column: 1 / -1; }
-  .console-signal .signal-dashboard .signal-model-summary { max-width: 400px; }
-}
-
-@media (max-width: 479px) {
-  .console-signal .signal-dashboard .signal-metric { padding: 14px; }
-  .console-signal .signal-dashboard .signal-metric-foot { margin-inline: -14px; margin-bottom: -14px; padding-inline: 14px; }
-  .console-signal .signal-dashboard .signal-lead-grid .signal-value { font-size: 23px; }
-  .console-signal .signal-dashboard .signal-value { font-size: 22px; }
-  .console-signal .signal-dashboard .signal-actions-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .console-signal .signal-dashboard .signal-telemetry { justify-content: flex-start; }
-  .console-signal .signal-dashboard .signal-lead-grid--simple > .signal-metric { grid-column: 1 / -1; }
-}
 
 .console-signal .signal-profile :is(.rounded-3xl, .rounded-2xl) {
   border-radius: 8px;
@@ -484,7 +431,7 @@ body:has(.console-signal) > .select-dropdown-portal {
 
 @media (prefers-reduced-motion: reduce) {
   :is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay) .btn:active:not(:disabled) { transform: none; }
-  .console-signal .signal-dashboard .signal-actions button { transition: none; }
+  .console-signal .signal-dashboard .signal-actions .signal-action { transition: none; }
 }
 
 .console-signal.model-plaza-public {
@@ -573,30 +520,6 @@ body:has(.console-signal) > .select-dropdown-portal {
   flex-shrink: 0;
 }
 
-.console-signal .signal-dashboard .signal-lead-grid {
-  gap: 18px;
-  margin-top: 4px;
-}
-
-.console-signal .signal-dashboard .signal-metric--balance {
-  background: var(--signal-surface);
-  border-color: var(--signal-line);
-  color: var(--signal-text);
-}
-
-.console-signal .signal-dashboard .signal-metric--balance :is(.signal-value, .signal-metric-foot strong) {
-  color: var(--signal-text);
-}
-
-.console-signal .signal-dashboard .signal-metric--balance :is(.signal-label, .signal-metric-foot) {
-  color: var(--signal-muted);
-  border-color: var(--signal-line);
-}
-
-.console-signal .signal-dashboard .signal-metric--balance .signal-label > span {
-  color: var(--signal-accent);
-}
-
 .console-signal .admin-overview-identity p {
   font-family: var(--signal-display-font);
 }
@@ -649,21 +572,17 @@ body:has(.console-signal) > .select-dropdown-portal {
   .console-signal :is(.signal-lead-grid, .signal-stat-strip, .admin-metric-grid) > :nth-child(n + 7) { --console-enter-delay: 270ms; }
 
   /* 交互过渡统一走 motion token */
-  .console-signal :is(.btn, .signal-actions button, .plaza-seg-item) {
+  .console-signal :is(.btn, .signal-actions .signal-action, .plaza-seg-item) {
     transition: transform var(--motion-dur-fast) var(--motion-out),
       background-color 160ms ease, color 160ms ease, border-color 160ms ease,
       box-shadow var(--motion-dur-base) var(--motion-out);
-  }
-
-  .console-signal .signal-actions button > svg:last-child {
-    transition: transform 200ms var(--motion-out);
   }
 
   .console-signal .signal-sidebar .sidebar-link > svg {
     transition: transform 200ms var(--motion-out), color 160ms ease;
   }
 
-  .console-signal :is(.btn, .signal-actions button):active:not(:disabled) {
+  .console-signal :is(.btn, .signal-actions .signal-action):active:not(:disabled) {
     transform: translateY(1px) scale(0.985);
   }
 
@@ -675,13 +594,12 @@ body:has(.console-signal) > .select-dropdown-portal {
       border-color var(--motion-dur-base) ease, box-shadow var(--motion-dur-base) var(--motion-out);
   }
 
-  .console-signal :is(.btn, .signal-actions button, .plaza-seg-item, .signal-sidebar .sidebar-link) {
+  .console-signal :is(.btn, .signal-actions .signal-action, .plaza-seg-item, .signal-sidebar .sidebar-link) {
     transition-timing-function: var(--motion-out), ease, ease, ease;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .console-signal .signal-sidebar .sidebar-link:hover > svg { transform: translateX(2px); }
-    .console-signal .signal-actions button:hover > svg:last-child { transform: translateX(4px); }
     .console-signal .btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
     .console-signal :is(.signal-lead-grid, .signal-stat-strip) > .signal-metric:hover,
     .console-signal .admin-metric-grid > .card:hover {

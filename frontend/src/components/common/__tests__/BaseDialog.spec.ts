@@ -13,6 +13,21 @@ describe('BaseDialog', () => {
     document.body.classList.remove('modal-open')
   })
 
+  it('places description and actions in the header and describes the dialog', () => {
+    const wrapper = mount(BaseDialog, {
+      attachTo: document.body,
+      props: { show: true, title: 'Details' },
+      slots: { description: 'Published today', actions: '<button>Mark all read</button>', default: 'Body' },
+      global: { stubs: { Teleport: true, Transition: true, Icon: true } },
+    })
+    const description = wrapper.get('.modal-header .modal-description')
+    expect(description.text()).toBe('Published today')
+    expect(wrapper.get('[role="dialog"]').attributes('aria-describedby')).toBe(description.attributes('id'))
+    expect(wrapper.get('.modal-header-actions button').text()).toBe('Mark all read')
+    expect(wrapper.get('.modal-body').text()).toBe('Body')
+    wrapper.unmount()
+  })
+
   it('resets body scroll position when reopened', async () => {
     const wrapper = mount(BaseDialog, {
       attachTo: document.body,

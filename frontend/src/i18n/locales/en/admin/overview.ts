@@ -989,6 +989,8 @@ export default {
       clearAll: 'Clear All',
       confirmClearAll: 'Are you sure you want to clear all rate multiplier settings for this group? This cannot be undone.',
       rateCleared: 'All rate multipliers cleared',
+      batchSet: 'Set all rates to',
+      applySet: 'Set',
       batchAdjust: 'Batch Adjust Rates',
       multiplierFactor: 'Factor',
       applyMultiplier: 'Apply',
@@ -1070,7 +1072,8 @@ export default {
         title: 'Grok Safety-Refusal Billing',
         hint: 'Charge per request rejected with SAFETY_CHECK_TYPE (USD). Leave empty for the default 0.1; set 0 to disable the charge.',
         pricePerCall: 'Charge per refusal (USD)',
-        placeholder: 'default 0.1'
+        placeholder: 'default 0.1',
+        effective: 'Effective charge: {price} per refusal, charged flat and never multiplied by the group rate; leave empty for the $0.1 default, set 0 to disable.'
       },
       modelPricing: {
         title: 'Per-model group pricing',

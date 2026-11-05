@@ -3,6 +3,11 @@
 package repository
 
 import (
+	"context"
+	"fmt"
+	"time"
+
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -172,6 +177,106 @@ func (s *UserRepoSuite) TestSetBalance_ReplacesValueAndReportsPrevious() {
 	got, err := s.repo.GetByID(s.ctx, user.ID)
 	s.Require().NoError(err, "GetByID")
 	s.Require().InDelta(2, got.Balance, 1e-9)
+}
+
+func (s *UserRepoSuite) TestSetBalance_ReportsBalanceAfterConcurrentDeduction() {
+	for _, value := range []float64{20, 10} {
+		for _, commit := range []bool{true, false} {
+			s.Run(fmt.Sprintf("value_%g_commit_%t", value, commit), func() {
+				user := s.mustCreateUser(&service.User{
+					Email:   fmt.Sprintf("set-balance-concurrent-%g-%t@example.com", value, commit),
+					Balance: 10,
+				})
+				ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+				defer cancel()
+
+				deductTx, err := s.client.Tx(ctx)
+				s.Require().NoError(err, "begin deduction transaction")
+				defer func() { _ = deductTx.Rollback() }()
+				deductCtx := dbent.NewTxContext(ctx, deductTx)
+				s.Require().NoError(s.repo.DeductBalance(deductCtx, user.ID, 3))
+
+				setTx, err := s.client.Tx(ctx)
+				s.Require().NoError(err, "begin set transaction")
+				// Release the blocker before rolling back a possibly waiting SetBalance.
+				defer func() {
+					cancel()
+					_ = deductTx.Rollback()
+					_ = setTx.Rollback()
+				}()
+				setCtx := dbent.NewTxContext(ctx, setTx)
+				pidRows, err := setTx.Client().QueryContext(ctx, "SELECT pg_backend_pid()")
+				s.Require().NoError(err)
+				s.Require().True(pidRows.Next())
+				var setPID int
+				s.Require().NoError(pidRows.Scan(&setPID))
+				s.Require().NoError(pidRows.Close())
+
+				type result struct {
+					change service.BalanceChange
+					err    error
+				}
+				results := make(chan result, 1)
+				go func() {
+					change, err := s.repo.SetBalance(setCtx, user.ID, value)
+					results <- result{change: change, err: err}
+				}()
+
+				// Observe the actual PostgreSQL lock wait before releasing the deduction.
+				// A fixed delay could let SetBalance start only after the commit.
+				waitCtx, stopWaiting := context.WithTimeout(ctx, 5*time.Second)
+				defer stopWaiting()
+				poll := time.NewTicker(10 * time.Millisecond)
+				defer poll.Stop()
+				for {
+					var waiting bool
+					err := integrationDB.QueryRowContext(waitCtx, `
+						SELECT EXISTS (
+							SELECT 1 FROM pg_stat_activity
+							WHERE pid = $1 AND wait_event_type = 'Lock'
+							AND cardinality(pg_blocking_pids(pid)) > 0
+						)`, setPID).Scan(&waiting)
+					s.Require().NoError(err, "observe SetBalance lock wait")
+					if waiting {
+						break
+					}
+					select {
+					case got := <-results:
+						s.Require().FailNow("SetBalance returned before the deduction released its lock", "%+v", got)
+					case <-waitCtx.Done():
+						s.Require().NoError(waitCtx.Err(), "SetBalance must wait for the deduction lock")
+					case <-poll.C:
+					}
+				}
+				s.Require().NoError(deductTx.Commit(), "commit concurrent deduction")
+
+				var got result
+				select {
+				case got = <-results:
+				case <-ctx.Done():
+					s.Require().NoError(ctx.Err(), "SetBalance must finish after the lock is released")
+				}
+				s.Require().NoError(got.err, "SetBalance")
+				s.Require().InDelta(7, got.change.Old, 1e-9, "Old must include the committed deduction")
+				s.Require().InDelta(value, got.change.New, 1e-9)
+				s.Require().InDelta(value-7, got.change.New-got.change.Old, 1e-9, "source record and cache delta")
+
+				persisted, err := s.repo.GetByID(ctx, user.ID)
+				s.Require().NoError(err)
+				s.Require().InDelta(7, persisted.Balance, 1e-9, "SetBalance must stay in the context transaction")
+				want := float64(7)
+				if commit {
+					s.Require().NoError(setTx.Commit())
+					want = value
+				} else {
+					s.Require().NoError(setTx.Rollback())
+				}
+				persisted, err = s.repo.GetByID(ctx, user.ID)
+				s.Require().NoError(err)
+				s.Require().InDelta(want, persisted.Balance, 1e-9, "transaction outcome must control the balance")
+			})
+		}
+	}
 }
 
 func (s *UserRepoSuite) TestSetBalance_RejectsNegativeValue() {

@@ -820,6 +820,9 @@
               />
             </div>
           </div>
+          <p class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-dark-800 dark:text-gray-300" data-testid="create-grok-moderation-refusal-effective">
+            {{ t("admin.groups.moderationRefusalPricing.effective", { price: createGrokModerationRefusalPreview }) }}
+          </p>
         </div>
 
         <div class="border-t pt-4">
@@ -2501,6 +2504,9 @@
               />
             </div>
           </div>
+          <p class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-dark-800 dark:text-gray-300" data-testid="edit-grok-moderation-refusal-effective">
+            {{ t("admin.groups.moderationRefusalPricing.effective", { price: editGrokModerationRefusalPreview }) }}
+          </p>
         </div>
 
         <div class="border-t pt-4">
@@ -5575,6 +5581,16 @@ const formatImagePricePreview = (value: number | string | null | undefined) => {
   }
   return `$${price.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
 };
+
+const buildGrokModerationRefusalPreview = (form: { grok_moderation_refusal_price: number | string | null }) => {
+  const raw = form.grok_moderation_refusal_price;
+  const value = raw === null || raw === undefined || raw === "" ? 0.1 : Number(raw);
+  return Number.isFinite(value) && value >= 0
+    ? `$${value}`
+    : formatImagePricePreview(value);
+};
+const createGrokModerationRefusalPreview = computed(() => buildGrokModerationRefusalPreview(createForm));
+const editGrokModerationRefusalPreview = computed(() => buildGrokModerationRefusalPreview(editForm));
 
 const formatVideoPricePreview = (value: number | string | null | undefined) => {
   if (value === null || value === undefined || value === "") {

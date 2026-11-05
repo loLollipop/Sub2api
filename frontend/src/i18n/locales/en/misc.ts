@@ -141,6 +141,8 @@ export default {
 
   // Announcements Page
   announcements: {
+    loadFailed: 'Announcements could not be loaded. Please retry.',
+    readFailed: 'Could not mark this announcement as read. Please retry.',
     title: 'Announcements',
     description: 'View system announcements',
     unreadOnly: 'Show unread only',

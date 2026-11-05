@@ -347,8 +347,8 @@
           <template #cell-usage="{ row }">
             <AccountUsageCell
               :account="row"
-              :today-stats="todayStatsByAccountId[String(row.id)] ?? null"
-              :today-stats-loading="todayStatsLoading"
+              :today-stats="todayStatsInUsage ? (todayStatsByAccountId[String(row.id)] ?? null) : null"
+              :today-stats-loading="todayStatsInUsage && todayStatsLoading"
               :manual-refresh-token="usageManualRefreshToken"
               :batched-usage="usageBatchByAccountId[String(row.id)] ?? null"
               :batched-usage-error="usageBatchErrorByAccountId[String(row.id)] ?? null"
@@ -399,7 +399,7 @@
                 :title="t('admin.accounts.upstreamBilling.syncedRateTooltip')"
                 data-testid="account-rate-sync-indicator"
               >
-                <Icon name="sync" size="xs" />
+                <Icon name="link" size="xs" />
               </span>
             </span>
           </template>
@@ -414,6 +414,7 @@
           <template #cell-upstream_billing_rate="{ row }">
             <UpstreamBillingRateCell
               :account="row"
+              :account-rate-visible="isColumnVisible('rate_multiplier')"
               :global-probe-enabled="upstreamBillingProbeGloballyEnabled"
               :now="upstreamBillingNow"
               :probing="probingUpstreamBilling.has(row.id)"
@@ -1153,6 +1154,7 @@ const toggleColumn = (key: string) => {
 }
 
 const isColumnVisible = (key: string) => !hiddenColumns.has(key)
+const todayStatsInUsage = computed(() => hiddenColumns.has('today_stats'))
 const shouldIncludeSchedulerScore = () => isColumnVisible('scheduler_score')
 const syncAccountListDerivedParams = () => {
   // Keep every load path, including auto-refresh and sorting, aligned with the current column visibility.

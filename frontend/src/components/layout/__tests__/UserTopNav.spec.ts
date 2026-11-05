@@ -153,4 +153,33 @@ describe('browse navigation and sidebar operations', () => {
     expect(sidebarLinks()).toContain('/keys')
     expect(sidebarLinks()).not.toContain('/admin/accounts')
   })
+
+  it.each(['/model-plaza?embedded=1', '/leaderboard', '/available-channels', '/monitor'])(
+    'returns administrators to their console from %s', async (path) => {
+      const { router } = await render(false, true, 'admin')
+      await router.push(path)
+      await flushPromises()
+      const consoleLink = wrapper!.findAll('.top-browse-link').find(link => link.text() === 'Console')!
+      expect(consoleLink.attributes('href')).toBe('/admin/dashboard')
+      expect(consoleLink.classes()).not.toContain('is-active')
+      await consoleLink.trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/admin/dashboard')
+      expect(sidebarLinks()).toContain('/admin/accounts')
+    },
+  )
+
+  it.each(['/model-plaza?embedded=1', '/leaderboard', '/available-channels', '/monitor'])(
+    'returns regular users to their console from %s', async (path) => {
+      const { router } = await render()
+      await router.push(path)
+      await flushPromises()
+      const consoleLink = wrapper!.findAll('.top-browse-link').find(link => link.text() === 'Console')!
+      expect(consoleLink.attributes('href')).toBe('/dashboard')
+      await consoleLink.trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/dashboard')
+      expect(sidebarLinks()).not.toContain('/admin/accounts')
+    },
+  )
 })

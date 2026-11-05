@@ -178,6 +178,11 @@ describe('user UsageView', () => {
   it('keeps the latest error filters and loading state when requests finish out of order', async () => {
     const wrapper = mountUsageView()
     await flushPromises()
+    expect(wrapper.find('.usage-analysis-disclosure').exists()).toBe(false)
+    expect(wrapper.find('.usage-detail-workspace').exists()).toBe(false)
+    expect(wrapper.get('.usage-range-card').find('date-range-picker-stub').exists()).toBe(true)
+    expect(wrapper.get('.signal-log-filters').element.nextElementSibling).toBe(wrapper.get('.usage-record-toolbar').element)
+    expect(Array.from(wrapper.get('.signal-usage-chart-grid').element.children).map(child => child.getAttribute('model-stats') !== null ? 'model' : child.getAttribute('group-stats') !== null ? 'group' : child.getAttribute('endpoint-stats') !== null ? 'endpoint' : 'trend')).toEqual(['model', 'group', 'endpoint', 'trend'])
     const pending: { resolve: (value: unknown) => void; signal: AbortSignal }[] = []
     listMyErrorRequests.mockImplementation((_params, options) => new Promise(resolve => {
       pending.push({ resolve, signal: options.signal })

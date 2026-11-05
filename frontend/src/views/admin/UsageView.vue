@@ -1,75 +1,59 @@
 <template>
   <AppLayout>
     <div class="admin-usage-workbench">
-      <PageHeader :title="t('admin.usage.title')" />
+      <PageHeader :title="t('admin.usage.title')" :description="t('admin.usage.description')">
+        <template #actions>
+          <div class="usage-range-controls">
+            <div class="usage-control-cluster"><span class="text-sm font-medium text-gray-500">{{ t('admin.dashboard.timeRange') }}:</span><DateRangePicker ref="rangeToolbarRef" include-time v-model:start-date="startDate" v-model:end-date="endDate" @change="onDateRangeChange" /></div>
+            <div class="usage-control-cluster"><span class="text-sm font-medium text-gray-500">{{ t('admin.dashboard.granularity') }}:</span><div class="w-28"><Select v-model="granularity" :options="granularityOptions" @change="loadChartData" /></div></div>
+          </div>
+        </template>
+      </PageHeader>
       <section class="usage-summary-strip">
         <UsageStatsCards :stats="usageStats" />
       </section>
       <!-- Charts Section -->
       <section class="usage-analysis-workspace">
-        <div class="usage-range-toolbar">
-          <div class="usage-range-controls">
-            <div class="usage-control-cluster">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}:</span>
-              <DateRangePicker
-                ref="rangeToolbarRef"
-                include-time
-                v-model:start-date="startDate"
-                v-model:end-date="endDate"
-                @change="onDateRangeChange"
-              />
-            </div>
-            <div class="usage-control-cluster usage-granularity-control">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
-              <div class="w-28">
-                <Select v-model="granularity" :options="granularityOptions" @change="loadChartData" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
-        <details class="usage-analysis-disclosure">
-          <summary><Icon name="chart" size="sm" /><span>{{ t('usage.distributionAnalysis') }}</span><Icon name="chevronDown" size="sm" /></summary>
-          <div class="usage-chart-grid">
-            <ModelDistributionChart
-              v-model:source="modelDistributionSource"
-              v-model:metric="modelDistributionMetric"
-              :model-stats="requestedModelStats"
-              :upstream-model-stats="upstreamModelStats"
-              :mapping-model-stats="mappingModelStats"
-              :loading="modelStatsLoading"
-              :show-source-toggle="true"
-              :show-metric-toggle="true"
-              :start-date="startDate"
-              :end-date="endDate"
-              :filters="breakdownFilters"
-            />
-            <GroupDistributionChart
-              v-model:metric="groupDistributionMetric"
-              :group-stats="groupStats"
-              :loading="chartsLoading"
-              :show-metric-toggle="true"
-              :start-date="startDate"
-              :end-date="endDate"
-              :filters="breakdownFilters"
-            />
+        <div class="usage-chart-grid">
+          <ModelDistributionChart
+            v-model:source="modelDistributionSource"
+            v-model:metric="modelDistributionMetric"
+            :model-stats="requestedModelStats"
+            :upstream-model-stats="upstreamModelStats"
+            :mapping-model-stats="mappingModelStats"
+            :loading="modelStatsLoading"
+            :show-source-toggle="true"
+            :show-metric-toggle="true"
+            :start-date="startDate"
+            :end-date="endDate"
+            :filters="breakdownFilters"
+          />
+          <GroupDistributionChart
+            v-model:metric="groupDistributionMetric"
+            :group-stats="groupStats"
+            :loading="chartsLoading"
+            :show-metric-toggle="true"
+            :start-date="startDate"
+            :end-date="endDate"
+            :filters="breakdownFilters"
+          />
 
-            <EndpointDistributionChart
-              v-model:source="endpointDistributionSource"
-              v-model:metric="endpointDistributionMetric"
-              :endpoint-stats="inboundEndpointStats"
-              :upstream-endpoint-stats="upstreamEndpointStats"
-              :endpoint-path-stats="endpointPathStats"
-              :loading="endpointStatsLoading"
-              :show-source-toggle="true"
-              :show-metric-toggle="true"
-              :title="t('usage.endpointDistribution')"
-              :start-date="startDate"
-              :end-date="endDate"
-              :filters="breakdownFilters"
-            />
-          </div>
-        </details>
+          <EndpointDistributionChart
+            v-model:source="endpointDistributionSource"
+            v-model:metric="endpointDistributionMetric"
+            :endpoint-stats="inboundEndpointStats"
+            :upstream-endpoint-stats="upstreamEndpointStats"
+            :endpoint-path-stats="endpointPathStats"
+            :loading="endpointStatsLoading"
+            :show-source-toggle="true"
+            :show-metric-toggle="true"
+            :title="t('usage.endpointDistribution')"
+            :start-date="startDate"
+            :end-date="endDate"
+            :filters="breakdownFilters"
+          />
+          <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+        </div>
       </section>
       <!-- 明细区：tab 栏 + 筛选 + 内容收进同一张卡片，消除割裂感 -->
       <section class="card usage-detail-workspace">
@@ -211,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildErrorLogColumns } from '@/utils/errorLogColumns'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
@@ -825,26 +810,8 @@ const ERR_ALWAYS_VISIBLE = ['user', 'status', 'created_at', 'actions']
 const ERR_DEFAULT_HIDDEN_COLUMNS = ['user_agent']
 const ERR_HIDDEN_COLUMNS_KEY = 'usage-error-hidden-columns'
 
-// key 集合须与 OpsErrorLogTable 内部 allColumns 一致
-const errAllColumns = computed(() => [
-  { key: 'user', label: t('admin.ops.errorLog.user') },
-  { key: 'api_key', label: t('admin.ops.errorLog.apiKey') },
-  { key: 'account', label: t('admin.ops.errorLog.account') },
-  { key: 'platform', label: t('admin.ops.errorLog.platform') },
-  { key: 'model', label: t('admin.ops.errorLog.model') },
-  { key: 'endpoint', label: t('admin.ops.errorLog.endpoint') },
-  { key: 'group', label: t('admin.ops.errorLog.group') },
-  { key: 'type', label: t('admin.ops.errorLog.type') },
-  { key: 'category', label: t('usage.errors.category') },
-  { key: 'status', label: t('admin.ops.errorLog.status') },
-  { key: 'message', label: t('admin.ops.errorLog.message') },
-  { key: 'request_id', label: t('admin.usage.requestId') },
-  { key: 'upstream_request_id', label: t('admin.usage.upstreamRequestId') },
-  { key: 'created_at', label: t('admin.ops.errorLog.time') },
-  { key: 'user_agent', label: t('usage.userAgent') },
-  { key: 'client_ip', label: t('admin.ops.errorLog.ip') },
-  { key: 'actions', label: t('admin.ops.errorLog.action') },
-])
+// 与 OpsErrorLogTable 共享列定义。
+const errAllColumns = computed(() => buildErrorLogColumns(t))
 
 const errHiddenColumns = reactive<Set<string>>(new Set())
 
@@ -1053,36 +1020,9 @@ defineExpose({ requestedModelStats, refreshData })
   padding: 0;
 }
 
-.usage-range-toolbar {
-  padding: 12px 14px;
-  border: 1px solid var(--signal-line);
-  border-radius: 12px;
-  background: var(--signal-surface);
-  box-shadow: none;
-}
-
-.usage-range-controls,
-.usage-control-cluster {
-  display: flex;
-  align-items: center;
-}
-
-.usage-range-controls {
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 12px 20px;
-}
-
-.usage-control-cluster {
-  min-width: 0;
-  gap: 8px;
-}
-
-.usage-granularity-control {
-  margin-left: auto;
-  padding-left: 20px;
-  border-left: 1px solid var(--signal-line);
-}
+.usage-range-controls, .usage-control-cluster { display: flex; align-items: center; min-width: 0; }
+.usage-range-controls { flex-wrap: wrap; justify-content: flex-end; gap: 8px 16px; }
+.usage-control-cluster { gap: 8px; }
 
 .usage-chart-grid {
   display: grid;
@@ -1160,6 +1100,14 @@ defineExpose({ requestedModelStats, refreshData })
   overflow-x: auto;
 }
 
+.usage-detail-content :deep(.usage-table table) {
+  min-width: 1680px;
+}
+
+.usage-detail-content :deep(.usage-endpoint-detail) {
+  min-width: 160px;
+}
+
 .usage-detail-content :deep(th) {
   padding-top: 11px;
   padding-bottom: 11px;
@@ -1185,38 +1133,15 @@ defineExpose({ requestedModelStats, refreshData })
 }
 
 @media (max-width: 639px) {
+  .usage-range-controls, .usage-control-cluster { align-items: stretch; width: 100%; }
+  .usage-control-cluster { flex-direction: column; }
+  .usage-control-cluster > div { width: 100%; }
   .admin-usage-workbench {
     gap: 14px;
   }
 
   .usage-analysis-workspace {
     padding-block: 12px;
-  }
-
-  .usage-range-toolbar {
-    padding: 12px;
-  }
-
-  .usage-range-controls,
-  .usage-control-cluster {
-    align-items: stretch;
-  }
-
-  .usage-control-cluster {
-    width: 100%;
-    flex-direction: column;
-  }
-
-  .usage-granularity-control {
-    margin-left: 0;
-    padding-top: 12px;
-    padding-left: 0;
-    border-top: 1px solid var(--signal-line);
-    border-left: 0;
-  }
-
-  .usage-granularity-control > div {
-    width: 100%;
   }
 
   .usage-detail-tabs {

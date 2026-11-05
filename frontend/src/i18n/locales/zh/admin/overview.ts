@@ -1005,6 +1005,8 @@ export default {
       clearAll: '全部清空',
       confirmClearAll: '确定要清空该分组所有用户的专属倍率设置吗？此操作不可撤销。',
       rateCleared: '已清空所有专属倍率',
+      batchSet: '批量设为',
+      applySet: '设置',
       batchAdjust: '批量调整倍率',
       multiplierFactor: '乘数',
       applyMultiplier: '应用',
@@ -1067,7 +1069,8 @@ export default {
         title: 'Grok 安全拒绝扣费',
         hint: '命中 SAFETY_CHECK_TYPE 安全拒绝时每次扣多少（USD）。留空使用默认 0.1；填 0 表示不扣费。',
         pricePerCall: '每次扣费（USD）',
-        placeholder: '默认 0.1'
+        placeholder: '默认 0.1',
+        effective: '当前生效：{price}/次，按次固定扣费，不乘分组倍率；留空使用默认 $0.1，填 0 则不扣费。'
       },
       modelPricing: {
         title: '分组逐模型定价',

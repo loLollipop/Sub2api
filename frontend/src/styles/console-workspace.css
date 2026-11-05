@@ -106,18 +106,24 @@
 }
 
 .console-signal .signal-usage-metrics {
-  gap: 16px;
-  border: 0;
+  gap: 0;
+  border-top: 1px solid var(--signal-line);
+  border-bottom: 1px solid var(--signal-line);
 }
 
 .console-signal .signal-usage-metrics > .card {
   align-items: flex-start;
-  border: 1px solid var(--signal-line);
-  border-radius: 8px;
-  padding: 20px;
-  background: var(--signal-surface);
+  border: 0;
+  border-right: 1px solid var(--signal-line);
+  border-radius: 0;
+  padding: 24px 20px;
+  background: transparent;
   box-shadow: none;
   min-width: 0;
+}
+
+.console-signal .signal-usage-metrics > .card:last-child {
+  border-right: 0;
 }
 
 .console-signal .signal-usage-metrics > .card > div:first-child {
@@ -194,6 +200,11 @@
 
 .console-signal .signal-main .signal-pagination button:hover:not(:disabled) {
   background: var(--signal-hover);
+}
+
+@media (max-width: 1023px) {
+  .console-signal .signal-usage-metrics > .card:nth-child(2) { border-right: 0; }
+  .console-signal .signal-usage-metrics > .card:nth-child(-n+2) { border-bottom: 1px solid var(--signal-line); }
 }
 
 @media (max-width: 639px) {

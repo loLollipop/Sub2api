@@ -1,24 +1,24 @@
 /**
  * Model Plaza API（公开端点，可匿名访问）
- * 以分组为中心的模型价目：分组信息 + 模型渠道定价 + LiteLLM 官方参考价。
+ * 以分组为中心的模型价目：分组信息 + 模型计费定价 + 参考价（配置基础价或目录价）。
  * 带 token 请求时后端会额外返回专属分组与用户专属倍率。
  */
 
 import { apiClient } from './client'
 import type { UserPricingInterval, UserSupportedModelPricing } from './channels'
 
-/** 官方参考价（USD per token，与计费目录同源；字段缺失 = 目录未覆盖）。 */
+/** 参考价（USD per token）：配置参考价来自实际计费方案，纯目录参考价来自计费目录；字段缺失表示该来源未提供此价格。 */
 export interface PlazaOfficialPricing {
   /** Reference base price is configured by this group rather than the catalog. */
   custom?: boolean
   input_price: number | null
   output_price: number | null
-  /** 5m 缓存写入（= LiteLLM cache_creation）。 */
+  /** 5m 缓存写入参考价（目录来源对应 LiteLLM cache_creation）。 */
   cache_write_price: number | null
-  /** 1h 缓存写入（LiteLLM cache_creation_above_1hr），多数模型缺失。 */
+  /** 1h 缓存写入参考价（目录来源对应 LiteLLM cache_creation_above_1hr），多数模型缺失。 */
   cache_write_1h_price?: number | null
   cache_read_price: number | null
-  /** 官方长上下文阶梯（多档模型才有），不受分组开关影响。 */
+  /** 参考价阶梯（多档模型才有）：配置参考价跟随实际计费阶梯，纯目录参考价保留目录阶梯。 */
   intervals?: UserPricingInterval[]
 }
 
@@ -75,7 +75,7 @@ export interface ModelPlazaGroup {
   /** 生图独立倍率：true 时图片计费模型的实付倍率取 image_rate_multiplier，不取分组/专属倍率。 */
   image_rate_independent: boolean
   image_rate_multiplier: number
-  /** 分组是否启用长上下文阶梯计费；false 时实付列只展示最低档，官方阶梯仅供参考。 */
+  /** 分组是否启用模型目录的长上下文加价；显式配置区间仍按实际计费生效。配置参考价跟随实际计费阶梯，纯目录参考价保留目录阶梯。 */
   long_context_pricing_enabled: boolean
   models: PlazaModel[]
   /** 降智检测状态；未开启检测的分组省略。'healthy' | 'suspect' */

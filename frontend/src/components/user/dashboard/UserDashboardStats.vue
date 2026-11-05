@@ -1,64 +1,38 @@
 <template>
   <section class="signal-stats" :aria-label="t('dashboard.title')">
-    <div v-if="section !== 'platforms'" class="signal-lead-grid" :class="{ 'signal-lead-grid--simple': isSimple }">
-      <div v-if="!isSimple" class="signal-metric signal-metric--balance">
-        <p class="signal-label">{{ t('dashboard.balance') }} <span>USD</span></p>
-        <p class="signal-value">$<AnimatedNumber :value="balance" :format="formatBalance" /></p>
-        <div class="signal-metric-foot">
-          <span>{{ t('dashboard.recentTotal') }} / {{ t('dashboard.actual') }}</span>
-          <strong>${{ formatCost(stats?.total_actual_cost || 0) }}</strong>
-          <span>{{ t('dashboard.standard') }} ${{ formatCost(stats?.total_cost || 0) }}</span>
-        </div>
-      </div>
-      <div class="signal-metric signal-metric--total">
-        <p class="signal-label">{{ t('dashboard.recentTokens') }}</p>
-        <p class="signal-value"><AnimatedNumber :value="stats?.total_tokens || 0" :format="formatTokens" /> <small>tokens</small></p>
-        <dl class="signal-token-split">
-          <div><dt>{{ t('dashboard.input') }}</dt><dd>{{ formatTokens(stats?.total_input_tokens || 0) }}</dd></div>
-          <div><dt>{{ t('dashboard.output') }}</dt><dd>{{ formatTokens(stats?.total_output_tokens || 0) }}</dd></div>
-          <div><dt>{{ t('dashboard.cache') }}</dt><dd>{{ formatTokens((stats?.total_cache_creation_tokens || 0) + (stats?.total_cache_read_tokens || 0)) }}</dd></div>
-        </dl>
-      </div>
-      <slot name="actions" />
-    </div>
-
-    <div v-if="section !== 'platforms'" class="signal-stat-strip" :class="{ 'signal-stat-strip--models': $slots.models }">
-      <div class="signal-metric signal-metric--tokens">
-        <p class="signal-label">{{ t('dashboard.todayTokens') }}</p>
-        <p class="signal-value"><AnimatedNumber :value="stats?.today_tokens || 0" :format="formatTokens" /></p>
-        <div class="signal-metric-foot">
-          <span>{{ t('dashboard.input') }} {{ formatTokens(stats?.today_input_tokens || 0) }} / {{ t('dashboard.output') }} {{ formatTokens(stats?.today_output_tokens || 0) }}</span>
-          <span>{{ t('dashboard.cache') }} {{ formatTokens((stats?.today_cache_creation_tokens || 0) + (stats?.today_cache_read_tokens || 0)) }}</span>
-        </div>
-      </div>
-      <div class="signal-metric signal-metric--cost">
-        <p class="signal-label"><Icon name="dollar" size="sm" />{{ t('dashboard.todayCost') }}</p>
-        <p class="signal-value" :title="t('dashboard.actual')">$<AnimatedNumber :value="stats?.today_actual_cost || 0" :format="formatCost" :duration="480" /></p>
-        <div class="signal-metric-foot"><span>{{ t('dashboard.standard') }}</span><strong>${{ formatCost(stats?.today_cost || 0) }}</strong></div>
-      </div>
-      <div class="signal-metric">
-        <p class="signal-label"><Icon name="chart" size="sm" />{{ t('dashboard.todayRequests') }}</p>
-        <p class="signal-value"><AnimatedNumber :value="stats?.today_requests || 0" :decimals="0" /></p>
-        <div class="signal-metric-foot"><span>{{ t('dashboard.recentTotal') }}</span><strong>{{ formatNumber(stats?.total_requests || 0) }}</strong></div>
-      </div>
-      <div class="signal-metric">
-        <p class="signal-label"><Icon name="key" size="sm" />{{ t('dashboard.apiKeys') }}</p>
-        <p class="signal-value"><AnimatedNumber :value="stats?.total_api_keys || 0" :decimals="0" /></p>
-        <div class="signal-metric-foot"><span class="signal-active">{{ stats?.active_api_keys || 0 }} {{ t('common.active') }}</span></div>
-      </div>
-      <slot name="models" />
-    </div>
-
-    <div v-if="section !== 'platforms'" class="signal-telemetry">
-      <div class="signal-reading">
-        <p class="signal-label">{{ t('dashboard.performance') }}</p>
-        <p class="signal-reading-value">{{ formatTokens(stats?.rpm || 0) }} <span>RPM</span> / {{ formatTokens(stats?.tpm || 0) }} <span>TPM</span></p>
-      </div>
-      <div class="signal-reading">
-        <p class="signal-label">{{ t('dashboard.avgResponse') }}</p>
-        <p class="signal-reading-value">{{ formatDuration(stats?.average_duration_ms || 0) }}</p>
-      </div>
-    </div>
+    <DashboardStatGrid v-if="section !== 'platforms'">
+      <DashboardStat v-if="!isSimple" class="overview-metric overview-metric--balance" icon="creditCard" :label="`${t('dashboard.balance')} USD`">
+        $<AnimatedNumber :value="balance" :format="formatBalance" />
+        <template #detail><span>{{ t('dashboard.recentTotal') }} · {{ t('dashboard.actual') }} <strong>${{ formatCost(stats.total_actual_cost) }}</strong></span><span>{{ t('dashboard.standard') }} ${{ formatCost(stats.total_cost) }}</span></template>
+      </DashboardStat>
+      <DashboardStat class="overview-metric overview-metric--cost" icon="dollar" tone="green" :label="t('dashboard.todayCost')">
+        <span :title="t('dashboard.actual')">$<AnimatedNumber :value="stats.today_actual_cost" :format="formatCost" :duration="480" /></span>
+        <template #detail><span>{{ t('dashboard.standard') }} <strong>${{ formatCost(stats.today_cost) }}</strong></span></template>
+      </DashboardStat>
+      <DashboardStat class="overview-metric overview-metric--tokens" icon="cube" tone="blue" :label="t('dashboard.todayTokens')">
+        <AnimatedNumber :value="stats.today_tokens" :format="formatTokens" />
+        <template #detail><span>{{ t('dashboard.input') }} {{ formatTokens(stats.today_input_tokens) }} / {{ t('dashboard.output') }} {{ formatTokens(stats.today_output_tokens) }}</span><span>{{ t('dashboard.cache') }} {{ formatTokens(stats.today_cache_creation_tokens + stats.today_cache_read_tokens) }}</span></template>
+      </DashboardStat>
+      <DashboardStat class="overview-metric" icon="chart" tone="violet" :label="t('dashboard.todayRequests')">
+        <AnimatedNumber :value="stats.today_requests" :decimals="0" />
+        <template #detail><span>{{ t('dashboard.recentTotal') }} <strong>{{ formatNumber(stats.total_requests) }}</strong></span></template>
+      </DashboardStat>
+      <DashboardStat class="overview-metric overview-metric--total" icon="database" tone="violet" :label="t('dashboard.recentTokens')">
+        <AnimatedNumber :value="stats.total_tokens" :format="formatTokens" />
+        <template #detail><span class="overview-token-split">{{ t('dashboard.input') }} {{ formatTokens(stats.total_input_tokens) }} / {{ t('dashboard.output') }} {{ formatTokens(stats.total_output_tokens) }} / {{ t('dashboard.cache') }} {{ formatTokens(stats.total_cache_creation_tokens + stats.total_cache_read_tokens) }}</span></template>
+      </DashboardStat>
+      <DashboardStat class="overview-metric" icon="key" tone="blue" :label="t('dashboard.apiKeys')">
+        <AnimatedNumber :value="stats.total_api_keys" :decimals="0" />
+        <template #badge><span class="stat-badge-success">{{ stats.active_api_keys }} {{ t('common.active') }}</span></template>
+      </DashboardStat>
+      <DashboardStat class="overview-reading" icon="bolt" :label="t('dashboard.performance')">
+        {{ formatTokens(stats.rpm) }} <small>RPM</small>
+        <template #detail><span><strong>{{ formatTokens(stats.tpm) }}</strong> TPM</span></template>
+      </DashboardStat>
+      <DashboardStat class="overview-reading" icon="clock" tone="green" :label="t('dashboard.avgResponse')">
+        {{ formatDuration(stats.average_duration_ms) }}
+      </DashboardStat>
+    </DashboardStatGrid>
 
     <section v-if="section !== 'summary' && !isSimple && platformCards.length > 0" class="signal-platforms">
       <header class="signal-section-heading">
@@ -112,7 +86,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Icon from '@/components/icons/Icon.vue'
+import DashboardStat from '@/components/dashboard/DashboardStat.vue'
+import DashboardStatGrid from '@/components/dashboard/DashboardStatGrid.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import type { UserDashboardStats as UserStatsType } from '@/api/usage'
@@ -257,27 +232,10 @@ const formatDuration = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(2)}s`
 </script>
 
 <style scoped>
+.signal-label { font-size: 12px; color: var(--signal-muted); }
+.signal-spend { color: var(--signal-amber); }
 .signal-stats { min-width: 0; }
 .signal-platform-empty { padding: 48px 0; color: var(--signal-muted); font-size: 14px; text-align: center; }
-.signal-stat-strip, .signal-telemetry {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-bottom: 1px solid var(--signal-line, #dce2df);
-}
-.signal-stat-strip { background: var(--signal-surface, #fff); border-top: 1px solid var(--signal-line, #dce2df); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--signal-accent, #087f68) 12%, transparent); }
-.signal-stat-strip--simple { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.signal-metric, .signal-reading { min-width: 0; padding: 20px; }
-.signal-metric + .signal-metric, .signal-reading + .signal-reading { border-left: 1px solid var(--signal-line, #dce2df); }
-.signal-label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; color: var(--signal-muted, #65716a); }
-.signal-value { margin: 10px 0 5px; font-size: 28px; line-height: 1.25; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.signal-metric--balance .signal-value, .signal-active { color: var(--signal-accent, #087f68); }
-.signal-metric--cost .signal-value, .signal-spend { color: var(--signal-amber, #99640c); }
-.signal-detail { margin-top: 4px; font-size: 12px; line-height: 1.6; color: var(--signal-muted, #65716a); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.signal-detail--wrap { display: flex; flex-wrap: wrap; gap: 0 8px; }
-.signal-detail.signal-active { color: var(--signal-accent, #087f68); }
-.signal-reading { padding-top: 16px; padding-bottom: 16px; }
-.signal-reading-value { margin-top: 7px; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.signal-reading-value span { font-size: 11px; color: var(--signal-muted, #65716a); font-weight: 500; }
 .signal-section-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; padding: 20px 0 12px; }
 .signal-section-heading h2 { font-size: 14px; font-weight: 600; }
 .signal-section-heading > span { font-size: 12px; color: var(--signal-muted, #65716a); }
@@ -302,13 +260,8 @@ const formatDuration = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(2)}s`
 .signal-reset { margin-top: 4px; font-size: 11px; color: var(--signal-muted, #65716a); }
 @media (max-width: 1100px) {
   .signal-platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .signal-metric, .signal-reading { padding: 16px 12px; }
 }
 @media (max-width: 640px) {
-  .signal-stat-strip, .signal-stat-strip--simple, .signal-telemetry { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .signal-metric:nth-child(odd), .signal-reading:nth-child(odd) { border-left: 0; }
-  .signal-metric:nth-child(n+3), .signal-reading:nth-child(n+3) { border-top: 1px solid var(--signal-line, #dce2df); }
-  .signal-value { font-size: 24px; }
   .signal-platform-grid { gap: 0 16px; }
 }
 @media (max-width: 420px) {

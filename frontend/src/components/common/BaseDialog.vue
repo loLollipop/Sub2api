@@ -4,8 +4,10 @@
       <div
         v-if="show"
         class="modal-overlay"
+        :class="[overlayClass, { 'modal-overlay--drawer': placement === 'right' }]"
         :style="zIndexStyle"
         :aria-labelledby="dialogId"
+        :aria-describedby="$slots.description ? `${dialogId}-description` : undefined"
         role="dialog"
         :aria-modal="isTopDialog || undefined"
         :aria-hidden="!isTopDialog || undefined"
@@ -14,16 +16,18 @@
         <!-- Modal panel -->
         <div
           ref="dialogRef"
-          :class="['modal-content', widthClasses]"
+          :class="['modal-content', widthClasses, panelClass]"
           tabindex="-1"
           @focusin="rememberFocus"
           @click.stop
         >
           <!-- Header -->
           <div class="modal-header">
-            <h3 :id="dialogId" class="modal-title">
-              {{ title }}
-            </h3>
+            <div class="min-w-0 flex-1">
+              <h3 :id="dialogId" class="modal-title">{{ title }}</h3>
+              <div v-if="$slots.description" :id="`${dialogId}-description`" class="modal-description"><slot name="description" /></div>
+            </div>
+            <div v-if="$slots.actions" class="modal-header-actions"><slot name="actions" /></div>
             <button
               v-if="showCloseButton"
               @click="emit('close')"
@@ -78,6 +82,9 @@ interface Props {
   closeOnClickOutside?: boolean
   showCloseButton?: boolean
   zIndex?: number
+  placement?: 'center' | 'right'
+  panelClass?: string
+  overlayClass?: string
 }
 
 interface Emits {
@@ -89,7 +96,10 @@ const props = withDefaults(defineProps<Props>(), {
   closeOnEscape: true,
   closeOnClickOutside: false,
   showCloseButton: true,
-  zIndex: 50
+  zIndex: 50,
+  placement: 'center',
+  panelClass: '',
+  overlayClass: ''
 })
 
 const emit = defineEmits<Emits>()
@@ -211,3 +221,17 @@ onBeforeUnmount(() => {
   if (wasTop) dialogLayer.restoreFocus(previousActiveElement)
 })
 </script>
+
+<style scoped>
+.modal-description { margin-top: 6px; color: var(--signal-muted, #64748b); font-size: 12px; line-height: 20px; }
+.modal-header-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; margin-left: 12px; }
+.modal-description:empty, .modal-header-actions:empty { display: none; }
+.modal-overlay.modal-overlay--drawer { justify-content: flex-end; align-items: stretch; padding: 0; }
+.modal-overlay.modal-overlay--drawer > .modal-content { width: min(448px, 100%); max-width: 448px; max-height: 100dvh; height: 100dvh; margin: 0; border-radius: 0; }
+.modal-overlay--drawer .modal-body { flex: 1; }
+.modal-enter-active.modal-overlay--drawer .modal-content, .modal-leave-active.modal-overlay--drawer .modal-content { transition: transform 220ms ease; }
+.modal-enter-from.modal-overlay--drawer .modal-content, .modal-leave-to.modal-overlay--drawer .modal-content { transform: translateX(100%); }
+.modal-enter-to.modal-overlay--drawer .modal-content, .modal-leave-from.modal-overlay--drawer .modal-content { transform: translateX(0); }
+@media (prefers-reduced-motion: reduce) { .modal-enter-active.modal-overlay--drawer .modal-content, .modal-leave-active.modal-overlay--drawer .modal-content { transition: none; } }
+@media (max-width: 639px) { .modal-overlay.modal-overlay--drawer > .modal-content { border-radius: 0; } }
+</style>

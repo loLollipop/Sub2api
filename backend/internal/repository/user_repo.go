@@ -985,9 +985,14 @@ func (r *userRepository) SetBalance(ctx context.Context, id int64, value float64
 		return service.BalanceChange{Old: current, New: value}, service.ErrBalanceNegative
 	}
 	const updateSQL = `
+		WITH prev AS (
+			SELECT id, balance FROM users
+			WHERE id = $2 AND deleted_at IS NULL
+			FOR UPDATE
+		)
 		UPDATE users AS u
 		SET balance = $1, updated_at = NOW()
-		FROM (SELECT id, balance FROM users WHERE id = $2 AND deleted_at IS NULL) AS prev
+		FROM prev
 		WHERE u.id = prev.id AND u.deleted_at IS NULL
 		RETURNING prev.balance, u.balance
 	`

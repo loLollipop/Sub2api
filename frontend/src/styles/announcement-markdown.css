@@ -1,4 +1,37 @@
 /* Shared rich-text styles for announcement popup and bell detail content. */
+.modal-overlay.announcement-overlay,
+body:has(.console-signal) > .modal-overlay.announcement-overlay {
+  background: color-mix(in srgb, var(--signal-inset, #f9fafb) 75%, transparent);
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.announcement-overlay--drawer,
+body:has(.console-signal) > .modal-overlay.announcement-overlay--drawer {
+  background: color-mix(in srgb, var(--signal-inset, #f9fafb) 75%, transparent);
+  backdrop-filter: blur(3px);
+}
+.dark .modal-overlay.announcement-overlay,
+.dark body:has(.console-signal) > .modal-overlay.announcement-overlay {
+  background: color-mix(in srgb, var(--signal-inset, #15181d) 75%, transparent);
+}
+.dark .modal-overlay.announcement-overlay--drawer,
+.dark body:has(.console-signal) > .modal-overlay.announcement-overlay--drawer {
+  background: color-mix(in srgb, var(--signal-inset, #15181d) 75%, transparent);
+}
+.announcement-overlay > .modal-content,
+body:has(.console-signal) > .modal-overlay.announcement-overlay > .modal-content {
+  background: var(--signal-surface, #fff);
+}
+.dark .announcement-overlay > .modal-content,
+.dark body:has(.console-signal) > .modal-overlay.announcement-overlay > .modal-content {
+  background: var(--signal-surface, #181b20);
+}
+.modal-overlay.announcement-overlay.announcement-overlay--drawer > .modal-content,
+body:has(.console-signal) > .modal-overlay.announcement-overlay.announcement-overlay--drawer > .modal-content { border-radius: 0; }
+.modal-content.announcement-popup-panel { max-width: 672px; }
+.modal-content.announcement-detail-panel { max-width: 768px; }
+.announcement-popup-panel .modal-body { max-height: 50vh; overflow-y: auto; }
+.announcement-detail-panel .modal-body { max-height: 60vh; overflow-y: auto; }
+
 .markdown-body {
   @apply text-[15px] leading-[1.75];
   @apply text-gray-700 dark:text-gray-300;

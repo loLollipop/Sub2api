@@ -118,11 +118,16 @@ describe('SIGNAL shell route isolation', () => {
     expect(wrapper!.classes()).not.toContain('signal-admin')
   })
 
-  it.each(['/model-plaza?embedded=1', '/batch-image', '/custom/demo'])('returns administrators to the public home from %s while retaining the console entry', async (path) => {
+  it.each([
+    ['/model-plaza?embedded=1', '/admin/dashboard'],
+    ['/leaderboard', '/admin/dashboard'],
+    ['/batch-image', '/dashboard'],
+    ['/custom/demo', '/dashboard']
+  ])('returns administrators to the public home from %s while retaining the console entry', async (path, consolePath) => {
     const { router } = await renderShell(path, 'admin')
     const home = wrapper!.get('.top-brand')
     expect(home.attributes('href')).toBe('/')
-    expect(wrapper!.get('.top-browse-nav a[href="/dashboard"]').exists()).toBe(true)
+    expect(wrapper!.get(`.top-browse-nav a[href="${consolePath}"]`).exists()).toBe(true)
     await home.trigger('click')
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
   })

@@ -1,13 +1,11 @@
 <template>
   <AppLayout>
     <div class="signal-dashboard">
-      <PageHeader :title="t('dashboard.overview')">
-        <template #actions>
-          <button class="btn btn-secondary btn-icon" :title="t('common.refresh')" :aria-label="t('common.refresh')" :disabled="loading || loadingCharts" @click="refreshAll">
-            <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading || loadingCharts }" />
-          </button>
-        </template>
-      </PageHeader>
+      <PageHeader :title="t('dashboard.overview')" />
+      <AnalyticsToolbar refresh :loading="loading || loadingCharts" @refresh="refreshAll">
+        <template #date><DateRangePicker v-model:start-date="startDate" v-model:end-date="endDate" @change="changeChartRange" /></template>
+        <template #granularity><Select v-model="granularity" :aria-label="t('dashboard.granularity')" :options="[{ value: 'day', label: t('dashboard.day') }, { value: 'hour', label: t('dashboard.hour') }]" @change="loadCharts" /></template>
+      </AnalyticsToolbar>
       <div v-if="loading && !stats" class="signal-loading"><LoadingSpinner /></div>
       <div v-if="statsError" class="signal-error" role="alert">
         <Icon name="exclamationCircle" size="md" />
@@ -15,16 +13,13 @@
         <button class="btn btn-secondary" @click="refreshAll">{{ t('common.refresh') }}</button>
       </div>
       <template v-if="stats">
-        <UserDashboardQuickActions />
         <UserDashboardStats section="summary" :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" />
-        <div class="dashboard-analysis-grid">
-          <UserDashboardCharts
-            v-model:startDate="startDate" v-model:endDate="endDate" v-model:granularity="granularity"
-            :loading="loadingCharts" :error="chartsError" :trend="trendData"
-            @dateRangeChange="changeChartRange" @granularityChange="loadCharts" @refresh="loadCharts"
-          />
-          <UserDashboardModels :models="modelStats" :start-date="startDate" :end-date="endDate" :loading="loadingCharts" :error="chartsError" />
-        </div>
+        <UserDashboardQuickActions />
+        <UserDashboardCharts
+          :loading="loadingCharts" :error="chartsError" :trend="trendData"
+          @refresh="loadCharts"
+        />
+        <UserDashboardModels :models="modelStats" :start-date="startDate" :end-date="endDate" :loading="loadingCharts" :error="chartsError" />
         <div class="signal-dashboard-details">
           <details v-if="!authStore.isSimpleMode" @toggle="togglePlatforms" class="signal-disclosure" data-detail="platforms">
             <summary><Icon name="grid" size="sm" /><span>{{ t('dashboard.platformBreakdown') }}</span><Icon name="chevronDown" size="sm" /></summary>
@@ -63,8 +58,11 @@ import { formatDateLocalInput } from '@/utils/format'
 import type { UsageLog, TrendDataPoint, ModelStat, PlatformQuotaItem } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
+import AnalyticsToolbar from '@/components/dashboard/AnalyticsToolbar.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Icon from '@/components/icons/Icon.vue'
+import DateRangePicker from '@/components/common/DateRangePicker.vue'
+import Select from '@/components/common/Select.vue'
 import UserDashboardStats from '@/components/user/dashboard/UserDashboardStats.vue'
 import UserDashboardCharts from '@/components/user/dashboard/UserDashboardCharts.vue'
 import UserDashboardModels from '@/components/user/dashboard/UserDashboardModels.vue'
@@ -215,8 +213,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.dashboard-analysis-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; gap: 16px; min-width: 0; }
-@media (max-width: 1199px) { .dashboard-analysis-grid { grid-template-columns: minmax(0, 1fr); } }
 .signal-dashboard { display: grid; gap: 18px; min-width: 0; color: var(--signal-text); }
 .signal-loading { display: flex; justify-content: center; padding: 40px 0; }
 .signal-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 24px 0; color: var(--signal-muted); font-size: 13px; }

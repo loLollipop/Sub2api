@@ -41,13 +41,14 @@ var (
 	// Official GPT Image 2.5 token rates (2026-09-08):
 	// https://developers.openai.com/api/docs/pricing#image-generation-models
 	openAIGPTImage25FallbackPricing = &LiteLLMModelPricing{
-		InputCostPerToken:       5e-06,
-		CacheReadInputTokenCost: 1.25e-06,
-		InputCostPerImageToken:  8e-06,
-		OutputCostPerImageToken: 3e-05,
-		LiteLLMProvider:         "openai",
-		Mode:                    "image_generation",
-		SupportsPromptCaching:   true,
+		InputCostPerToken:            5e-06,
+		CacheReadInputTokenCost:      1.25e-06,
+		InputCostPerImageToken:       8e-06,
+		CacheReadInputImageTokenCost: 2e-06,
+		OutputCostPerImageToken:      3e-05,
+		LiteLLMProvider:              "openai",
+		Mode:                         "image_generation",
+		SupportsPromptCaching:        true,
 	}
 	openAIGPT54FallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken:       2.5e-06, // $2.5 per MTok
@@ -228,21 +229,23 @@ type LiteLLMModelPricing struct {
 	CacheCreationInputTokenCost float64 `json:"cache_creation_input_token_cost"`
 	// CacheCreationInputTokenCostExplicit 为真表示价格表显式给出了缓存写入价。
 	// GPT-6 Sol/Luna/6.1 的官方写入价低于输入价的 1.25 倍，必须靠它阻止按 1.25 倍回填。
-	CacheCreationInputTokenCostExplicit bool    `json:"-"`
-	CacheCreationInputTokenCostPriority float64 `json:"cache_creation_input_token_cost_priority"`
-	CacheCreationInputTokenCostAbove1hr float64 `json:"cache_creation_input_token_cost_above_1hr"`
-	CacheReadInputTokenCost             float64 `json:"cache_read_input_token_cost"`
-	CacheReadInputTokenCostPriority     float64 `json:"cache_read_input_token_cost_priority"`
-	LongContextInputTokenThreshold      int     `json:"long_context_input_token_threshold,omitempty"`
-	LongContextInputCostMultiplier      float64 `json:"long_context_input_cost_multiplier,omitempty"`
-	LongContextOutputCostMultiplier     float64 `json:"long_context_output_cost_multiplier,omitempty"`
-	SupportsServiceTier                 bool    `json:"supports_service_tier"`
-	LiteLLMProvider                     string  `json:"litellm_provider"`
-	Mode                                string  `json:"mode"`
-	SupportsPromptCaching               bool    `json:"supports_prompt_caching"`
-	OutputCostPerImage                  float64 `json:"output_cost_per_image"`       // 图片生成模型每张图片价格
-	OutputCostPerImageToken             float64 `json:"output_cost_per_image_token"` // 图片输出 token 价格
-	InputCostPerImageToken              float64 `json:"input_cost_per_image_token"`  // 图片输入 token 价格（如 gpt-image-2 图片编辑）
+	CacheCreationInputTokenCostExplicit  bool    `json:"-"`
+	CacheCreationInputTokenCostPriority  float64 `json:"cache_creation_input_token_cost_priority"`
+	CacheCreationInputTokenCostAbove1hr  float64 `json:"cache_creation_input_token_cost_above_1hr"`
+	CacheReadInputTokenCost              float64 `json:"cache_read_input_token_cost"`
+	CacheReadInputTokenCostPriority      float64 `json:"cache_read_input_token_cost_priority"`
+	LongContextInputTokenThreshold       int     `json:"long_context_input_token_threshold,omitempty"`
+	LongContextInputCostMultiplier       float64 `json:"long_context_input_cost_multiplier,omitempty"`
+	LongContextOutputCostMultiplier      float64 `json:"long_context_output_cost_multiplier,omitempty"`
+	SupportsServiceTier                  bool    `json:"supports_service_tier"`
+	LiteLLMProvider                      string  `json:"litellm_provider"`
+	Mode                                 string  `json:"mode"`
+	SupportsPromptCaching                bool    `json:"supports_prompt_caching"`
+	OutputCostPerImage                   float64 `json:"output_cost_per_image"`       // 图片生成模型每张图片价格
+	OutputCostPerImageToken              float64 `json:"output_cost_per_image_token"` // 图片输出 token 价格
+	InputCostPerImageToken               float64 `json:"input_cost_per_image_token"`  // 图片输入 token 价格（如 gpt-image-2 图片编辑）
+	CacheReadInputImageTokenCost         float64 `json:"cache_read_input_image_token_cost"`
+	CacheReadInputImageTokenCostExplicit bool    `json:"-"`
 
 	// Nil means absent; an explicit zero makes storage free without enabling token pricing.
 	CacheStorageCostPerTokenPerHour *float64 `json:"cache_storage_cost_per_token_per_hour,omitempty"`
@@ -284,6 +287,7 @@ type LiteLLMRawEntry struct {
 	OutputCostPerImage                  *float64 `json:"output_cost_per_image"`
 	OutputCostPerImageToken             *float64 `json:"output_cost_per_image_token"`
 	InputCostPerImageToken              *float64 `json:"input_cost_per_image_token"`
+	CacheReadInputImageTokenCost        *float64 `json:"cache_read_input_image_token_cost"`
 }
 
 // PricingService 动态价格服务
@@ -784,6 +788,10 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		}
 		if entry.InputCostPerImageToken != nil {
 			pricing.InputCostPerImageToken = *entry.InputCostPerImageToken
+		}
+		if entry.CacheReadInputImageTokenCost != nil {
+			pricing.CacheReadInputImageTokenCost = *entry.CacheReadInputImageTokenCost
+			pricing.CacheReadInputImageTokenCostExplicit = true
 		}
 
 		hasExplicitLongContext := entry.LongContextInputTokenThreshold != nil ||
@@ -1725,10 +1733,15 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 		return openAIGPT54FallbackPricing
 	}
 
-	// Remote price mirrors can lag new releases. Never bill GPT Image 2.5
+	// Remote price mirrors can lag new releases. Never bill GPT Image 2.5 / 2.6
 	// using the older image model's rates when its entry is absent.
-	for _, imageModel := range []string{"gpt-image-2.5-flare", "gpt-image-2.5-sunburst"} {
-		if model == imageModel || model == imageModel+"-2026-09-08" {
+	for _, imageModel := range []string{
+		"gpt-image-2.5-flare", "gpt-image-2.5-sunburst",
+		"gpt-image-2.5-flare-2026-09-08", "gpt-image-2.5-sunburst-2026-09-08",
+		"gpt-image-2.6-flare", "gpt-image-2.6-sunburst",
+		"gpt-image-2.6-flare-2026-11-04", "gpt-image-2.6-sunburst-2026-11-04",
+	} {
+		if model == imageModel {
 			return openAIGPTImage25FallbackPricing
 		}
 	}

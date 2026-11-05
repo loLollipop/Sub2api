@@ -18,7 +18,7 @@ export interface ModelPlazaPricingProps {
   imageRateMultiplier?: number | null
   /**
    * 高峰窗口描述(含倍率与服务器时区标注),空串/缺省 = 分组未启用高峰。
-   * 表格所有价格均为不含高峰因子的口径,该窗口仅用于分时时段行的 tooltip 披露:
+   * 表格所有价格均为不含高峰因子的口径,该窗口用于分时标签的 tooltip 披露:
    * 与高峰重叠的部分实付还会再乘高峰倍率。
    */
   peakWindow?: string
@@ -32,8 +32,8 @@ export function useModelPlazaPricing(props: ModelPlazaPricingProps) {
 
   /**
    * 展示顺序:
-   * 1. token 计费的排在前,按图/按次计费的沉到末尾——它们的官方 token 价与实付的按张/按次价不同量纲,混排无意义;
-   * 2. 组内按官方输出价从高到低,无官方价的排最后;
+   * 1. token 计费的排在前,按图/按次计费的沉到末尾——它们的参考 token 价与实付的按张/按次价不同量纲,混排无意义;
+   * 2. 组内按参考输出价从高到低,无参考价的排最后;
    * 3. 同价按名称降序(新版本号在前,如 gpt-5.6 先于 gpt-5.5)。
    */
   const sortedModels = computed(() => {
@@ -69,34 +69,30 @@ export function useModelPlazaPricing(props: ModelPlazaPricingProps) {
   /** 价格统一保底 2 位小数,更长的有效小数原样保留。 */
   const MIN_DECIMALS = 2
 
-  /** 表格行:每个模型一行标准价;配置了分时倍率的模型再按时段各加一行。 */
-  interface PlazaRow {
-    model: PlazaModel
-    period: PlazaTimePricingPeriod | null
-    key: string
+  interface TimeGroup {
+    multiplier: number
+    rate: number
+    windows: string[]
   }
 
-  const rows = computed<PlazaRow[]>(() =>
-    sortedModels.value.flatMap((m) => {
-      const base: PlazaRow = { model: m, period: null, key: `${m.platform}:${m.name}` }
-      const periodRows = timePeriods(m).map<PlazaRow>((p, idx) => ({
-        model: m,
-        period: p,
-        key: `${base.key}:${idx}`
-      }))
-      return [base, ...periodRows]
-    })
-  )
-
-  /** 时段行的生效倍率 = 生效倍率 × 时段倍率(去掉浮点噪声)。 */
-  function periodRate(m: PlazaModel, period: PlazaTimePricingPeriod): number {
-    return Math.round(requestRate(m) * period.multiplier * 1000) / 1000
+  /** Same-rate windows share one label; preserve small nonzero multipliers. */
+  function timeGroups(m: PlazaModel): TimeGroup[] {
+    const groups = new Map<number, TimeGroup>()
+    for (const period of timePeriods(m)) {
+      let group = groups.get(period.multiplier)
+      if (!group) {
+        group = { multiplier: period.multiplier, rate: Number((requestRate(m) * period.multiplier).toPrecision(12)), windows: [] }
+        groups.set(period.multiplier, group)
+      }
+      group.windows.push(formatTimeWindow(period))
+    }
+    return [...groups.values()]
   }
 
-  /** 实付价 = 渠道单价 × 生效倍率(时段行再乘时段倍率),按 $/1M token 展示。 */
-  function paidPerMillion(m: PlazaModel, value: number | null | undefined, period: PlazaTimePricingPeriod | null = null): string {
+  /** 实付价 = 渠道单价 × 生效倍率(分时倍率在标签中展示),按 $/1M token 展示。 */
+  function paidPerMillion(_model: PlazaModel, value: number | null | undefined): string {
     if (value == null) return '-'
-    const rate = period ? periodRate(m, period) : effectiveRate.value
+    const rate = effectiveRate.value
     return formatScaled(value * rate, PER_MILLION, MIN_DECIMALS)
   }
 
@@ -111,15 +107,15 @@ export function useModelPlazaPricing(props: ModelPlazaPricingProps) {
   }
 
   /** 按次 / 按图片单价(乘该行生效倍率,不换算 1M)。 */
-  function paidRequestPrice(m: PlazaModel, value: number | null | undefined, period: PlazaTimePricingPeriod | null = null): string {
+  function paidRequestPrice(m: PlazaModel, value: number | null | undefined): string {
     // The plaza API does not expose the resolved per-model video prices and
     // independent video rate. Never label a channel fallback as an actual quote.
     if (billingMode(m) === BILLING_MODE_VIDEO) return '-'
     if (value == null) return '-'
-    return formatScaled(value * (period ? periodRate(m, period) : requestRate(m)), 1, MIN_DECIMALS)
+    return formatScaled(value * requestRate(m), 1, MIN_DECIMALS)
   }
 
-  /** 官方参考价不乘倍率。 */
+  /** 参考价不乘倍率。 */
   function official(value: number | null | undefined): string {
     if (value == null) return '-'
     return formatScaled(value, PER_MILLION, MIN_DECIMALS)
@@ -147,16 +143,16 @@ export function useModelPlazaPricing(props: ModelPlazaPricingProps) {
   }
 
   /**
-   * 时段行 tooltip:仅工作日生效的配置换用带周末回落说明的文案;
-   * 分组启用高峰倍率时追加披露——本行价格不含高峰因子,与高峰窗口重叠的部分实付再乘高峰倍率。
+   * 分时标签 tooltip:仅工作日生效的配置换用带周末回落说明的文案;
+   * 分组启用高峰倍率时追加披露——标签倍率不含高峰因子,与高峰窗口重叠的部分实付再乘高峰倍率。
    */
-  function timePricingRowHint(m: PlazaModel): string {
+  function timePricingHint(m: PlazaModel, group: TimeGroup): string {
     const key = m.time_pricing?.weekdays_only
-      ? 'modelPlaza.table.timePricingRowHintWeekdays'
-      : 'modelPlaza.table.timePricingRowHint'
-    let hint = t(key, { timezone: m.time_pricing?.timezone })
+      ? 'modelPlaza.table.timePricingHintWeekdays'
+      : 'modelPlaza.table.timePricingHint'
+    let hint = t(key, { timezone: m.time_pricing?.timezone, rate: group.rate, base: requestRate(m), multiplier: group.multiplier })
     if (props.peakWindow) {
-      hint += t('modelPlaza.table.timePricingRowHintPeak', {
+      hint += t('modelPlaza.table.timePricingHintPeak', {
         window: props.peakWindow,
         multiplier: props.peakRateMultiplier ?? 1
       })
@@ -180,7 +176,7 @@ export function useModelPlazaPricing(props: ModelPlazaPricingProps) {
     return sortByContext(m.pricing?.intervals ?? []).map(iv => resolveIntervalPrices(iv, m.pricing!))
   }
 
-  /** 官方阶梯(后端按目录规则合成,不受分组开关影响)。 */
+  /** 参考价阶梯：配置参考价跟随实际计费阶梯，纯目录参考价保留目录阶梯。 */
   function officialIntervals(m: PlazaModel): UserPricingInterval[] {
     return sortByContext(m.official_pricing?.intervals ?? [])
   }
@@ -226,5 +222,5 @@ export function useModelPlazaPricing(props: ModelPlazaPricingProps) {
     return String(Math.round(n * 100) / 100)
   }
 
-  return { sortedModels, effectiveRate, hasCustomRate, billingMode, billingModeLabel, rows, periodRate, paidPerMillion, usesIndependentImageRate, requestRate, paidRequestPrice, official, perUnitSuffix, hasCachePricing, hasOfficialCache, timePeriods, timePricingRowHint, formatTimeWindow, tokenIntervals, officialIntervals, hasTierCachePricing, tierHint, requestIntervals, tierLabel }
+  return { sortedModels, effectiveRate, hasCustomRate, billingMode, billingModeLabel, timeGroups, paidPerMillion, usesIndependentImageRate, requestRate, paidRequestPrice, official, perUnitSuffix, hasCachePricing, hasOfficialCache, timePeriods, timePricingHint, formatTimeWindow, tokenIntervals, officialIntervals, hasTierCachePricing, tierHint, requestIntervals, tierLabel }
 }

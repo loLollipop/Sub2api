@@ -2,31 +2,33 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.5",
-  "imported_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
+  "imported_version": "2.3.11",
+  "imported_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.5",
-  "latest_observed_release_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
-  "latest_observed_main_commit": "a0e9e0f3493667963319cf79bfb64592ea043cee",
+  "latest_observed_version": "2.3.11",
+  "latest_observed_release_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
+  "latest_observed_main_commit": "4eef20cf6ba48abd4a6a52bd97e99235c1fed31c",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.5",
-  "reviewed_release_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
+  "reviewed_release_tag": "v2.3.11",
+  "reviewed_release_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
   "observed_delta_review": {
-    "from_commit": "65db90acee6ea7983611ef1b9e248cf8c7663235",
-    "to_commit": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
-    "status": "formal_v2305_reviewed_no_applicable_runtime_delta",
-    "scope": "All six formal-release paths reviewed. Unknown schedulable-timer confirmation and requestcapture diagnostic test fixes apply only to deferred modules absent locally. Advance review/monitoring checkpoints only; preserve local schedulable toggles, quality plans, UI and billing. No migration or dependency changes. Unreleased main remains outside the checkpoint. User subsequently authorized reviewed personal v2.1.49 publication and controlled deployment.",
-    "evidence": "maintenance/notes/upstream-sync-20261103-v2305.md"
+    "from_commit": "2746b74a38922ad763cb6ad5626a6441780a931d",
+    "to_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
+    "status": "formal_v2311_selective_images_pricing_and_table_adaptation",
+    "scope": "Review 57 formal-release paths. Adapt GPT Image 2.6 native Images routing, GIF controls, image cached-input billing, configured plaza reference prices, merged time labels, Grok fixed-charge preview and table deduplication. Correct cache-price precedence/explicit zero, shared usage parsing/terminal snapshots, pre-output retry and account-test fallback parity. Preserve older OAuth image routes, local billing/UI and excluded modules; no migrations, dependencies, personal version or deployment changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261105-v2311.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "51748099a2b82dbb16eb8f080cf92efe4a2722b2",
+    "source_head": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.11 selected image 2.6/GIF/cache billing, configured plaza references/time labels, Grok preview and table deduplication. Correct eight reproduced source/local integration defects; preserve existing image routes, local UI and billing. See maintenance/notes/upstream-sync-20261105-v2311.md.",
+      "Formal v2.3.6-v2.3.10 selected atomic admin balance/source writes and batch-set group user multipliers; adapt dashboard, usage and announcement UI to both local workspaces. Preserve local protocols, billing and theme; fix acknowledgment retry/session isolation and single-connection transaction lookup. See maintenance/notes/upstream-sync-20261105-v2310.md for exclusions and evidence.",
       "Formal v2.3.1-v2.3.4 selected DeepSeek native/request-reasoning semantics, free authenticated discovery, custom group references, route-aware key filtering and Intl caches; home footer centered. Preserve local replay scope/UI/billing; see maintenance/notes/upstream-sync-20261103-v2304.md for explicit exclusions and verification limits.",
       "Formal v2.2.67-v2.3.0 selected native DeepSeek effort preservation, unknown capacity state and batched on-demand user platform quotas. Retain Vue SPA, native protocols and existing feature removals. Local original pig-hero theme/footer refinement recorded separately in maintenance/notes/upstream-sync-20261102-v2300.md",
       "Formal v2.2.63-v2.2.66: cap explicit Gemini Flash thinking budgets across model generations; preserve mapped-model selection and existing exclusions. See maintenance/notes/upstream-sync-20261101-v2266.md",
@@ -109,6 +111,11 @@
   ],
   "selected_deepseek_fix": "Formal v2304 native DeepSeek bypasses legacy call-ID/request-state rewriting and rejected-field retries; genuine reasoning and thinking-switch options are provider-gated. Existing legacy conversion empty-shell repair remains scoped. Preserve local key/conversation/requested-model replay isolation, native protocols and distinct IDs; no cache-key weakening, Hosted execution, DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2310-ops-rate-history-account-reveal-and-runtime-expansion",
+      "upstream_commits": ["b500c1bbe", "d14cb1376", "ac007527a", "484d24eab", "4e53e58dc"],
+      "reason": "Defer monitoring/channel/rate-history modules and source migrations 307-311. Plaintext credential reveal conflicts with local redacted account details and optional step-up; immediate account edit skeleton is separate. Removed crypto/payment/canvas, absent requestcapture/timers and Nuxt/SSR/CI/deployment changes remain excluded. Source router5 and theme-specific tooltip fixes do not apply. See v2310 note."
+    },
     {
       "feature": "v2305-schedulable-timer-and-requestcapture-fixes",
       "upstream_commits": [

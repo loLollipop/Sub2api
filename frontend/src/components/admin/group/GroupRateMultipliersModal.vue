@@ -74,7 +74,7 @@
         </div>
 
         <!-- 批量调整 + 全部清空 -->
-        <div v-if="localEntries.length > 0" class="mt-3 flex items-center gap-3 border-t border-gray-100 pt-3 dark:border-dark-600">
+        <div v-if="localEntries.length > 0" class="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3 dark:border-dark-600">
           <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.groups.batchAdjust') }}</span>
           <div class="flex items-center gap-1.5">
             <span class="text-xs text-gray-400">×</span>
@@ -91,10 +91,27 @@
             <button
               type="button"
               class="btn btn-primary btn-sm shrink-0 px-2.5 py-1 text-xs"
-              :disabled="!batchFactor || batchFactor <= 0"
+              :disabled="!canEditDraft || !batchFactor || batchFactor <= 0"
               @click="applyBatchFactor"
             >
               {{ t('admin.groups.applyMultiplier') }}
+            </button>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <label for="group-batch-set-rate" class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.groups.batchSet') }}</label>
+            <input
+              id="group-batch-set-rate"
+              v-model.number="batchSetValue"
+              type="number"
+              step="0.000001"
+              min="0.000001"
+              max="999999.9999"
+              autocomplete="off"
+              class="hide-spinner w-24 rounded border border-gray-200 bg-white px-2 py-1 text-center text-sm focus:border-primary-500 focus:outline-none dark:border-dark-500 dark:bg-dark-700"
+              :disabled="!canEditDraft"
+            />
+            <button type="button" class="btn btn-primary btn-sm shrink-0 px-2.5 py-1 text-xs" :disabled="!canEditDraft || !validRate(batchSetValue)" @click="applyBatchSet">
+              {{ t('admin.groups.applySet') }}
             </button>
           </div>
           <div class="ml-auto">
@@ -284,6 +301,7 @@ const newRate = ref<number | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const batchFactor = ref<number | null>(null)
+const batchSetValue = ref<number | null>(null)
 
 const canEditDraft = computed(() => props.show && !!props.group && entriesLoaded.value && !loading.value)
 const validRate = (rate: number | null | undefined): rate is number =>
@@ -303,6 +321,7 @@ const resetDraft = () => {
   localEntries.value = []
   currentPage.value = 1
   batchFactor.value = null
+  batchSetValue.value = null
   searchQuery.value = ''
   searchResults.value = []
   showDropdown.value = false
@@ -463,7 +482,7 @@ const removeLocal = (userId: number) => {
 
 // 批量乘数应用到本地
 const applyBatchFactor = () => {
-  if (!batchFactor.value || !Number.isFinite(batchFactor.value) || batchFactor.value <= 0) return
+  if (!canEditDraft.value || !batchFactor.value || !Number.isFinite(batchFactor.value) || batchFactor.value <= 0) return
   if (localEntries.value.some(entry => entry.rate_multiplier != null && !validRate(entry.rate_multiplier * batchFactor.value!))) {
     appStore.showError(t('admin.groups.failedToSave'))
     return
@@ -476,6 +495,15 @@ const applyBatchFactor = () => {
   batchFactor.value = null
 }
 
+// Replace every draft entry, including entries whose rate was cleared locally.
+const applyBatchSet = () => {
+  if (!canEditDraft.value || !validRate(batchSetValue.value)) return
+  const rate = parseFloat(batchSetValue.value.toFixed(6))
+  if (!validRate(rate)) return
+  for (const entry of localEntries.value) entry.rate_multiplier = rate
+  batchSetValue.value = null
+}
+
 // 本地清空
 const clearAllLocal = () => {
   localEntries.value = []
@@ -485,6 +513,7 @@ const clearAllLocal = () => {
 const handleCancel = () => {
   localEntries.value = cloneEntries(serverEntries.value)
   batchFactor.value = null
+  batchSetValue.value = null
   adjustPage()
 }
 
@@ -508,6 +537,7 @@ const handleSave = async () => {
     await adminAPI.groups.batchSetGroupRateMultipliers(groupId, entries)
     if (version !== loadVersion || !props.show || props.group?.id !== groupId) return
     appStore.showSuccess(t('admin.groups.rateSaved'))
+    batchSetValue.value = null
     emit('success')
     emit('close')
   } catch (error) {

@@ -1,92 +1,74 @@
 <template>
   <AppLayout>
-    <div class="signal-usage space-y-6">
-      <PageHeader :title="t('usage.title')">
-        <template #actions><p class="signal-period"><Icon name="calendar" size="sm" />{{ startDate }} / {{ endDate }}</p></template>
-      </PageHeader>
-      <UsageStatsCards class="signal-usage-metrics" :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
-
-      <div class="space-y-4">
-        <div class="signal-range-bar">
-          <div class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}:</span>
-              <DateRangePicker
-                ref="dateRangeRef"
-                v-model:start-date="startDate"
-                v-model:end-date="endDate"
-                @change="onDateRangeChange"
-              />
-            </div>
-            <div class="ml-auto flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
-              <div class="w-28">
-                <Select v-model="granularity" :options="granularityOptions" @change="loadChartData" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" :animation-duration="chartAnimationDuration" />
-        <details class="usage-analysis-disclosure">
-          <summary><Icon name="chart" size="sm" /><span>{{ t('usage.distributionAnalysis') }}</span><Icon name="chevronDown" size="sm" /></summary>
-          <div class="signal-usage-chart-grid grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ModelDistributionChart
-              v-model:metric="modelDistributionMetric"
-              :model-stats="requestedModelStats"
-              :animation-duration="chartAnimationDuration"
-              :loading="modelStatsLoading"
-              :show-source-toggle="false"
-              :show-metric-toggle="true"
-              :enable-breakdown="false"
-              :show-account-cost="false"
-              :start-date="startDate"
-              :end-date="endDate"
-            />
-            <GroupDistributionChart
-              v-model:metric="groupDistributionMetric"
-              :group-stats="groupStats"
-              :animation-duration="chartAnimationDuration"
-              :loading="chartsLoading"
-              :show-metric-toggle="true"
-              :enable-breakdown="false"
-              :show-account-cost="false"
-              :start-date="startDate"
-              :end-date="endDate"
-            />
-
-            <EndpointDistributionChart
-              v-model:source="endpointDistributionSource"
-              v-model:metric="endpointDistributionMetric"
-              :endpoint-stats="inboundEndpointStats"
-              :animation-duration="chartAnimationDuration"
-              :upstream-endpoint-stats="upstreamEndpointStats"
-              :endpoint-path-stats="endpointPathStats"
-              :loading="endpointStatsLoading"
-              :show-source-toggle="false"
-              :show-metric-toggle="true"
-              :enable-breakdown="false"
-              :title="t('usage.endpointDistribution')"
-              :start-date="startDate"
-              :end-date="endDate"
-            />
-          </div>
-        </details>
+    <div class="signal-usage space-y-4">
+      <PageHeader :title="t('usage.title')" :description="`${startDate} / ${endDate}`" />
+      <div class="usage-stats-strip">
+        <UsageStatsCards class="signal-usage-metrics" :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
       </div>
 
-      <div class="signal-log-filters">
+      <section class="card usage-range-card p-3 sm:px-4 sm:py-3">
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div class="flex items-center gap-2"><span class="text-sm font-medium text-gray-500">{{ t('admin.dashboard.timeRange') }}</span><DateRangePicker ref="dateRangeRef" v-model:start-date="startDate" v-model:end-date="endDate" @change="onDateRangeChange" /></div>
+          <div class="ml-auto flex items-center gap-2"><span class="text-sm font-medium text-gray-500">{{ t('admin.dashboard.granularity') }}</span><div class="w-28"><Select v-model="granularity" :options="granularityOptions" @change="loadChartData" /></div></div>
+        </div>
+      </section>
+
+      <div class="signal-usage-chart-grid grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ModelDistributionChart
+          v-model:metric="modelDistributionMetric"
+          :model-stats="requestedModelStats"
+          :animation-duration="chartAnimationDuration"
+          :loading="modelStatsLoading"
+          :show-source-toggle="false"
+          :show-metric-toggle="true"
+          :enable-breakdown="false"
+          :show-account-cost="false"
+          :start-date="startDate"
+          :end-date="endDate"
+        />
+        <GroupDistributionChart
+          v-model:metric="groupDistributionMetric"
+          :group-stats="groupStats"
+          :animation-duration="chartAnimationDuration"
+          :loading="chartsLoading"
+          :show-metric-toggle="true"
+          :enable-breakdown="false"
+          :show-account-cost="false"
+          :start-date="startDate"
+          :end-date="endDate"
+        />
+
+        <EndpointDistributionChart
+          v-model:source="endpointDistributionSource"
+          v-model:metric="endpointDistributionMetric"
+          :endpoint-stats="inboundEndpointStats"
+          :animation-duration="chartAnimationDuration"
+          :upstream-endpoint-stats="upstreamEndpointStats"
+          :endpoint-path-stats="endpointPathStats"
+          :loading="endpointStatsLoading"
+          :show-source-toggle="false"
+          :show-metric-toggle="true"
+          :enable-breakdown="false"
+          :title="t('usage.endpointDistribution')"
+          :start-date="startDate"
+          :end-date="endDate"
+        />
+        <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" :animation-duration="chartAnimationDuration" />
+      </div>
+
+      <div class="card signal-log-filters">
         <div class="flex flex-wrap items-end justify-between gap-4">
-          <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
+          <div v-if="activeTab === 'errors'" class="grid w-full grid-cols-1 items-end gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div class="min-w-0">
               <label for="usage-error-request-id" class="input-label">{{ t('admin.usage.requestId') }}</label>
               <input id="usage-error-request-id" v-model="errorFilter.request_id" type="text" class="input" :placeholder="t('usage.requestIdPlaceholder')" @change="applyErrorFilters" @keyup.enter="applyErrorFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
+            <div class="min-w-0">
               <label class="input-label">{{ t('usage.errors.keyName') }}</label>
               <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
             </div>
             <div id="usage-secondary-filters" v-show="isDesktop || secondaryFiltersExpanded" class="flex w-full flex-wrap items-end gap-4 sm:contents">
-              <div class="w-full sm:w-auto sm:min-w-[220px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('usage.errors.model') }}</label>
                 <Select
                   v-model="errorFilter.model"
@@ -98,118 +80,120 @@
                   @change="applyErrorFilters"
                 />
               </div>
-              <div class="w-full sm:w-auto sm:min-w-[200px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('usage.errors.category') }}</label>
                 <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
               </div>
-              <div class="w-full sm:w-auto sm:min-w-[180px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('usage.errors.status') }}</label>
                 <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
               </div>
             </div>
           </div>
-          <div v-else class="flex flex-1 flex-wrap items-end gap-4">
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
+          <div v-else class="grid w-full grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div class="min-w-0">
               <label for="usage-request-id" class="input-label">{{ t('admin.usage.requestId') }}</label>
               <input id="usage-request-id" v-model="filters.request_id" type="text" class="input" :placeholder="t('usage.requestIdPlaceholder')" @change="applyFilters" @keyup.enter="applyFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
+            <div class="min-w-0">
               <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
               <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
             </div>
             <div id="usage-secondary-filters" v-show="isDesktop || secondaryFiltersExpanded" class="flex w-full flex-wrap items-end gap-4 sm:contents">
-              <div class="w-full sm:w-auto sm:min-w-[220px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('usage.model') }}</label>
                 <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
               </div>
-              <div class="w-full sm:w-auto sm:min-w-[200px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('admin.usage.group') }}</label>
                 <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
               </div>
-              <div class="w-full sm:w-auto sm:min-w-[180px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('usage.type') }}</label>
                 <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
               </div>
-              <div class="w-full sm:w-auto sm:min-w-[180px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('usage.compactionFilter') }}</label>
                 <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="applyFilters" />
               </div>
-              <div class="w-full sm:w-auto sm:min-w-[200px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('admin.usage.billingType') }}</label>
                 <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
               </div>
-              <div class="w-full sm:w-auto sm:min-w-[200px]">
+              <div class="min-w-0">
                 <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
                 <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
               </div>
             </div>
           </div>
 
-          <div class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
-            <button
-              v-if="!isDesktop"
-              ref="secondaryFiltersToggle"
-              type="button"
-              class="btn btn-secondary mr-auto"
-              data-testid="usage-secondary-filters-toggle"
-              :aria-expanded="secondaryFiltersExpanded"
-              aria-controls="usage-secondary-filters"
-              @click="toggleSecondaryFilters"
-            >
-              {{ t(secondaryFiltersExpanded ? 'usage.fewerFilters' : 'usage.moreFilters') }}
-              <span v-if="!secondaryFiltersExpanded">({{ secondaryFilterCount }})</span>
-              <Icon :name="secondaryFiltersExpanded ? 'chevronUp' : 'chevronDown'" size="sm" class="ml-2" />
-            </button>
-            <button type="button" @click="refreshData" :disabled="activeTab === 'errors' ? errorLoading : loading" class="btn btn-secondary btn-icon" :title="t('common.refresh')" :aria-label="t('common.refresh')">
-              <Icon name="refresh" size="md" :class="{ 'animate-spin': activeTab === 'errors' ? errorLoading : loading }" />
-            </button>
-            <button type="button" @click="resetFilters" class="btn btn-secondary btn-icon" :title="t('common.reset')" :aria-label="t('common.reset')">
-              <Icon name="xCircle" size="md" />
-            </button>
-            <div class="relative" ref="columnDropdownRef">
-              <button
-                type="button"
-                data-testid="usage-column-settings"
-                @click="showColumnDropdown = !showColumnDropdown"
-                class="btn btn-secondary btn-icon"
-                :title="t('admin.users.columnSettings')"
-                :aria-label="t('admin.users.columnSettings')"
-                :aria-expanded="showColumnDropdown"
-              >
-                <Icon name="grid" size="md" />
-              </button>
-              <div
-                v-if="showColumnDropdown"
-                class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
-              >
-                <button
-                  v-for="col in currentToggleableColumns"
-                  :key="col.key"
-                  type="button"
-                  :data-testid="`usage-column-toggle-${col.key}`"
-                  @click="toggleCurrentColumn(col.key)"
-                  class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-                >
-                  <span>{{ col.label }}</span>
-                  <Icon v-if="isCurrentColumnVisible(col.key)" name="check" size="sm" class="text-primary-500" />
-                </button>
-              </div>
-            </div>
-            <button v-if="activeTab !== 'errors'" type="button" @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
-              <Icon name="download" size="sm" class="mr-2" />
-              {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
-            </button>
-          </div>
+          <button
+            v-if="!isDesktop"
+            ref="secondaryFiltersToggle"
+            type="button"
+            class="btn btn-secondary mr-auto"
+            data-testid="usage-secondary-filters-toggle"
+            :aria-expanded="secondaryFiltersExpanded"
+            aria-controls="usage-secondary-filters"
+            @click="toggleSecondaryFilters"
+          >
+            {{ t(secondaryFiltersExpanded ? 'usage.fewerFilters' : 'usage.moreFilters') }}
+            <span v-if="!secondaryFiltersExpanded">({{ secondaryFilterCount }})</span>
+            <Icon :name="secondaryFiltersExpanded ? 'chevronUp' : 'chevronDown'" size="sm" class="ml-2" />
+          </button>
         </div>
       </div>
 
-      <div v-if="errorViewEnabled" class="flex gap-2 border-b border-gray-200 dark:border-dark-700">
-        <button class="tab" :class="{ 'tab-active': activeTab === 'usage' }" @click="activeTab = 'usage'">
-          {{ t('usage.tabs.usage') }}
-        </button>
-        <button class="tab" :class="{ 'tab-active': activeTab === 'errors' }" @click="switchToErrors">
-          {{ t('usage.tabs.errors') }}
-        </button>
+      <div class="usage-record-toolbar flex flex-wrap items-center justify-between gap-3">
+        <div v-if="errorViewEnabled" class="usage-tabs" role="tablist">
+          <button class="usage-tab" role="tab" :aria-selected="activeTab === 'usage'" @click="activeTab = 'usage'">
+            {{ t('usage.tabs.usage') }}
+          </button>
+          <button class="usage-tab" role="tab" :aria-selected="activeTab === 'errors'" @click="switchToErrors">
+            {{ t('usage.tabs.errors') }}
+          </button>
+        </div>
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <button type="button" @click="refreshData" :disabled="activeTab === 'errors' ? errorLoading : loading" class="btn btn-secondary btn-icon" :title="t('common.refresh')" :aria-label="t('common.refresh')">
+            <Icon name="refresh" size="md" :class="{ 'animate-spin': activeTab === 'errors' ? errorLoading : loading }" />
+          </button>
+          <button type="button" @click="resetFilters" class="btn btn-secondary btn-icon" :title="t('common.reset')" :aria-label="t('common.reset')">
+            <Icon name="xCircle" size="md" />
+          </button>
+          <div class="relative" ref="columnDropdownRef">
+            <button
+              type="button"
+              data-testid="usage-column-settings"
+              @click="showColumnDropdown = !showColumnDropdown"
+              class="btn btn-secondary btn-icon"
+              :title="t('admin.users.columnSettings')"
+              :aria-label="t('admin.users.columnSettings')"
+              :aria-expanded="showColumnDropdown"
+            >
+              <Icon name="grid" size="md" />
+            </button>
+            <div
+              v-if="showColumnDropdown"
+              class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+            >
+              <button
+                v-for="col in currentToggleableColumns"
+                :key="col.key"
+                type="button"
+                :data-testid="`usage-column-toggle-${col.key}`"
+                @click="toggleCurrentColumn(col.key)"
+                class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
+              >
+                <span>{{ col.label }}</span>
+                <Icon v-if="isCurrentColumnVisible(col.key)" name="check" size="sm" class="text-primary-500" />
+              </button>
+            </div>
+          </div>
+          <button v-if="activeTab !== 'errors'" type="button" @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
+            <Icon name="download" size="sm" class="mr-2" />
+            {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
+          </button>
+        </div>
       </div>
 
       <template v-if="activeTab === 'usage'">
@@ -219,6 +203,7 @@
           <span v-if="inflightTotal" class="ml-auto text-xs font-normal text-gray-400">{{ inflightRows.length }}/{{ inflightTotal }}</span>
         </button>
         <UsageTable
+          flat
           v-if="inflightOpen"
           class="mb-3"
           :data="inflightRows"
@@ -1083,3 +1068,15 @@ watch(endpointDistributionSource, () => {
   // Endpoint source switching is handled by the chart component using already loaded stats.
 })
 </script>
+
+<style scoped>
+.usage-stats-strip { overflow: hidden; border: 1px solid var(--signal-line); border-radius: 12px; background: var(--signal-surface); }
+.usage-stats-strip :deep(.signal-usage-metrics) { border: 0; }
+.usage-stats-strip :deep(.signal-usage-metrics > .card) { border-radius: 0; box-shadow: none; background: transparent; }
+.usage-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--signal-raised); }
+.usage-tab { min-height: 32px; padding: 4px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--signal-muted); transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+.usage-tab:hover { color: var(--signal-text); }
+.usage-tab:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 1px; }
+.usage-tab[aria-selected='true'] { background: var(--signal-surface); color: var(--signal-text); box-shadow: 0 1px 2px #0a0a0a14, 0 0 0 1px var(--signal-line); }
+@media (prefers-reduced-motion: reduce) { .usage-tab { transition: none; } }
+</style>

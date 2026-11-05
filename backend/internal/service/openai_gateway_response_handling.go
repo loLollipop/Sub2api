@@ -1429,6 +1429,9 @@ func mergeOpenAIUsageNonZero(dst *OpenAIUsage, src OpenAIUsage) {
 	if src.ImageInputTokens > 0 {
 		dst.ImageInputTokens = src.ImageInputTokens
 	}
+	if src.ImageCacheReadTokens > 0 {
+		dst.ImageCacheReadTokens = src.ImageCacheReadTokens
+	}
 	if src.OutputTokens > 0 {
 		dst.OutputTokens = src.OutputTokens
 	}
@@ -1733,9 +1736,12 @@ func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 		value.Get("input_tokens_details.image_tokens"),
 		value.Get("prompt_tokens_details.image_tokens"),
 	)
+	cachedDetails := openAIImageCacheDetails(value)
+	imageCached, _ := boundedJSONNonNegativeInt(cachedDetails.Get("image_tokens"))
 	return OpenAIUsage{
 		InputTokens:              int(inputTokens),
 		ImageInputTokens:         imageInputTokens,
+		ImageCacheReadTokens:     min(imageCached, max(imageInputTokens, 0), max(cacheReadTokens, 0)),
 		OutputTokens:             int(outputTokens),
 		CacheCreationInputTokens: cacheCreationTokens,
 		CacheCreation5mTokens: cacheCreationTTLTokensFromUsage(
@@ -1778,9 +1784,26 @@ func openAICacheReadTokensFromUsage(value gjson.Result) int {
 			return firstPositiveGJSONInt(aliases...)
 		}
 	}
+	if details := openAIImageCacheDetails(value); details.IsObject() {
+		input, _ := boundedJSONNonNegativeInt(value.Get("input_tokens"))
+		if !value.Get("input_tokens").Exists() {
+			input, _ = boundedJSONNonNegativeInt(value.Get("prompt_tokens"))
+		}
+		images, _ := boundedJSONNonNegativeInt(details.Get("image_tokens"))
+		text, _ := boundedJSONNonNegativeInt(details.Get("text_tokens"))
+		images = min(images, input)
+		return images + min(text, input-images)
+	}
 	// DeepSeek prompt_tokens already includes hits and misses. Preserve that
 	// total and classify only the hit bucket; standard fields, even zero, win.
 	return max(int(value.Get("prompt_cache_hit_tokens").Int()), 0)
+}
+
+func openAIImageCacheDetails(value gjson.Result) gjson.Result {
+	if details := value.Get("input_tokens_details.cached_tokens_details"); details.Exists() {
+		return details
+	}
+	return value.Get("prompt_tokens_details.cached_tokens_details")
 }
 
 func openAICacheCreationTokensFromUsage(value gjson.Result) int {

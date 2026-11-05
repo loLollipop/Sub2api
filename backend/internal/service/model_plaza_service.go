@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 )
 
-// PlazaOfficialPricing 模型广场展示用的官方参考价（USD per token），与计费同源：
-// LiteLLM → 内置兜底价卡 → 模型策略。字段为 nil 表示该项缺失（0 视为未配置）。
+// PlazaOfficialPricing 模型广场参考价（USD per token）。配置了分组/渠道价格时
+// 使用选定计费身份的标准时段价与阶梯；其余保留目录参考价。nil 表示缺失，0 可为显式免费。
 type PlazaOfficialPricing struct {
 	Custom            bool // 分组自定义参考价，非官方目录价。
 	InputPrice        *float64
@@ -16,7 +17,7 @@ type PlazaOfficialPricing struct {
 	CacheWritePrice   *float64 // 5m 缓存写入（= LiteLLM cache_creation）
 	CacheWrite1hPrice *float64 // 1h 缓存写入，仅计费会区分 5m/1h 时给出
 	CacheReadPrice    *float64
-	// Intervals 官方长上下文阶梯（多档时给出），不受分组开关影响。
+	// Intervals 多档时给出；配置价跟随实际计费阶梯，目录价保留目录阶梯。
 	Intervals []PricingInterval
 }
 
@@ -219,12 +220,9 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 				fillGlobalPricingFallback(s.pricingService, one)
 				pg.Models[j].Pricing = one[0].Pricing
 			}
-			pricingModel, schedule, custom := s.fillDisplayPricing(ctx, &pg.Models[j], g)
+			pricingModel, schedule := s.fillDisplayPricing(ctx, &pg.Models[j], g)
 			reference := s.lookupOfficialPricing(ctx, pricingModel, officialMemo)
-			if custom {
-				reference = customReferencePricing(reference, schedule)
-			}
-			pg.Models[j].OfficialPricing = reference
+			pg.Models[j].OfficialPricing = configuredReferencePricing(reference, schedule)
 		}
 		out = append(out, *pg)
 	}
@@ -241,7 +239,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 // fillDisplayPricing 把模型的展示定价换成实收口径：
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
 // 图片/按次模型（或阶梯表不可用时）沿用渠道定价与分组图片档位价。
-func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) (string, *ContextPricingSchedule, bool) {
+func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) (string, *ContextPricingSchedule) {
 	if s.billingService != nil && s.resolver != nil {
 		for _, model := range s.plazaBillingModelCandidates(ctx, m, g) {
 			sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{
@@ -265,7 +263,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 					m.LongContextBasis = sched.Basis
 				}
 				m.TimePricing = sched.TimePricing
-				return model, sched, resolved != nil && resolved.Source == PricingSourceGroup
+				return model, sched
 			}
 			// Non-token prices must follow the same selected billing identity too;
 			// SupportedModels' raw price may belong to the mapping target even when
@@ -279,34 +277,83 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 					display = plazaImageDisplayPricing(display, g)
 				}
 				m.Pricing = withDefaultMaxReasoningEffortMultiplier(display, model)
-				return model, nil, false
+				return model, nil
 			}
 		}
 	}
 	m.Pricing = withDefaultMaxReasoningEffortMultiplier(plazaImageDisplayPricing(m.Pricing, g), m.Name)
-	return m.Name, nil, false
+	return m.Name, nil
 }
 
-// Reference prices use the same selected billing identity as paid prices. Keep
-// catalog context tiers when the group disables them, but never leave the old
-// catalog base tier visible in place of the configured group reference price.
-// Copy the memoized reference instead of modifying another group's catalog.
-func customReferencePricing(official *PlazaOfficialPricing, schedule *ContextPricingSchedule) *PlazaOfficialPricing {
-	first := schedule.Tiers[0]
-	ref := &PlazaOfficialPricing{
-		Custom:     true,
-		InputPrice: first.Input, OutputPrice: first.Output,
-		CacheWritePrice: first.CacheWrite, CacheWrite1hPrice: first.CacheWrite1h, CacheReadPrice: first.CacheRead,
+// configuredReferencePricing 决定「参考价」列显示什么。
+//
+// 管理员给这个模型配过价（分组价卡或渠道定价）时，列里要显示他配的价，而不是目录价，
+// 否则 实付 = 官方价 × 倍率 对不上（例如渠道配 $1、目录是 $0.22，倍率 0.3x 的实付 $0.30
+// 旁边却写着 $0.22）。显示的价取计费阶梯表，与实付同源，档位也一起取阶梯表。
+//
+//   - 阶梯表为空（图片/按次等非 token 计费）、或定价来自目录：保持目录价。
+//   - 来自分组价卡：一律用阶梯表，并标记 Custom（界面上有「自定义价」标记）。
+//   - 来自渠道定价：显式价格（包括零价、1h 缓存与高档区间）使用实际计费阶梯。
+//     只有放行模型、未改价的条目保留目录参考，不受分组阶梯开关影响。
+func configuredReferencePricing(official *PlazaOfficialPricing, sched *ContextPricingSchedule) *PlazaOfficialPricing {
+	if sched == nil || len(sched.Tiers) == 0 {
+		return official
 	}
-	if official != nil && len(official.Intervals) > 1 {
-		ref.Intervals = append([]PricingInterval(nil), official.Intervals...)
-		ref.Intervals[0].InputPrice = first.Input
-		ref.Intervals[0].OutputPrice = first.Output
-		ref.Intervals[0].CacheWritePrice = first.CacheWrite
-		ref.Intervals[0].CacheWrite1hPrice = first.CacheWrite1h
-		ref.Intervals[0].CacheReadPrice = first.CacheRead
+	switch sched.Source {
+	case PricingSourceGroup:
+		return referencePricingFromSchedule(sched, true)
+	case PricingSourceChannel:
+		if !sched.HasPriceOverrides && firstTierMatchesOfficial(sched.Tiers[0], official) {
+			return official
+		}
+		return referencePricingFromSchedule(sched, false)
+	default:
+		return official
+	}
+}
+
+// referencePricingFromSchedule 把阶梯表压成参考价：首档作起步价，多档时逐档给出绝对单价。
+func referencePricingFromSchedule(sched *ContextPricingSchedule, custom bool) *PlazaOfficialPricing {
+	first := sched.Tiers[0]
+	ref := &PlazaOfficialPricing{
+		InputPrice:        first.Input,
+		OutputPrice:       first.Output,
+		CacheWritePrice:   first.CacheWrite,
+		CacheWrite1hPrice: first.CacheWrite1h,
+		CacheReadPrice:    first.CacheRead,
+		Custom:            custom,
+	}
+	if len(sched.Tiers) > 1 {
+		ref.Intervals = plazaIntervalsFromTiers(sched.Tiers)
 	}
 	return ref
+}
+
+// firstTierMatchesOfficial 判断计费首档是否和目录价一致（输入/输出/缓存写入/缓存读取）。
+// 不比 1h 缓存写入：阶梯表对它总会探出一个值，目录只在支持 5m/1h 分档时才给。
+func firstTierMatchesOfficial(tier ContextPricingTier, official *PlazaOfficialPricing) bool {
+	if official == nil {
+		return false
+	}
+	return samePrice(tier.Input, official.InputPrice) &&
+		samePrice(tier.Output, official.OutputPrice) &&
+		samePrice(tier.CacheWrite, official.CacheWritePrice) &&
+		samePrice(tier.CacheRead, official.CacheReadPrice)
+}
+
+// samePrice 比较两个单价，nil 与 0 都表示没有价格。探针值保留 12 位有效数字，容差取相对 1e-9。
+func samePrice(a, b *float64) bool {
+	var x, y float64
+	if a != nil {
+		x = *a
+	}
+	if b != nil {
+		y = *b
+	}
+	if x == y {
+		return true
+	}
+	return math.Abs(x-y) <= 1e-9*math.Max(math.Abs(x), math.Abs(y))
 }
 
 func plazaGroupID(g *Group) *int64 {

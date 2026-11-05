@@ -46,6 +46,7 @@ export default {
     noGroup: 'No Group',
     requests: 'Requests',
     tokens: 'Tokens',
+    share: 'Share',
     actual: 'Actual',
     standard: 'Standard',
     input: 'Input',
@@ -62,6 +63,7 @@ export default {
     batchImageAgent: 'Batch Image Assistant',
     batchImageAgentDesc: 'Copy instructions for an agent',
     viewUsage: 'View Usage',
+    inviteRecords: 'Invitation Records',
     checkDetailedLogs: 'Check detailed usage logs',
     redeemCode: 'Redeem Code',
     addBalanceWithCode: 'Add balance with a code'
@@ -716,8 +718,8 @@ export default {
       copyName: 'Copy model name',
       pricingFor: 'Current group: {group}',
       cacheRead: 'Cache read',
-      officialReference: 'Official reference',
-      customReference: 'Reference uses this group’s custom base price. Paid prices apply the group rate.',
+      officialReference: 'Reference uses the billed model’s base price. Paid prices apply your current group or personal rate.',
+      customReference: 'Reference uses this group’s custom base price. Paid prices apply your current group or personal rate.',
       noPricing: 'Pricing not configured',
       searchPlaceholder: 'Search models or providers…',
       filters: 'Filter models',
@@ -775,13 +777,12 @@ export default {
       maxReasoningMultiplierBadge: 'Max ×{multiplier}',
       maxReasoningMultiplierHint: 'When the forwarded reasoning effort is max, billing and quota usage for the request are multiplied by {multiplier}',
       marginalBadge: 'excess-only tiers',
-      timePricingRowHint: 'Requests made within this period ({timezone} time) are billed at the prices in this row',
-      timePricingRowHintWeekdays:
-        'On weekdays (Mon–Fri) only, requests made within this period ({timezone} time) are billed at the prices in this row; weekends use the standard prices',
-      timePricingRowHintPeak:
-        '; prices in this row exclude the peak-hour rate — where this period overlaps the peak hours {window}, the overlapping portion is additionally multiplied by ×{multiplier}',
+      timePricingHint: 'Requests made in this period ({timezone} time) are billed at {rate}x (rate {base} × period multiplier {multiplier})',
+      timePricingHintWeekdays:
+        'On weekdays (Mon–Fri) only, requests made in this period ({timezone} time) are billed at {rate}x (rate {base} × period multiplier {multiplier}); weekends use the standard price',
+      timePricingHintPeak:
+        '; this rate excludes the peak-hour rate — where the period overlaps the peak hours {window}, the overlapping portion is additionally multiplied by ×{multiplier}',
       timePricingWeekdays: 'Weekdays',
-      timePricingRateHint: 'Effective rate {rate} × period multiplier {multiplier}',
       paidPrice: 'Your Price (Discounted)',
       officialPrice: 'Official Price',
       referencePrice: 'Reference Price',

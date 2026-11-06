@@ -338,11 +338,8 @@ export function formatReasoningEffortMapping(
 ): string {
   const requestedLabel = formatReasoningEffort(requested)
   const forwardedLabel = formatReasoningEffort(forwarded)
-  if (requestedLabel === '-' && forwardedLabel === '-') return '-'
-  if (requestedLabel === '-' || reasoningEffortValuesEqual(requested, forwarded)) {
-    return forwardedLabel === '-' ? requestedLabel : forwardedLabel
-  }
-  if (forwardedLabel === '-') return requestedLabel
+  if (!requested?.trim()) return forwardedLabel
+  if (!forwarded?.trim() || reasoningEffortValuesEqual(requested, forwarded)) return requestedLabel
   return `${requestedLabel} → ${forwardedLabel}`
 }
 

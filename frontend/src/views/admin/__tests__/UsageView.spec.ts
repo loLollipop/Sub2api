@@ -186,6 +186,7 @@ describe('admin UsageView route filters', () => {
     getSnapshotV2.mockReset().mockResolvedValue({ trend: [], models: [], groups: [] })
     getModelStats.mockReset().mockResolvedValue({ models: [] })
     getById.mockReset()
+    listErrorLogs.mockReset().mockResolvedValue({ items: [], total: 0 })
   })
 
   afterEach(() => {
@@ -197,10 +198,62 @@ describe('admin UsageView route filters', () => {
     const wrapper = mountRouteFilteredUsageView()
     await flushPromises()
     const vm = wrapper.vm as unknown as { visibleColumns: { key: string }[] }
-    expect(vm.visibleColumns.slice(0, 7).map(column => column.key)).toEqual([
-      'user', 'api_key', 'account', 'model', 'tokens', 'cost', 'latency',
+    expect(vm.visibleColumns.slice(0, 8).map(column => column.key)).toEqual([
+      'user', 'api_key', 'account', 'model', 'reasoning_effort', 'tokens', 'cost', 'latency',
     ])
     wrapper.unmount()
+  })
+
+  it('keeps only the latest error page and its loading state when requests finish out of order', async () => {
+    let finishOld!: (value: { items: { id: number }[]; total: number }) => void
+    let finishLatest!: (value: { items: { id: number }[]; total: number }) => void
+    listErrorLogs.mockReset()
+      .mockReturnValueOnce(new Promise(resolve => { finishOld = resolve }))
+      .mockReturnValueOnce(new Promise(resolve => { finishLatest = resolve }))
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.switchTab('errors')
+    vm.onErrPage(2)
+    finishOld({ items: [{ id: 1 }], total: 99 })
+    await flushPromises()
+    expect(vm.errLoading).toBe(true)
+    expect(vm.errRows).toEqual([])
+    finishLatest({ items: [{ id: 2 }], total: 2 })
+    await flushPromises()
+    expect(vm.errRows).toEqual([{ id: 2 }])
+    expect(vm.errTotal).toBe(2)
+    expect(vm.errLoading).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('discards pending errors when filters change on another tab and on unmount', async () => {
+    let finishOld!: (value: { items: { id: number }[]; total: number }) => void
+    listErrorLogs.mockReset().mockReturnValueOnce(new Promise(resolve => { finishOld = resolve }))
+      .mockResolvedValueOnce({ items: [{ id: 2 }], total: 1 })
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.switchTab('errors')
+    vm.switchTab('usage')
+    vm.filters.model = 'new-model'
+    vm.applyFilters()
+    finishOld({ items: [{ id: 1 }], total: 99 })
+    await flushPromises()
+    expect(vm.errRows).toEqual([])
+    expect(vm.errTotal).toBe(0)
+    vm.switchTab('errors')
+    await flushPromises()
+    expect(listErrorLogs).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'new-model' }))
+    expect(vm.errRows).toEqual([{ id: 2 }])
+
+    let finishUnmounted!: (value: { items: { id: number }[]; total: number }) => void
+    listErrorLogs.mockReturnValueOnce(new Promise(resolve => { finishUnmounted = resolve }))
+    vm.onErrPage(2)
+    wrapper.unmount()
+    finishUnmounted({ items: [{ id: 3 }], total: 3 })
+    await flushPromises()
+    expect(vm.errRows).toEqual([{ id: 2 }])
   })
 
   it('contains the records toolbar and exposes an inflight failure with a working retry', async () => {

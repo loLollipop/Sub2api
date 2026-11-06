@@ -97,6 +97,7 @@ interface Props {
   startDate: string
   endDate: string
   includeTime?: boolean
+  preset?: string | null
 }
 
 interface Emits {
@@ -121,10 +122,10 @@ const normalizeInput = (value: string, end = false): string => {
 }
 const localStartDate = ref(normalizeInput(props.startDate))
 const localEndDate = ref(normalizeInput(props.endDate, true))
-const activePreset = ref<string | null>('last24Hours')
+const activePreset = ref<string | null>(props.preset === undefined ? 'last24Hours' : props.preset)
 const appliedStartDate = ref(localStartDate.value)
 const appliedEndDate = ref(localEndDate.value)
-const appliedPreset = ref<string | null>('last24Hours')
+const appliedPreset = ref<string | null>(activePreset.value)
 const maximumDate = computed(() => normalizeInput(tomorrow.value, true))
 const validRange = computed(() => {
   const start = new Date(localStartDate.value).getTime()
@@ -246,6 +247,7 @@ const displayValue = computed(() => {
   }
 
   if (appliedStartDate.value && appliedEndDate.value) {
+    if (props.includeTime) return t('dates.custom')
     if (appliedStartDate.value === appliedEndDate.value) {
       return formatDate(appliedStartDate.value)
     }
@@ -258,12 +260,6 @@ const displayValue = computed(() => {
 const formatDate = (dateStr: string): string => {
   const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00')
   const dateLocale = locale.value === 'zh' ? 'zh-CN' : 'en-US'
-  if (props.includeTime) {
-    return date.toLocaleString(dateLocale, {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-    })
-  }
   return date.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })
 }
 
@@ -360,15 +356,16 @@ const handleEscape = (event: KeyboardEvent) => {
 // relative preset's clock may have advanced since selection. External changes
 // still reset/re-detect the preset, and manual input calls onDateChange above.
 watch(
-  () => [props.startDate, props.endDate, props.includeTime] as const,
-  ([start, end]) => {
+  () => [props.startDate, props.endDate, props.includeTime, props.preset] as const,
+  ([start, end, , preset], previous) => {
     const normalizedStart = normalizeInput(start)
     const normalizedEnd = normalizeInput(end, true)
     const unchanged = normalizedStart === appliedStartDate.value && normalizedEnd === appliedEndDate.value
     appliedStartDate.value = normalizedStart
     appliedEndDate.value = normalizedEnd
-    if (!unchanged) appliedPreset.value = findMatchingPreset(normalizedStart, normalizedEnd)
-    if (!unchanged || !isOpen.value) resetDraft()
+    if (preset !== undefined) appliedPreset.value = preset
+    else if (!unchanged) appliedPreset.value = findMatchingPreset(normalizedStart, normalizedEnd)
+    if (!unchanged || preset !== previous[3] || !isOpen.value) resetDraft()
   }
 )
 
@@ -376,7 +373,9 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleEscape)
   // Initialize active preset detection
-  appliedPreset.value = findMatchingPreset(appliedStartDate.value, appliedEndDate.value)
+  appliedPreset.value = props.preset !== undefined
+    ? props.preset
+    : findMatchingPreset(appliedStartDate.value, appliedEndDate.value)
   resetDraft()
 })
 
@@ -388,7 +387,7 @@ onUnmounted(() => {
 
 <style scoped>
 .date-picker-trigger {
-  @apply flex items-center gap-2;
+  @apply flex min-w-0 max-w-full items-center gap-2;
   @apply rounded-lg px-3 py-2 text-sm;
   @apply bg-white dark:bg-dark-800;
   @apply border border-gray-200 dark:border-dark-600;
@@ -404,15 +403,15 @@ onUnmounted(() => {
 }
 
 .date-picker-icon {
-  @apply text-gray-400 dark:text-dark-400;
+  @apply shrink-0 text-gray-400 dark:text-dark-400;
 }
 
 .date-picker-value {
-  @apply font-medium;
+  @apply min-w-0 truncate font-medium;
 }
 
 .date-picker-chevron {
-  @apply text-gray-400 dark:text-dark-400;
+  @apply shrink-0 text-gray-400 dark:text-dark-400;
 }
 
 .date-picker-dropdown {

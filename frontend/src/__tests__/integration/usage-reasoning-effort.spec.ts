@@ -214,7 +214,12 @@ const sharedPageStubs = {
 }
 
 function reasoningCellText(wrapper: ReturnType<typeof mount>): string {
-  return wrapper.get('[data-testid="reasoning-effort-cell"]').text()
+  const modelCell = wrapper.get('[data-testid="usage-model-cell"]')
+  const effortCell = wrapper.get('[data-testid="reasoning-effort-cell"]')
+  expect(modelCell.element.closest('td')?.nextElementSibling).toBe(effortCell.element.closest('td'))
+  expect(wrapper.get('th.usage-column-model').element.nextElementSibling)
+    .toBe(wrapper.get('th.usage-column-reasoning_effort').element)
+  return effortCell.text()
 }
 
 describe('usage reasoning effort page display', () => {
@@ -259,7 +264,7 @@ describe('usage reasoning effort page display', () => {
     expect(wrapper.text()).not.toContain('XHigh')
   })
 
-  it('admin usage page shows requested and mapped effort after the column is enabled', async () => {
+  it('admin usage page shows requested and mapped effort in a separate column after the model by default', async () => {
     const wrapper = mount(AdminUsageView, {
       global: {
         stubs: {
@@ -276,16 +281,17 @@ describe('usage reasoning effort page display', () => {
     })
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="reasoning-effort-cell"]').exists()).toBe(false)
-
-    await wrapper.get('[data-testid="usage-column-settings"]').trigger('click')
-    await wrapper.get('[data-testid="usage-column-toggle-reasoning_effort"]').trigger('click')
-    await flushPromises()
-
     const cell = reasoningCellText(wrapper)
     expect(cell).toContain('Max')
     expect(cell).toContain('XHigh')
-    expect(cell).toContain('↳')
+    expect(cell).toContain('→')
+    await wrapper.get('[data-testid="usage-column-settings"]').trigger('click')
+    const toggle = wrapper.get('[data-testid="usage-column-toggle-reasoning_effort"]')
+    await toggle.trigger('click')
+    expect(wrapper.find('[data-testid="reasoning-effort-cell"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="usage-model-cell"]').text()).toBe('gpt-5.4')
+    await toggle.trigger('click')
+    expect(reasoningCellText(wrapper)).toBe('Max → XHigh')
   })
 
   it('admin usage page shows a single value when reasoning effort was not mapped', async () => {
@@ -309,10 +315,6 @@ describe('usage reasoning effort page display', () => {
         },
       },
     })
-    await flushPromises()
-
-    await wrapper.get('[data-testid="usage-column-settings"]').trigger('click')
-    await wrapper.get('[data-testid="usage-column-toggle-reasoning_effort"]').trigger('click')
     await flushPromises()
 
     const cell = reasoningCellText(wrapper)

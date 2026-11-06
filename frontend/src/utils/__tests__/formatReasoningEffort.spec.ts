@@ -23,6 +23,14 @@ describe('formatReasoningEffortMapping', () => {
     expect(formatReasoningEffortMapping('max', 'xhigh')).toBe('Max → XHigh')
     expect(formatReasoningEffortMapping('high', 'medium')).toBe('High → Medium')
   })
+
+  it('distinguishes explicit minimal effort from a missing value', () => {
+    expect(formatReasoningEffortMapping('high', 'minimal')).toBe('High → -')
+    expect(formatReasoningEffortMapping('minimal', 'high')).toBe('- → High')
+    expect(formatReasoningEffortMapping('minimal', 'minimal')).toBe('-')
+    expect(formatReasoningEffortMapping('high', null)).toBe('High')
+    expect(formatReasoningEffortMapping('  ', 'high')).toBe('High')
+  })
 })
 
 describe('reasoningEffortValuesEqual', () => {

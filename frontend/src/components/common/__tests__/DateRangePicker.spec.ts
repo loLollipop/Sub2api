@@ -16,6 +16,7 @@ const messages: Record<string, string> = {
   'dates.startDate': 'Start Date',
   'dates.endDate': 'End Date',
   'dates.apply': 'Apply',
+  'dates.custom': 'Custom',
   'dates.selectDateRange': 'Select date range'
 }
 
@@ -106,11 +107,12 @@ describe('DateRangePicker second precision', () => {
   it('shows and emits seconds without truncating to dates or minutes', async () => {
     const wrapper = mountSeconds()
     await wrapper.vm.$nextTick()
-    expect(wrapper.text()).toContain('04:43:28')
-    expect(wrapper.text()).toContain('05:02:08')
+    expect(wrapper.get('.date-picker-value').text()).toBe('Custom')
     await wrapper.find('.date-picker-trigger').trigger('click')
     const inputs = wrapper.findAll('input[type="datetime-local"]')
     expect(inputs).toHaveLength(2)
+    expect(inputs[0].element.value.slice(0, 19)).toBe('2026-10-03T04:43:28')
+    expect(inputs[1].element.value.slice(0, 19)).toBe('2026-10-03T05:02:08')
     expect(inputs[0].attributes('step')).toBe('1')
     await inputs[1].setValue('2026-10-03T05:02:09')
     await wrapper.find('.date-picker-apply').trigger('click')
@@ -300,7 +302,7 @@ describe('DateRangePicker applied range and editing draft', () => {
     expect(wrapper.emitted('change')).toEqual([[{
       startDate: '2026-10-01T02:03:04', endDate: '2026-10-02T05:06:07', preset: null,
     }]])
-    expect(wrapper.get('.date-picker-value').text()).toContain('02:03:04')
+    expect(wrapper.get('.date-picker-value').text()).toBe('Custom')
     expect(wrapper.vm.refreshActivePreset()).toBeNull()
     wrapper.unmount()
   })
@@ -324,12 +326,52 @@ describe('DateRangePicker applied range and editing draft', () => {
     await wrapper.get('.date-picker-trigger').trigger('click')
     await wrapper.findAll('.date-picker-preset').find(node => node.text() === 'Yesterday')!.trigger('click')
     await wrapper.setProps({ startDate: '2026-10-04T01:02:03', endDate: '2026-10-05T04:05:06' })
-    expect(wrapper.get('.date-picker-value').text()).toContain('01:02:03')
+    expect(wrapper.get('.date-picker-value').text()).toBe('Custom')
     expect(wrapper.findAll('input').map(input => input.element.value.slice(0, 19))).toEqual([
       '2026-10-04T01:02:03', '2026-10-05T04:05:06',
     ])
     expect(wrapper.find('.date-picker-preset-active').exists()).toBe(false)
     expect(wrapper.vm.refreshActivePreset()).toBeNull()
+    wrapper.unmount()
+  })
+})
+
+describe('DateRangePicker shared preset', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('preserves a supplied rolling preset when mounting after the range was created', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 10, 6, 19, 30, 5))
+    const wrapper = mount(DateRangePicker, {
+      props: {
+        startDate: '2026-11-05T19:30:00', endDate: '2026-11-06T19:30:00',
+        includeTime: true, preset: 'last24Hours',
+      },
+      global: { stubs: { Icon: true } },
+    })
+    expect(wrapper.get('.date-picker-value').text()).toBe('Last 24 Hours')
+    expect(wrapper.vm.refreshActivePreset()).toEqual({
+      startDate: '2026-11-05T19:30:05', endDate: '2026-11-06T19:30:05',
+    })
+    wrapper.unmount()
+  })
+
+  it('keeps explicit custom ranges fixed and synchronizes a preset chosen by another picker', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 10, 6, 19, 30, 0))
+    const wrapper = mount(DateRangePicker, {
+      props: {
+        startDate: '2026-11-05T19:30:00', endDate: '2026-11-06T19:30:00',
+        includeTime: true, preset: null,
+      },
+      global: { stubs: { Icon: true } },
+    })
+    expect(wrapper.get('.date-picker-value').text()).toBe('Custom')
+    expect(wrapper.vm.refreshActivePreset()).toBeNull()
+    await wrapper.setProps({ preset: 'last24Hours' })
+    expect(wrapper.get('.date-picker-value').text()).toBe('Last 24 Hours')
+    vi.setSystemTime(new Date(2026, 10, 6, 19, 31, 0))
+    expect(wrapper.vm.refreshActivePreset()?.endDate).toBe('2026-11-06T19:31:00')
     wrapper.unmount()
   })
 })

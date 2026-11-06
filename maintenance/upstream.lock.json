@@ -2,31 +2,33 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.13",
-  "imported_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
+  "imported_version": "2.3.14",
+  "imported_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.13",
-  "latest_observed_release_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
-  "latest_observed_main_commit": "cc6abfb553a6732c88b549bba1465fe22c8bf8bf",
+  "latest_observed_version": "2.3.14",
+  "latest_observed_release_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
+  "latest_observed_main_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.13",
-  "reviewed_release_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
+  "reviewed_release_tag": "v2.3.14",
+  "reviewed_release_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
   "observed_delta_review": {
-    "from_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
-    "to_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
-    "status": "formal_v2313_selective_gif_and_complete_usage_ui_adaptation",
-    "scope": "Review 20 commits / 50 paths. Select native Images GIF normalization with local decode/resize limits and disposal corrections. Complete source-derived user/admin usage layouts and adapt settings toolbar/section hierarchy. Keep bounded real-usage disconnect draining; exclude the entire estimated incomplete/disconnect billing policy, deferred Hosted module and source framework/theme. Dependencies already patched locally; no migrations, personal version change or deployment.",
-    "evidence": "maintenance/notes/upstream-sync-20261106-v2313.md"
+    "from_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
+    "to_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+    "status": "formal_v2314_review_and_user_authorized_post_release_gif_parameter_backport",
+    "scope": "Review 7 commits / 8 paths. Exclude the formal v2.3.14 incomplete-billing estimator fixes because the entire policy remains absent locally. The user explicitly authorized the separately identified post-release GIF numeric-string compatibility fix; adapt only leaf 9c518bf7f while retaining exact non-negative integer/overflow checks and existing GIF resource limits. No UI changes, migrations, dependencies, personal version change or deployment.",
+    "evidence": "maintenance/notes/upstream-sync-20261106-v2314.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
+    "source_head": "ca2abf5c537d372084b8852c57a5883fcb52c804",
     "reviewed_without_runtime_changes": [
+      "Formal v2.3.14: opaque-blob folding, 2M estimated-input cap and Responses shape-dispatch repair only serve the excluded incomplete/disconnect estimated-billing policy. Review checkpoints advanced without enabling that policy; the separately user-authorized post-release GIF fix is recorded independently below.",
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "User-authorized post-v2.3.14 leaf 9c518bf7f: GIF frame_count/frame_duration_ms accept decimal integer strings, API-key JSON forwarding normalizes them to numbers and OAuth uses typed parsed fields. Keep bounded numeric validation, original numeric/multipart representations, native routes and GIF response budgets; see maintenance/notes/upstream-sync-20261106-v2314.md.",
       "Formal v2.3.12-v2.3.13: bounded native Images GIF frame/delay/dimension normalization; complete source-derived usage stats/chart/filter/toolbar/inflight UI for both roles and settings hierarchy. Preserve original drain/billing, local theme and all module exclusions. See maintenance/notes/upstream-sync-20261106-v2313.md.",
       "Formal v2.3.11 selected image 2.6/GIF/cache billing, configured plaza references/time labels, Grok preview and table deduplication. Correct eight reproduced source/local integration defects; preserve existing image routes, local UI and billing. See maintenance/notes/upstream-sync-20261105-v2311.md.",
       "Formal v2.3.6-v2.3.10 selected atomic admin balance/source writes and batch-set group user multipliers; adapt dashboard, usage and announcement UI to both local workspaces. Preserve local protocols, billing and theme; fix acknowledgment retry/session isolation and single-connection transaction lookup. See maintenance/notes/upstream-sync-20261105-v2310.md for exclusions and evidence.",
@@ -672,5 +674,23 @@
     "preserved": "Bounded drain of real terminal usage, native routes and retry/no-replay boundaries; local UI, all filters/exports/permission gates and prior module removals.",
     "migration": "None. Existing migrations, Ent, Go/frontend dependency manifests unchanged.",
     "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-06. Prepare personal v2.1.52 via PR/CI, own Release/GHCR and the existing controlled backup/restore-validated rollout; final source/artifact/runtime acceptance is recorded separately. No migration or dependency changes."
+  },
+  "sync_20261106_v2314": {
+    "evidence": "maintenance/notes/upstream-sync-20261106-v2314.md",
+    "reviewed_release_tag": "v2.3.14",
+    "reviewed_release_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
+    "selected_unreleased_backports": [
+      {
+        "commit": "9c518bf7f14754a32284181c23b2bd0ab98fd9fe",
+        "observed_main": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+        "authorization": "User explicitly requested selective synchronization after being informed that this GIF numeric-string fix is not in the formal release. This is a one-patch exception, not a change to release-only monitoring.",
+        "scope": "Quoted GIF control parsing and API-key JSON normalization, retaining local exact non-negative integer/overflow validation, OAuth/native behavior and existing resource limits."
+      }
+    ],
+    "excluded_commits": ["40fff03b9", "308bdd3e7"],
+    "excluded_scope": "Incomplete/disconnect estimated billing and its opaque-blob/shape-dispatch corrections; no immediate-disconnect or 95%-cache billing policy imported.",
+    "preserved": "Current adaptive usage-table edits and saved column preferences, local real-terminal-usage settlement, GIF rendering/resource bounds, prior module exclusions and the official-release-only monitoring policy.",
+    "migration": "None. Existing migrations, dependency manifests, personal VERSION and deployment configuration unchanged.",
+    "release_status": "User subsequently authorized GitHub submission and deployment. Prepare personal v2.1.53 including the previously accepted adaptive usage-table edits via PR/CI, own Release/GHCR and existing controlled backup/restore-validated rollout; final source/artifact/runtime acceptance is recorded separately. No migration, dependency or deployment configuration changes."
   }
 }

@@ -17,6 +17,7 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 import UsageTable from '../UsageTable.vue'
+import type { Column } from '@/components/common/types'
 
 const messages: Record<string, string> = {
   'admin.usage.userDeletedBadge': 'Deleted',
@@ -88,7 +89,7 @@ vi.mock('vue-i18n', async () => {
 })
 
 const DataTableStub = {
-  props: ['data'],
+  props: ['data', 'columns'],
   template: `
     <div>
       <div v-for="row in data" :key="row.request_id">
@@ -132,6 +133,49 @@ const baseImageRow = {
   image_size_source: null,
   image_size_breakdown: null,
 }
+
+describe('usage table column layout', () => {
+  it('updates adaptive spacing when visible columns change and handles an empty set', async () => {
+    const columns: Column[] = [
+      { key: 'user', label: 'User' },
+      { key: 'model', label: 'Model' },
+      { key: 'tokens', label: 'Token' },
+    ]
+    const wrapper = mount(UsageTable, {
+      props: { data: [], columns },
+      global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
+    })
+    const columnCount = () => (wrapper.get('.usage-table').element as HTMLElement).style.getPropertyValue('--usage-column-count')
+    expect(columnCount()).toBe('3')
+    await wrapper.setProps({ columns: columns.slice(0, 2) })
+    expect(columnCount()).toBe('2')
+    await wrapper.setProps({ columns: [] })
+    expect(columnCount()).toBe('1')
+    wrapper.unmount()
+  })
+
+  it('keeps caller column order and metadata while assigning readable column layouts', () => {
+    const columns: Column[] = [
+      { key: 'user', label: 'User', class: 'custom-user' },
+      { key: 'model', label: 'Model', sortable: true },
+      { key: 'tokens', label: 'Token' },
+      { key: 'created_at', label: 'Time', sortable: true },
+    ]
+    const wrapper = mount(UsageTable, {
+      props: { data: [], columns },
+      global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
+    })
+    const renderedColumns = wrapper.getComponent(DataTableStub).props('columns') as Column[]
+    expect(renderedColumns.map(({ key, label, sortable }) => ({ key, label, sortable })))
+      .toEqual(columns.map(({ key, label, sortable }) => ({ key, label, sortable })))
+    expect(renderedColumns[0].class).toContain('custom-user usage-column-user')
+    expect(renderedColumns[2].class).toBe('usage-column-tokens')
+    expect(renderedColumns[3].class).toContain('usage-date-column')
+    expect(columns[0].class).toBe('custom-user')
+    expect(wrapper.find('.overflow-auto').exists()).toBe(false)
+    wrapper.unmount()
+  })
+})
 
 describe('admin UsageTable tooltip', () => {
   it.each([

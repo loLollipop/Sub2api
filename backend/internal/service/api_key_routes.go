@@ -712,22 +712,3 @@ func (s *APIKeyService) replaceAPIKeyGroupRoutes(ctx context.Context, apiKeyID i
 	}
 	return nil
 }
-
-func (s *APIKeyService) attachAPIKeyGroupRoutes(ctx context.Context, keys []APIKey) error {
-	store, ok := s.apiKeyRepo.(apiKeyGroupRouteStore)
-	if !ok || len(keys) == 0 {
-		return nil
-	}
-	ids := make([]int64, 0, len(keys))
-	for i := range keys {
-		ids = append(ids, keys[i].ID)
-	}
-	routes, err := store.ListGroupRoutes(ctx, ids)
-	if err != nil {
-		return err
-	}
-	for i := range keys {
-		keys[i].RouteGroupIDs = routes[keys[i].ID]
-	}
-	return nil
-}

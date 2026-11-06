@@ -605,7 +605,8 @@ describe('admin UsageTable tooltip', () => {
     const text = wrapper.text()
     expect(text).toContain('Max')
     expect(text).toContain('XHigh')
-    expect(text).toContain('↳')
+    expect(wrapper.get('[data-testid="reasoning-effort-cell"]').text()).toBe('Max → XHigh')
+    expect(wrapper.get('[data-testid="usage-model-cell"]').text()).not.toContain('Max')
   })
 
   it('shows a single reasoning effort when requested matches forwarded', () => {

@@ -179,8 +179,8 @@ describe('user UsageView', () => {
     const wrapper = mountUsageView()
     await flushPromises()
     const vm = wrapper.vm as unknown as { visibleColumns: { key: string }[] }
-    expect(vm.visibleColumns.slice(0, 5).map(column => column.key)).toEqual([
-      'api_key', 'model', 'tokens', 'cost', 'latency',
+    expect(vm.visibleColumns.slice(0, 6).map(column => column.key)).toEqual([
+      'api_key', 'model', 'reasoning_effort', 'tokens', 'cost', 'latency',
     ])
     wrapper.unmount()
   })

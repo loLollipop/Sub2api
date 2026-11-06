@@ -21,7 +21,6 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/admin/group/__tests__/GroupRateMultipliersModal.requests.spec.ts \
 	src/components/admin/user/__tests__/UserAllowedGroupsModal.rates.spec.ts \
 	src/components/common/__tests__/PlatformIcon.spec.ts \
-	src/components/modelPlaza/__tests__/PlazaGroupSection.spec.ts \
 	src/components/modelPlaza/__tests__/PlazaModelPricingTable.spec.ts \
 	src/components/modelPlaza/__tests__/ModelPlazaContent.spec.ts \
 	src/components/admin/group/__tests__/GroupRPMOverridesModal.edit.spec.ts \

@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.14",
-  "imported_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
+  "imported_version": "2.3.15",
+  "imported_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.14",
-  "latest_observed_release_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
-  "latest_observed_main_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+  "latest_observed_version": "2.3.15",
+  "latest_observed_release_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+  "latest_observed_main_commit": "f035fdc0eb1aa9cebc816227703285f54505a6ed",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.14",
-  "reviewed_release_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
+  "reviewed_release_tag": "v2.3.15",
+  "reviewed_release_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
   "observed_delta_review": {
-    "from_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
+    "from_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
     "to_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
-    "status": "formal_v2314_review_and_user_authorized_post_release_gif_parameter_backport",
-    "scope": "Review 7 commits / 8 paths. Exclude the formal v2.3.14 incomplete-billing estimator fixes because the entire policy remains absent locally. The user explicitly authorized the separately identified post-release GIF numeric-string compatibility fix; adapt only leaf 9c518bf7f while retaining exact non-negative integer/overflow checks and existing GIF resource limits. No UI changes, migrations, dependencies, personal version change or deployment.",
-    "evidence": "maintenance/notes/upstream-sync-20261106-v2314.md"
+    "status": "formal_v2315_review_already_adapted_gif_fix",
+    "scope": "Review the formal release delta: 3 commits / 3 paths. GIF numeric-string parsing and API-key normalization from leaf 9c518bf7f are already locally adapted and regression-verified. The only newly observed main commit after the prior review is source VERSION bookkeeping. Advance formal release checkpoints without changing image behavior, existing UI edits, billing, dependencies, migrations or personal VERSION.",
+    "evidence": "maintenance/notes/upstream-sync-20261106-v2315.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "ca2abf5c537d372084b8852c57a5883fcb52c804",
+    "source_head": "a17cc8118ffdd1dc5931a3462aabf30685994630",
     "reviewed_without_runtime_changes": [
+      "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
       "Formal v2.3.14: opaque-blob folding, 2M estimated-input cap and Responses shape-dispatch repair only serve the excluded incomplete/disconnect estimated-billing policy. Review checkpoints advanced without enabling that policy; the separately user-authorized post-release GIF fix is recorded independently below.",
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
@@ -692,5 +693,16 @@
     "preserved": "Current adaptive usage-table edits and saved column preferences, local real-terminal-usage settlement, GIF rendering/resource bounds, prior module exclusions and the official-release-only monitoring policy.",
     "migration": "None. Existing migrations, dependency manifests, personal VERSION and deployment configuration unchanged.",
     "release_status": "User subsequently authorized GitHub submission and deployment. Prepare personal v2.1.53 including the previously accepted adaptive usage-table edits via PR/CI, own Release/GHCR and existing controlled backup/restore-validated rollout; final source/artifact/runtime acceptance is recorded separately. No migration, dependency or deployment configuration changes."
+  },
+  "sync_20261106_v2315": {
+    "evidence": "maintenance/notes/upstream-sync-20261106-v2315.md",
+    "reviewed_release_tag": "v2.3.15",
+    "reviewed_release_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+    "reviewed_commits": ["01d3b5db7", "9c518bf7f", "a17cc8118"],
+    "already_adapted": "GIF frame_count/frame_duration_ms accept numeric strings and API-key forwarding normalizes them to JSON numbers. Local exact integer, non-negative and overflow validation, OAuth/native routes and GIF resource budgets remain in place.",
+    "excluded_scope": "Source VERSION bookkeeping; previous estimated-disconnect billing and other recorded module exclusions remain unchanged.",
+    "preserved": "All 31 pre-existing changed paths, including the compact time-range fix, independent effort column immediately after model, search/error-list race fixes and verified unused-code removals.",
+    "migration": "None. Dependency manifests, migrations, personal VERSION and deployment configuration unchanged.",
+    "release_status": "User subsequently authorized GitHub submission and deployment. Prepare personal v2.1.54 with the accepted usage-range/independent-effort-column/race fixes and unused-code cleanup through PR/CI, own Release/GHCR and the existing backup/restore-validated controlled rollout; final acceptance is recorded separately. No migration, dependency or deployment configuration changes."
   }
 }

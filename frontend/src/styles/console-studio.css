@@ -528,15 +528,6 @@ body:has(.console-signal) > .select-dropdown-portal {
   min-height: 146px;
 }
 
-.console-signal .plaza-group {
-  box-shadow: none;
-}
-
-.console-signal .plaza-group-header {
-  background: var(--signal-surface);
-  border-top: 2px solid var(--signal-control-line);
-}
-
 .console-signal .signal-editorial-heading::after {
   content: '';
   position: absolute;
@@ -559,8 +550,7 @@ body:has(.console-signal) > .select-dropdown-portal {
 
   /* 卡片入场：stagger 展开（最多 9 张，超出统一走末位延迟） */
   .console-signal :is(.signal-lead-grid, .signal-stat-strip) > .signal-metric,
-  .console-signal .admin-metric-grid > .card,
-  .console-signal .plaza-group {
+  .console-signal .admin-metric-grid > .card {
     animation: console-content-enter 460ms var(--motion-out) var(--console-enter-delay, 0ms) backwards;
   }
 

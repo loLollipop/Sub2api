@@ -9,6 +9,7 @@
             include-time
             :start-date="startDate"
             :end-date="endDate"
+            :preset="preset"
             @change="onDateRangeChange"
           />
         </div>
@@ -66,6 +67,7 @@
           <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
           <input
             v-model="apiKeyKeyword"
+            data-testid="usage-api-key-search"
             type="text"
             class="input pr-8"
             :placeholder="t('admin.usage.searchApiKeyPlaceholder')"
@@ -109,6 +111,7 @@
           <label class="input-label">{{ t('admin.usage.account') }}</label>
           <input
             v-model="accountKeyword"
+            data-testid="usage-account-search"
             type="text"
             class="input pr-8"
             :placeholder="t('admin.usage.searchAccountPlaceholder')"
@@ -251,6 +254,7 @@ interface Props {
   exporting: boolean
   startDate: string
   endDate: string
+  preset?: string | null
   showActions?: boolean
   modelOptions?: string[]
   /**
@@ -304,6 +308,7 @@ const apiKeyKeyword = ref('')
 const apiKeyResults = ref<SimpleApiKey[]>([])
 const showApiKeyDropdown = ref(false)
 let apiKeySearchTimeout: ReturnType<typeof setTimeout> | null = null
+let apiKeySearchSequence = 0
 
 interface SimpleAccount {
   id: number
@@ -313,6 +318,7 @@ const accountKeyword = ref('')
 const accountResults = ref<SimpleAccount[]>([])
 const showAccountDropdown = ref(false)
 let accountSearchTimeout: ReturnType<typeof setTimeout> | null = null
+let accountSearchSequence = 0
 
 const modelOptions = computed<SelectOption[]>(() => [
   { value: null, label: t('admin.usage.allModels') },
@@ -412,34 +418,38 @@ const debounceUserSearch = () => {
   }, 300)
 }
 
-const debounceApiKeySearch = () => {
+const clearPendingApiKeySearch = () => {
   if (apiKeySearchTimeout) clearTimeout(apiKeySearchTimeout)
-  apiKeySearchTimeout = setTimeout(async () => {
-    try {
-      apiKeyResults.value = await adminAPI.usage.searchApiKeys(
-        filters.value.user_id,
-        apiKeyKeyword.value || ''
-      )
-    } catch {
-      apiKeyResults.value = []
-    }
+  apiKeySearchTimeout = null
+  apiKeySearchSequence += 1
+}
+
+const searchApiKeys = async (sequence: number) => {
+  try {
+    const results = await adminAPI.usage.searchApiKeys(filters.value.user_id, apiKeyKeyword.value || '')
+    if (sequence === apiKeySearchSequence) apiKeyResults.value = results
+  } catch {
+    if (sequence === apiKeySearchSequence) apiKeyResults.value = []
+  }
+}
+
+const debounceApiKeySearch = () => {
+  clearPendingApiKeySearch()
+  const sequence = apiKeySearchSequence
+  apiKeySearchTimeout = setTimeout(() => {
+    apiKeySearchTimeout = null
+    void searchApiKeys(sequence)
   }, 300)
 }
 
-const selectUser = async (u: SimpleUser) => {
+const selectUser = (u: SimpleUser) => {
   clearPendingUserSearch()
   userKeyword.value = u.email
   showUserDropdown.value = false
   filters.value.user_id = u.id
   clearApiKey()
 
-  // Auto-load API keys for this user
-  try {
-    apiKeyResults.value = await adminAPI.usage.searchApiKeys(u.id, '')
-  } catch {
-    apiKeyResults.value = []
-  }
-
+  void searchApiKeys(apiKeySearchSequence)
   emitChange()
 }
 
@@ -454,6 +464,7 @@ const clearUser = () => {
 }
 
 const selectApiKey = (k: SimpleApiKey) => {
+  clearPendingApiKeySearch()
   apiKeyKeyword.value = k.name || String(k.id)
   showApiKeyDropdown.value = false
   filters.value.api_key_id = k.id
@@ -461,6 +472,7 @@ const selectApiKey = (k: SimpleApiKey) => {
 }
 
 const clearApiKey = () => {
+  clearPendingApiKeySearch()
   apiKeyKeyword.value = ''
   apiKeyResults.value = []
   showApiKeyDropdown.value = false
@@ -472,23 +484,35 @@ const onClearApiKey = () => {
   emitChange()
 }
 
-const debounceAccountSearch = () => {
+const clearPendingAccountSearch = () => {
   if (accountSearchTimeout) clearTimeout(accountSearchTimeout)
+  accountSearchTimeout = null
+  accountSearchSequence += 1
+}
+
+const debounceAccountSearch = () => {
+  clearPendingAccountSearch()
+  const query = accountKeyword.value.trim()
+  if (!query) {
+    accountResults.value = []
+    return
+  }
+  const sequence = accountSearchSequence
   accountSearchTimeout = setTimeout(async () => {
-    if (!accountKeyword.value) {
-      accountResults.value = []
-      return
-    }
+    accountSearchTimeout = null
     try {
-      const res = await adminAPI.accounts.list(1, 20, { search: accountKeyword.value })
-      accountResults.value = res.items.map((a) => ({ id: a.id, name: a.name }))
+      const res = await adminAPI.accounts.list(1, 20, { search: query })
+      if (sequence === accountSearchSequence) {
+        accountResults.value = res.items.map((a) => ({ id: a.id, name: a.name }))
+      }
     } catch {
-      accountResults.value = []
+      if (sequence === accountSearchSequence) accountResults.value = []
     }
   }, 300)
 }
 
 const selectAccount = (a: SimpleAccount) => {
+  clearPendingAccountSearch()
   accountKeyword.value = a.name
   showAccountDropdown.value = false
   filters.value.account_id = a.id
@@ -496,6 +520,7 @@ const selectAccount = (a: SimpleAccount) => {
 }
 
 const clearAccount = () => {
+  clearPendingAccountSearch()
   accountKeyword.value = ''
   accountResults.value = []
   showAccountDropdown.value = false
@@ -543,32 +568,38 @@ watch(
 watch(
   () => filters.value.user_id,
   (userId) => {
+    clearApiKey()
     if (!userId) {
       clearPendingUserSearch()
       userKeyword.value = ''
       userResults.value = []
     }
-  }
+  },
+  { flush: 'sync' }
 )
 
 watch(
   () => filters.value.api_key_id,
   (apiKeyId) => {
     if (!apiKeyId) {
+      clearPendingApiKeySearch()
       apiKeyKeyword.value = ''
       apiKeyResults.value = []
     }
-  }
+  },
+  { flush: 'sync' }
 )
 
 watch(
   () => filters.value.account_id,
   (accountId) => {
     if (!accountId) {
+      clearPendingAccountSearch()
       accountKeyword.value = ''
       accountResults.value = []
     }
-  }
+  },
+  { flush: 'sync' }
 )
 
 onMounted(async () => {
@@ -585,6 +616,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearPendingUserSearch()
+  clearPendingApiKeySearch()
+  clearPendingAccountSearch()
   document.removeEventListener('click', onDocumentClick)
 })
 

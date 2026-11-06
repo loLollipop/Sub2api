@@ -790,10 +790,6 @@ type GatewayService struct {
 	modelsListSF          singleflight.Group
 	platformsListCache    *gocache.Cache
 	platformsListCacheTTL time.Duration
-	// usageQuotaFlushSF coalesces best-effort platform-quota persistence. Redis
-	// remains the request-time source; the durable write is intentionally bounded
-	// and cannot create one goroutine/transaction per completed request.
-	usageQuotaFlushSF     singleflight.Group
 	settingService        *SettingService
 	responseHeaderFilter  *responseheaders.CompiledHeaderFilter
 	debugModelRouting     atomic.Bool

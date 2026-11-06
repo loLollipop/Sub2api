@@ -57,24 +57,13 @@
         </template>
 
         <template #cell-model="{ row }">
-          <div class="space-y-0.5 text-xs">
-            <div v-if="row.model_mapping_chain && row.model_mapping_chain.includes('→')" class="space-y-0.5">
-              <div v-for="(step, i) in row.model_mapping_chain.split('→')" :key="i"
-                   class="break-all"
-                   :class="i === 0 ? 'font-medium text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'"
-                   :style="i > 0 ? `padding-left: ${i * 0.75}rem` : ''">
-                <span v-if="i > 0" class="mr-0.5">↳</span>{{ step }}
-              </div>
+          <div data-testid="usage-model-cell" class="space-y-0.5 text-xs">
+            <div v-for="(step, i) in modelSteps(row)" :key="i"
+                 class="break-all"
+                 :class="i === 0 ? 'font-medium text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'"
+                 :style="i > 0 ? `padding-left: ${i * 0.75}rem` : ''">
+              <span v-if="i > 0" class="mr-0.5">↳</span>{{ step }}
             </div>
-            <div v-else-if="row.upstream_model && row.upstream_model !== row.model" class="space-y-0.5">
-              <div class="break-all font-medium text-gray-900 dark:text-white">
-                {{ row.model }}
-              </div>
-              <div class="break-all text-gray-500 dark:text-gray-400">
-                <span class="mr-0.5">↳</span>{{ row.upstream_model }}
-              </div>
-            </div>
-            <span v-else class="font-medium text-gray-900 dark:text-white">{{ row.model }}</span>
             <div
               v-if="row.upstream_model_mismatch === true && row.upstream_response_model"
               class="break-all pl-3 text-[11px]"
@@ -95,16 +84,8 @@
         </template>
 
         <template #cell-reasoning_effort="{ row }">
-          <div v-if="hasReasoningEffortMapping(row)" data-testid="reasoning-effort-cell" class="space-y-0.5 text-xs">
-            <div class="font-medium text-gray-900 dark:text-white">
-              {{ formatReasoningEffort(row.reasoning_effort) }}
-            </div>
-            <div class="text-gray-500 dark:text-gray-400">
-              <span class="mr-0.5">↳</span>{{ formatReasoningEffort(row.upstream_reasoning_effort) }}
-            </div>
-          </div>
-          <span v-else data-testid="reasoning-effort-cell" class="text-sm text-gray-900 dark:text-white">
-            {{ formatReasoningEffort(row.reasoning_effort) }}
+          <span data-testid="reasoning-effort-cell" class="whitespace-nowrap text-sm text-gray-900 dark:text-white">
+            {{ reasoningEffortLabel(row) }}
           </span>
         </template>
 
@@ -576,7 +557,7 @@
 import { computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
-import { formatDateTime, formatReasoningEffort, reasoningEffortValuesEqual } from '@/utils/format'
+import { formatDateTime, formatReasoningEffortMapping } from '@/utils/format'
 import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
@@ -658,8 +639,6 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const displayDuration = (row: { duration_ms?: number | null }) => row.duration_ms
 const copiedRequestId = ref<string | null>(null)
-const showAccountBilling = props.showAccountBilling
-const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)
 
 const showIpGeoToolbar = computed(() => props.columns.some((col) => col.key === 'ip_address'))
@@ -675,11 +654,13 @@ const layoutColumns = computed(() => props.columns.map(column => ({
   ].filter(Boolean).join(' '),
 })))
 
-const hasReasoningEffortMapping = (row: AdminUsageLog): boolean => {
-  const requested = row.reasoning_effort?.trim() || ''
-  const forwarded = row.upstream_reasoning_effort?.trim() || ''
-  return requested !== '' && forwarded !== '' && !reasoningEffortValuesEqual(requested, forwarded)
+const modelSteps = (row: AdminUsageLog): string[] => {
+  if (row.model_mapping_chain?.includes('→')) return row.model_mapping_chain.split('→').map(step => step.trim())
+  return row.upstream_model && row.upstream_model !== row.model ? [row.model, row.upstream_model] : [row.model]
 }
+
+const reasoningEffortLabel = (row: AdminUsageLog): string =>
+  formatReasoningEffortMapping(row.reasoning_effort, row.upstream_reasoning_effort)
 
 const sentUpstreamModel = (row: AdminUsageLog): string => row.upstream_model?.trim() || row.model?.trim() || ''
 

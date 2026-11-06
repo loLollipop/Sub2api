@@ -7,7 +7,7 @@
       </section>
       <section class="usage-range-card">
         <AnalyticsToolbar refresh :loading="loading || chartsLoading || modelStatsLoading" @refresh="refreshData">
-          <template #date><DateRangePicker ref="rangeToolbarRef" include-time v-model:start-date="startDate" v-model:end-date="endDate" @change="onDateRangeChange" /></template>
+          <template #date><DateRangePicker ref="rangeToolbarRef" include-time :preset="datePreset" v-model:start-date="startDate" v-model:end-date="endDate" @change="onDateRangeChange" /></template>
           <template #granularity><Select v-model="granularity" :options="granularityOptions" :aria-label="t('admin.dashboard.granularity')" @change="loadChartData" /></template>
         </AnalyticsToolbar>
       </section>
@@ -75,7 +75,7 @@
           </button>
         </div>
 
-        <UsageFilters v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="usage-filter-panel" :start-date="startDate" :end-date="endDate" :exporting="exporting" :model-options="modelNameOptions" @date-range-change="onDateRangeChange" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
+        <UsageFilters v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="usage-filter-panel" :start-date="startDate" :end-date="endDate" :preset="datePreset" :exporting="exporting" :model-options="modelNameOptions" @date-range-change="onDateRangeChange" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
           <template #after-reset>
             <div v-if="activeTab !== 'ranking'" class="relative" ref="columnDropdownRef">
               <button
@@ -318,6 +318,7 @@ const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
 }
 const defaultRange = getLast24HoursRangeDates()
 const startDate = ref(defaultRange.start); const endDate = ref(defaultRange.end)
+const datePreset = ref<string | null>('last24Hours')
 const filters = ref<AdminUsageQueryParams>({ user_id: undefined, model: undefined, group_id: undefined, request_type: undefined, native_compaction_v2: null, billing_type: null, start_date: startDate.value, end_date: endDate.value })
 const pagination = reactive({ page: 1, page_size: getPersistedPageSize(), total: 0 })
 const sortState = reactive({
@@ -341,6 +342,7 @@ const applyRouteQueryFilters = () => {
   const queryStartDate = getSingleQueryValue(route.query.start_date)
   const queryEndDate = getSingleQueryValue(route.query.end_date)
   const queryUserId = getNumericQueryValue(route.query.user_id)
+  if (queryStartDate || queryEndDate) datePreset.value = null
 
   if (queryStartDate) {
     startDate.value = queryStartDate
@@ -379,6 +381,7 @@ const loadRouteUserFilterLabel = async () => {
 }
 
 const onDateRangeChange = (range: { startDate: string; endDate: string; preset: string | null }) => {
+  datePreset.value = range.preset
   startDate.value = range.startDate
   endDate.value = range.endDate
   filters.value = {
@@ -635,14 +638,14 @@ const applyFilters = () => {
   loadModelStats(modelDistributionSource.value, true)
   loadChartData()
   errPage.value = 1
+  invalidateErrors()
   if (activeTab.value === 'errors') {
     loadAdminErrors()
-  } else {
-    errRows.value = []
   }
 }
 const handleRequestIdClick = (requestID: string) => {
   filters.value.request_id = '=' + requestID
+  invalidateErrors()
   pagination.page = 1
   loadLogs()
 }
@@ -665,11 +668,13 @@ const refreshData = () => {
   loadStats(true)
   loadModelStats(modelDistributionSource.value, true)
   loadChartData()
+  invalidateErrors()
   if (activeTab.value === 'errors') loadAdminErrors()
   if (rankingMounted.value) rankingRef.value?.reload()
 }
 const resetFilters = () => {
   const range = getLast24HoursRangeDates()
+  datePreset.value = 'last24Hours'
   startDate.value = range.start
   endDate.value = range.end
   filters.value = { start_date: startDate.value, end_date: endDate.value, request_type: undefined, native_compaction_v2: null, billing_type: null, billing_mode: undefined }
@@ -763,7 +768,7 @@ const exportToExcel = async () => {
 
 // Column visibility
 const ALWAYS_VISIBLE = ['user', 'created_at']
-const DEFAULT_HIDDEN_COLUMNS = ['reasoning_effort', 'request_id', 'upstream_request_id', 'user_agent']
+const DEFAULT_HIDDEN_COLUMNS = ['request_id', 'upstream_request_id', 'user_agent']
 const HIDDEN_COLUMNS_KEY = 'usage-hidden-columns'
 const HIDDEN_COLUMNS_VERSION_KEY = 'usage-hidden-columns-version'
 // 隐藏列版本链：每级只把当级新增列加入隐藏集，不重置用户已显式打开的列。
@@ -775,10 +780,10 @@ const allColumns = computed(() => [
   { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
   { key: 'account', label: t('admin.usage.account'), sortable: false },
   { key: 'model', label: t('usage.model'), sortable: true },
+  { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
   { key: 'cost', label: t('usage.cost'), sortable: false },
   { key: 'latency', label: t('usage.latency'), sortable: false },
-  { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
   { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
   { key: 'group', label: t('admin.usage.group'), sortable: false },
   { key: 'stream', label: t('usage.type'), sortable: false },
@@ -924,6 +929,13 @@ const errLoading = ref(false)
 const errPage = ref(1)
 const errPageSize = ref(20)
 const errTotal = ref(0)
+let errRequestSequence = 0
+const invalidateErrors = () => {
+  ++errRequestSequence
+  errRows.value = []
+  errTotal.value = 0
+  errLoading.value = false
+}
 const errSortBy = ref('created_at')
 const errSortOrder = ref<'asc' | 'desc'>('desc')
 const showErrorModal = ref(false)
@@ -938,6 +950,7 @@ const toRFC3339 = (d: string | undefined, endOfRange = false): string | undefine
 }
 
 const loadAdminErrors = async () => {
+  const sequence = ++errRequestSequence
   errLoading.value = true
   try {
     const resp = await listErrorLogs({
@@ -958,13 +971,15 @@ const loadAdminErrors = async () => {
       sort_by: errSortBy.value,
       sort_order: errSortOrder.value,
     })
+    if (sequence !== errRequestSequence) return
     errRows.value = resp.items
     errTotal.value = resp.total
   } catch (error) {
+    if (sequence !== errRequestSequence) return
     console.error('Failed to load admin errors:', error)
     appStore.showError(t('usage.errors.failedToLoad'))
   } finally {
-    errLoading.value = false
+    if (sequence === errRequestSequence) errLoading.value = false
   }
 }
 
@@ -1000,7 +1015,7 @@ onMounted(() => {
   loadSavedErrColumns()
   document.addEventListener('click', handleColumnClickOutside)
 })
-onUnmounted(() => { ++logsGeneration; invalidateInflight(); abortController?.abort(); exportAbortController?.abort(); document.removeEventListener('click', handleColumnClickOutside) })
+onUnmounted(() => { ++logsGeneration; ++errRequestSequence; invalidateInflight(); abortController?.abort(); exportAbortController?.abort(); document.removeEventListener('click', handleColumnClickOutside) })
 
 watch(modelDistributionSource, (source) => {
   void loadModelStats(source)

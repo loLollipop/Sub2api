@@ -75,10 +75,10 @@ func emailMetricBlock(label, value string) string {
 
 func emailDetails(rows ...[2]string) string {
 	var b strings.Builder
-	b.WriteString(`<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:20px 0;border-collapse:collapse;table-layout:fixed;font-size:14px;line-height:1.7;">`)
+	_, _ = b.WriteString(`<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:20px 0;border-collapse:collapse;table-layout:fixed;font-size:14px;line-height:1.7;">`)
 	for _, row := range rows {
-		b.WriteString(`<tr><td style="width:40%;padding:12px 8px 12px 0;border-bottom:1px solid #eee8df;color:#857565;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;">` + row[0] + `</td><td style="padding:12px 0 12px 8px;border-bottom:1px solid #eee8df;color:#302a23;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap;">` + row[1] + `</td></tr>`)
+		_, _ = b.WriteString(`<tr><td style="width:40%;padding:12px 8px 12px 0;border-bottom:1px solid #eee8df;color:#857565;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;">` + row[0] + `</td><td style="padding:12px 0 12px 8px;border-bottom:1px solid #eee8df;color:#302a23;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap;">` + row[1] + `</td></tr>`)
 	}
-	b.WriteString(`</table>`)
+	_, _ = b.WriteString(`</table>`)
 	return b.String()
 }

@@ -609,6 +609,22 @@ describe('admin UsageTable tooltip', () => {
     expect(wrapper.get('[data-testid="usage-model-cell"]').text()).not.toContain('Max')
   })
 
+  it.each([
+    ['high', 'minimal', 'High → -'],
+    ['minimal', 'high', '- → High'],
+  ])('preserves the %s to %s effort mapping', (requested, forwarded, expected) => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [{ request_id: 'req-minimal-mapping', model: 'gpt-5.4', reasoning_effort: requested, upstream_reasoning_effort: forwarded }],
+        loading: false,
+        columns: [],
+      },
+      global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
+    })
+    expect(wrapper.get('[data-testid="reasoning-effort-cell"]').text()).toBe(expected)
+    wrapper.unmount()
+  })
+
   it('shows a single reasoning effort when requested matches forwarded', () => {
     const wrapper = mount(UsageTable, {
       props: {

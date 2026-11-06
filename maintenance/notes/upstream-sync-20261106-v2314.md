@@ -39,6 +39,8 @@ v2.3.14 的 `40fff03b9` 和 `308bdd3e7` 折叠大段 base64、把估算输入封
 - `CGO_ENABLED=0 go build -p 2 -tags embed ./cmd/server` 通过，产物写入诊断目录，未替换运行中的服务。
 - 修改的 Go 文件已通过 `gofmt` 格式检查，来源锁文件可解析，`git diff --check` 通过。
 
+发布 CI 首次运行发现相邻旧回归 `TestImagesRegressionGIFFractionNotSilentlyTruncated` 仍把合法数字字符串 `"2"` 列为拒绝项。已按本次明确采用的新契约更新该 fixture，保留所有数字非整数、负数与溢出拒绝断言，并补充对应字符串非法值和 direct OAuth 合法整数字符串的类型/数值检查；没有修改运行时代码。此前定向正则未覆盖 `TestImagesRegression`，发布时补跑此组全部回归通过，首次 CI 失败证据保留在发布记录中。
+
 原始测试日志、构建日志和检查产物位于工作区 `development/diagnostics/upstream-v2314-gif-20261106/`。前端文件在 GIF 同步阶段没有修改，沿用此前使用记录自适应布局的有效验证结果。未发送真实模型或付费生图请求。
 
 ## 个人 v2.1.53 发布授权

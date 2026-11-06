@@ -75,21 +75,28 @@ func TestImagesRegressionDirectNonStreamUserErrorWritesResponse(t *testing.T) {
 
 func TestImagesRegressionGIFFractionNotSilentlyTruncated(t *testing.T) {
 	for _, field := range []string{"frame_count", "frame_duration_ms"} {
-		for _, value := range []string{"2.9", "120.5", "1e100", "9223372036854775808", "-1", `"2"`} {
+		for _, value := range []string{"2.9", "120.5", "1e100", "9223372036854775808", "-1", `"2.9"`, `"120.5"`, `"1e100"`, `"9223372036854775808"`, `"-1"`} {
 			raw := []byte(fmt.Sprintf(`{"model":"gpt-image-2.6-flare","prompt":"draw","output_format":"gif",%q:%s}`, field, value))
 			c, _ := newOpenAIImagesTestContext(t, raw)
 			_, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, raw)
 			require.Error(t, err, "%s=%s must not be truncated", field, value)
 		}
 	}
-	raw := []byte(`{"model":"gpt-image-2.6-flare","prompt":"draw","frame_count":2e1,"frame_duration_ms":1.2e2}`)
-	c, _ := newOpenAIImagesTestContext(t, raw)
-	parsed, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, raw)
-	require.NoError(t, err)
-	encoded, _, err := buildOpenAIImagesOAuthPayload(parsed, parsed.Model)
-	require.NoError(t, err)
-	require.Equal(t, int64(20), gjson.GetBytes(encoded, "frame_count").Int())
-	require.Equal(t, int64(120), gjson.GetBytes(encoded, "frame_duration_ms").Int())
+	for _, fields := range []string{
+		`"frame_count":2e1,"frame_duration_ms":1.2e2`,
+		`"frame_count":"20","frame_duration_ms":"120"`,
+	} {
+		raw := []byte(`{"model":"gpt-image-2.6-flare","prompt":"draw",` + fields + `}`)
+		c, _ := newOpenAIImagesTestContext(t, raw)
+		parsed, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, raw)
+		require.NoError(t, err)
+		encoded, _, err := buildOpenAIImagesOAuthPayload(parsed, parsed.Model)
+		require.NoError(t, err)
+		require.Equal(t, gjson.Number, gjson.GetBytes(encoded, "frame_count").Type)
+		require.Equal(t, int64(20), gjson.GetBytes(encoded, "frame_count").Int())
+		require.Equal(t, gjson.Number, gjson.GetBytes(encoded, "frame_duration_ms").Type)
+		require.Equal(t, int64(120), gjson.GetBytes(encoded, "frame_duration_ms").Int())
+	}
 }
 
 func TestImagesRegressionAccountTestFallbackParity(t *testing.T) {

@@ -1,20 +1,20 @@
 <template>
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    <div class="card p-4 flex items-center gap-3">
+  <div class="usage-metrics">
+    <div class="usage-metric" data-testid="usage-metric">
       <div class="usage-stat-icon rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30 text-blue-600">
         <Icon name="document" size="md" />
       </div>
       <div>
-        <p class="text-xs font-medium text-gray-500">{{ t('usage.totalRequests') }}</p>
-        <p class="text-xl font-bold">{{ stats?.total_requests?.toLocaleString() || '0' }}</p>
-        <p class="text-xs text-gray-400">{{ t('usage.inSelectedRange') }}</p>
+        <p class="usage-metric-label">{{ t('usage.totalRequests') }}</p>
+        <p class="usage-metric-value">{{ stats?.total_requests?.toLocaleString() || '0' }}</p>
+        <p class="usage-metric-note">{{ t('usage.inSelectedRange') }}</p>
       </div>
     </div>
-    <div class="card p-4 flex items-center gap-3">
+    <div class="usage-metric" data-testid="usage-metric">
       <div class="usage-stat-icon rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30 text-amber-600"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" /></svg></div>
       <div>
-        <p class="text-xs font-medium text-gray-500">{{ t('usage.totalTokens') }}</p>
-        <p class="text-xl font-bold">{{ formatTokens(stats?.total_tokens || 0) }}</p>
+        <p class="usage-metric-label">{{ t('usage.totalTokens') }}</p>
+        <p class="usage-metric-value">{{ formatTokens(stats?.total_tokens || 0) }}</p>
         <p class="flex flex-wrap items-center gap-x-1 text-xs text-gray-500">
           <span>{{ t('usage.in') }}: {{ formatTokens(stats?.total_input_tokens || 0) }}</span>
           <span>/</span>
@@ -58,16 +58,16 @@
         </p>
       </div>
     </div>
-    <div class="card p-4 flex items-center gap-3">
+    <div class="usage-metric" data-testid="usage-metric">
       <div class="usage-stat-icon rounded-lg bg-green-100 p-2 dark:bg-green-900/30 text-green-600">
         <Icon name="dollar" size="md" />
       </div>
       <div class="min-w-0 flex-1">
-        <p class="text-xs font-medium text-gray-500">{{ t('usage.totalCost') }}</p>
-        <p class="text-xl font-bold text-green-600">
+        <p class="usage-metric-label">{{ t('usage.totalCost') }}</p>
+        <p class="usage-metric-value usage-metric-cost">
           ${{ (stats?.total_actual_cost || 0).toFixed(4) }}
         </p>
-        <p class="text-xs text-gray-400">
+        <p class="usage-metric-note">
           <template v-if="showAccountCost && totalAccountCost != null">
             <span class="text-orange-500">{{ t('usage.accountCost') }} ${{ totalAccountCost.toFixed(4) }}</span>
             <span> · </span>
@@ -79,11 +79,11 @@
         </p>
       </div>
     </div>
-    <div class="card p-4 flex items-center gap-3">
+    <div class="usage-metric" data-testid="usage-metric">
       <div class="usage-stat-icon rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30 text-purple-600">
         <Icon name="clock" size="md" />
       </div>
-      <div><p class="text-xs font-medium text-gray-500">{{ t('usage.avgDuration') }}</p><p class="text-xl font-bold">{{ formatDuration(stats?.average_duration_ms || 0) }}</p></div>
+      <div><p class="usage-metric-label">{{ t('usage.avgDuration') }}</p><p class="usage-metric-value">{{ formatDuration(stats?.average_duration_ms || 0) }}</p></div>
     </div>
   </div>
 </template>
@@ -128,11 +128,23 @@ const cacheDetailLabel = () => t('usage.cacheBreakdown')
 </script>
 
 <style scoped>
-/* Light mode: neutral icon chips with a hairline ring (Nuxt UI dashboard stats). */
-html:not(.dark) .usage-stat-icon {
-  border-radius: 9999px;
-  background: #f4f4f4;
-  box-shadow: inset 0 0 0 1px #e5e5e5;
-  color: #171717;
+.usage-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; border: 1px solid var(--signal-line); border-radius: 12px; background: var(--signal-surface); }
+.usage-metric { display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 22px 20px; border-right: 1px solid var(--signal-line); }
+.usage-metric:last-child { border-right: 0; }
+.usage-metric > div:last-child { min-width: 0; overflow-wrap: anywhere; }
+.usage-stat-icon { flex-shrink: 0; margin-top: 2px; padding: 3px; border-radius: 50%; background: var(--signal-inset); box-shadow: inset 0 0 0 1px var(--signal-line); color: var(--signal-muted); }
+.usage-metric-label { color: var(--signal-muted); font-size: 12px; line-height: 20px; font-weight: 500; }
+.usage-metric-value { margin: 3px 0; color: var(--signal-text); font-size: 28px; line-height: 34px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+.usage-metric-cost { color: var(--signal-amber); }
+.usage-metric-note { color: var(--signal-muted); font-size: 12px; line-height: 20px; }
+@media (max-width: 1023px) {
+  .usage-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .usage-metric:nth-child(2) { border-right: 0; }
+  .usage-metric:nth-child(-n+2) { border-bottom: 1px solid var(--signal-line); }
+}
+@media (max-width: 639px) {
+  .usage-metric { gap: 8px; padding: 16px 12px; }
+  .usage-metric-value { font-size: 23px; line-height: 30px; }
+  .usage-stat-icon :deep(svg) { width: 16px; height: 16px; }
 }
 </style>

@@ -230,6 +230,27 @@ describe('user UsageView', () => {
     expect(showError).not.toHaveBeenCalled()
   })
 
+  it('contains the records toolbar and exposes an inflight failure with a working retry', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+    query.mockImplementation(params => params.inflight_only
+      ? Promise.reject(new Error('temporary failure'))
+      : Promise.resolve({ items: [], total: 0 }))
+    const vm = wrapper.vm as any
+    vm.toggleInflight()
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('usage.inflightLoadFailed')
+    expect(wrapper.find('[data-testid="inflight-empty"]').exists()).toBe(false)
+    query.mockResolvedValue({ items: [], total: 0 })
+    await wrapper.get('[data-testid="inflight-refresh"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="inflight-empty"]').exists()).toBe(true)
+    expect(wrapper.get('.usage-record-workspace .usage-record-toolbar').exists()).toBe(true)
+    expect(wrapper.get('.usage-record-workspace .signal-log-filters').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('keeps latest completed logs when an older silent response arrives', async () => {
     const wrapper = mountUsageView()
     await flushPromises()

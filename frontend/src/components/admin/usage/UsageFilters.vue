@@ -1,10 +1,8 @@
 <template>
-  <div :class="flat ? 'p-4 sm:p-6' : 'card p-6'">
-    <!-- Toolbar: left filters (multi-line) + right actions -->
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <!-- Left: filters (allowed to wrap to multiple rows) -->
-      <div class="flex flex-1 flex-wrap items-end gap-4">
-        <div class="w-full sm:w-auto" data-testid="usage-date-range-filter">
+  <div class="usage-filters" :class="{ card: !flat }">
+    <div>
+      <div :id="filterGridId" class="usage-filter-grid" :class="{ 'is-expanded': secondaryFiltersExpanded }">
+        <div class="min-w-0" data-testid="usage-date-range-filter">
           <label class="input-label">{{ t('admin.dashboard.timeRange') }}</label>
           <DateRangePicker
             ref="dateRangeRef"
@@ -14,7 +12,7 @@
             @change="onDateRangeChange"
           />
         </div>
-        <div class="w-full sm:w-auto sm:min-w-[220px]">
+        <div class="min-w-0">
           <label class="input-label">{{ t('admin.usage.requestId') }}</label>
           <input
             v-model="filters.request_id"
@@ -26,7 +24,7 @@
           />
         </div>
         <!-- User Search -->
-        <div ref="userSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]">
+        <div ref="userSearchRef" class="usage-filter-dropdown relative min-w-0">
           <label class="input-label">{{ t('admin.usage.userFilter') }}</label>
           <input
             v-model="userKeyword"
@@ -64,7 +62,7 @@
         </div>
 
         <!-- API Key Search -->
-        <div ref="apiKeySearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]">
+        <div ref="apiKeySearchRef" class="usage-filter-dropdown relative min-w-0">
           <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
           <input
             v-model="apiKeyKeyword"
@@ -101,13 +99,13 @@
         </div>
 
         <!-- Model Filter -->
-        <div class="w-full sm:w-auto sm:min-w-[220px]">
+        <div class="min-w-0">
           <label class="input-label">{{ t('usage.model') }}</label>
           <Select v-model="filters.model" :options="modelOptions" searchable @change="emitChange" />
         </div>
 
         <!-- Account Filter -->
-        <div ref="accountSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[220px]">
+        <div ref="accountSearchRef" class="usage-filter-dropdown relative min-w-0">
           <label class="input-label">{{ t('admin.usage.account') }}</label>
           <input
             v-model="accountKeyword"
@@ -144,84 +142,100 @@
         </div>
 
         <!-- Request Type Filter (usage only) -->
-        <div v-if="mode !== 'errors'" class="w-full sm:w-auto sm:min-w-[180px]">
+        <div v-if="mode !== 'errors'" class="min-w-0">
           <label class="input-label">{{ t('usage.type') }}</label>
           <Select v-model="filters.request_type" :options="requestTypeOptions" @change="emitChange" />
         </div>
 
         <!-- Native compaction is independent of the transport request type. -->
-        <div v-if="mode !== 'errors'" class="w-full sm:w-auto sm:min-w-[180px]">
+        <div v-if="mode !== 'errors'" class="min-w-0">
           <label class="input-label">{{ t('usage.compactionFilter') }}</label>
           <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="emitChange" />
         </div>
 
         <!-- Billing Type Filter (usage only) -->
-        <div v-if="mode !== 'errors'" class="w-full sm:w-auto sm:min-w-[200px]">
+        <div v-if="mode !== 'errors'" class="min-w-0">
           <label class="input-label">{{ t('admin.usage.billingType') }}</label>
           <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="emitChange" />
         </div>
 
         <!-- Billing Mode Filter (usage only；用户排行的 user-breakdown 接口不支持该维度) -->
-        <div v-if="mode === 'usage'" class="w-full sm:w-auto sm:min-w-[200px]">
+        <div v-if="mode === 'usage'" class="min-w-0">
           <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
           <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="emitChange" />
         </div>
 
-        <div v-if="mode === 'usage'" class="w-full sm:w-auto sm:min-w-[220px]">
+        <div v-if="mode === 'usage'" class="min-w-0">
           <label class="input-label">{{ t('admin.usage.upstreamModelAudit') }}</label>
           <Select v-model="filters.upstream_model_mismatch" :options="upstreamModelMismatchOptions" @change="emitChange" />
         </div>
 
         <!-- Error Phase Filter (errors only) -->
-        <div v-if="mode === 'errors'" class="w-full sm:w-auto sm:min-w-[180px]">
+        <div v-if="mode === 'errors'" class="min-w-0">
           <label class="input-label">{{ t('admin.ops.errorLog.type') }}</label>
           <Select v-model="filters.error_phase" :options="errorPhaseOptions" @change="emitChange" />
         </div>
 
         <!-- Error Category Filter (errors only) -->
-        <div v-if="mode === 'errors'" class="w-full sm:w-auto sm:min-w-[180px]">
+        <div v-if="mode === 'errors'" class="min-w-0">
           <label class="input-label">{{ t('usage.errors.category') }}</label>
           <Select v-model="filters.error_category" :options="errorCategoryOptions" @change="emitChange" />
         </div>
 
         <!-- Status Code Filter (errors only) -->
-        <div v-if="mode === 'errors'" class="w-full sm:w-auto sm:min-w-[180px]">
+        <div v-if="mode === 'errors'" class="min-w-0">
           <label class="input-label">{{ t('admin.ops.errorLog.status') }}</label>
           <Select v-model="filters.status_code" :options="statusCodeOptions" @change="emitChange" />
         </div>
 
         <!-- Group Filter -->
-        <div class="w-full sm:w-auto sm:min-w-[200px]">
+        <div class="min-w-0">
           <label class="input-label">{{ t('admin.usage.group') }}</label>
           <Select v-model="filters.group_id" :options="groupOptions" searchable @change="emitChange" />
         </div>
 
       </div>
 
-      <!-- Right: actions -->
-      <div v-if="showActions" class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
-        <button type="button" @click="$emit('refresh')" class="btn btn-secondary">
-          {{ t('common.refresh') }}
+      <div class="usage-filter-footer">
+        <button
+          type="button"
+          class="usage-filter-more"
+          data-testid="admin-usage-secondary-filters-toggle"
+          :aria-expanded="secondaryFiltersExpanded"
+          :aria-controls="filterGridId"
+          @click="secondaryFiltersExpanded = !secondaryFiltersExpanded"
+        >
+          <Icon name="filter" size="sm" />
+          {{ t(secondaryFiltersExpanded ? 'usage.fewerFilters' : 'usage.moreFilters') }}
+          <Icon :name="secondaryFiltersExpanded ? 'chevronUp' : 'chevronDown'" size="sm" />
         </button>
-        <button type="button" @click="$emit('reset')" class="btn btn-secondary">
-          {{ t('common.reset') }}
-        </button>
-        <slot name="after-reset" />
-        <template v-if="mode === 'usage'">
-          <button type="button" @click="$emit('cleanup')" class="btn btn-danger">
-            {{ t('admin.usage.cleanup.button') }}
+        <div v-if="showActions" class="usage-filter-actions">
+          <button type="button" @click="$emit('refresh')" class="btn btn-secondary btn-icon" :title="t('common.refresh')" :aria-label="t('common.refresh')">
+            <Icon name="refresh" size="sm" />
           </button>
-          <button type="button" @click="$emit('export')" :disabled="exporting" class="btn btn-primary">
-            {{ t('usage.exportExcel') }}
+          <button type="button" @click="$emit('reset')" class="btn btn-secondary btn-icon" :title="t('common.reset')" :aria-label="t('common.reset')">
+            <Icon name="xCircle" size="sm" />
           </button>
-        </template>
+          <slot name="after-reset" />
+          <template v-if="mode === 'usage'">
+            <button type="button" @click="$emit('cleanup')" class="btn btn-secondary usage-cleanup-action">
+              <Icon name="trash" size="sm" />
+              {{ t('admin.usage.cleanup.button') }}
+            </button>
+            <button type="button" @click="$emit('export')" :disabled="exporting" class="btn btn-primary">
+              <Icon name="download" size="sm" />
+              {{ t('usage.exportExcel') }}
+            </button>
+          </template>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, toRef, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, toRef, watch, computed, useId } from 'vue'
+import Icon from '@/components/icons/Icon.vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import { fetchPaginatedItems } from '@/utils/paginatedItems'
@@ -266,6 +280,8 @@ const emit = defineEmits([
 ])
 
 const { t } = useI18n()
+const filterGridId = `usage-filters-${useId()}`
+const secondaryFiltersExpanded = ref(false)
 const filters = toRef(props, 'modelValue')
 const onDateRangeChange = (range: { startDate: string; endDate: string; preset: string | null }) => {
   emit('update:startDate', range.startDate)
@@ -590,3 +606,25 @@ const refreshActivePreset = (): { startDate: string; endDate: string } | null =>
 
 defineExpose({ getUserSearchRevision, setUserKeyword, refreshActivePreset })
 </script>
+
+<style scoped>
+.usage-filters { min-width: 0; padding: 18px; container-type: inline-size; }
+.usage-filter-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: 14px 16px; }
+.usage-filter-grid > :nth-child(n+4) { display: none; }
+.usage-filter-grid.is-expanded > :nth-child(n+4) { display: block; }
+.usage-filter-grid :deep(.date-picker-trigger) { width: 100%; justify-content: space-between; }
+.usage-filter-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.usage-filter-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-left: auto; }
+.usage-filter-actions :deep(.btn) { gap: 6px; }
+.usage-filter-actions :deep(.btn-icon) { width: 36px; height: 36px; padding: 8px; }
+.usage-filter-more { display: flex; align-items: center; gap: 6px; color: var(--signal-muted); font-size: 13px; }
+.usage-filter-more:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 4px; }
+.usage-cleanup-action { color: var(--signal-muted); }
+.usage-cleanup-action:hover { border-color: #dc2626; color: #dc2626; background: var(--signal-surface); }
+@container (min-width: 540px) {
+  .usage-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .usage-filter-grid > :nth-child(n+4) { display: block; }
+  .usage-filter-more { display: none; }
+}
+@container (min-width: 1080px) { .usage-filter-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+</style>

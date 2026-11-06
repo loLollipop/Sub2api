@@ -959,6 +959,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesNonStreamingResponse(
 		return OpenAIUsage{}, 0, nil, err
 	}
 	body = s.backfillOpenAIImagesB64JSON(ctx, account, parsed, body)
+	body = normalizeOpenAIImagesGIFAnimationResponseBody(body, parsed)
 	if upstreamFinancialFailureEnvelope(body) {
 		WriteUpstreamFinancialError(c, 0, body)
 		usage, _ := extractOpenAIUsageFromJSONBytes(body)
@@ -1015,6 +1016,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 	pendingErrorHeader := ""
 	financialTerminal := false
 	var streamErr error
+	gifBudget := newOpenAIGIFAnimationBudget()
 	finish := func() error {
 		if direct == nil {
 			return nil
@@ -1033,6 +1035,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 		fallbackBody.Reset()
 		fallbackBytes = 0
 		if direct != nil && strings.HasSuffix(gjson.GetBytes(dataBytes, "type").String(), ".completed") {
+			dataBytes = normalizeOpenAIImagesGIFAnimationEvent(dataBytes, direct, &gifBudget)
 			if size := detectOpenAIImageResultSize(gjson.GetBytes(dataBytes, "b64_json").String()); size != "" {
 				dataBytes, _ = sjson.SetBytes(dataBytes, "size", size)
 			}

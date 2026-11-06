@@ -2,31 +2,32 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.11",
-  "imported_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
+  "imported_version": "2.3.13",
+  "imported_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.11",
-  "latest_observed_release_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
-  "latest_observed_main_commit": "4eef20cf6ba48abd4a6a52bd97e99235c1fed31c",
+  "latest_observed_version": "2.3.13",
+  "latest_observed_release_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
+  "latest_observed_main_commit": "cc6abfb553a6732c88b549bba1465fe22c8bf8bf",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.11",
-  "reviewed_release_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
+  "reviewed_release_tag": "v2.3.13",
+  "reviewed_release_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
   "observed_delta_review": {
-    "from_commit": "2746b74a38922ad763cb6ad5626a6441780a931d",
-    "to_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
-    "status": "formal_v2311_selective_images_pricing_and_table_adaptation",
-    "scope": "Review 57 formal-release paths. Adapt GPT Image 2.6 native Images routing, GIF controls, image cached-input billing, configured plaza reference prices, merged time labels, Grok fixed-charge preview and table deduplication. Correct cache-price precedence/explicit zero, shared usage parsing/terminal snapshots, pre-output retry and account-test fallback parity. Preserve older OAuth image routes, local billing/UI and excluded modules; no migrations, dependencies, personal version or deployment changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261105-v2311.md"
+    "from_commit": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
+    "to_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
+    "status": "formal_v2313_selective_gif_and_complete_usage_ui_adaptation",
+    "scope": "Review 20 commits / 50 paths. Select native Images GIF normalization with local decode/resize limits and disposal corrections. Complete source-derived user/admin usage layouts and adapt settings toolbar/section hierarchy. Keep bounded real-usage disconnect draining; exclude the entire estimated incomplete/disconnect billing policy, deferred Hosted module and source framework/theme. Dependencies already patched locally; no migrations, personal version change or deployment.",
+    "evidence": "maintenance/notes/upstream-sync-20261106-v2313.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "8bbb31374967e20ac70ddceaf30e23ec2be96144",
+    "source_head": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.12-v2.3.13: bounded native Images GIF frame/delay/dimension normalization; complete source-derived usage stats/chart/filter/toolbar/inflight UI for both roles and settings hierarchy. Preserve original drain/billing, local theme and all module exclusions. See maintenance/notes/upstream-sync-20261106-v2313.md.",
       "Formal v2.3.11 selected image 2.6/GIF/cache billing, configured plaza references/time labels, Grok preview and table deduplication. Correct eight reproduced source/local integration defects; preserve existing image routes, local UI and billing. See maintenance/notes/upstream-sync-20261105-v2311.md.",
       "Formal v2.3.6-v2.3.10 selected atomic admin balance/source writes and batch-set group user multipliers; adapt dashboard, usage and announcement UI to both local workspaces. Preserve local protocols, billing and theme; fix acknowledgment retry/session isolation and single-connection transaction lookup. See maintenance/notes/upstream-sync-20261105-v2310.md for exclusions and evidence.",
       "Formal v2.3.1-v2.3.4 selected DeepSeek native/request-reasoning semantics, free authenticated discovery, custom group references, route-aware key filtering and Intl caches; home footer centered. Preserve local replay scope/UI/billing; see maintenance/notes/upstream-sync-20261103-v2304.md for explicit exclusions and verification limits.",
@@ -651,5 +652,25 @@
     "migration": "None. Existing migrations, Ent, frontend dependency manifests and deployment configuration unchanged.",
     "release_dependency_fix": "Upgrade golang.org/x/crypto v0.58.0 to v0.58.1-0.20261009181718-2f1f834330b2 with checksums for GO-2026-5932. The single upstream change splits unused deprecated OpenPGP into a module; bcrypt, curve25519 and nacl/box sources are unchanged. No audit exemption.",
     "release_status": "User authorized code review, GitHub submission and deployment on 2026-11-03. Prepare personal v2.1.47 via PR/CI, own GHCR and the controlled updater; final source/artifact/runtime acceptance evidence is recorded separately. No migration; only the explicitly reviewed x/crypto security dependency update."
+  },
+  "sync_20261106_v2313": {
+    "evidence": "maintenance/notes/upstream-sync-20261106-v2313.md",
+    "reviewed_release_tag": "v2.3.13",
+    "reviewed_release_commit": "4e3cd3c0a7b5af8d311a1418d7d797ae552d615f",
+    "selected_commits": [
+      "ec799ee447161b018ae6df34a66a95df1829e98a"
+    ],
+    "ui_reference": "Full released source of usage views, DistributionPanel, InflightUsagePanel and SettingsSection/SettingsView, including structures predating this release delta. Adapt structure, not Nuxt components or source tokens.",
+    "already_covered": "39eac6b42 brotli 1.2.7 and klauspost/compress 1.20.2 security upgrades already present in personal v2.1.51. Accounts today-stat deduplication, Grok refusal previews and key limit windows also already present.",
+    "excluded_commits": [
+      "737361ba9",
+      "96983dcc6",
+      "7c6897947",
+      "503f2b970"
+    ],
+    "excluded_scope": "Whole immediate-disconnect/estimated-incomplete-usage/95%-cache financial policy; deferred Hosted Search failover; source theme transitions/Nuxt token rewrites, source-only docs routes and VERSION bookkeeping.",
+    "preserved": "Bounded drain of real terminal usage, native routes and retry/no-replay boundaries; local UI, all filters/exports/permission gates and prior module removals.",
+    "migration": "None. Existing migrations, Ent, Go/frontend dependency manifests unchanged.",
+    "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-06. Prepare personal v2.1.52 via PR/CI, own Release/GHCR and the existing controlled backup/restore-validated rollout; final source/artifact/runtime acceptance is recorded separately. No migration or dependency changes."
   }
 }

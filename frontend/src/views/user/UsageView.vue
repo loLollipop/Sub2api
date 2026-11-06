@@ -3,14 +3,14 @@
     <div class="signal-usage space-y-4">
       <PageHeader :title="t('usage.title')" :description="`${startDate} / ${endDate}`" />
       <div class="usage-stats-strip">
-        <UsageStatsCards class="signal-usage-metrics" :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
+        <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
       </div>
 
-      <section class="card usage-range-card p-3 sm:px-4 sm:py-3">
-        <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <div class="flex items-center gap-2"><span class="text-sm font-medium text-gray-500">{{ t('admin.dashboard.timeRange') }}</span><DateRangePicker ref="dateRangeRef" v-model:start-date="startDate" v-model:end-date="endDate" @change="onDateRangeChange" /></div>
-          <div class="ml-auto flex items-center gap-2"><span class="text-sm font-medium text-gray-500">{{ t('admin.dashboard.granularity') }}</span><div class="w-28"><Select v-model="granularity" :options="granularityOptions" @change="loadChartData" /></div></div>
-        </div>
+      <section class="usage-range-card">
+        <AnalyticsToolbar refresh :loading="loading || chartsLoading || modelStatsLoading" @refresh="refreshData">
+          <template #date><DateRangePicker ref="dateRangeRef" v-model:start-date="startDate" v-model:end-date="endDate" @change="onDateRangeChange" /></template>
+          <template #granularity><Select v-model="granularity" :options="granularityOptions" :aria-label="t('admin.dashboard.granularity')" @change="loadChartData" /></template>
+        </AnalyticsToolbar>
       </section>
 
       <div class="signal-usage-chart-grid grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -56,7 +56,8 @@
         <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" :animation-duration="chartAnimationDuration" />
       </div>
 
-      <div class="card signal-log-filters">
+      <section class="card usage-record-workspace">
+      <div class="signal-log-filters">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div v-if="activeTab === 'errors'" class="grid w-full grid-cols-1 items-end gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <div class="min-w-0">
@@ -67,7 +68,7 @@
               <label class="input-label">{{ t('usage.errors.keyName') }}</label>
               <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
             </div>
-            <div id="usage-secondary-filters" v-show="isDesktop || secondaryFiltersExpanded" class="flex w-full flex-wrap items-end gap-4 sm:contents">
+            <div id="usage-secondary-filters" v-show="isDesktop || secondaryFiltersExpanded" class="grid w-full grid-cols-1 gap-4 sm:contents">
               <div class="min-w-0">
                 <label class="input-label">{{ t('usage.errors.model') }}</label>
                 <Select
@@ -99,7 +100,7 @@
               <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
               <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
             </div>
-            <div id="usage-secondary-filters" v-show="isDesktop || secondaryFiltersExpanded" class="flex w-full flex-wrap items-end gap-4 sm:contents">
+            <div id="usage-secondary-filters" v-show="isDesktop || secondaryFiltersExpanded" class="grid w-full grid-cols-1 gap-4 sm:contents">
               <div class="min-w-0">
                 <label class="input-label">{{ t('usage.model') }}</label>
                 <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
@@ -144,7 +145,7 @@
         </div>
       </div>
 
-      <div class="usage-record-toolbar flex flex-wrap items-center justify-between gap-3">
+      <div class="usage-record-toolbar">
         <div v-if="errorViewEnabled" class="usage-tabs" role="tablist">
           <button class="usage-tab" role="tab" :aria-selected="activeTab === 'usage'" @click="activeTab = 'usage'">
             {{ t('usage.tabs.usage') }}
@@ -170,7 +171,7 @@
               :aria-label="t('admin.users.columnSettings')"
               :aria-expanded="showColumnDropdown"
             >
-              <Icon name="grid" size="md" />
+              <Icon name="columns" size="md" />
             </button>
             <div
               v-if="showColumnDropdown"
@@ -197,25 +198,29 @@
       </div>
 
       <template v-if="activeTab === 'usage'">
-        <button type="button" class="mb-3 flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-left text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-100 dark:hover:bg-dark-700" @click="toggleInflight">
-          <Icon name="chevronDown" size="sm" :class="['text-gray-400 transition-transform', inflightOpen ? '' : '-rotate-90']" />
-          <span>{{ t('usage.inflightFold') }}</span>
-          <span v-if="inflightTotal" class="ml-auto text-xs font-normal text-gray-400">{{ inflightRows.length }}/{{ inflightTotal }}</span>
-        </button>
+        <InflightUsagePanel
+          :open="inflightOpen"
+          :total="inflightTotal"
+          :shown="inflightRows.length"
+          :loading="inflightLoading"
+          :loaded="inflightLoaded"
+          :has-more="inflightHasMore"
+          :error="inflightError"
+          @toggle="toggleInflight"
+          @refresh="loadInflight(false)"
+          @more="loadMoreInflight"
+        >
+          <UsageTable
+            flat
+            :data="inflightRows"
+            :loading="inflightLoading"
+            :columns="visibleColumns"
+            :show-account-billing="false"
+            :show-upstream-endpoint="false"
+          />
+        </InflightUsagePanel>
         <UsageTable
           flat
-          v-if="inflightOpen"
-          class="mb-3"
-          :data="inflightRows"
-          :loading="inflightLoading"
-          :columns="visibleColumns"
-          :show-account-billing="false"
-          :show-upstream-endpoint="false"
-        />
-        <button v-if="inflightOpen && inflightHasMore" type="button" class="btn btn-secondary mb-4 w-full" :disabled="inflightLoading" @click="loadMoreInflight">
-          {{ inflightLoading ? t('common.loading') : t('usage.inflightMore') }}
-        </button>
-        <UsageTable
           :data="usageLogs"
           :loading="loading"
           :columns="visibleColumns"
@@ -252,6 +257,7 @@
         @update:pageSize="onErrorPageSize"
         @ipGeoBatchFailed="handleIpGeoBatchFailed"
       />
+      </section>
     </div>
   </AppLayout>
 
@@ -265,10 +271,12 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import AnalyticsToolbar from '@/components/dashboard/AnalyticsToolbar.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
+import InflightUsagePanel from '@/components/admin/usage/InflightUsagePanel.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
@@ -509,6 +517,8 @@ let logsGeneration = 0
 const inflightOpen = ref(false)
 const inflightRows = ref<UsageLog[]>([])
 const inflightLoading = ref(false)
+const inflightLoaded = ref(false)
+const inflightError = ref('')
 const inflightPage = ref(1)
 const inflightTotal = ref(0)
 const inflightHasMore = computed(() => inflightRows.value.length < inflightTotal.value)
@@ -523,6 +533,8 @@ const invalidateInflight = () => {
   inflightController?.abort()
   inflightController = null
   inflightLoading.value = false
+  inflightLoaded.value = false
+  inflightError.value = ''
   inflightRows.value = []
   inflightTotal.value = 0
   inflightPage.value = 1
@@ -539,6 +551,7 @@ const loadInflight = async (append = false) => {
   const logsVersion = logsGeneration
   const page = append ? inflightPage.value + 1 : 1
   inflightLoading.value = true
+  inflightError.value = ''
   try {
     const res = await usageAPI.query({
       ...buildUsageListParams(page, 10),
@@ -555,9 +568,12 @@ const loadInflight = async (append = false) => {
     inflightTotal.value = res.total || 0
     inflightPage.value = page
     inflightFilterKey = filterKey
+    inflightLoaded.value = true
     ++inflightListVersion
   } catch (error) {
-    if (!controller.signal.aborted) console.error('[UsageView] loadInflight failed:', error)
+    if (!controller.signal.aborted && generation === inflightGeneration && filterKey === currentInflightFilterKey()) {
+      inflightError.value = t('usage.inflightLoadFailed')
+    }
   } finally {
     if (inflightController === controller) inflightLoading.value = false
   }
@@ -1070,9 +1086,12 @@ watch(endpointDistributionSource, () => {
 </script>
 
 <style scoped>
-.usage-stats-strip { overflow: hidden; border: 1px solid var(--signal-line); border-radius: 12px; background: var(--signal-surface); }
-.usage-stats-strip :deep(.signal-usage-metrics) { border: 0; }
-.usage-stats-strip :deep(.signal-usage-metrics > .card) { border-radius: 0; box-shadow: none; background: transparent; }
+.usage-range-card { padding: 10px 14px; border: 1px solid var(--signal-line); border-radius: 12px; background: var(--signal-surface); }
+.usage-record-workspace { min-width: 0; padding: 0; }
+.signal-usage .signal-log-filters { padding: 18px; border: 0; border-radius: 12px 12px 0 0; background: transparent; }
+.usage-record-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--signal-line); border-bottom: 1px solid var(--signal-line); }
+.usage-record-toolbar .btn-icon { width: 36px; height: 36px; padding: 8px; }
+.usage-record-workspace :deep(.inflight-panel) { margin-top: 12px; }
 .usage-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--signal-raised); }
 .usage-tab { min-height: 32px; padding: 4px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--signal-muted); transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
 .usage-tab:hover { color: var(--signal-text); }

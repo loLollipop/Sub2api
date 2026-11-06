@@ -193,6 +193,16 @@ describe('admin UsageView route filters', () => {
     vi.useRealTimers()
   })
 
+  it('prioritizes token counts, billing and latency before secondary columns', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { visibleColumns: { key: string }[] }
+    expect(vm.visibleColumns.slice(0, 7).map(column => column.key)).toEqual([
+      'user', 'api_key', 'account', 'model', 'tokens', 'cost', 'latency',
+    ])
+    wrapper.unmount()
+  })
+
   it('contains the records toolbar and exposes an inflight failure with a working retry', async () => {
     const wrapper = mountRouteFilteredUsageView()
     await flushPromises()

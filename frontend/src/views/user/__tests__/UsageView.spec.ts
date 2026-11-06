@@ -175,6 +175,16 @@ function mountUsageView(attachTo?: HTMLElement) {
 
 describe('user UsageView', () => {
 
+  it('prioritizes token counts, billing and latency before secondary columns', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { visibleColumns: { key: string }[] }
+    expect(vm.visibleColumns.slice(0, 5).map(column => column.key)).toEqual([
+      'api_key', 'model', 'tokens', 'cost', 'latency',
+    ])
+    wrapper.unmount()
+  })
+
   it('keeps the latest error filters and loading state when requests finish out of order', async () => {
     const wrapper = mountUsageView()
     await flushPromises()

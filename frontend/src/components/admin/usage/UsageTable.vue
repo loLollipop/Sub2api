@@ -1,5 +1,9 @@
 <template>
-  <div class="usage-table" :class="flat ? '' : 'card overflow-hidden'">
+  <div
+    class="usage-table"
+    :class="flat ? '' : 'card overflow-hidden'"
+    :style="{ '--usage-column-count': Math.max(1, columns.length) }"
+  >
     <div
       v-if="showIpGeoToolbar"
       class="flex items-center justify-end gap-2 border-b border-gray-200 px-4 py-2 dark:border-dark-700"
@@ -16,7 +20,7 @@
         {{ ipGeoBatchLoading ? t('usage.ipGeo.batchFetching') : t('usage.ipGeo.batchFetch') }}
       </button>
     </div>
-    <div class="overflow-auto">
+    <div class="usage-table-scroll">
       <DataTable
         :columns="layoutColumns"
         :data="data"
@@ -660,10 +664,15 @@ const ipGeoBatchLoading = ref(false)
 
 const showIpGeoToolbar = computed(() => props.columns.some((col) => col.key === 'ip_address'))
 
-const wrappingColumns = new Set(['user', 'api_key', 'account', 'model', 'endpoint', 'group'])
+const wrappingColumns = new Set(['user', 'api_key', 'account', 'model', 'endpoint', 'group', 'ip_address'])
 const layoutColumns = computed(() => props.columns.map(column => ({
   ...column,
-  class: [column.class, wrappingColumns.has(column.key) ? 'usage-text-column' : '', column.key === 'created_at' ? 'usage-date-column' : ''].filter(Boolean).join(' '),
+  class: [
+    column.class,
+    `usage-column-${column.key}`,
+    wrappingColumns.has(column.key) ? 'usage-text-column' : '',
+    column.key === 'created_at' ? 'usage-date-column' : '',
+  ].filter(Boolean).join(' '),
 })))
 
 const hasReasoningEffortMapping = (row: AdminUsageLog): boolean => {
@@ -931,6 +940,7 @@ onBeforeUnmount(() => {
 }
 
 .usage-table {
+  container-type: inline-size;
   min-width: 0;
   width: 100%;
 }
@@ -939,15 +949,48 @@ onBeforeUnmount(() => {
   min-width: 100%;
 }
 
+.usage-table-scroll {
+  min-width: 0;
+}
+
+/* Auto layout sizes content; the container width and visible count set the breathing room. */
+.usage-table :deep(th),
+.usage-table :deep(td) {
+  padding-inline: clamp(8px, calc((100cqw / var(--usage-column-count) - 96px) / 4), 20px);
+}
+
+.usage-table :deep(th) {
+  white-space: nowrap;
+}
+
 .usage-table :deep(td.usage-text-column) {
-  min-width: 5rem;
+  min-width: 7rem;
   max-width: 14rem;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
+.usage-table :deep(td.usage-column-user) {
+  max-width: none;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.usage-table :deep(td.usage-column-model) {
+  min-width: 8rem;
+}
+
+.usage-table :deep(td.usage-column-endpoint) {
+  min-width: 10rem;
+}
+
 .usage-table :deep(td.usage-date-column) {
   min-width: 6.5rem;
   white-space: normal;
+}
+
+/* Keep both token counts together; secondary columns may scroll on smaller screens. */
+.usage-table :deep(td.usage-column-tokens .usage-token-values) {
+  flex-wrap: nowrap;
 }
 </style>

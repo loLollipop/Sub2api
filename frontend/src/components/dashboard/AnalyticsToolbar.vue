@@ -33,5 +33,5 @@ const { t } = useI18n()
 .analytics-refresh:hover { background: var(--signal-hover); color: var(--signal-text); }
 .analytics-refresh:disabled { cursor: default; opacity: .5; }
 .analytics-refresh:focus-visible { outline: 2px solid var(--signal-accent); outline-offset: 2px; }
-@media (max-width: 639px) { .analytics-toolbar { gap: 9px; } .analytics-granularity { width: 64px; } .analytics-date { max-width: calc(100% - 114px); } }
+@media (max-width: 639px) { .analytics-toolbar { gap: 9px; } .analytics-granularity { width: 80px; } .analytics-date { max-width: calc(100% - 130px); } }
 </style>

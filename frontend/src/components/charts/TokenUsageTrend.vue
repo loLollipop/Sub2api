@@ -1,24 +1,29 @@
 <template>
-  <div class="card p-4">
-    <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-      {{ t('admin.dashboard.tokenUsageTrend') }}
-    </h3>
-    <div v-if="loading" class="flex h-48 items-center justify-center">
-      <LoadingSpinner />
-    </div>
-    <div v-else-if="trendData.length > 0 && chartData" class="h-48">
-      <Line :data="chartData" :options="lineOptions" />
-    </div>
-    <div
-      v-else
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      {{ t('admin.dashboard.noDataAvailable') }}
+  <div class="card usage-chart-card">
+    <header class="usage-chart-heading">
+      <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+        {{ t('admin.dashboard.tokenUsageTrend') }}
+      </h3>
+    </header>
+    <div class="usage-chart-body">
+      <div v-if="loading" class="flex h-48 items-center justify-center">
+        <LoadingSpinner />
+      </div>
+      <div v-else-if="trendData.length > 0 && chartData" class="h-48">
+        <Line :data="chartData" :options="lineOptions" />
+      </div>
+      <div
+        v-else
+        class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+      >
+        {{ t('admin.dashboard.noDataAvailable') }}
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import './chartCards.css'
 import { computed, ref } from 'vue'
 import { useMutationObserver } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'

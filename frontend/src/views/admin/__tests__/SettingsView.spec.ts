@@ -580,6 +580,23 @@ describe("admin SettingsView email domain quota copy", () => {
 });
 
 describe("admin SettingsView settings controls", () => {
+  it("keeps navigation and the form save action together and hides global save for backups", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    const toolbar = wrapper.get('[data-testid="settings-toolbar"]');
+    expect(toolbar.get('[role="tablist"]').exists()).toBe(true);
+    const save = toolbar.get('[data-testid="settings-save"]');
+    expect(save.attributes("type")).toBe("submit");
+    expect(save.isVisible()).toBe(true);
+    expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
+    await toolbar.get("#settings-tab-backup").trigger("click");
+    await flushPromises();
+    expect(toolbar.get(".settings-toolbar-save").attributes("style")).toContain("display: none");
+    await toolbar.get("#settings-tab-email").trigger("click");
+    await flushPromises();
+    expect(save.isVisible()).toBe(true);
+    wrapper.unmount();
+  });
   it("loads and saves both leaderboard switches from the feature settings card", async () => {
     getSettings.mockResolvedValueOnce({ ...baseSettingsResponse, leaderboard_enabled: true, leaderboard_require_auth: false });
     const wrapper = mountView();

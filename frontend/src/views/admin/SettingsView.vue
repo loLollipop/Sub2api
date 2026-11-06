@@ -15,8 +15,45 @@
 
       <!-- Settings Form -->
       <form v-else @submit.prevent="saveSettings" class="settings-form space-y-6" novalidate>
-        <!-- Tab Navigation -->
-        <SettingsTabBar v-model="activeTab" class="settings-navigation" />
+        <!-- Adapted from the upstream settings toolbar: navigation and save share one row. -->
+        <div class="settings-toolbar" data-testid="settings-toolbar">
+          <SettingsTabBar v-model="activeTab" class="settings-navigation" />
+          <div v-show="activeTab !== 'backup'" class="settings-toolbar-save">
+            <button
+              type="submit"
+              :disabled="saving || loadFailed"
+              class="btn btn-primary settings-save-button"
+              data-testid="settings-save"
+            >
+              <svg
+                v-if="saving"
+                class="h-4 w-4 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              {{
+                saving
+                  ? t("admin.settings.saving")
+                  : t("admin.settings.saveSettings")
+              }}
+            </button>
+          </div>
+        </div>
+        <div class="settings-content space-y-8">
 
         <!-- Tab: Security — Admin API Key -->
         <div v-show="activeTab === 'security'" class="space-y-6">
@@ -6563,40 +6600,6 @@
           <BackupSettings />
         </div>
 
-        <!-- Save all settings -->
-        <div v-show="activeTab !== 'backup'" class="settings-save-bar">
-          <p class="settings-save-label">{{ t("admin.settings.title") }}</p>
-          <button
-            type="submit"
-            :disabled="saving || loadFailed"
-            class="btn btn-primary settings-save-button"
-          >
-            <svg
-              v-if="saving"
-              class="h-4 w-4 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            {{
-              saving
-                ? t("admin.settings.saving")
-                : t("admin.settings.saveSettings")
-            }}
-          </button>
         </div>
       </form>
 
@@ -9704,30 +9707,24 @@ watch(
   }
 }
 
-.settings-save-bar {
+/* Keep the save action reachable without a second floating bar. */
+.settings-toolbar {
   position: sticky;
-  z-index: 10;
-  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  top: calc(var(--shell-height, 4rem) + 8px);
+  z-index: 20;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--console-edge, #e5e7eb);
-  border-radius: 0.75rem;
-  background: var(--signal-surface, #fff);
-  box-shadow: 0 4px 18px rgb(0 0 0 / 0.05);
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--console-edge, #e5e7eb);
+  background: var(--signal-bg, #faf9f6);
 }
 
-.settings-save-label {
-  color: var(--signal-muted, #6b7280);
-  font-size: 0.8125rem;
-  font-weight: 500;
-}
-
-.settings-save-button {
-  flex-shrink: 0;
-}
+.settings-navigation { flex: 1 1 40rem; }
+.settings-toolbar-save { margin-left: auto; }
+.settings-save-button { flex-shrink: 0; }
+.settings-content { width: 100%; max-width: 48rem; margin-inline: auto; }
 
 @media (max-width: 639px) {
   .settings-section-header {
@@ -9749,11 +9746,6 @@ watch(
   .settings-section-header,
   .settings-toggle-row {
     gap: 1rem;
-  }
-
-  .settings-save-bar {
-    gap: 0.75rem;
-    padding: 0.75rem;
   }
 
   .settings-inline-action {

@@ -166,7 +166,7 @@
   border-radius: 8px;
   background: var(--signal-surface);
   box-shadow: none;
-  padding: 20px;
+  padding: 0;
 }
 
 .console-signal .signal-log-filters {

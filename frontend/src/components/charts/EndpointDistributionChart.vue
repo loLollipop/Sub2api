@@ -1,6 +1,6 @@
 <template>
-  <div class="card p-4">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div class="card usage-chart-card">
+    <header class="usage-chart-heading">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
         {{ title || t('usage.endpointDistribution') }}
       </h3>
@@ -67,72 +67,75 @@
           </button>
         </div>
       </div>
-    </div>
-    <div v-if="loading" class="flex h-48 items-center justify-center">
-      <LoadingSpinner />
-    </div>
-    <div v-else-if="displayEndpointStats.length > 0 && chartData" class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-      <div class="h-48 w-48 shrink-0">
-        <Doughnut :data="chartData" :options="doughnutOptions" />
+    </header>
+    <div class="usage-chart-body">
+      <div v-if="loading" class="flex h-48 items-center justify-center">
+        <LoadingSpinner />
       </div>
-      <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
-        <table class="w-full text-xs">
-          <thead>
-            <tr class="text-gray-500 dark:text-gray-400">
-              <th class="pb-2 text-left">{{ t('usage.endpoint') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.requests') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.tokens') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.actual') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.standard') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="item in displayEndpointStats" :key="item.endpoint">
-              <tr
-                class="border-t border-gray-100 transition-colors dark:border-dark-700"
-                :class="enableBreakdown ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700/40' : ''"
-                @click="enableBreakdown && toggleBreakdown(item.endpoint)"
-              >
-                <td class="max-w-[180px] truncate py-1.5 font-medium" :class="enableBreakdown ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300' : 'text-gray-900 dark:text-white'" :title="item.endpoint">
-                  <span class="inline-flex items-center gap-1">
-                    <Icon name="chevronDownSmall" size="none" v-if="enableBreakdown && expandedKey === item.endpoint" class="h-3 w-3 shrink-0" :stroke-width="2" />
-                    <Icon name="chevronRightSmall" size="none" v-else-if="enableBreakdown" class="h-3 w-3 shrink-0" :stroke-width="2" />
-                    {{ item.endpoint }}
-                  </span>
-                </td>
-                <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
-                  {{ formatNumber(item.requests) }}
-                </td>
-                <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
-                  {{ formatTokens(item.total_tokens) }}
-                </td>
-                <td class="py-1.5 text-right text-green-600 dark:text-green-400">
-                  ${{ formatCost(item.actual_cost) }}
-                </td>
-                <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">
-                  ${{ formatCost(item.cost) }}
-                </td>
+      <div v-else-if="displayEndpointStats.length > 0 && chartData" class="distribution-layout">
+        <div class="distribution-doughnut">
+          <Doughnut :data="chartData" :options="doughnutOptions" />
+        </div>
+        <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-gray-500 dark:text-gray-400">
+                <th class="pb-2 text-left">{{ t('usage.endpoint') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.requests') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.tokens') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.actual') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.standard') }}</th>
               </tr>
-              <tr v-if="expandedKey === item.endpoint">
-                <td colspan="5" class="p-0">
-                  <UserBreakdownSubTable
-                    :items="breakdownItems"
-                    :loading="breakdownLoading"
-                  />
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <template v-for="item in displayEndpointStats" :key="item.endpoint">
+                <tr
+                  class="border-t border-gray-100 transition-colors dark:border-dark-700"
+                  :class="enableBreakdown ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700/40' : ''"
+                  @click="enableBreakdown && toggleBreakdown(item.endpoint)"
+                >
+                  <td class="max-w-[180px] truncate py-1.5 font-medium" :class="enableBreakdown ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300' : 'text-gray-900 dark:text-white'" :title="item.endpoint">
+                    <span class="inline-flex items-center gap-1">
+                      <Icon name="chevronDownSmall" size="none" v-if="enableBreakdown && expandedKey === item.endpoint" class="h-3 w-3 shrink-0" :stroke-width="2" />
+                      <Icon name="chevronRightSmall" size="none" v-else-if="enableBreakdown" class="h-3 w-3 shrink-0" :stroke-width="2" />
+                      {{ item.endpoint }}
+                    </span>
+                  </td>
+                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
+                    {{ formatNumber(item.requests) }}
+                  </td>
+                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
+                    {{ formatTokens(item.total_tokens) }}
+                  </td>
+                  <td class="py-1.5 text-right text-green-600 dark:text-green-400">
+                    ${{ formatCost(item.actual_cost) }}
+                  </td>
+                  <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">
+                    ${{ formatCost(item.cost) }}
+                  </td>
+                </tr>
+                <tr v-if="expandedKey === item.endpoint">
+                  <td colspan="5" class="p-0">
+                    <UserBreakdownSubTable
+                      :items="breakdownItems"
+                      :loading="breakdownLoading"
+                    />
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-    <div v-else class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-      {{ t('admin.dashboard.noDataAvailable') }}
+      <div v-else class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+        {{ t('admin.dashboard.noDataAvailable') }}
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import './chartCards.css'
 import Icon from '@/components/icons/Icon.vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'

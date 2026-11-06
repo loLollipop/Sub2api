@@ -1,6 +1,6 @@
 <template>
-  <div class="card p-4">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div class="card usage-chart-card">
+    <header class="usage-chart-heading">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
         {{ !enableRankingView || activeView === 'model_distribution'
           ? t('admin.dashboard.modelDistribution')
@@ -94,163 +94,165 @@
           </button>
         </div>
       </div>
-    </div>
-
-    <div v-if="activeView === 'model_distribution' && loading" class="flex h-48 items-center justify-center">
-      <LoadingSpinner />
-    </div>
-    <div
-      v-else-if="activeView === 'model_distribution' && displayModelStats.length > 0 && chartData"
-      class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6"
-    >
-      <div class="h-48 w-48 shrink-0">
-        <Doughnut :data="chartData" :options="doughnutOptions" />
+    </header>
+    <div class="usage-chart-body">
+      <div v-if="activeView === 'model_distribution' && loading" class="flex h-48 items-center justify-center">
+        <LoadingSpinner />
       </div>
       <div
-        class="distribution-scroll max-h-48 w-full min-w-0 flex-1 overflow-auto"
-        :class="{ 'is-scrolling': scrollbarVisible }"
-        @scroll.passive="showScrollbar"
+        v-else-if="activeView === 'model_distribution' && displayModelStats.length > 0 && chartData"
+        class="distribution-layout"
       >
-        <table class="w-full text-xs">
-          <thead>
-            <tr class="text-gray-500 dark:text-gray-400">
-              <th class="pb-2 text-left">{{ t('admin.dashboard.model') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.requests') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.tokens') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.actual') }}</th>
-              <th v-if="showAccountCost" class="pb-2 text-right">{{ t('admin.dashboard.accountCost') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.standard') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="model in displayModelStats" :key="model.model">
-              <tr
-                class="border-t border-gray-100 transition-colors dark:border-dark-700"
-                :class="enableBreakdown ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700/40' : ''"
-                @click="enableBreakdown && toggleBreakdown('model', model.model)"
-              >
-                <td
-                  class="max-w-[100px] truncate py-1.5 font-medium"
-                  :class="enableBreakdown ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300' : 'text-gray-900 dark:text-white'"
-                  :title="model.model"
+        <div class="distribution-doughnut">
+          <Doughnut :data="chartData" :options="doughnutOptions" />
+        </div>
+        <div
+          class="distribution-scroll max-h-48 w-full min-w-0 flex-1 overflow-auto"
+          :class="{ 'is-scrolling': scrollbarVisible }"
+          @scroll.passive="showScrollbar"
+        >
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-gray-500 dark:text-gray-400">
+                <th class="pb-2 text-left">{{ t('admin.dashboard.model') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.requests') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.tokens') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.actual') }}</th>
+                <th v-if="showAccountCost" class="pb-2 text-right">{{ t('admin.dashboard.accountCost') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.standard') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="model in displayModelStats" :key="model.model">
+                <tr
+                  class="border-t border-gray-100 transition-colors dark:border-dark-700"
+                  :class="enableBreakdown ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700/40' : ''"
+                  @click="enableBreakdown && toggleBreakdown('model', model.model)"
                 >
-                  <span class="inline-flex items-center gap-1">
-                    <Icon name="chevronDownSmall" size="none" v-if="enableBreakdown && expandedKey === `model-${model.model}`" class="h-3 w-3 shrink-0" :stroke-width="2" />
-                    <Icon name="chevronRightSmall" size="none" v-else-if="enableBreakdown" class="h-3 w-3 shrink-0" :stroke-width="2" />
-                    {{ model.model }}
-                  </span>
+                  <td
+                    class="max-w-[100px] truncate py-1.5 font-medium"
+                    :class="enableBreakdown ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300' : 'text-gray-900 dark:text-white'"
+                    :title="model.model"
+                  >
+                    <span class="inline-flex items-center gap-1">
+                      <Icon name="chevronDownSmall" size="none" v-if="enableBreakdown && expandedKey === `model-${model.model}`" class="h-3 w-3 shrink-0" :stroke-width="2" />
+                      <Icon name="chevronRightSmall" size="none" v-else-if="enableBreakdown" class="h-3 w-3 shrink-0" :stroke-width="2" />
+                      {{ model.model }}
+                    </span>
+                  </td>
+                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
+                    {{ formatNumber(model.requests) }}
+                  </td>
+                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
+                    {{ formatTokens(model.total_tokens) }}
+                  </td>
+                  <td class="py-1.5 text-right text-green-600 dark:text-green-400">
+                    ${{ formatCost(model.actual_cost) }}
+                  </td>
+                  <td v-if="showAccountCost" class="py-1.5 text-right text-orange-500 dark:text-orange-400">
+                    ${{ formatCost(model.account_cost) }}
+                  </td>
+                  <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">
+                    ${{ formatCost(model.cost) }}
+                  </td>
+                </tr>
+                <tr v-if="expandedKey === `model-${model.model}`">
+                  <td :colspan="distributionColspan" class="p-0">
+                    <UserBreakdownSubTable
+                      :items="breakdownItems"
+                      :loading="breakdownLoading"
+                      :show-account-cost="showAccountCost"
+                    />
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div
+        v-else-if="activeView === 'model_distribution'"
+        class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+      >
+        {{ t('admin.dashboard.noDataAvailable') }}
+      </div>
+
+      <div v-else-if="rankingLoading" class="flex h-48 items-center justify-center">
+        <LoadingSpinner />
+      </div>
+      <div
+        v-else-if="rankingError"
+        class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+      >
+        {{ t('admin.dashboard.failedToLoad') }}
+      </div>
+      <div v-else-if="rankingDisplayItems.length > 0 && rankingChartData" class="distribution-layout">
+        <div class="distribution-doughnut">
+          <Doughnut :data="rankingChartData" :options="rankingDoughnutOptions" />
+        </div>
+        <div
+          class="distribution-scroll max-h-48 w-full min-w-0 flex-1 overflow-auto"
+          :class="{ 'is-scrolling': scrollbarVisible }"
+          @scroll.passive="showScrollbar"
+        >
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-gray-500 dark:text-gray-400">
+                <th class="pb-2 text-left">{{ t('admin.dashboard.spendingRankingUser') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingRequests') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingTokens') }}</th>
+                <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingSpend') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(item, index) in rankingDisplayItems"
+                :key="item.isOther ? 'others' : `${item.user_id}-${index}`"
+                class="border-t border-gray-100 transition-colors dark:border-dark-700"
+                :class="item.isOther
+                  ? 'bg-gray-50/70 dark:bg-dark-700/20'
+                  : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700/40'"
+                @click="item.isOther ? undefined : emit('ranking-click', item)"
+              >
+                <td class="py-1.5">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <span class="shrink-0 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                      {{ item.isOther ? 'Σ' : `#${index + 1}` }}
+                    </span>
+                    <span
+                      class="block max-w-[140px] truncate font-medium text-gray-900 dark:text-white"
+                      :title="getRankingRowLabel(item)"
+                    >
+                      {{ getRankingRowLabel(item) }}
+                    </span>
+                  </div>
                 </td>
                 <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
-                  {{ formatNumber(model.requests) }}
+                  {{ formatNumber(item.requests) }}
                 </td>
                 <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
-                  {{ formatTokens(model.total_tokens) }}
+                  {{ formatTokens(item.tokens) }}
                 </td>
                 <td class="py-1.5 text-right text-green-600 dark:text-green-400">
-                  ${{ formatCost(model.actual_cost) }}
-                </td>
-                <td v-if="showAccountCost" class="py-1.5 text-right text-orange-500 dark:text-orange-400">
-                  ${{ formatCost(model.account_cost) }}
-                </td>
-                <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">
-                  ${{ formatCost(model.cost) }}
+                  ${{ formatCost(item.actual_cost) }}
                 </td>
               </tr>
-              <tr v-if="expandedKey === `model-${model.model}`">
-                <td :colspan="distributionColspan" class="p-0">
-                  <UserBreakdownSubTable
-                    :items="breakdownItems"
-                    :loading="breakdownLoading"
-                    :show-account-cost="showAccountCost"
-                  />
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div
-      v-else-if="activeView === 'model_distribution'"
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      {{ t('admin.dashboard.noDataAvailable') }}
-    </div>
-
-    <div v-else-if="rankingLoading" class="flex h-48 items-center justify-center">
-      <LoadingSpinner />
-    </div>
-    <div
-      v-else-if="rankingError"
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      {{ t('admin.dashboard.failedToLoad') }}
-    </div>
-    <div v-else-if="rankingDisplayItems.length > 0 && rankingChartData" class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-      <div class="h-48 w-48 shrink-0">
-        <Doughnut :data="rankingChartData" :options="rankingDoughnutOptions" />
+            </tbody>
+          </table>
+        </div>
       </div>
       <div
-        class="distribution-scroll max-h-48 w-full min-w-0 flex-1 overflow-auto"
-        :class="{ 'is-scrolling': scrollbarVisible }"
-        @scroll.passive="showScrollbar"
+        v-else
+        class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
       >
-        <table class="w-full text-xs">
-          <thead>
-            <tr class="text-gray-500 dark:text-gray-400">
-              <th class="pb-2 text-left">{{ t('admin.dashboard.spendingRankingUser') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingRequests') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingTokens') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingSpend') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(item, index) in rankingDisplayItems"
-              :key="item.isOther ? 'others' : `${item.user_id}-${index}`"
-              class="border-t border-gray-100 transition-colors dark:border-dark-700"
-              :class="item.isOther
-                ? 'bg-gray-50/70 dark:bg-dark-700/20'
-                : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700/40'"
-              @click="item.isOther ? undefined : emit('ranking-click', item)"
-            >
-              <td class="py-1.5">
-                <div class="flex min-w-0 items-center gap-2">
-                  <span class="shrink-0 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
-                    {{ item.isOther ? 'Σ' : `#${index + 1}` }}
-                  </span>
-                  <span
-                    class="block max-w-[140px] truncate font-medium text-gray-900 dark:text-white"
-                    :title="getRankingRowLabel(item)"
-                  >
-                    {{ getRankingRowLabel(item) }}
-                  </span>
-                </div>
-              </td>
-              <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
-                {{ formatNumber(item.requests) }}
-              </td>
-              <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
-                {{ formatTokens(item.tokens) }}
-              </td>
-              <td class="py-1.5 text-right text-green-600 dark:text-green-400">
-                ${{ formatCost(item.actual_cost) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        {{ t('admin.dashboard.noDataAvailable') }}
       </div>
-    </div>
-    <div
-      v-else
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      {{ t('admin.dashboard.noDataAvailable') }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import './chartCards.css'
 import Icon from '@/components/icons/Icon.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'

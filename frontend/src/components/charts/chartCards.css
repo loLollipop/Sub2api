@@ -1,0 +1,20 @@
+/* Adapted from the upstream UCard header/body and DistributionPanel container sizing. */
+.usage-chart-card { min-width: 0; padding: 0; overflow: hidden; }
+.usage-chart-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 54px; padding: 12px 18px; border-bottom: 1px solid var(--signal-line); }
+.usage-chart-heading > h3 { margin: 0; color: var(--signal-muted); font-size: 12px; line-height: 20px; font-weight: 500; }
+.usage-chart-body { min-width: 0; padding: 18px; container-type: inline-size; }
+.distribution-layout { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; }
+.distribution-doughnut { width: 160px; height: 160px; flex-shrink: 0; }
+.distribution-layout table { white-space: nowrap; }
+.distribution-layout :is(th, td) { padding-inline: 6px; }
+.distribution-layout :is(th, td):first-child { padding-left: 0; }
+.distribution-layout :is(th, td):last-child { padding-right: 0; }
+@container (min-width: 448px) {
+  .distribution-layout { flex-direction: row; gap: 20px; }
+  .distribution-doughnut { width: 128px; height: 128px; }
+}
+@container (min-width: 576px) { .distribution-doughnut { width: 160px; height: 160px; } }
+@container (min-width: 768px) { .distribution-doughnut { width: 192px; height: 192px; } }
+/* Dashboard parents already supply their heading, value and body spacing. */
+.signal-trend .usage-chart-heading { display: none; }
+.signal-trend .usage-chart-body { padding: 0; }

@@ -324,3 +324,24 @@ describe('UsageFilters — native compaction filter', () => {
     expect(wrapper.emitted('change')).toBeTruthy()
   })
 })
+
+describe('UsageFilters layout', () => {
+  it('keeps actions outside the full-width grid and expands secondary fields without resetting values', async () => {
+    const filters = defaultFilters()
+    filters.billing_type = 0
+    filters.native_compaction_v2 = false
+    const wrapper = mountFilters(filters)
+    expect(wrapper.find('.usage-filter-grid').exists()).toBe(true)
+    const toggle = wrapper.get('[data-testid="admin-usage-secondary-filters-toggle"]')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    await toggle.trigger('click')
+    expect(wrapper.get('.usage-filter-grid').classes()).toContain('is-expanded')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(filters.billing_type).toBe(0)
+    expect(filters.native_compaction_v2).toBe(false)
+    await wrapper.setProps({ showActions: true })
+    expect(wrapper.find('.usage-filter-grid .usage-filter-actions').exists()).toBe(false)
+    expect(wrapper.get('.usage-filter-actions').findAll('button')).toHaveLength(4)
+    wrapper.unmount()
+  })
+})

@@ -1170,7 +1170,7 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 			// 上游未返回 usage 时 actual=0，整笔预扣必须释放，不得记为消费。
 			// SSE 传输限额错误同样保留已观测的 usage，不推算未交付的输出。
 			// 其余错误（含 failover）仍返回 nil，不暴露部分结果。
-			if !errors.Is(err, ErrBalanceWithholdingFailed) && !(errors.Is(err, errSSETransportLimit) && streamRes != nil) {
+			if !errors.Is(err, ErrBalanceWithholdingFailed) && (!errors.Is(err, errSSETransportLimit) || streamRes == nil) {
 				return nil, err
 			}
 			streamTopUpAbortErr = err

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 	"testing"
@@ -24,8 +25,12 @@ func (h *cyberRedisCommandHook) DialHook(next redis.DialHook) redis.DialHook { r
 func (h *cyberRedisCommandHook) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
 	return func(ctx context.Context, cmd redis.Cmder) error {
 		if cmd.Name() == "evalsha" && cmd.Args()[1] == setCyberSessionBlockedScript.Hash() {
+			keyCount, ok := cmd.Args()[2].(int)
+			if !ok {
+				return fmt.Errorf("expected EVALSHA key count to be int, got %T", cmd.Args()[2])
+			}
 			h.mu.Lock()
-			h.setBatchSizes = append(h.setBatchSizes, cmd.Args()[2].(int)-2)
+			h.setBatchSizes = append(h.setBatchSizes, keyCount-2)
 			h.mu.Unlock()
 		}
 		if cmd.Name() == "mget" {

@@ -22,6 +22,7 @@ export function useChartPalette() {
   return computed(() => {
     const series = dark.value ? darkSeries : lightSeries
     return {
+      isDark: dark.value,
       series,
       accent: series[0],
       blue: series[1],

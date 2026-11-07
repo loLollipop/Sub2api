@@ -17,6 +17,26 @@ const (
 	internal500PenaltyTier3Threshold = 3                // 第 3+ 轮：永久禁用
 )
 
+const defaultInternal500ImageCooldown = 2 * time.Minute
+
+// handleInternal500ForModel handles an INTERNAL 500 that survived every retry. Image models get a
+// model-level cooldown only; anything else goes through the account penalty as upstream does.
+func (s *AntigravityGatewayService) handleInternal500ForModel(
+	ctx context.Context, prefix string, account *Account, modelKey string,
+) {
+	if account != nil && isAntigravityGeminiImageModel(modelKey) {
+		until := time.Now().Add(defaultInternal500ImageCooldown)
+		if setModelRateLimitByModelName(ctx, s.accountRepo, account.ID, modelKey, prefix, http.StatusInternalServerError, until, false) {
+			s.updateAccountModelRateLimitInCache(ctx, account, modelKey, until)
+		}
+		slog.Info("internal500_image_model_cooldown",
+			"account_id", account.ID, "account_name", account.Name, "model", modelKey,
+			"duration", time.Until(until).Truncate(time.Second))
+		return
+	}
+	s.handleInternal500RetryExhausted(ctx, prefix, account)
+}
+
 // isAntigravityInternalServerError 检测特定的 INTERNAL 500 错误
 // 必须同时匹配 error.code==500, error.message=="Internal error encountered.", error.status=="INTERNAL"
 func isAntigravityInternalServerError(statusCode int, body []byte) bool {

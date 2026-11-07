@@ -236,7 +236,11 @@ func messageContentWire(parts []ResponsesContentPart) []map[string]any {
 		if typ == "" {
 			typ = "output_text"
 		}
-		out = append(out, map[string]any{"type": typ, "text": p.Text})
+		if typ == "output_text" {
+			out = append(out, outputTextPartWire(&p))
+		} else {
+			out = append(out, map[string]any{"type": typ, "text": p.Text})
+		}
 	}
 	return out
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 )
 
 // antigravityRetryLoopParams 重试循环的参数
@@ -686,7 +687,11 @@ urlFallbackLoop:
 
 				// INTERNAL 500 渐进惩罚：3 次重试全部命中特定 500 时递增计数器并惩罚
 				if allAttemptsInternal500 && isAntigravityInternalServerError(resp.StatusCode, respBody) {
-					s.handleInternal500RetryExhausted(p.ctx, p.prefix, p.account)
+					model := gjson.GetBytes(p.body, "model").String()
+					if model == "" {
+						model = resolveFinalAntigravityModelKey(p.ctx, p.account, p.requestedModel)
+					}
+					s.handleInternal500ForModel(p.ctx, p.prefix, p.account, model)
 				}
 
 				// 其他 4xx 错误或重试用尽，直接返回

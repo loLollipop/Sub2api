@@ -5,28 +5,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useMutationObserver, usePreferredReducedMotion } from '@vueuse/core'
+import { usePreferredReducedMotion } from '@vueuse/core'
 import { Bar } from 'vue-chartjs'
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, type ChartOptions } from 'chart.js'
 import type { LeaderboardResponse } from '@/api/leaderboard'
 import { providerLabel } from '@/components/modelPlaza/modelPlazaProviders'
-import { bucketLabels, compactTokens, providerOf, PROVIDER_COLORS, SERIES_COLORS, rankModels, trendBuckets } from './leaderboardData'
+import { bucketLabels, compactTokens, providerOf, rankModels, trendBuckets } from './leaderboardData'
+import { useLeaderboardPalette } from './useLeaderboardPalette'
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip)
 const props = defineProps<{ data: LeaderboardResponse; share?: boolean }>()
 const { t, locale } = useI18n()
-const dark = ref(document.documentElement.classList.contains('dark'))
-useMutationObserver(document.documentElement, () => { dark.value = document.documentElement.classList.contains('dark') }, { attributes: true, attributeFilter: ['class'] })
+const palette = useLeaderboardPalette()
 const reducedMotion = usePreferredReducedMotion()
 const buckets = computed(() => trendBuckets(props.data))
 const series = computed(() => {
   if (props.share) return [...new Set(props.data.models.filter(m => m.total_tokens > 0).map(m => providerOf(m.model)))]
-    .map(provider => ({ key: provider, label: provider === 'other' ? t('leaderboard.other') : providerLabel(provider), color: PROVIDER_COLORS[provider] || '#94a3b8' }))
+    .map(provider => ({ key: provider, label: provider === 'other' ? t('leaderboard.other') : providerLabel(provider), color: palette.value.providers[provider] || palette.value.other }))
   const models = rankModels(props.data.models).slice(0, 8)
-  const entries = models.map((m, i) => ({ key: m.model, label: m.model, color: SERIES_COLORS[i] }))
-  if (props.data.models.filter(m => m.total_tokens > 0).length > 8) entries.push({ key: '__other__', label: t('leaderboard.otherModels'), color: SERIES_COLORS[8] })
+  const entries = models.map((m, i) => ({ key: m.model, label: m.model, color: palette.value.series[i] }))
+  if (props.data.models.filter(m => m.total_tokens > 0).length > 8) entries.push({ key: '__other__', label: t('leaderboard.otherModels'), color: palette.value.other })
   return entries
 })
 const chartData = computed(() => {
@@ -61,15 +61,15 @@ const options = computed<ChartOptions<'bar'>>(() => ({
   plugins: {
     legend: { display: false },
     tooltip: {
-      backgroundColor: dark.value ? '#252b35' : '#1f2937', padding: 12,
+      backgroundColor: palette.value.isDark ? '#302c27' : '#3b342d', padding: 12,
       callbacks: { label: context => `${context.dataset.label}: ${props.share ? `${Number(context.raw).toFixed(1)}%` : compactTokens(Number(context.raw))}` },
     },
   },
   scales: {
-    x: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: dark.value ? '#a7aeb9' : '#6b7280', font: { size: 11 }, maxRotation: 0, maxTicksLimit: 12 } },
+    x: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: palette.value.text, font: { size: 11 }, maxRotation: 0, maxTicksLimit: 12 } },
     y: { stacked: true, beginAtZero: true, ...(props.share ? { max: 100 } : {}), border: { display: false },
-      grid: { color: dark.value ? '#ffffff0e' : '#1f293710' },
-      ticks: { color: dark.value ? '#a7aeb9' : '#6b7280', font: { size: 11 }, maxTicksLimit: 5, callback: value => props.share ? `${value}%` : compactTokens(Number(value)) },
+      grid: { color: palette.value.grid },
+      ticks: { color: palette.value.text, font: { size: 11 }, maxTicksLimit: 5, callback: value => props.share ? `${value}%` : compactTokens(Number(value)) },
     },
   },
 }))

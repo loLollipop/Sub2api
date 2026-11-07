@@ -72,8 +72,30 @@ func requestBodyReadErrorKind(err error) string {
 		return "truncated_body"
 	}
 	var netErr net.Error
+	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout() {
+		return "timeout"
+	}
 	if errors.As(err, &netErr) {
 		return "transport"
 	}
 	return "io_read"
+}
+
+// requestBodyReadFailure shares the payload-free classifier with read logging.
+func requestBodyReadFailure(reqLog *zap.Logger, req *http.Request, err error) (int, string) {
+	logRequestBodyReadFailure(reqLog, req, err)
+	if maxErr, ok := extractMaxBytesError(err); ok {
+		return http.StatusRequestEntityTooLarge, buildBodyTooLargeMessage(maxErr.Limit)
+	}
+	if req != nil && errors.Is(req.Context().Err(), context.Canceled) {
+		return 499, "Client closed request"
+	}
+	switch requestBodyReadErrorKind(err) {
+	case "timeout":
+		return http.StatusRequestTimeout, "Timed out reading request body"
+	case "client_disconnect":
+		return 499, "Client closed request"
+	default:
+		return http.StatusBadRequest, "Failed to read request body"
+	}
 }

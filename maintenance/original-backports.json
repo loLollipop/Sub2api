@@ -7,18 +7,19 @@
     "v0.2.16": "01842576b3d5c1e2545b5a99ad555d36e28ed306",
     "v0.2.17": "060d0160417782cd962a0c7f460f6cd4565d4916",
     "v0.2.18": "ac1b8f1271be0d674fa6f074403c1410f30a3a81",
-    "v0.2.19": "dece26153621959ccd7635814f4b2d08304e681a"
+    "v0.2.19": "dece26153621959ccd7635814f4b2d08304e681a",
+    "v0.2.20": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0"
   },
-  "latest_reviewed_main_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
+  "latest_reviewed_main_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v0.2.19",
-  "reviewed_release_commit": "dece26153621959ccd7635814f4b2d08304e681a",
+  "reviewed_release_tag": "v0.2.20",
+  "reviewed_release_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
+    "source_head": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
     "implemented_with_local_regression": [
       "Toolchain, cooldown scopes and frontend lifecycle fixes",
       "2026-10-17 Responses created_at, Gemini compatibility thinking, subscription retirement/public catalogs and payment compatibility; dated sync note records local adaptations and verification",
@@ -33,7 +34,8 @@
       "Codex workspace-aware imports, Vertex capacity/token errors and single error-policy evaluation",
       "Anthropic protocol base URL, Composite OpenAI OAuth ambiguity rejection and configurable minimum output tokens",
       "Argon and Antigravity catalogs, tool media/native parts, GLM credit windows and source pricing constants",
-      "2026-10-29 formal v0.2.19 selective multipart, pagination, rate-limit, malformed response, image usage, role, fingerprint, cache, admin and Gemini catalog fixes; see maintenance/notes/upstream-sync-20261029.md"
+      "2026-10-29 formal v0.2.19 selective multipart, pagination, rate-limit, malformed response, image usage, role, fingerprint, cache, admin and Gemini catalog fixes; see maintenance/notes/upstream-sync-20261029.md",
+      "2026-11-07 formal v0.2.20 selective resource bounds, legacy-compatible cyber prefix matching, Gemini/Antigravity tool/schema/stream fixes, safe authentication/read errors and eight protocol/usage correctness fixes; see maintenance/notes/upstream-sync-20261107-v0220.md"
     ],
     "implemented_not_runtime_enabled": [
       "Gemini cache binding/endpoint identity260-261 and source-compatible quote/protocol helpers; runtime CRUD is not enabled"
@@ -117,7 +119,24 @@
     {"commit": "7bce2cfb45d8cf6e8ea7f9cf2710c9febb8a2f51", "scope": "claude-fingerprint-utf16", "note": "Local behavior adaptation and validation: maintenance/notes/upstream-sync-20261029.md"},
     {"commit": "9eba617367469e3e37fa4aa131275499ea2f8c14", "scope": "web-search-per-platform-config-merge", "note": "Local behavior adaptation and validation: maintenance/notes/upstream-sync-20261029.md"},
     {"commit": "1352e899ecd418ecf0b81a5151a9c992c953d945", "scope": "web-search-merge-type-checks", "note": "Local behavior adaptation and validation: maintenance/notes/upstream-sync-20261029.md"},
-    {"commit": "31564b2e86ccb6f4de348a21eb9e47b366f326ba", "scope": "current-gemini-default-catalog", "note": "Local behavior adaptation and validation: maintenance/notes/upstream-sync-20261029.md"}
+    {"commit": "31564b2e86ccb6f4de348a21eb9e47b366f326ba", "scope": "current-gemini-default-catalog", "note": "Local behavior adaptation and validation: maintenance/notes/upstream-sync-20261029.md"},
+    {"commit": "a0b058a9e9d73a4f5d9bed2bdccb503eb7ed8cc4", "scope": "bedrock-eventstream-frame-limits", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "7e3b6c72faded2427585a6d528b977943184e0e5", "scope": "cyber-exact-prefix-length-and-legacy-block-compatibility", "note": "Retain legacy scope/block records through real bounded-batch prefix lookup and atomic Redis writes; preserve API-key isolation and existing block TTL."},
+    {"commit": "d446c4a6bbf798b34527ef50b20e14a2d90378f6", "scope": "bounded-gemini-sse-and-antigravity-body", "note": "Only minimal line/event reader dependencies; preserve known usage and bounded real-terminal drain; no general body-memory/timeout/worker redesign."},
+    {"commit": "0b535b5c0700d901208136250b1400189c2646d3", "scope": "antigravity-generation-response-schema", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "aae31c7438a1452bbdb81f7de72f184f0c4f7045", "scope": "gemini-native-function-response-media", "note": "Gemini3+ functionResponse.parts chosen from final upstream model; retain Gemini2 fallback and per-tool ownership."},
+    {"commit": "2106081510f98cbe71e5525593d7e3c762c27f9c", "scope": "cloudflare-rest-messages-url", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "f10a45c03088b4658bca63141673ed9026cc6c37", "scope": "api-key-invalid-utf8-and-client-cancel", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "22693fb4feed5c71c8b18883fca1f7e5e6e50639", "scope": "grok-voice-body-read-classification", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "2ce1849bdfe0acc6c48d3362af4303658bc10950", "scope": "antigravity-image-internal500-model-isolation", "note": "Only final-wire image-model cooldown; configurable account penalty tiers remain deferred."},
+    {"commit": "c35418032b1c549fada003ffff60bd2cdcb65877", "scope": "antigravity-direct-gemini-stream-shape", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "2d6b64a18e619e57ac7364cc7f42918eb49fd76b", "scope": "responses-completed-content-fields", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "522f1fb999db5380dc88724a71098c7902b094fc", "scope": "grok-responses-delegated-message-input", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "e16e69a7c4e0c6145887b615422e0e632658bdde", "scope": "websocket-per-turn-first-token-time", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "40d9c0964b05f192f3b31ab155aa037eebf42593", "scope": "websocket-http-bridge-codex-fingerprint", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "c476edbf40f100f04a08619da665439d3dd8e795", "scope": "skip-forced-mode-responses-probe", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "a8d90a72ea05579fae9061783fd886ef42c779e7", "scope": "setup-token-passive-weekly-usage", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"},
+    {"commit": "fa6f06510b6de03b80c329e2be4e5e0b112c079b", "scope": "body-limit-error-passthrough-rule-priority", "note": "Local adaptation and regression evidence: maintenance/notes/upstream-sync-20261107-v0220.md"}
   ],
   "preserve_during_future_sync": [
     "Existing 0.15 billing and fixed-price shop-link recharge customizations",
@@ -137,13 +156,16 @@
     "afbef7c8c duplicate DeepSeek image alias fix: source alias-generation predecessor absent locally; broader input compatibility intentionally not imported.",
     "2026-10-29: scoped admin keys, image_count_billing migrations/UI, managed Grok catalog observer/diagnostics, Gemini explicit-cache runtime remain outside this selective sync.",
     "2026-10-29: GPT-6.1 Terra new capability, configurable Gemini same-account retries and mapping-as-existence union catalog require separate adaptation; existing behavior retained.",
-    "2026-10-29: reviewed main-only OAuth nonstream Responses fix group 6b2fdfcac/9b5407449/4db8402b5 is deferred together under official-releases-only policy; no partial import."
+    "2026-11-07: management MCP/OAuth/migration249, full-access admin-key compatibility, account-size routing, managed catalog/Terra pricing and new account penalty configuration remain deferred.",
+    "2026-11-07: do not import disconnect usage truncation/estimation or 95% cache charging. General request memory budgets, transport timeouts, session caches and billing background-worker redesign from457602c8f remain separate; only bounded Gemini SSE dependencies are adapted.",
+    "2026-11-07: image-size-tier stickiness6b565e45a depends on excluded size routing. Empty-instructions/response-echo a699c2bae changes existing Codex validation/default injection across protocols and remains deferred as a complete policy group."
   ],
   "observed_delta_review": {
-    "from_commit": "5c185c5c5d4f5e409e2139806e0964ae944e03e8",
-    "to_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
-    "status": "formal_v0219_selective_backport_main_only_reviewed_and_deferred",
-    "evidence": "maintenance/notes/upstream-sync-20261029.md"
+    "from_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
+    "to_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+    "reviewed_release_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
+    "status": "formal_v0220_selective_backport_version_only_postrelease_main_reviewed",
+    "evidence": "maintenance/notes/upstream-sync-20261107-v0220.md"
   },
   "sync_20261022": {
     "evidence": "maintenance/notes/upstream-sync-20261022.md",
@@ -162,5 +184,36 @@
     "reviewed_release_commit": "dece26153621959ccd7635814f4b2d08304e681a",
     "observed_main_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
     "release_status": "User authorized GitHub submission and deployment on 2026-10-29. Prepare personal v2.1.42; final PR/CI, artifact and deployment gates recorded separately."
+  },
+  "sync_20261107_v0220": {
+    "evidence": "maintenance/notes/upstream-sync-20261107-v0220.md",
+    "reviewed_release_tag": "v0.2.20",
+    "reviewed_release_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
+    "observed_main_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+    "selected_source_commits": [
+      "a0b058a9e9d73a4f5d9bed2bdccb503eb7ed8cc4",
+      "7e3b6c72faded2427585a6d528b977943184e0e5",
+      "d446c4a6bbf798b34527ef50b20e14a2d90378f6",
+      "0b535b5c0700d901208136250b1400189c2646d3",
+      "aae31c7438a1452bbdb81f7de72f184f0c4f7045",
+      "2106081510f98cbe71e5525593d7e3c762c27f9c",
+      "f10a45c03088b4658bca63141673ed9026cc6c37",
+      "22693fb4feed5c71c8b18883fca1f7e5e6e50639",
+      "2ce1849bdfe0acc6c48d3362af4303658bc10950",
+      "c35418032b1c549fada003ffff60bd2cdcb65877",
+      "2d6b64a18e619e57ac7364cc7f42918eb49fd76b",
+      "522f1fb999db5380dc88724a71098c7902b094fc",
+      "e16e69a7c4e0c6145887b615422e0e632658bdde",
+      "40d9c0964b05f192f3b31ab155aa037eebf42593",
+      "c476edbf40f100f04a08619da665439d3dd8e795",
+      "a8d90a72ea05579fae9061783fd886ef42c779e7",
+      "fa6f06510b6de03b80c329e2be4e5e0b112c079b"
+    ],
+    "already_covered": [
+      "Former main-only OAuth nonstream Responses group6b2fdfcac/9b5407449/4db8402b5 is now in formal v0.2.20; local stronger SSE/terminal-usage handling already covers it.",
+      "Kimi concurrency403 short cooldown, buffered reasoning_text, GPT Image2.6 core native flow, RPM override auth snapshot and fixed dependency versions."
+    ],
+    "main_only_delta": "VERSION sync only; no unreleased business code imported",
+    "release_status": "User subsequently authorized code review, GitHub submission and deployment on 2026-11-07. Prepare personal v2.1.58; final PR/CI, artifact and deployment gates recorded separately."
   }
 }

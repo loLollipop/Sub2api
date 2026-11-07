@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { defineComponent } from 'vue'
 import type { LeaderboardModel, LeaderboardResponse } from '@/api/leaderboard'
-import { bucketLabels, PROVIDER_COLORS, providerOf, providerShares, rankModels, trendBuckets } from '../leaderboardData'
+import { bucketLabels, providerOf, providerShares, rankModels, trendBuckets } from '../leaderboardData'
+import { useLeaderboardPalette } from '../useLeaderboardPalette'
 
 const model = (name: string, current: number, previous: number): LeaderboardModel => ({ model: name, total_tokens: current, previous_tokens: previous, requests: 1, previous_requests: 1 })
 function response(overrides: Partial<LeaderboardResponse> = {}): LeaderboardResponse {
@@ -53,11 +56,35 @@ describe('leaderboard data semantics', () => {
     expect(new Set(labels).size).toBe(25)
   })
 
-  it('assigns a distinct color to every recognized provider and to unknown models', () => {
-    const colors = Object.values(PROVIDER_COLORS)
-    expect(new Set(colors).size).toBe(colors.length)
-    for (const family of ['gpt-5', 'claude-opus', 'gemini-pro', 'deepseek-chat', 'qwen3', 'glm-5', 'mistral-large', 'llama-4', 'hunyuan-turbo', 'ernie-4', 'yi-model', 'spark-v4', 'command-r']) {
-      expect(PROVIDER_COLORS[providerOf(family)]).toBeDefined()
+  it('keeps provider colors distinct and updates them when the theme changes', async () => {
+    const originalClass = document.documentElement.className
+    document.documentElement.classList.remove('dark')
+    let palette!: ReturnType<typeof useLeaderboardPalette>
+    const wrapper = mount(defineComponent({
+      setup() {
+        palette = useLeaderboardPalette()
+        return () => palette.value.other
+      },
+    }))
+    try {
+      const light = palette.value
+      for (const theme of ['light', 'dark', 'light']) {
+        document.documentElement.classList.toggle('dark', theme === 'dark')
+        await flushPromises()
+        const themedPalette = palette.value
+        expect(themedPalette.isDark).toBe(theme === 'dark')
+        const colors = Object.values(themedPalette.providers)
+        expect(new Set(colors).size).toBe(colors.length)
+        for (const family of ['gpt-5', 'claude-opus', 'gemini-pro', 'deepseek-chat', 'qwen3', 'glm-5', 'mistral-large', 'llama-4', 'hunyuan-turbo', 'ernie-4', 'yi-model', 'spark-v4', 'command-r']) {
+          expect(themedPalette.providers[providerOf(family)]).toBeDefined()
+        }
+        expect(themedPalette.providers.openai).toBe(themedPalette.accent)
+        expect(themedPalette.providers.other).toBe(themedPalette.other)
+        expect(themedPalette.providers.openai === light.providers.openai).toBe(theme === 'light')
+      }
+    } finally {
+      wrapper.unmount()
+      document.documentElement.className = originalClass
     }
   })
 })

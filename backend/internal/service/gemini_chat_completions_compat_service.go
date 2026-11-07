@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -97,7 +96,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 		mappedModel = account.GetMappedModel(req.Model)
 	}
 
-	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(claudeBody)
+	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(claudeBody, mappedModel)
 	if err != nil {
 		return nil, s.writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
@@ -276,27 +275,37 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	var firstTokenMs *int
 	clientDisconnect := false
 	streamFinished := false
+	var streamReadErr error
 	if clientStream {
 		streamRes, err := s.handleChatCompletionsStreamingResponseFromGemini(c, resp, startTime, originalModel, account.Type == AccountTypeOAuth, includeUsage)
 		if err != nil {
-			return nil, err
+			if !errors.Is(err, errSSETransportLimit) || streamRes == nil {
+				return nil, err
+			}
+			streamReadErr = err
 		}
 		usage = streamRes.usage
 		firstTokenMs = streamRes.firstTokenMs
 		clientDisconnect = streamRes.clientDisconnect
 		streamFinished = streamRes.finished
 	} else if useUpstreamStream {
-		collected, usageObj, err := collectGeminiSSE(resp.Body, account.Type == AccountTypeOAuth)
+		collected, usageObj, err := collectGeminiSSE(s.cfg, resp.Body, account.Type == AccountTypeOAuth)
 		if err != nil {
-			return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Failed to read upstream stream")
+			writeErr := s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Failed to read upstream stream")
+			if !errors.Is(err, errSSETransportLimit) || !usageObj.hasObservedTokens() {
+				return nil, writeErr
+			}
+			usage = usageObj
+			streamReadErr = errors.Join(err, writeErr)
+		} else {
+			collectedBytes, _ := json.Marshal(collected)
+			chatResp, usageObj2, err := geminiResponseToChatCompletions(collected, originalModel, collectedBytes, usageObj)
+			if err != nil {
+				return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
+			}
+			c.JSON(http.StatusOK, chatResp)
+			usage = usageObj2
 		}
-		collectedBytes, _ := json.Marshal(collected)
-		chatResp, usageObj2, err := geminiResponseToChatCompletions(collected, originalModel, collectedBytes, usageObj)
-		if err != nil {
-			return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
-		}
-		c.JSON(http.StatusOK, chatResp)
-		usage = usageObj2
 	} else {
 		usageResp, err := s.handleChatCompletionsNonStreamingResponseFromGemini(c, resp, originalModel, account.Type == AccountTypeOAuth)
 		if err != nil {
@@ -316,7 +325,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 		imageCount = 1
 	}
 	// 客户端在收到结束分片前断开时只计已送达的图片：Chat 流不向客户端转发图片。
-	if clientDisconnect && !streamFinished {
+	if streamReadErr != nil || clientDisconnect && !streamFinished {
 		imageCount = 0
 	}
 
@@ -334,7 +343,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 		ImageSize:        imageSize,
 		ImageInputSize:   imageInputSize,
 		ClientDisconnect: clientDisconnect,
-	}, nil
+	}, streamReadErr
 }
 
 func (s *GeminiMessagesCompatService) buildGeminiChatCompletionsUpstreamRequestFunc(
@@ -642,9 +651,9 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsStreamingResponseFrom
 		return disconnected
 	}
 
-	reader := bufio.NewReader(resp.Body)
+	reader := newBoundedSSELineReader(resp.Body, s.cfg)
 	for {
-		line, err := reader.ReadString('\n')
+		line, err := reader.ReadLineString()
 		if len(line) > 0 && (err == nil || errors.Is(err, io.EOF)) {
 			trimmed := strings.TrimRight(line, "\r\n")
 			if strings.HasPrefix(trimmed, "data:") {
@@ -822,6 +831,9 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsStreamingResponseFrom
 				logger.LegacyPrintf("service.gemini_messages_compat", "[GeminiAPI] Client disconnected during chat completions stream, billing collected usage: %v", err)
 				clientDisconnect = true
 				return streamResult(), nil
+			}
+			if errors.Is(err, errSSETransportLimit) && usage.hasObservedTokens() {
+				return streamResult(), err
 			}
 			return nil, fmt.Errorf("stream read error: %w", err)
 		}

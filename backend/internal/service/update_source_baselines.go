@@ -6,7 +6,7 @@ package service
 const (
 	forkImportedVersion    = "2.3.19"
 	forkImportedCommit     = "a16b937d6afea658434aa2c16049114c91984867"
-	originalReviewedCommit = "a3298b46ebe239fb0720b068a1eb3383955bdac2"
+	originalReviewedCommit = "6b4b37db43443b5e88e424fe3c69602cc3810dfb"
 )
 
 type updateSourceBaseline struct {
@@ -21,6 +21,6 @@ type updateSourceBaseline struct {
 func defaultUpdateSourceBaselines() []updateSourceBaseline {
 	return []updateSourceBaseline{
 		{repository: "kiss-kedaya/sub2api", branch: "main", commit: forkImportedCommit, releaseTag: "v" + forkImportedVersion, releaseCommit: forkImportedCommit},
-		{repository: "Wei-Shaw/sub2api", branch: "main", commit: originalReviewedCommit, releaseTag: "v0.2.19", releaseCommit: "dece26153621959ccd7635814f4b2d08304e681a"},
+		{repository: "Wei-Shaw/sub2api", branch: "main", commit: originalReviewedCommit, releaseTag: "v0.2.20", releaseCommit: "dab829a4e9b7d1cc307189aea8b0319eb29e29d0"},
 	}
 }

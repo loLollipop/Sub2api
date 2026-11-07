@@ -34,7 +34,7 @@
           <div class="ranking-total"><strong>{{ compactTokens(data.total_tokens) }}</strong><span>{{ t('leaderboard.tokens') }}</span></div>
         </header>
         <div class="ranking-chart-area"><LeaderboardChart :data="data" /></div>
-        <div class="ranking-legend" aria-hidden="true"><span v-for="(model, i) in ranked.slice(0, 8)" :key="model.model"><i :style="{ background: SERIES_COLORS[i] }" />{{ model.model }}</span><span v-if="ranked.length > 8"><i :style="{ background: SERIES_COLORS[8] }" />{{ t('leaderboard.otherModels') }}</span></div>
+        <div class="ranking-legend" aria-hidden="true"><span v-for="(model, i) in ranked.slice(0, 8)" :key="model.model"><i :style="{ background: palette.series[i] }" />{{ model.model }}</span><span v-if="ranked.length > 8"><i :style="{ background: palette.other }" />{{ t('leaderboard.otherModels') }}</span></div>
         <div class="ranking-list-section">
           <div class="ranking-section-heading"><div><h2><Icon name="trophy" size="sm" />{{ t('leaderboard.modelRanking') }}</h2><p>{{ t('leaderboard.rankingHint') }}</p></div><span>{{ t('leaderboard.activeModels') }} <b>{{ ranked.length }}</b></span></div>
           <ol class="ranking-model-list" :style="{ '--ranking-rows': Math.ceil(Math.min(20, ranked.length) / 2) }">
@@ -56,7 +56,7 @@
           <ol class="ranking-provider-list">
             <li v-for="(provider, i) in providers" :key="provider.provider">
               <span class="ranking-position">{{ String(i + 1).padStart(2, '0') }}</span>
-              <i class="ranking-provider-dot" :style="{ background: PROVIDER_COLORS[provider.provider] || '#94a3b8' }" />
+              <i class="ranking-provider-dot" :style="{ background: palette.providers[provider.provider] || palette.other }" />
               <span class="ranking-provider-name">{{ provider.provider === 'other' ? t('leaderboard.other') : providerLabel(provider.provider) }}</span>
               <div class="ranking-model-value"><strong>{{ compactTokens(provider.tokens) }}</strong><span>{{ provider.share.toLocaleString(locale, { maximumFractionDigits: 1 }) }}%</span></div>
             </li>
@@ -89,12 +89,14 @@ import PlazaProviderIcon from '@/components/modelPlaza/PlazaProviderIcon.vue'
 import { providerLabel } from '@/components/modelPlaza/modelPlazaProviders'
 import type { LeaderboardPeriod, LeaderboardResponse } from '@/api/leaderboard'
 import LeaderboardChart from './LeaderboardChart.vue'
-import { rankModels, providerShares, compactTokens, SERIES_COLORS, PROVIDER_COLORS } from './leaderboardData'
+import { rankModels, providerShares, compactTokens } from './leaderboardData'
+import { useLeaderboardPalette } from './useLeaderboardPalette'
 import './leaderboard.css'
 
 const props = defineProps<{ data: LeaderboardResponse | null; period: LeaderboardPeriod; loading: boolean; error: 'failed' | 'disabled' | null }>()
 defineEmits<{ 'update:period': [LeaderboardPeriod]; refresh: [] }>()
 const { t, locale } = useI18n()
+const palette = useLeaderboardPalette()
 const periods: LeaderboardPeriod[] = ['day', 'week', 'month', 'year']
 const directions = ['rising', 'falling'] as const
 const ranked = computed(() => rankModels(props.data?.models || []))

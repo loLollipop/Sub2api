@@ -1,15 +1,6 @@
 import type { LeaderboardModel, LeaderboardResponse } from '@/api/leaderboard'
 import { modelProvider } from '@/components/modelPlaza/modelPlazaProviders'
 
-export const SERIES_COLORS = ['#6486a5', '#659b87', '#b29968', '#b37979', '#9685af', '#ae8394', '#729e98', '#b28c70', '#7e88ac']
-export const PROVIDER_COLORS: Record<string, string> = {
-  openai: '#10b981', anthropic: '#c47754', gemini: '#4285f4', grok: '#64748b',
-  deepseek: '#4d6bfe', qwen: '#8b5cf6', kimi: '#2563eb', zhipu: '#06b6d4',
-  minimax: '#f43f5e', doubao: '#eab308', other: '#94a3b8',
-  mistral: '#f59e0b', meta: '#0866ff', hunyuan: '#0f766e', baidu: '#dc2626',
-  yi: '#7c3aed', spark: '#c026d3', cohere: '#65a30d',
-}
-
 export function providerOf(model: string): string {
   return modelProvider({ name: model, platform: '' })
 }

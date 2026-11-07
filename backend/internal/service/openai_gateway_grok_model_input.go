@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -205,6 +206,18 @@ func encodeGrokResponsesModelInput(raw string) ([]byte, error) {
 		pendingOutputImages = pendingOutputImages[:0]
 
 		switch itemType {
+		case "agent_message":
+			content, err := json.Marshal(item["content"])
+			if err != nil {
+				return nil, fmt.Errorf("serialize Grok agent message content: %w", err)
+			}
+			text := apicompat.AgentMessageText(content)
+			if text == "" {
+				continue
+			}
+			role = "user"
+			item = map[string]any{"type": "message", "role": role, "content": text}
+			itemType = "message"
 		case "text", "input_text", "output_text":
 			text := strings.TrimSpace(grokStringValue(item["text"]))
 			if text == "" {

@@ -323,55 +323,107 @@ func (c *gatewayCache) GetReasoningContent(ctx context.Context, itemID string) (
 }
 
 const (
-	cyberSessionBlockPrefix         = "cyber_session_block:"
-	cyberSessionScopePrefix         = "cyber_session_scope:"
-	cyberSessionRedisCommandMaxKeys = 128
+	cyberSessionBlockPrefix             = "cyber_session_block:"
+	cyberSessionScopePrefix             = "cyber_session_scope:"
+	cyberSessionTranscriptLengthsPrefix = "cyber_session_transcript_lengths:"
+	cyberSessionRedisCommandMaxKeys     = 128
 )
 
-// SetCyberSessionBlocked writes exact blocks in bounded transactions. The
-// coarse scope is activated only after all exact blocks have been stored.
-func (c *gatewayCache) SetCyberSessionBlocked(ctx context.Context, scopeKey string, keys []string, ttl time.Duration) error {
-	if len(keys) == 0 {
-		return nil
+func cyberSessionTranscriptLengthsKey(apiKeyID int64) string {
+	return cyberSessionTranscriptLengthsPrefix + strconv.FormatInt(apiKeyID, 10)
+}
+
+// Each bounded batch publishes its exact blocks, length index and scope in one
+// atomic script. Validate types before writing: Redis scripts do not roll back
+// a preceding SET if SADD fails. Never shorten an index or scope's live TTL.
+var setCyberSessionBlockedScript = redis.NewScript(`
+	local scoped = ARGV[2] == '1'
+	local scope = false
+	if scoped then
+		local kind = redis.call('TYPE', KEYS[2]).ok
+		if kind ~= 'none' and kind ~= 'set' then
+			return redis.error_reply('invalid cyber transcript index type')
+		end
+		scope = redis.call('GET', KEYS[1])
+	end
+	local ttl = tonumber(ARGV[1])
+	for i = 3, #KEYS do
+		redis.call('SET', KEYS[i], '1', 'PX', math.max(ttl, redis.call('PTTL', KEYS[i])))
+	end
+	if scoped then
+		local indexTTL = redis.call('PTTL', KEYS[2])
+		for i = 3, #ARGV do
+			redis.call('SADD', KEYS[2], ARGV[i])
+		end
+		if #ARGV > 2 then
+			redis.call('PEXPIRE', KEYS[2], math.max(ttl, indexTTL))
+		end
+		local scopeTTL = redis.call('PTTL', KEYS[1])
+		-- An old scope lacks a complete length index, even if a new hit adds
+		-- indexed blocks to the same API key. Keep its legacy lookup until idle.
+		local version = scope == '1' and '1' or '2'
+		redis.call('SET', KEYS[1], version, 'PX', math.max(ttl, scopeTTL))
+	end
+	return 1
+`)
+
+func (c *gatewayCache) SetCyberSessionBlocked(ctx context.Context, block service.CyberSessionBlock, ttl time.Duration) error {
+	args := []any{max(ttl.Milliseconds(), int64(1)), "0"}
+	if block.ScopeKey != "" {
+		args[1] = "1"
+		for _, length := range block.TranscriptLengths {
+			args = append(args, length)
+		}
 	}
-	exactKeys := make([]string, 0, cyberSessionRedisCommandMaxKeys)
+	keys := []string{cyberSessionScopePrefix + block.ScopeKey, cyberSessionTranscriptLengthsKey(block.APIKeyID)}
 	flush := func() error {
-		if len(exactKeys) == 0 {
+		if len(keys) == 2 {
 			return nil
 		}
-		pipe := c.rdb.TxPipeline()
-		for _, key := range exactKeys {
-			pipe.Set(ctx, cyberSessionBlockPrefix+key, "1", ttl)
-		}
-		_, err := pipe.Exec(ctx)
-		exactKeys = exactKeys[:0]
+		err := setCyberSessionBlockedScript.Run(ctx, c.rdb, keys, args...).Err()
+		keys = keys[:2]
 		return err
 	}
-	for _, key := range keys {
-		if key != "" {
-			exactKeys = append(exactKeys, key)
-			if len(exactKeys) == cyberSessionRedisCommandMaxKeys {
-				if err := flush(); err != nil {
-					return err
-				}
+	for _, key := range block.Keys {
+		if key == "" {
+			continue
+		}
+		keys = append(keys, cyberSessionBlockPrefix+key)
+		if len(keys)-2 == cyberSessionRedisCommandMaxKeys {
+			if err := flush(); err != nil {
+				return err
 			}
 		}
 	}
-	if err := flush(); err != nil {
-		return err
-	}
-	if scopeKey != "" {
-		return c.rdb.Set(ctx, cyberSessionScopePrefix+scopeKey, "1", ttl).Err()
-	}
-	return nil
+	return flush()
 }
 
-func (c *gatewayCache) IsCyberSessionScopeActive(ctx context.Context, scopeKey string) (bool, error) {
-	n, err := c.rdb.Exists(ctx, cyberSessionScopePrefix+scopeKey).Result()
-	if err != nil {
-		return false, err
+var cyberSessionTranscriptLengthsScript = redis.NewScript(`
+	local scope = redis.call('GET', KEYS[1])
+	if not scope then return {} end
+	if scope == '1' then return {'-1'} end
+	return redis.call('SMEMBERS', KEYS[2])
+`)
+
+func (c *gatewayCache) CyberSessionTranscriptLengths(ctx context.Context, apiKeyID int64, scopeKey string) ([]int, error) {
+	if scopeKey == "" {
+		return nil, nil
 	}
-	return n > 0, nil
+	members, err := cyberSessionTranscriptLengthsScript.Run(ctx, c.rdb, []string{
+		cyberSessionScopePrefix + scopeKey, cyberSessionTranscriptLengthsKey(apiKeyID),
+	}).StringSlice()
+	if err != nil {
+		return nil, err
+	}
+	lengths := make([]int, 0, len(members))
+	for _, member := range members {
+		length, err := strconv.Atoi(member)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cyber transcript length: %w", err)
+		}
+		lengths = append(lengths, length)
+	}
+	return lengths, nil
 }
 
 // FindCyberSessionBlocked checks bounded batches in caller order and stops at

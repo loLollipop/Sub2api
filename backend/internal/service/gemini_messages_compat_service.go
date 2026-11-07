@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -22,6 +21,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/gemini"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -670,7 +670,7 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 		mappedModel = account.GetMappedModel(req.Model)
 	}
 
-	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(body)
+	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(body, mappedModel)
 	if err != nil {
 		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
@@ -930,7 +930,7 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 					stageName = "thinking+tools"
 					signatureRetryStage = 2
 				}
-				retryGeminiReq, txErr := convertClaudeMessagesToGeminiGenerateContent(strippedClaudeBody)
+				retryGeminiReq, txErr := convertClaudeMessagesToGeminiGenerateContent(strippedClaudeBody, mappedModel)
 				if txErr == nil {
 					logger.LegacyPrintf("service.gemini_messages_compat", "Gemini account %d: detected signature-related 400, retrying with downgraded Claude blocks (%s)", account.ID, stageName)
 					// 降级只改写历史块，思考参数沿用客户端原始请求。
@@ -1159,9 +1159,8 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 	var firstTokenMs *int
 	clientDisconnect := false
 	streamFinished := false
-	// streamTopUpAbortErr 记录「流式补扣失败主动中止」哨兵错误，与已交付输出的部分
-	// 结果一起在函数末尾返回给 handler（result 非 nil + err 非 nil），避免既走结算又
-	// 被误判为成功。
+	// streamTopUpAbortErr 保留补扣中止或 SSE 传输限额错误，与已观测的部分结果
+	// 一起返回给 handler（result 非 nil + err 非 nil），避免结算时误判为成功。
 	var streamTopUpAbortErr error
 	if req.Stream {
 		streamRes, err := s.handleStreamingResponse(c, resp, startTime, originalModel)
@@ -1169,8 +1168,9 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 			// 流式补扣失败主动中止（ErrBalanceWithholdingFailed）时保留一个
 			// 零 usage 的 ForwardResult（携 err），让统一计费任务完成幂等结算。
 			// 上游未返回 usage 时 actual=0，整笔预扣必须释放，不得记为消费。
+			// SSE 传输限额错误同样保留已观测的 usage，不推算未交付的输出。
 			// 其余错误（含 failover）仍返回 nil，不暴露部分结果。
-			if !errors.Is(err, ErrBalanceWithholdingFailed) {
+			if !errors.Is(err, ErrBalanceWithholdingFailed) && (!errors.Is(err, errSSETransportLimit) || streamRes == nil) {
 				return nil, err
 			}
 			streamTopUpAbortErr = err
@@ -1189,18 +1189,24 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 		}
 	} else {
 		if useUpstreamStream {
-			collected, usageObj, err := collectGeminiSSE(resp.Body, true)
+			collected, usageObj, err := collectGeminiSSE(s.cfg, resp.Body, true)
 			if err != nil {
-				return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Failed to read upstream stream")
-			}
-			collectedBytes, _ := json.Marshal(collected)
-			upstreamResponseModelObserverFromContext(c).ObserveGemini(collectedBytes)
-			observeGeminiImageOutputs(c, collectedBytes)
-			claudeResp, usageObj2 := convertGeminiToClaudeMessage(collected, originalModel, collectedBytes, false)
-			c.JSON(http.StatusOK, claudeResp)
-			usage = usageObj2
-			if usageObj != nil && (usageObj.InputTokens > 0 || usageObj.OutputTokens > 0) {
+				writeErr := s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Failed to read upstream stream")
+				if !errors.Is(err, errSSETransportLimit) || !usageObj.hasObservedTokens() {
+					return nil, writeErr
+				}
 				usage = usageObj
+				streamTopUpAbortErr = errors.Join(err, writeErr)
+			} else {
+				collectedBytes, _ := json.Marshal(collected)
+				upstreamResponseModelObserverFromContext(c).ObserveGemini(collectedBytes)
+				observeGeminiImageOutputs(c, collectedBytes)
+				claudeResp, usageObj2 := convertGeminiToClaudeMessage(collected, originalModel, collectedBytes, false)
+				c.JSON(http.StatusOK, claudeResp)
+				usage = usageObj2
+				if usageObj != nil && (usageObj.InputTokens > 0 || usageObj.OutputTokens > 0) {
+					usage = usageObj
+				}
 			}
 		} else {
 			usage, err = s.handleNonStreamingResponse(c, resp, originalModel)
@@ -1214,7 +1220,9 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 	imageInputSize := s.extractImageInputSize(body)
 	imageSize := normalizeOpenAIImageSizeTier(imageInputSize)
 	imageCount := resolveGeminiImageCount(c, originalModel, mappedModel)
-	if clientDisconnect && !streamFinished {
+	if streamTopUpAbortErr != nil {
+		imageCount = observedGeminiImageOutputs(c)
+	} else if clientDisconnect && !streamFinished {
 		imageCount = 0
 	}
 
@@ -1721,11 +1729,19 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	var firstTokenMs *int
 	clientDisconnect := false
 	streamFinished := false
+	var streamReadErr error
 
 	if stream {
 		streamRes, err := s.handleNativeStreamingResponse(c, resp, startTime, isOAuth, account, requestID)
 		if err != nil {
-			return nil, err
+			if errors.Is(err, errSSETransportLimit) && !c.Writer.Written() {
+				c.Header("Content-Type", "application/json; charset=utf-8")
+				_ = s.writeGoogleError(c, http.StatusBadGateway, "Upstream stream exceeds the configured limit")
+			}
+			if !errors.Is(err, errSSETransportLimit) || streamRes == nil {
+				return nil, err
+			}
+			streamReadErr = err
 		}
 		usage = streamRes.usage
 		firstTokenMs = streamRes.firstTokenMs
@@ -1734,26 +1750,32 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	} else {
 		if useUpstreamStream {
 			var best geminiResponseSignal
-			collected, usageObj, stats, err := collectGeminiSSEObserved(resp.Body, isOAuth, func(rawBytes []byte) {
+			collected, usageObj, stats, err := collectGeminiSSEObserved(s.cfg, resp.Body, isOAuth, func(rawBytes []byte) {
 				if sig, ok := detectGeminiResponseSignal(rawBytes); ok && sig.Kind > best.Kind {
 					best = sig
 				}
 			})
 			if err != nil {
-				return nil, s.writeGoogleError(c, http.StatusBadGateway, "Failed to read upstream stream")
+				writeErr := s.writeGoogleError(c, http.StatusBadGateway, "Failed to read upstream stream")
+				if !errors.Is(err, errSSETransportLimit) || !usageObj.hasObservedTokens() {
+					return nil, writeErr
+				}
+				usage = usageObj
+				streamReadErr = errors.Join(err, writeErr)
+			} else {
+				s.finalizeGeminiSSESignal(c, account, false, requestID, best, stats.dataEvents > 0, stats.fallback)
+				b, _ := json.Marshal(collected)
+				if upstreamFinancialFailureEnvelope(b) {
+					defer GuardUpstreamFinancialError(c, 0, b)()
+				}
+				if best.Kind == geminiSignalError {
+					defer GuardUpstreamFinancialError(c, best.Status, []byte(best.Detail))()
+				}
+				upstreamResponseModelObserverFromContext(c).ObserveGemini(b)
+				observeGeminiImageOutputs(c, b)
+				c.Data(http.StatusOK, "application/json", b)
+				usage = usageObj
 			}
-			s.finalizeGeminiSSESignal(c, account, false, requestID, best, stats.dataEvents > 0, stats.fallback)
-			b, _ := json.Marshal(collected)
-			if upstreamFinancialFailureEnvelope(b) {
-				defer GuardUpstreamFinancialError(c, 0, b)()
-			}
-			if best.Kind == geminiSignalError {
-				defer GuardUpstreamFinancialError(c, best.Status, []byte(best.Detail))()
-			}
-			upstreamResponseModelObserverFromContext(c).ObserveGemini(b)
-			observeGeminiImageOutputs(c, b)
-			c.Data(http.StatusOK, "application/json", b)
-			usage = usageObj
 		} else {
 			usageResp, err := s.handleNativeNonStreamingResponse(c, resp, isOAuth, account, requestID)
 			if err != nil {
@@ -1771,7 +1793,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	imageInputSize := s.extractImageInputSize(body)
 	imageSize := normalizeOpenAIImageSizeTier(imageInputSize)
 	imageCount := resolveGeminiImageCount(c, originalModel, mappedModel)
-	if clientDisconnect && !streamFinished {
+	if streamReadErr != nil || clientDisconnect && !streamFinished {
 		imageCount = observedGeminiImageOutputs(c)
 	}
 
@@ -1790,7 +1812,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 		ImageCount:                    imageCount,
 		ImageSize:                     imageSize,
 		ImageInputSize:                imageInputSize,
-	}, nil
+	}, streamReadErr
 }
 
 // checkErrorPolicyInLoop 在重试循环内对上游错误响应检查错误策略，resp 已重建可直接使用。
@@ -2298,9 +2320,9 @@ func (s *GeminiMessagesCompatService) handleStreamingResponse(c *gin.Context, re
 	openToolName := ""
 	seenToolJSON := ""
 
-	reader := bufio.NewReader(resp.Body)
+	reader := newBoundedSSELineReader(resp.Body, s.cfg)
 	for {
-		line, err := reader.ReadString('\n')
+		line, err := reader.ReadLineString()
 		if err != nil && !errors.Is(err, io.EOF) {
 			if geminiStreamAbortedWithBillableOutput(c, err, &usage) {
 				logger.LegacyPrintf("service.gemini_messages_compat", "[GeminiAPI] Client disconnected during messages stream, billing collected usage: %v", err)
@@ -2310,6 +2332,9 @@ func (s *GeminiMessagesCompatService) handleStreamingResponse(c *gin.Context, re
 					clientDisconnect: true,
 					finished:         finishReason != "",
 				}, nil
+			}
+			if errors.Is(err, errSSETransportLimit) && (usage.hasObservedTokens() || observedGeminiImageOutputs(c) > 0) {
+				return &geminiStreamResult{usage: &usage, firstTokenMs: firstTokenMs, finished: finishReason != ""}, err
 			}
 			return nil, fmt.Errorf("stream read error: %w", err)
 		}
@@ -2654,8 +2679,8 @@ func unwrapIfNeeded(isOAuth bool, raw []byte) []byte {
 	return inner
 }
 
-func collectGeminiSSE(body io.Reader, isOAuth bool) (map[string]any, *ClaudeUsage, error) {
-	collected, usage, _, err := collectGeminiSSEObserved(body, isOAuth, nil)
+func collectGeminiSSE(cfg *config.Config, body io.Reader, isOAuth bool) (map[string]any, *ClaudeUsage, error) {
+	collected, usage, _, err := collectGeminiSSEObserved(cfg, body, isOAuth, nil)
 	return collected, usage, err
 }
 
@@ -2666,8 +2691,8 @@ type geminiSSECollectStats struct {
 }
 
 // collectGeminiSSEObserved 在聚合的同时把每个解包后的事件原文交给 observe（可为 nil）。
-func collectGeminiSSEObserved(body io.Reader, isOAuth bool, observe func(rawBytes []byte)) (map[string]any, *ClaudeUsage, geminiSSECollectStats, error) {
-	reader := bufio.NewReader(body)
+func collectGeminiSSEObserved(cfg *config.Config, body io.Reader, isOAuth bool, observe func(rawBytes []byte)) (map[string]any, *ClaudeUsage, geminiSSECollectStats, error) {
+	reader := newBoundedSSELineReader(body, cfg)
 
 	var last map[string]any
 	var lastWithParts map[string]any
@@ -2676,7 +2701,7 @@ func collectGeminiSSEObserved(body io.Reader, isOAuth bool, observe func(rawByte
 	stats := geminiSSECollectStats{fallback: &geminiSSEFallbackBody{}}
 
 	for {
-		line, err := reader.ReadString('\n')
+		line, err := reader.ReadLineString()
 		if len(line) > 0 {
 			trimmed := strings.TrimRight(line, "\r\n")
 			if !strings.HasPrefix(trimmed, "data:") {
@@ -2732,7 +2757,7 @@ func collectGeminiSSEObserved(body io.Reader, isOAuth bool, observe func(rawByte
 			break
 		}
 		if err != nil {
-			return nil, nil, stats, err
+			return nil, usage, stats, err
 		}
 	}
 
@@ -2997,7 +3022,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 		return nil, errors.New("streaming not supported")
 	}
 
-	reader := bufio.NewReader(newUpstreamErrorFrameReader(resp.Body, resolveUpstreamResponseReadLimit(s.cfg)))
+	reader := newBoundedSSELineReader(newUpstreamErrorFrameReader(resp.Body, resolveUpstreamResponseReadLimit(s.cfg)), s.cfg)
 	usage := &ClaudeUsage{}
 	observer := upstreamResponseModelObserverFromContext(c)
 	if observer == nil {
@@ -3015,7 +3040,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 	}
 
 	for {
-		line, err := reader.ReadString('\n')
+		line, err := reader.ReadLineString()
 		if len(line) > 0 && (err == nil || errors.Is(err, io.EOF)) {
 			trimmed := strings.TrimRight(line, "\r\n")
 			if strings.TrimSpace(trimmed) == "event: error" {
@@ -3103,6 +3128,9 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 			break
 		}
 		if err != nil {
+			if errors.Is(err, errSSETransportLimit) && (usage.hasObservedTokens() || observedGeminiImageOutputs(c) > 0) {
+				return streamResult(), err
+			}
 			if !geminiStreamAbortedWithBillableOutput(c, err, usage) {
 				return nil, err
 			}
@@ -3574,7 +3602,7 @@ func mapGeminiFinishReasonToClaudeStopReason(finishReason string) string {
 	}
 }
 
-func convertClaudeMessagesToGeminiGenerateContent(body []byte) ([]byte, error) {
+func convertClaudeMessagesToGeminiGenerateContent(body []byte, model string) ([]byte, error) {
 	var req map[string]any
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, err
@@ -3583,7 +3611,7 @@ func convertClaudeMessagesToGeminiGenerateContent(body []byte) ([]byte, error) {
 	toolUseIDToName := make(map[string]string)
 
 	systemText := extractClaudeSystemText(req["system"])
-	contents, err := convertClaudeMessagesToGeminiContents(req["messages"], toolUseIDToName)
+	contents, err := convertClaudeMessagesToGeminiContents(req["messages"], toolUseIDToName, gemini.SupportsMultimodalFunctionResponses(model))
 	if err != nil {
 		return nil, err
 	}
@@ -3663,7 +3691,7 @@ func extractClaudeSystemText(system any) string {
 	}
 }
 
-func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[string]string) ([]any, error) {
+func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[string]string, multimodalToolResults bool) ([]any, error) {
 	arr, ok := messages.([]any)
 	if !ok {
 		return nil, errors.New("messages must be an array")
@@ -3739,18 +3767,19 @@ func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[str
 					}
 					text := extractClaudeContentText(bm["content"])
 					images := extractClaudeToolResultImageParts(bm["content"])
-					if text == "" && len(images) > 0 {
+					if text == "" && len(images) > 0 && !multimodalToolResults {
 						text = "[image attached below]"
 					}
-					parts = append(parts, map[string]any{
-						"functionResponse": map[string]any{
-							"name": name,
-							"response": map[string]any{
-								"content": text,
-							},
-						},
-					})
-					toolImageParts = append(toolImageParts, images...)
+					response := map[string]any{
+						"name":     name,
+						"response": map[string]any{"content": text},
+					}
+					if multimodalToolResults && len(images) > 0 {
+						response["parts"] = images
+					} else {
+						toolImageParts = append(toolImageParts, images...)
+					}
+					parts = append(parts, map[string]any{"functionResponse": response})
 				case "image":
 					if src, ok := bm["source"].(map[string]any); ok {
 						if srcType, _ := src["type"].(string); srcType == "base64" {

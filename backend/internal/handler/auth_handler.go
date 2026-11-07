@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -224,6 +225,15 @@ func (h *AuthHandler) SendVerifyCode(c *gin.Context) {
 
 	result, err := h.authService.SendVerifyCodeAsync(c.Request.Context(), req.Email, c.GetHeader("Accept-Language"))
 	if err != nil {
+		// Match the successful send response without sending mail to registered
+		// addresses, so this endpoint does not disclose account existence.
+		if errors.Is(err, service.ErrEmailExists) {
+			response.Success(c, SendVerifyCodeResponse{
+				Message:   "Verification code sent successfully",
+				Countdown: 60,
+			})
+			return
+		}
 		response.ErrorFrom(c, err)
 		return
 	}

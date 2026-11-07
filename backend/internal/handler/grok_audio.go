@@ -222,7 +222,7 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 	if endpoint == "tts" {
 		subject, _ := middleware2.GetAuthSubjectFromContext(c)
 		reqLog := requestLogger(c, "handler.openai_gateway.grok_voice", zap.String("endpoint", endpoint))
-		// TTS bodies use {"input":"..."} (and variants). Normalize to chat messages so
+		// TTS bodies use {"text":"..."} (and input/prompt aliases). Normalize to chat messages so
 		// content moderation extractors see the spoken text.
 		auditBody := body
 		if input := extractGrokTTSInputText(body); input != "" {
@@ -406,19 +406,5 @@ func readGrokVoiceGatewayBody(c *gin.Context) ([]byte, error) {
 
 // extractGrokTTSInputText pulls the primary spoken text from a TTS JSON body.
 func extractGrokTTSInputText(body []byte) string {
-	if len(body) == 0 {
-		return ""
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return ""
-	}
-	for _, key := range []string{"input", "text", "prompt"} {
-		if v, ok := payload[key]; ok {
-			if s, ok := v.(string); ok {
-				return strings.TrimSpace(s)
-			}
-		}
-	}
-	return ""
+	return service.GrokTTSText(body)
 }

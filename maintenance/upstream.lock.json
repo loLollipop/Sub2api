@@ -2,27 +2,27 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.15",
-  "imported_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+  "imported_version": "2.3.17",
+  "imported_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.15",
-  "latest_observed_release_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
-  "latest_observed_main_commit": "f035fdc0eb1aa9cebc816227703285f54505a6ed",
+  "latest_observed_version": "2.3.17",
+  "latest_observed_release_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
+  "latest_observed_main_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.15",
-  "reviewed_release_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+  "reviewed_release_tag": "v2.3.17",
+  "reviewed_release_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
   "observed_delta_review": {
-    "from_commit": "ca2abf5c537d372084b8852c57a5883fcb52c804",
-    "to_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
-    "status": "formal_v2315_review_already_adapted_gif_fix",
-    "scope": "Review the formal release delta: 3 commits / 3 paths. GIF numeric-string parsing and API-key normalization from leaf 9c518bf7f are already locally adapted and regression-verified. The only newly observed main commit after the prior review is source VERSION bookkeeping. Advance formal release checkpoints without changing image behavior, existing UI edits, billing, dependencies, migrations or personal VERSION.",
-    "evidence": "maintenance/notes/upstream-sync-20261106-v2315.md"
+    "from_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+    "to_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
+    "status": "formal_v2316_v2317_selective_backport",
+    "scope": "Review 44 commits / 138 paths from formal v2.3.15 through v2.3.17. Adapt register verification privacy, filtered admin inflight cap, text-first Grok TTS, HTTP-200 image error handling and CC Switch v4.0.26. Defer API-key quota reservation and model metadata due confirmed consistency, protocol coverage, provider matching and pricing defects; retain existing financial and module exclusions.",
+    "evidence": "maintenance/notes/upstream-sync-20261107-v2317.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "a17cc8118ffdd1dc5931a3462aabf30685994630",
+    "source_head": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
       "Formal v2.3.14: opaque-blob folding, 2M estimated-input cap and Responses shape-dispatch repair only serve the excluded incomplete/disconnect estimated-billing policy. Review checkpoints advanced without enabling that policy; the separately user-authorized post-release GIF fix is recorded independently below.",
@@ -399,6 +399,22 @@
         "a20b72ca3"
       ],
       "reason": "New optional behavior modifies HTTP/SSE/WebSocket model output and conversation/tool histories. Not a compatibility fix; defer as a complete feature with its settings and authorization boundaries. Preserve local output and atomic billing/refusal handling."
+    },
+    {
+      "feature": "v2316-api-key-usd-inflight-quota",
+      "upstream_commits": [
+        "57ae74f4e66197f101211cd6c6bc0b35748defec"
+      ],
+      "reason": "API-key quota mirror seeding races, media settlement/lifecycle and WebSocket turn omissions, size and decimal admission errors.",
+      "evidence": "maintenance/notes/upstream-sync-20261107-v2317.md"
+    },
+    {
+      "feature": "v2317-model-catalogue-metadata-and-pricing",
+      "upstream_commits": [
+        "7437f686dd5ebf3162cec2b08df778eac66adcf9"
+      ],
+      "reason": "Provider ownership and exact/alias ambiguity, effective local pricing and smart-routing mismatch; preserve discovery/permissions/ETags until complete scoped adaptation. See dated review evidence.",
+      "evidence": "maintenance/notes/upstream-sync-20261107-v2317.md"
     }
   ],
   "deployment_repository": "loLollipop/Sub2api",
@@ -704,5 +720,31 @@
     "preserved": "All 31 pre-existing changed paths, including the compact time-range fix, independent effort column immediately after model, search/error-list race fixes and verified unused-code removals.",
     "migration": "None. Dependency manifests, migrations, personal VERSION and deployment configuration unchanged.",
     "release_status": "User subsequently authorized GitHub submission and deployment. Prepare personal v2.1.54 with the accepted usage-range/independent-effort-column/race fixes and unused-code cleanup through PR/CI, own Release/GHCR and the existing backup/restore-validated controlled rollout; final acceptance is recorded separately. No migration, dependency or deployment configuration changes."
+  },
+  "sync_20261107_v2317": {
+    "evidence": "maintenance/notes/upstream-sync-20261107-v2317.md",
+    "reviewed_release_tag": "v2.3.17",
+    "reviewed_release_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
+    "selected_releases": [
+      "v2.3.16",
+      "v2.3.17"
+    ],
+    "selected_commits": [
+      "e03a860de477420bb5534b4523290d99b9a4f155",
+      "04d010f3cf0c1b765f9b60d7bb3c655e97bf2559",
+      "a12763f02de64d9404fdfdd7e03be671869d17d8",
+      "c064c3cb6b7df9c84698daba0bff2495dce2594c",
+      "f85fa7707a63d8a0fbfa924fba4339ab1e66dc33"
+    ],
+    "selected_scope": "Verification-code send hides existing email and aliases without enqueueing; only first-page admin merged inflight supplement capped at 50 after filtering/deduplication; Grok TTS shares text>input>prompt string precedence across moderation, reservation and settlement; recognized HTTP-200 image failures return typed errors without successful usage result, with egress privacy; CC Switch v4.0.26 apps/deeplinks and Pi-family model requirement.",
+    "deferred_commits": [
+      "57ae74f4e66197f101211cd6c6bc0b35748defec",
+      "7437f686dd5ebf3162cec2b08df778eac66adcf9"
+    ],
+    "deferred_scope": "API-key quota mirror seeding races, media settlement/lifecycle and WebSocket turn omissions, size and decimal admission errors. Model metadata raw pricing mismatches effective local billing and smart routing; provider ignored, exact/alias conflicts and lossy family matching; pinned/Codex ETags require distinct integration. No unused partial infrastructure imported.",
+    "excluded_scope": "Existing immediate-disconnect/estimated-usage/95%-cache financial policy; retired crypto/payment order changes; source-only ChannelsView hidden-required fix and docs routes; blanket 3840 GIF sheet rejection for every custom relay, whose layout is not known; source VERSION bookkeeping. Other recorded exclusions remain.",
+    "preserved": "Real terminal usage and bounded drain, local billing/multipliers, native discovery and authoritative empty catalogs, allowlists/retrieve/ETags, local UI and independent reasoning-effort column; three pre-existing untracked Go tests.",
+    "migration": "None. Dependencies, migrations, deployment configuration and personal VERSION unchanged.",
+    "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-07. Prepare personal v2.1.55 through PR/CI, own Release/GHCR and the existing backup/restore-validated controlled rollout; final source/artifact/runtime acceptance is recorded separately. No migration, dependency or deployment configuration changes."
   }
 }

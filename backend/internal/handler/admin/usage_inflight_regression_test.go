@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,6 +17,65 @@ type adminUsageInflightStore struct{ calls int }
 
 func (s *adminUsageInflightStore) Save(context.Context, service.UsageInflightSnapshot) error {
 	return nil
+}
+
+type adminUsageManyInflightStore struct {
+	adminUsageInflightStore
+	rows []service.UsageInflightSnapshot
+}
+
+func (s *adminUsageManyInflightStore) ListAll(context.Context) ([]service.UsageInflightSnapshot, error) {
+	return s.rows, nil
+}
+
+func TestAdminUsageInflightSupplementIsBoundedAfterFiltering(t *testing.T) {
+	now := time.Now()
+	store := &adminUsageManyInflightStore{}
+	for i := 0; i < 80; i++ {
+		store.rows = append(store.rows, service.UsageInflightSnapshot{
+			RequestID: fmt.Sprintf("request-%d", i), UserID: 42, Model: "target",
+			StartedAt: now.Add(-time.Duration(i) * time.Second),
+		})
+	}
+	// Newer nonmatching rows must not consume the supplement limit.
+	for i := 0; i < 60; i++ {
+		store.rows = append(store.rows, service.UsageInflightSnapshot{
+			RequestID: fmt.Sprintf("other-%d", i), UserID: 42, Model: "other", StartedAt: now,
+		})
+	}
+	service.SetUsageInflightStore(store)
+	t.Cleanup(func() { service.SetUsageInflightStore(nil) })
+	router := newAdminUsageRequestTypeTestRouter(&adminUsageRepoCapture{})
+	for _, tc := range []struct {
+		query string
+		count int
+		total int
+		first string
+	}{
+		{query: "include_inflight=true&model=target&page_size=10", count: 50, first: "request-0"},
+		{query: "include_inflight=true&model=target&page=2&page_size=10"},
+		{query: "inflight_only=true&model=target&page=6&page_size=10", count: 10, total: 80, first: "request-50"},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin/usage?"+tc.query, nil))
+			require.Equal(t, http.StatusOK, rec.Code)
+			var body struct {
+				Data struct {
+					Items []struct {
+						RequestID string `json:"request_id"`
+					} `json:"items"`
+					Total int `json:"total"`
+				} `json:"data"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			require.Len(t, body.Data.Items, tc.count)
+			require.Equal(t, tc.total, body.Data.Total)
+			if tc.count > 0 {
+				require.Equal(t, tc.first, body.Data.Items[0].RequestID)
+			}
+		})
+	}
 }
 func (s *adminUsageInflightStore) Delete(context.Context, int64, string) error { return nil }
 func (s *adminUsageInflightStore) ListUser(context.Context, int64) ([]service.UsageInflightSnapshot, error) {

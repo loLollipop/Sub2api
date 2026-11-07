@@ -1143,19 +1143,8 @@ func writeOpenAIImagesUpstreamErrorResponse(c *gin.Context, err *OpenAIImagesUps
 	}
 	StopOpenAIImagesJSONKeepaliveCommitted(c)
 	defer GuardUpstreamFinancialError(c, err.StatusCode, openAIImagesUpstreamErrorResponseBody(err))()
-	errorObj := gin.H{
-		"type":    err.clientErrorType(),
-		"message": err.clientMessage(),
-	}
-	if code := strings.TrimSpace(err.Code); code != "" {
-		errorObj["code"] = code
-	}
-	if param := strings.TrimSpace(err.Param); param != "" {
-		errorObj["param"] = param
-	}
-	c.JSON(err.clientStatusCode(), gin.H{
-		"error": errorObj,
-	})
+	c.Data(err.clientStatusCode(), "application/json; charset=utf-8",
+		sanitizeClientUpstreamErrorBody(err.clientStatusCode(), openAIImagesUpstreamErrorResponseBody(err)))
 	return true
 }
 

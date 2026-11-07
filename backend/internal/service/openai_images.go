@@ -1014,6 +1014,26 @@ func (s *OpenAIGatewayService) handleOpenAIImagesNonStreamingResponse(
 		usage, _ := extractOpenAIUsageFromJSONBytes(body)
 		return usage, 0, nil, fmt.Errorf("images upstream financial error")
 	}
+	// Some relays return HTTP 200 with an error body. Do not produce a
+	// successful forwarding result, which would bill an image never generated.
+	if upstreamErr := openAIImagesHTTP200Error(body, resp.Header); upstreamErr != nil {
+		setOpsUpstreamError(c, upstreamErr.clientStatusCode(), upstreamErr.clientMessage(), "")
+		if account != nil {
+			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+				ProxyID:            opsUpstreamProxyID(account),
+				ProxyName:          opsUpstreamProxyName(account),
+				Platform:           account.Platform,
+				AccountID:          account.ID,
+				AccountName:        account.Name,
+				UpstreamStatusCode: resp.StatusCode,
+				UpstreamRequestID:  upstreamErr.UpstreamRequestID,
+				Kind:               "response_error",
+				Message:            upstreamErr.clientMessage(),
+			})
+		}
+		writeOpenAIImagesUpstreamErrorResponse(c, upstreamErr)
+		return OpenAIUsage{}, 0, nil, upstreamErr
+	}
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	contentType := "application/json"
 	if s.cfg != nil && !s.cfg.Security.ResponseHeaders.Enabled {

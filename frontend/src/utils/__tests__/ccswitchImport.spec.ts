@@ -8,7 +8,8 @@ import {
   buildCcSwitchImportDeeplink,
   ccSwitchProviderDeeplinkSupported,
   parseCcSwitchModelsList,
-  pickCcSwitchModel
+  pickCcSwitchModel,
+  resolveCcSwitchImportConfig
 } from '@/utils/ccswitchImport'
 import type { GroupPlatform } from '@/types'
 
@@ -184,7 +185,12 @@ describe('ccswitchImport utils', () => {
       'opencode',
       'openclaw',
       'hermes',
-      'pi'
+      'pi',
+      'mcode',
+      'kimi',
+      'dsh',
+      'agy',
+      'omp'
     ])
   })
 
@@ -207,7 +213,7 @@ describe('ccswitchImport utils', () => {
     }
   )
 
-  it('still emits app=pi even though CC Switch rejects Pi provider deeplinks', () => {
+  it('emits app=pi and marks it as a supported provider deeplink', () => {
     const params = paramsFromDeeplink(
       buildCcSwitchImportDeeplink({
         ...baseInput,
@@ -219,7 +225,7 @@ describe('ccswitchImport utils', () => {
 
     expect(params.get('app')).toBe('pi')
     expect(params.get('model')).toBe('grok-4.5')
-    expect(ccSwitchProviderDeeplinkSupported('pi')).toBe(false)
+    expect(ccSwitchProviderDeeplinkSupported('pi')).toBe(true)
   })
 
   it('emits app=claude-desktop for Claude Desktop imports', () => {
@@ -233,7 +239,67 @@ describe('ccswitchImport utils', () => {
     )
 
     expect(params.get('app')).toBe('claude-desktop')
-    expect(ccSwitchProviderDeeplinkSupported('claude-desktop')).toBe(false)
+    expect(ccSwitchProviderDeeplinkSupported('claude-desktop')).toBe(true)
+  })
+
+  it.each([
+    ['mcode', OPENAI_CC_SWITCH_CODEX_MODEL],
+    ['kimi', OPENAI_CC_SWITCH_CODEX_MODEL],
+    ['dsh', OPENAI_CC_SWITCH_CODEX_MODEL],
+    ['agy', GEMINI_CC_SWITCH_MODEL],
+    ['omp', OPENAI_CC_SWITCH_CODEX_MODEL]
+  ] as const)('imports v4 app=%s with its model and selected provider endpoint', (app, model) => {
+    expect(resolveCcSwitchImportConfig('openai', 'claude', baseInput.baseUrl, app)).toEqual({
+      app,
+      model,
+      endpoint: baseInput.baseUrl
+    })
+    const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput,
+      platform: 'openai',
+      app
+    }))
+    expect(params.get('app')).toBe(app)
+    expect(params.get('model')).toBe(model)
+    expect(params.get('endpoint')).toBe(baseInput.baseUrl)
+    expect(ccSwitchProviderDeeplinkSupported(app)).toBe(true)
+
+    const antigravity = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput,
+      platform: 'antigravity',
+      app,
+      model: 'custom-model'
+    }))
+    expect(antigravity.get('endpoint')).toBe(`${baseInput.baseUrl}/antigravity`)
+    expect(antigravity.get('model')).toBe('custom-model')
+  })
+
+  it.each(['pi', 'mcode', 'kimi', 'dsh', 'omp'] as const)(
+    'rejects missing models for Pi-family app=%s',
+    (app) => {
+      for (const model of ['', '   ']) {
+        expect(() => buildCcSwitchImportDeeplink({ ...baseInput, app, model }))
+          .toThrow(`${app} providers require a model`)
+      }
+      expect(paramsFromDeeplink(buildCcSwitchImportDeeplink({ ...baseInput, app })).get('model'))
+        .toBeTruthy()
+      expect(paramsFromDeeplink(buildCcSwitchImportDeeplink({
+        ...baseInput, app, model: ' custom-model '
+      })).get('model')).toBe('custom-model')
+    }
+  )
+
+  it('keeps Antigravity app selection independent from the Antigravity provider endpoint', () => {
+    const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput,
+      platform: 'gemini',
+      app: 'agy',
+      model: ''
+    }))
+    expect(params.get('endpoint')).toBe(baseInput.baseUrl)
+    expect(params.has('model')).toBe(false)
+    expect(resolveCcSwitchImportConfig('antigravity', 'claude', baseInput.baseUrl).app).toBe('claude')
+    expect(resolveCcSwitchImportConfig('antigravity', 'gemini', baseInput.baseUrl).app).toBe('gemini')
   })
 
   it('parses OpenAI-style /v1/models payloads and drops duplicates', () => {

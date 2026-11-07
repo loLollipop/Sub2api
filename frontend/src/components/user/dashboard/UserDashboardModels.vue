@@ -11,7 +11,7 @@
             <thead><tr><th>{{ t('dashboard.model') }}</th><th>{{ t('dashboard.tokens') }}</th><th>{{ t('dashboard.share') }}</th></tr></thead>
             <tbody>
               <tr v-for="(model, index) in rankedModels" :key="model.model">
-                <td><span class="signal-model-name"><span class="signal-model-dot" :style="{ background: colors[index % colors.length] }" /><span class="signal-model-label" :title="model.model">{{ model.model }}</span></span></td>
+                <td><span class="signal-model-name"><span class="signal-model-dot" :style="{ background: palette.series[index % palette.series.length] }" /><span class="signal-model-label" :title="model.model">{{ model.model }}</span></span></td>
                 <td :title="model.total_tokens.toLocaleString()">{{ formatTokensK(model.total_tokens) }}</td>
                 <td>{{ (model.total_tokens / totalTokens * 100).toFixed(1) }}%</td>
               </tr>
@@ -34,17 +34,18 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import DashboardChartCard from '@/components/dashboard/DashboardChartCard.vue'
 import type { ModelStat } from '@/types'
 import { formatTokensK } from '@/utils/format'
+import { useChartPalette } from '@/composables/useChartPalette'
 
 ChartJS.register(ArcElement, Tooltip)
 const props = defineProps<{ models: ModelStat[]; startDate: string; endDate: string; loading: boolean; error?: boolean }>()
 const { t } = useI18n()
 const motion = usePreferredReducedMotion()
-const colors = ['#6486a5', '#659b87', '#9685af', '#b29968', '#ae8394', '#8796a5']
+const palette = useChartPalette()
 const rankedModels = computed(() => props.models.filter(model => Number.isFinite(model.total_tokens) && model.total_tokens > 0).slice().sort((a, b) => b.total_tokens - a.total_tokens))
 const totalTokens = computed(() => rankedModels.value.reduce((sum, model) => sum + model.total_tokens, 0))
 const modelData = computed(() => totalTokens.value > 0 ? {
   labels: rankedModels.value.map(model => model.model),
-  datasets: [{ data: rankedModels.value.map(model => model.total_tokens), backgroundColor: rankedModels.value.map((_, index) => colors[index % colors.length]), borderWidth: 0 }],
+  datasets: [{ data: rankedModels.value.map(model => model.total_tokens), backgroundColor: rankedModels.value.map((_, index) => palette.value.series[index % palette.value.series.length]), borderWidth: 0 }],
 } : null)
 const options = computed<ChartOptions<'doughnut'>>(() => ({
   responsive: true,

@@ -1,19 +1,19 @@
 <template>
   <section class="signal-stats" :aria-label="t('dashboard.title')">
     <DashboardStatGrid v-if="section !== 'platforms'">
-      <DashboardStat v-if="!isSimple" class="overview-metric overview-metric--balance" icon="creditCard" :label="`${t('dashboard.balance')} USD`">
+      <DashboardStat v-if="!isSimple" class="overview-metric overview-metric--balance" icon="creditCard" tone="green" :label="`${t('dashboard.balance')} USD`">
         $<AnimatedNumber :value="balance" :format="formatBalance" />
         <template #detail><span>{{ t('dashboard.recentTotal') }} · {{ t('dashboard.actual') }} <strong>${{ formatCost(stats.total_actual_cost) }}</strong></span><span>{{ t('dashboard.standard') }} ${{ formatCost(stats.total_cost) }}</span></template>
       </DashboardStat>
-      <DashboardStat class="overview-metric overview-metric--cost" icon="dollar" tone="green" :label="t('dashboard.todayCost')">
+      <DashboardStat class="overview-metric overview-metric--cost" icon="dollar" tone="purple" :label="t('dashboard.todayCost')">
         <span :title="t('dashboard.actual')">$<AnimatedNumber :value="stats.today_actual_cost" :format="formatCost" :duration="480" /></span>
         <template #detail><span>{{ t('dashboard.standard') }} <strong>${{ formatCost(stats.today_cost) }}</strong></span></template>
       </DashboardStat>
-      <DashboardStat class="overview-metric overview-metric--tokens" icon="cube" tone="blue" :label="t('dashboard.todayTokens')">
+      <DashboardStat class="overview-metric overview-metric--tokens" icon="cube" :label="t('dashboard.todayTokens')">
         <AnimatedNumber :value="stats.today_tokens" :format="formatTokens" />
         <template #detail><span>{{ t('dashboard.input') }} {{ formatTokens(stats.today_input_tokens) }} / {{ t('dashboard.output') }} {{ formatTokens(stats.today_output_tokens) }}</span><span>{{ t('dashboard.cache') }} {{ formatTokens(stats.today_cache_creation_tokens + stats.today_cache_read_tokens) }}</span></template>
       </DashboardStat>
-      <DashboardStat class="overview-metric" icon="chart" tone="violet" :label="t('dashboard.todayRequests')">
+      <DashboardStat class="overview-metric" icon="chart" tone="blue" :label="t('dashboard.todayRequests')">
         <AnimatedNumber :value="stats.today_requests" :decimals="0" />
         <template #detail><span>{{ t('dashboard.recentTotal') }} <strong>{{ formatNumber(stats.total_requests) }}</strong></span></template>
       </DashboardStat>
@@ -21,15 +21,15 @@
         <AnimatedNumber :value="stats.total_tokens" :format="formatTokens" />
         <template #detail><span class="overview-token-split">{{ t('dashboard.input') }} {{ formatTokens(stats.total_input_tokens) }} / {{ t('dashboard.output') }} {{ formatTokens(stats.total_output_tokens) }} / {{ t('dashboard.cache') }} {{ formatTokens(stats.total_cache_creation_tokens + stats.total_cache_read_tokens) }}</span></template>
       </DashboardStat>
-      <DashboardStat class="overview-metric" icon="key" tone="blue" :label="t('dashboard.apiKeys')">
+      <DashboardStat class="overview-metric" icon="key" tone="green" :label="t('dashboard.apiKeys')">
         <AnimatedNumber :value="stats.total_api_keys" :decimals="0" />
         <template #badge><span class="stat-badge-success">{{ stats.active_api_keys }} {{ t('common.active') }}</span></template>
       </DashboardStat>
-      <DashboardStat class="overview-reading" icon="bolt" :label="t('dashboard.performance')">
+      <DashboardStat class="overview-reading" icon="bolt" tone="blue" :label="t('dashboard.performance')">
         {{ formatTokens(stats.rpm) }} <small>RPM</small>
         <template #detail><span><strong>{{ formatTokens(stats.tpm) }}</strong> TPM</span></template>
       </DashboardStat>
-      <DashboardStat class="overview-reading" icon="clock" tone="green" :label="t('dashboard.avgResponse')">
+      <DashboardStat class="overview-reading" icon="clock" tone="purple" :label="t('dashboard.avgResponse')">
         {{ formatDuration(stats.average_duration_ms) }}
       </DashboardStat>
     </DashboardStatGrid>

@@ -2,33 +2,34 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.17",
-  "imported_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
+  "imported_version": "2.3.18",
+  "imported_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.17",
-  "latest_observed_release_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
-  "latest_observed_main_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
+  "latest_observed_version": "2.3.18",
+  "latest_observed_release_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
+  "latest_observed_main_commit": "6330f0f462512e0045d8e9e19fe7e4bcab37ddba",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.17",
-  "reviewed_release_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
+  "reviewed_release_tag": "v2.3.18",
+  "reviewed_release_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
   "observed_delta_review": {
-    "from_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
-    "to_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
-    "status": "formal_v2316_v2317_selective_backport",
-    "scope": "Review 44 commits / 138 paths from formal v2.3.15 through v2.3.17. Adapt register verification privacy, filtered admin inflight cap, text-first Grok TTS, HTTP-200 image error handling and CC Switch v4.0.26. Defer API-key quota reservation and model metadata due confirmed consistency, protocol coverage, provider matching and pricing defects; retain existing financial and module exclusions.",
-    "evidence": "maintenance/notes/upstream-sync-20261107-v2317.md"
+    "from_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
+    "to_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
+    "status": "formal_v2318_selective_backport",
+    "scope": "Review 5 commits / 15 paths in formal v2.3.18. Adapt only the existing DeepSeek builtin fallback output limit and exact display names for DeepSeek 1017 and GPT Image Medium. Defer catalogue/plaza metadata and authoritative overrides: provider/alias, effective pricing, smart-routing and ETag gaps remain; Kimi envelopes lack direct per-model evidence. Retain all prior exclusions.",
+    "evidence": "maintenance/notes/upstream-sync-20261107-v2318.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
+    "source_head": "935e24168cb37c720bd5264be4ca290fb7841611",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
       "Formal v2.3.14: opaque-blob folding, 2M estimated-input cap and Responses shape-dispatch repair only serve the excluded incomplete/disconnect estimated-billing policy. Review checkpoints advanced without enabling that policy; the separately user-authorized post-release GIF fix is recorded independently below.",
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.18: correct missing-field DeepSeek builtin max output to 393216 and exact display names for deepseek-v4.1-flash-1017 and gpt-image-medium; no discovery, matching, pricing or precedence changes. Catalogue/Plaza and Kimi authoritative metadata remain deferred; see maintenance/notes/upstream-sync-20261107-v2318.md",
       "User-authorized post-v2.3.14 leaf 9c518bf7f: GIF frame_count/frame_duration_ms accept decimal integer strings, API-key JSON forwarding normalizes them to numbers and OAuth uses typed parsed fields. Keep bounded numeric validation, original numeric/multipart representations, native routes and GIF response budgets; see maintenance/notes/upstream-sync-20261106-v2314.md.",
       "Formal v2.3.12-v2.3.13: bounded native Images GIF frame/delay/dimension normalization; complete source-derived usage stats/chart/filter/toolbar/inflight UI for both roles and settings hierarchy. Preserve original drain/billing, local theme and all module exclusions. See maintenance/notes/upstream-sync-20261106-v2313.md.",
       "Formal v2.3.11 selected image 2.6/GIF/cache billing, configured plaza references/time labels, Grok preview and table deduplication. Correct eight reproduced source/local integration defects; preserve existing image routes, local UI and billing. See maintenance/notes/upstream-sync-20261105-v2311.md.",
@@ -746,5 +747,27 @@
     "preserved": "Real terminal usage and bounded drain, local billing/multipliers, native discovery and authoritative empty catalogs, allowlists/retrieve/ETags, local UI and independent reasoning-effort column; three pre-existing untracked Go tests.",
     "migration": "None. Dependencies, migrations, deployment configuration and personal VERSION unchanged.",
     "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-07. Prepare personal v2.1.55 through PR/CI, own Release/GHCR and the existing backup/restore-validated controlled rollout; final source/artifact/runtime acceptance is recorded separately. No migration, dependency or deployment configuration changes."
+  },
+  "sync_20261107_v2318": {
+    "evidence": "maintenance/notes/upstream-sync-20261107-v2318.md",
+    "reviewed_release_tag": "v2.3.18",
+    "reviewed_release_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
+    "observed_main_commit": "6330f0f462512e0045d8e9e19fe7e4bcab37ddba",
+    "selected_releases": [
+      "v2.3.18"
+    ],
+    "selected_commits": [
+      "d1191f6a52be929455711cea7a9278f7b49b2e71"
+    ],
+    "selected_scope": "DeepSeek builtin fallback max output 393216; exact display names for deepseek-v4.1-flash-1017 and gpt-image-medium. Existing primary metadata wins; no new discovery IDs, prefix matches, capabilities or prices.",
+    "deferred_commits": [
+      "4067236bfea657ab5b2c36af84fc2892b3535ed9",
+      "d1191f6a52be929455711cea7a9278f7b49b2e71"
+    ],
+    "deferred_scope": "Remainder of model metadata/catalogue and Plaza: platform ignored, exact/canonical alias conflicts, widened family lookup and unknown capabilities; existing effective pricing/smart-route/ETag gaps persist. Kimi 262144/65536 and modalities inferred from related models are not per-model authoritative evidence. Prior API-key quota and module deferrals unchanged.",
+    "local_ui": "Remove both landing-description lines and unused bilingual key/style; share near-white warm light surfaces and neutral warm-charcoal dark surfaces, with small terracotta/apricot accents. Use static warm gradients for the centered home title and top-left brand names, with slightly deeper light-theme stops for small branding text, remove fog/glow, soften warm red/sand-gold hero lines and chart saturation; preserve Keep Running and status colors.",
+    "preserved": "Primary-field-wins fill-only metadata, existing discovery/allowlists/retrieve/ETags, local billing and multipliers, real terminal usage and bounded drain, independent reasoning-effort column, three pre-existing untracked Go tests.",
+    "migration": "None. Dependencies, migrations and deployment configuration unchanged; personal VERSION advanced separately to 2.1.56 for the authorized release.",
+    "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-07. Prepare personal v2.1.56 through PR/CI, own Release/GHCR and the existing backup/restore-validated controlled rollout, including the accepted final warm theme and title/brand gradients; final build/source/artifact/runtime acceptance is recorded separately. No migration, dependency or deployment configuration changes."
   }
 }

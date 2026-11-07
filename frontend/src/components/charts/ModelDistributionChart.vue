@@ -369,18 +369,18 @@ watch(activeView, hideScrollbar)
 onBeforeUnmount(hideScrollbar)
 
 const chartColors = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#84cc16',
-  '#06b6d4',
-  '#a855f7'
+  '#6486a5',
+  '#659b87',
+  '#b29968',
+  '#b37979',
+  '#9685af',
+  '#ae8394',
+  '#729e98',
+  '#b28c70',
+  '#7e88ac',
+  '#939d70',
+  '#6b9fa8',
+  '#a08ba9'
 ]
 
 const displayModelStats = computed(() => {

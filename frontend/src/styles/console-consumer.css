@@ -1,10 +1,10 @@
-/* Pig-hero parchment and warm translucent surfaces; data keeps a quiet backdrop. */
+/* Neutral translucent surfaces retain the pig-hero identity behind the workspace. */
 .console-signal.top-layout {
   --shell-height: 56px;
   --signal-nav-size: 232px;
   --signal-nav-motion: 260ms cubic-bezier(.22, 1, .36, 1);
-  --shell-workspace: #ffffff52;
-  --shell-card: #ffffffc9;
+  --shell-workspace: color-mix(in srgb, var(--theme-surface) 32%, transparent);
+  --shell-card: color-mix(in srgb, var(--theme-surface) 79%, transparent);
   --shell-edge: #ffffffb3;
   --shell-shadow: 0 8px 32px #33415504, inset 0 1px 0 #ffffffb3;
   font-size: 13px;
@@ -12,8 +12,8 @@
   background: var(--signal-bg);
 }
 .dark .console-signal.top-layout {
-  --shell-workspace: #171c254d;
-  --shell-card: #1b1e24cf;
+  --shell-workspace: color-mix(in srgb, var(--theme-inset) 30%, transparent);
+  --shell-card: color-mix(in srgb, var(--theme-surface) 81%, transparent);
   --shell-edge: #ffffff12;
   --shell-shadow: 0 8px 32px #0000000d, inset 0 1px 0 #ffffff05;
 }

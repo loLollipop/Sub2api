@@ -1,6 +1,5 @@
 <template>
   <div class="ggbond-backdrop" :class="`ggbond-backdrop--${variant}`" aria-hidden="true">
-    <div class="ggbond-backdrop__light" />
     <svg class="ggbond-backdrop__crest" viewBox="0 0 480 540" fill="none">
       <!-- Original pig-hero insignia: a helmet, a snout and a protective shield. -->
       <path class="crest-field" d="M240 28 426 108v156c0 110-79 187-186 242C133 451 54 374 54 264V108Z" />
@@ -30,10 +29,8 @@ withDefaults(defineProps<{ variant?: 'shell' | 'home' | 'auth' }>(), { variant: 
 
 <style scoped>
 .ggbond-backdrop {
-  --hero-red: #c9573e;
-  --hero-gold: #c5913e;
-  --hero-glow: #f0cf9b6b;
-  --hero-blush: #eeb8a74a;
+  --hero-outline: #b9604e;
+  --hero-detail: #a7864e;
   position: fixed;
   inset: 0;
   z-index: -1;
@@ -42,55 +39,43 @@ withDefaults(defineProps<{ variant?: 'shell' | 'home' | 'auth' }>(), { variant: 
   pointer-events: none;
   user-select: none;
 }
-.dark .ggbond-backdrop {
-  --hero-red: #cc7968;
-  --hero-gold: #c5a477;
-  --hero-glow: #b65e2608;
-  --hero-blush: #963a3006;
-}
-.dark .ggbond-backdrop__crest { opacity: .85; }
-.dark .ggbond-backdrop__trail { opacity: .8; stroke-opacity: .14; }
+.dark .ggbond-backdrop__crest { opacity: .22; }
+.dark .ggbond-backdrop__trail { opacity: .24; }
 .dark .crest-field { fill: none; stroke-opacity: .19; }
 .dark .crest-rim { stroke-opacity: .32; }
 .dark :is(.crest-ear, .crest-helmet) { fill: none; stroke-opacity: .26; }
 .dark .crest-brow { fill-opacity: .025; stroke-opacity: .32; }
 .dark .crest-snout { fill: none; stroke-opacity: .3; }
-.ggbond-backdrop__light {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 76% 68% at 100% 0%, var(--hero-glow), transparent 80%),
-    radial-gradient(ellipse 52% 70% at 0% 84%, var(--hero-blush), transparent 76%);
-}
 .ggbond-backdrop__crest {
   position: absolute;
   top: 11vh;
   right: -156px;
   width: clamp(420px, 41vw, 640px);
-  color: var(--hero-red);
+  color: var(--hero-outline);
+  opacity: .38;
   transform: rotate(12deg);
 }
-.crest-field { fill: currentColor; fill-opacity: .026; stroke: currentColor; stroke-opacity: .1; stroke-width: 1; }
-.crest-rim { stroke: var(--hero-gold); stroke-opacity: .24; stroke-width: 1; }
-.crest-ear, .crest-helmet { fill: currentColor; fill-opacity: .025; stroke: currentColor; stroke-opacity: .17; stroke-width: 1.5; stroke-linejoin: round; }
-.crest-brow { fill: var(--hero-gold); fill-opacity: .075; stroke: var(--hero-gold); stroke-opacity: .25; stroke-width: 1.5; }
-.crest-snout { fill: var(--hero-gold); fill-opacity: .06; stroke: currentColor; stroke-opacity: .2; stroke-width: 1.5; }
+.crest-field { fill: none; stroke: currentColor; stroke-opacity: .1; stroke-width: 1; }
+.crest-rim { stroke: var(--hero-detail); stroke-opacity: .24; stroke-width: 1; }
+.crest-ear, .crest-helmet { fill: none; stroke: currentColor; stroke-opacity: .17; stroke-width: 1.5; stroke-linejoin: round; }
+.crest-brow { fill: var(--hero-detail); fill-opacity: .075; stroke: var(--hero-detail); stroke-opacity: .25; stroke-width: 1.5; }
+.crest-snout { fill: var(--hero-detail); fill-opacity: .06; stroke: currentColor; stroke-opacity: .2; stroke-width: 1.5; }
 .crest-nostrils { stroke: currentColor; stroke-opacity: .22; stroke-width: 7; stroke-linecap: round; }
-.crest-energy { fill: var(--hero-gold); fill-opacity: .3; }
-.crest-orbit { stroke: var(--hero-gold); stroke-opacity: .2; stroke-width: 1; stroke-linecap: round; }
-.crest-node { fill: var(--hero-gold); fill-opacity: .35; }
+.crest-energy { fill: var(--hero-detail); fill-opacity: .3; }
+.crest-orbit { stroke: var(--hero-detail); stroke-opacity: .2; stroke-width: 1; stroke-linecap: round; }
+.crest-node { fill: var(--hero-detail); fill-opacity: .35; }
 .ggbond-backdrop__trail {
   position: absolute;
   bottom: -80px;
   left: -90px;
   width: min(76vw, 1000px);
   height: 620px;
-  color: var(--hero-red);
+  color: var(--hero-outline);
   stroke: currentColor;
   stroke-width: 1;
-  stroke-opacity: .085;
+  stroke-opacity: .04;
 }
-.ggbond-backdrop__trail circle, .trail-spark { fill: var(--hero-gold); fill-opacity: .22; stroke: none; }
+.ggbond-backdrop__trail circle, .trail-spark { fill: var(--hero-detail); fill-opacity: .22; stroke: none; }
 .ggbond-backdrop--home { position: absolute; }
 .ggbond-backdrop--home .ggbond-backdrop__crest { top: 98px; right: -132px; width: clamp(420px, 43vw, 680px); }
 .ggbond-backdrop--home .ggbond-backdrop__trail { bottom: 40px; }

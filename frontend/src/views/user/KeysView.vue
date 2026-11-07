@@ -414,7 +414,7 @@
                 class="peer sr-only"
                 @change="selectKeyProvider(provider.value)"
               />
-              <span class="flex min-h-24 flex-col items-center justify-center gap-2 rounded-lg border border-gray-300 px-2 py-3 text-sm font-semibold text-gray-800 transition-colors peer-enabled:cursor-pointer peer-enabled:hover:border-teal-400 peer-checked:border-teal-500 peer-checked:bg-teal-50 peer-checked:ring-1 peer-checked:ring-teal-500 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-teal-500 peer-disabled:cursor-not-allowed peer-disabled:opacity-40 dark:border-dark-500 dark:text-gray-100 dark:peer-checked:bg-teal-500/10">
+              <span class="flex min-h-24 flex-col items-center justify-center gap-2 rounded-lg border border-gray-300 px-2 py-3 text-sm font-semibold text-gray-800 transition-colors peer-enabled:cursor-pointer peer-enabled:hover:border-primary-400 peer-checked:border-primary-500 peer-checked:bg-primary-50 peer-checked:ring-1 peer-checked:ring-primary-500 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary-500 peer-disabled:cursor-not-allowed peer-disabled:opacity-40 dark:border-dark-500 dark:text-gray-100 dark:peer-checked:bg-primary-500/10">
                 <span class="flex h-8 items-center justify-center gap-1" aria-hidden="true">
                   <span
                     v-for="platform in provider.icons"
@@ -428,7 +428,7 @@
               </span>
               <span
                 v-if="activeKeyProvider === provider.value"
-                class="pointer-events-none absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-white"
+                class="pointer-events-none absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary-600 text-white"
                 aria-hidden="true"
               >
                 <Icon name="check" size="xs" />
@@ -949,7 +949,7 @@
             form="key-form"
             type="submit"
             :disabled="submitting"
-            class="btn bg-teal-600 text-white shadow-sm hover:bg-teal-700 focus-visible:ring-teal-500/30 dark:bg-teal-500 dark:hover:bg-teal-600"
+            class="btn btn-primary"
             data-tour="key-form-submit"
           >
             <svg

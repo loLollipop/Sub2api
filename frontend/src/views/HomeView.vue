@@ -67,7 +67,7 @@
           alt="Logo"
           class="mx-auto mb-6 h-20 w-20 rounded-full object-contain"
         />
-        <h1 class="brand-gradient [overflow-wrap:anywhere] text-3xl font-bold md:text-4xl">{{ siteName }}</h1>
+        <h1 class="home-title-gradient [overflow-wrap:anywhere] text-3xl font-bold md:text-4xl">{{ siteName }}</h1>
         <p v-if="siteSubtitle.trim()" class="mt-4 whitespace-pre-wrap [overflow-wrap:anywhere] text-base text-gray-600 dark:text-dark-300">{{ siteSubtitle }}</p>
         <router-link
           :to="isAuthenticated ? dashboardPath : '/login'"
@@ -184,6 +184,5 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.compact-home-theme { position: relative; isolation: isolate; background: #f7f4ef; }
-.dark .compact-home-theme { background: #111318; }
+.compact-home-theme { position: relative; isolation: isolate; background: var(--theme-bg); }
 </style>

@@ -197,6 +197,8 @@ describe('HomeView compact mode', () => {
     expect(wrapper.find('.landing-sticker').exists()).toBe(false)
     expect(wrapper.find('.api-preview__guide').exists()).toBe(false)
     expect(wrapper.get('.landing-hero h1').text()).toBe('Test site')
+    expect(wrapper.find('.landing-description').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('home.landing.orbitDescription')
     expect(wrapper.get('[data-testid="home-code-cursor"]').attributes('aria-hidden')).toBe('true')
   })
 

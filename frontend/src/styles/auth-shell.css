@@ -1,22 +1,14 @@
-/* Public account flows share the console's quiet surfaces and warm accent. */
+/* Public account flows share the console's quiet surfaces and terracotta accent. */
 :is(.auth-shell, body:has(.auth-shell) > .modal-overlay) {
-  --auth-bg: #f7f4ef;
-  --auth-panel: #ffffffc9;
-  --auth-inset: #f3f4f680;
-  --auth-edge: #e5e7eb;
-  --auth-text: #1f2937;
-  --auth-muted: #6b7280;
-  --auth-accent: #c2410c;
+  --auth-bg: var(--theme-bg);
+  --auth-panel: var(--theme-surface);
+  --auth-inset: var(--theme-inset);
+  --auth-edge: var(--theme-line);
+  --auth-text: var(--theme-text);
+  --auth-muted: var(--theme-muted);
+  --auth-accent: var(--theme-accent);
 }
-.dark :is(.auth-shell, body:has(.auth-shell) > .modal-overlay) {
-  --auth-bg: #111318;
-  --auth-panel: #1b1e24e6;
-  --auth-inset: #24283080;
-  --auth-edge: #343943;
-  --auth-text: #f3f4f6;
-  --auth-muted: #a7aeb9;
-  --auth-accent: #fb923c;
-}
+
 .auth-shell { position: relative; isolation: isolate; min-height: 100dvh; padding: 116px 24px 32px; background: var(--auth-bg); color: var(--auth-text); font-size: 13px; line-height: 1.6; }
 .auth-content { width: 100%; max-width: 440px; min-width: 0; margin-inline: auto; }
 .auth-brand-block { position: absolute; top: 28px; left: 32px; right: 32px; }
@@ -33,9 +25,8 @@
 .auth-card .input:focus { border-color: var(--auth-accent); }
 .auth-card .input-error { border-color: #dc2626; }
 .auth-card .btn { min-height: 40px; border-radius: 8px; font-size: 13px; }
-.auth-card .btn-primary { background: var(--auth-accent); color: white; box-shadow: none; }
-.auth-card .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--auth-accent) 88%, #000); transform: none; }
-.dark .auth-card .btn-primary { color: #25160c; }
+.auth-card .btn-primary { background: var(--auth-accent); color: var(--theme-on-accent); box-shadow: none; }
+.auth-card .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--auth-accent) 92%, var(--auth-text)); transform: none; }
 .auth-card .password-toggle { justify-content: center; width: 42px; padding: 0; border-radius: 7px; }
 .auth-password-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .auth-password-label .input-label { margin: 0; }

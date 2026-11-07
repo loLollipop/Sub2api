@@ -18,7 +18,6 @@ export default {
       home: '首页',
       integration: '接入指南',
       orbitEyebrow: '多种模型，一个入口',
-      orbitDescription: '从对话到创作，用熟悉的 API 接入主流模型。\n统一管理密钥、余额与每一次调用。',
       exploreIntegration: '查看接入示例',
       scrollToExplore: '向下探索',
       modelEcosystem: '模型生态',

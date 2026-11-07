@@ -237,6 +237,11 @@ func (h *UsageHandler) List(c *gin.Context) {
 		}
 		now := time.Now()
 		live := service.VisibleUsageInflight(c.Request.Context(), filters.UserID, filters, finished)
+		// Bound the first-page supplement after filtering and deduplication.
+		// The inflight-only endpoint retains its separate pagination.
+		if len(live) > 50 {
+			live = live[:50]
+		}
 		if len(live) > 0 {
 			head := make([]dto.AdminUsageLog, 0, len(live))
 			for _, row := range live {

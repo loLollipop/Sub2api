@@ -593,6 +593,89 @@ describe('user KeysView column settings', () => {
     wrapper.unmount()
   })
 
+  it.each([
+    ['mcode', 'gpt-5.6-sol'],
+    ['kimi', 'gpt-5.6-sol'],
+    ['dsh', 'gpt-5.6-sol'],
+    ['agy', 'gemini-2.5-pro'],
+    ['omp', 'gpt-5.6-sol'],
+    ['pi', 'claude-sonnet-4-6'],
+    ['claude-desktop', 'claude-sonnet-4-6'],
+  ])('imports supported app=%s from the key dialog with a default model', async (app, model) => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [] }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    getPublicSettings.mockResolvedValue({ api_base_url: 'https://api.example.test' })
+    const wrapper = await mountView()
+    try {
+      await getButtonByText(wrapper, 'keys.importToCcSwitch').trigger('click')
+      await flushPromises()
+      expect(fetchMock).toHaveBeenCalledWith('https://api.example.test/v1/models',
+        expect.objectContaining({ headers: { Authorization: 'Bearer sk-test-key' } }))
+      const appSelect = wrapper.getComponent('#ccs-import-platform')
+      expect(appSelect.props('options').map((option: { value: string }) => option.value))
+        .toEqual(['claude', 'claude-desktop', 'codex', 'gemini', 'grokbuild', 'opencode',
+          'openclaw', 'hermes', 'pi', 'mcode', 'kimi', 'dsh', 'agy', 'omp'])
+      appSelect.vm.$emit('update:modelValue', app)
+      await nextTick()
+      expect(wrapper.getComponent('#ccs-import-model').props('modelValue')).toBe(model)
+      const confirm = getButtonByText(wrapper, 'common.import')
+      expect(confirm.attributes('disabled')).toBeUndefined()
+      await confirm.trigger('click')
+      expect(open).toHaveBeenCalledTimes(1)
+      const params = new URL(String(open.mock.calls[0][0])).searchParams
+      expect(params.get('app')).toBe(app)
+      expect(params.get('model')).toBe(model)
+      expect(params.get('endpoint')).toBe('https://api.example.test')
+    } finally {
+      wrapper.unmount()
+      open.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('requires a Pi-family model while preserving discovered models and optional-model imports', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ data: [{ id: 'key-only-model' }, { id: 'gpt-5.6-sol' }] }),
+    }))
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wrapper = await mountView()
+    try {
+      await getButtonByText(wrapper, 'keys.importToCcSwitch').trigger('click')
+      await flushPromises()
+      const appSelect = wrapper.getComponent('#ccs-import-platform')
+      const modelSelect = wrapper.getComponent('#ccs-import-model')
+      appSelect.vm.$emit('update:modelValue', 'mcode')
+      await nextTick()
+      expect(modelSelect.props('modelValue')).toBe('gpt-5.6-sol')
+      expect(modelSelect.props('options')).toEqual([
+        { value: 'key-only-model', label: 'key-only-model' },
+        { value: 'gpt-5.6-sol', label: 'gpt-5.6-sol' },
+      ])
+      modelSelect.vm.$emit('update:modelValue', null)
+      await nextTick()
+      const confirm = getButtonByText(wrapper, 'common.import')
+      expect(confirm.attributes('disabled')).toBeDefined()
+      expect(wrapper.get('#ccs-import-model-error').text()).toBe('keys.ccsImport.modelRequired')
+      await confirm.trigger('click')
+      expect(open).not.toHaveBeenCalled()
+      appSelect.vm.$emit('update:modelValue', 'agy')
+      await nextTick()
+      expect(modelSelect.props('modelValue')).toBe('key-only-model')
+      modelSelect.vm.$emit('update:modelValue', '')
+      await nextTick()
+      expect(confirm.attributes('disabled')).toBeUndefined()
+      await confirm.trigger('click')
+      const params = new URL(String(open.mock.calls[0][0])).searchParams
+      expect(params.get('app')).toBe('agy')
+      expect(params.has('model')).toBe(false)
+    } finally {
+      wrapper.unmount()
+      open.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('uses the default API key columns with low-frequency columns hidden', async () => {
     const wrapper = await mountView()
 

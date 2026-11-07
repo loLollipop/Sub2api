@@ -1061,9 +1061,14 @@
             :searchable="true"
             :creatable="true"
             :clearable="true"
+            :error="ccsImportModelMissing"
+            :aria-describedby="ccsImportModelMissing ? 'ccs-import-model-error' : undefined"
             :aria-label="t('keys.ccsImport.model')"
             @update:model-value="onCcsModelChange"
           />
+          <p v-if="ccsImportModelMissing" id="ccs-import-model-error" class="mt-1 text-xs text-red-600 dark:text-red-400">
+            {{ t('keys.ccsImport.modelRequired') }}
+          </p>
           <p class="input-hint mt-1">
             {{ ccsModelsLoading ? t('keys.ccsImport.modelLoading') : t('keys.ccsImport.modelHint') }}
           </p>
@@ -1083,7 +1088,7 @@
           <button
             type="button"
             class="btn btn-primary"
-            :disabled="ccsImportDeeplinkUnsupported"
+            :disabled="ccsImportDeeplinkUnsupported || ccsImportModelMissing"
             @click="confirmCcsImport"
           >
             {{ t('common.import') }}
@@ -1202,6 +1207,7 @@ import {
   CC_SWITCH_APPS,
   CC_SWITCH_MODEL_SUGGESTIONS,
   ccSwitchProviderDeeplinkSupported,
+  ccSwitchModelRequired,
   defaultCcSwitchModel,
   fetchCcSwitchModels,
   isCcSwitchApp,
@@ -1381,6 +1387,10 @@ const ccsAppOptions = computed(() =>
 
 const ccsImportDeeplinkUnsupported = computed(
   () => !ccSwitchProviderDeeplinkSupported(ccsImportApp.value)
+)
+
+const ccsImportModelMissing = computed(
+  () => ccSwitchModelRequired(ccsImportApp.value) && !ccsImportModel.value.trim()
 )
 
 const ccsModelOptions = computed(() => {
@@ -2197,7 +2207,7 @@ const executeCcsImport = (row: ApiKey, app: CcSwitchApp, model: string) => {
 
 const confirmCcsImport = () => {
   if (!pendingCcsRow.value) return
-  if (!ccSwitchProviderDeeplinkSupported(ccsImportApp.value)) return
+  if (ccsImportDeeplinkUnsupported.value || ccsImportModelMissing.value) return
   executeCcsImport(pendingCcsRow.value, ccsImportApp.value, ccsImportModel.value.trim())
   closeCcsImportModal()
 }

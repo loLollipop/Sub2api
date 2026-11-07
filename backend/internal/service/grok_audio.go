@@ -320,22 +320,30 @@ func grokRealtimeEventHasAudio(msg []byte) bool {
 	return false
 }
 
+// GrokTTSText returns the spoken text using xAI's text-first field precedence.
+// Billing, reservation and moderation must inspect the same string.
+func GrokTTSText(body []byte) string {
+	if !gjson.ValidBytes(body) {
+		return ""
+	}
+	for _, key := range []string{"text", "input", "prompt"} {
+		value := gjson.GetBytes(body, key)
+		if value.Type == gjson.String {
+			if text := strings.TrimSpace(value.String()); text != "" {
+				return text
+			}
+		}
+	}
+	return ""
+}
+
 // estimateGrokVoiceAudioUsage derives billing units from the request/response.
 // TTS: million characters of input text; STT: hours approximated from request body size
 // when duration is unknown; custom-voices: no units (nil).
 func estimateGrokVoiceAudioUsage(endpoint string, reqBody []byte, contentType string, respBody []byte, elapsed time.Duration) *AudioUsage {
 	switch strings.TrimSpace(endpoint) {
 	case "tts":
-		// Prefer JSON "input" / "text" fields; fallback to raw body length.
-		chars := 0
-		if gjson.ValidBytes(reqBody) {
-			for _, key := range []string{"input", "text", "prompt"} {
-				if s := strings.TrimSpace(gjson.GetBytes(reqBody, key).String()); s != "" {
-					chars = len([]rune(s))
-					break
-				}
-			}
-		}
+		chars := len([]rune(GrokTTSText(reqBody)))
 		if chars <= 0 {
 			chars = len(reqBody)
 		}

@@ -83,8 +83,19 @@ func TestClientErrorPrivacyImageAndMediaJSONWrites(t *testing.T) {
 				original := []byte(body)
 				resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(bytes.NewReader(original))}
 				if target == "image" {
-					_, _, _, err := (&OpenAIGatewayService{cfg: &config.Config{}}).handleOpenAIImagesNonStreamingResponse(t.Context(), resp, c, &Account{ID: 1}, &OpenAIImagesRequest{})
-					require.NoError(t, err)
+					usage, count, _, err := (&OpenAIGatewayService{cfg: &config.Config{}}).handleOpenAIImagesNonStreamingResponse(t.Context(), resp, c, &Account{ID: 1}, &OpenAIImagesRequest{})
+					if strings.Contains(body, "public.example") {
+						require.NoError(t, err)
+						require.Equal(t, 1, count)
+					} else {
+						// A recognizable HTTP-200 error now fails forwarding, while
+						// the privacy boundary must still retain the original bytes.
+						var upstreamErr *OpenAIImagesUpstreamError
+						require.ErrorAs(t, err, &upstreamErr)
+						require.Equal(t, http.StatusBadGateway, rec.Code)
+						require.Zero(t, count)
+						require.Equal(t, OpenAIUsage{}, usage)
+					}
 				} else {
 					writeGrokMediaResponse(c, resp, original, nil)
 				}

@@ -5,10 +5,32 @@ import (
 	"io"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGrokTTSTextAndBilledUnits(t *testing.T) {
+	for _, tc := range []struct{ name, body, want string }{
+		{"text wins", `{"text":"你好🙂","input":"longer unused input","prompt":"unused"}`, "你好🙂"},
+		{"input fallback", `{"text":"  ","input":" fallback ","prompt":"unused"}`, "fallback"},
+		{"prompt fallback", `{"text":123,"input":{},"prompt":"备用"}`, "备用"},
+		{"non-string", `{"text":123,"input":false}`, ""},
+		{"invalid JSON", `{`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, GrokTTSText([]byte(tc.body)))
+			usage := estimateGrokVoiceAudioUsage("tts", []byte(tc.body), "application/json", nil, time.Second)
+			require.NotNil(t, usage)
+			characters := len([]rune(tc.want))
+			if characters == 0 {
+				characters = len(tc.body)
+			}
+			require.Equal(t, float64(characters)/1e6, usage.DurationOrUnits)
+		})
+	}
+}
 
 func TestBuildGrokVoiceURL_UsesAPIDefaultForCLIProxyBase(t *testing.T) {
 	account := &Account{

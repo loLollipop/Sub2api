@@ -20,14 +20,14 @@
 
       <template v-else-if="stats">
         <DashboardStatGrid>
-          <DashboardStat icon="key" tone="blue" :label="t('admin.dashboard.apiKeys')">{{ stats.total_api_keys }}<template #detail><span>{{ stats.active_api_keys }} {{ t('common.active') }}</span></template></DashboardStat>
+          <DashboardStat icon="key" tone="green" :label="t('admin.dashboard.apiKeys')">{{ stats.total_api_keys }}<template #detail><span>{{ stats.active_api_keys }} {{ t('common.active') }}</span></template></DashboardStat>
           <DashboardStat icon="server" tone="violet" :label="t('admin.dashboard.accounts')">{{ stats.total_accounts }}<template #detail><span>{{ stats.normal_accounts }} {{ t('common.active') }}</span><span v-if="stats.error_accounts > 0" class="text-red-500">{{ stats.error_accounts }} {{ t('common.error') }}</span></template></DashboardStat>
-          <DashboardStat icon="chart" tone="green" :label="t('admin.dashboard.todayRequests')">{{ stats.today_requests }}<template #detail><span>{{ t('common.total') }}: <strong>{{ formatNumber(stats.total_requests) }}</strong></span></template></DashboardStat>
-          <DashboardStat icon="userPlus" :label="t('admin.dashboard.users')">{{ formatNumber(stats.total_users) }}<template #badge><span :class="{ 'stat-badge-success': stats.today_new_users > 0 }" :title="t('admin.dashboard.newUsersToday')">+{{ stats.today_new_users }}</span></template></DashboardStat>
+          <DashboardStat icon="chart" tone="blue" :label="t('admin.dashboard.todayRequests')">{{ stats.today_requests }}<template #detail><span>{{ t('common.total') }}: <strong>{{ formatNumber(stats.total_requests) }}</strong></span></template></DashboardStat>
+          <DashboardStat icon="userPlus" tone="green" :label="t('admin.dashboard.users')">{{ formatNumber(stats.total_users) }}<template #badge><span :class="{ 'stat-badge-success': stats.today_new_users > 0 }" :title="t('admin.dashboard.newUsersToday')">+{{ stats.today_new_users }}</span></template></DashboardStat>
           <DashboardStat icon="cube" :label="t('admin.dashboard.todayTokens')">{{ formatTokens(stats.today_tokens) }}<template #detail><span>{{ t('admin.dashboard.actual') }} <strong>${{ formatCost(stats.today_actual_cost) }}</strong></span><span>{{ t('admin.dashboard.accountCost') }} <strong>${{ formatCost(stats.today_account_cost) }}</strong></span><span>{{ t('admin.dashboard.standard') }} ${{ formatCost(stats.today_cost) }}</span></template></DashboardStat>
-          <DashboardStat icon="database" tone="blue" :label="t('admin.dashboard.totalTokens')">{{ formatTokens(stats.total_tokens) }}<template #detail><span>{{ t('admin.dashboard.actual') }} <strong>${{ formatCost(stats.total_actual_cost) }}</strong></span><span>{{ t('admin.dashboard.accountCost') }} <strong>${{ formatCost(stats.total_account_cost) }}</strong></span><span>{{ t('admin.dashboard.standard') }} ${{ formatCost(stats.total_cost) }}</span></template></DashboardStat>
-          <DashboardStat icon="bolt" tone="violet" :label="t('admin.dashboard.performance')">{{ formatTokens(stats.rpm) }} <small>RPM</small><template #detail><span><strong>{{ formatTokens(stats.tpm) }}</strong> TPM</span></template></DashboardStat>
-          <DashboardStat icon="clock" tone="green" :label="t('admin.dashboard.avgResponse')">{{ formatDuration(stats.average_duration_ms) }}<template #detail><span>{{ stats.active_users }} {{ t('admin.dashboard.activeUsers') }}</span></template></DashboardStat>
+          <DashboardStat icon="database" tone="violet" :label="t('admin.dashboard.totalTokens')">{{ formatTokens(stats.total_tokens) }}<template #detail><span>{{ t('admin.dashboard.actual') }} <strong>${{ formatCost(stats.total_actual_cost) }}</strong></span><span>{{ t('admin.dashboard.accountCost') }} <strong>${{ formatCost(stats.total_account_cost) }}</strong></span><span>{{ t('admin.dashboard.standard') }} ${{ formatCost(stats.total_cost) }}</span></template></DashboardStat>
+          <DashboardStat icon="bolt" tone="blue" :label="t('admin.dashboard.performance')">{{ formatTokens(stats.rpm) }} <small>RPM</small><template #detail><span><strong>{{ formatTokens(stats.tpm) }}</strong> TPM</span></template></DashboardStat>
+          <DashboardStat icon="clock" tone="purple" :label="t('admin.dashboard.avgResponse')">{{ formatDuration(stats.average_duration_ms) }}<template #detail><span>{{ stats.active_users }} {{ t('admin.dashboard.activeUsers') }}</span></template></DashboardStat>
         </DashboardStatGrid>
 
         <nav class="admin-dashboard-shortcuts" :aria-label="t('admin.dashboard.quickActions')">
@@ -105,6 +105,7 @@ import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
+import { useChartPalette } from '@/composables/useChartPalette'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 
 import {
@@ -184,16 +185,7 @@ const granularityOptions = computed(() => [
   { value: 'hour', label: t('admin.dashboard.hour') }
 ])
 
-// Dark mode detection
-const isDarkMode = computed(() => {
-  return document.documentElement.classList.contains('dark')
-})
-
-// Chart colors
-const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb'
-}))
+const chartColors = useChartPalette()
 
 // Line chart options (for user trend chart)
 const lineOptions = computed(() => ({
@@ -288,20 +280,7 @@ const userTrendChartData = computed(() => {
   })
 
   const sortedDates = Array.from(allDates).sort()
-  const colors = [
-    '#6486a5',
-    '#659b87',
-    '#b29968',
-    '#b37979',
-    '#9685af',
-    '#ae8394',
-    '#729e98',
-    '#b28c70',
-    '#7e88ac',
-    '#939d70',
-    '#6b9fa8',
-    '#a08ba9'
-  ]
+  const colors = chartColors.value.series
 
   const datasets = Array.from(userGroups.values()).map((group, idx) => ({
     label: group.name,

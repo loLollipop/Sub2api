@@ -24,8 +24,7 @@
 
 <script setup lang="ts">
 import './chartCards.css'
-import { computed, ref } from 'vue'
-import { useMutationObserver } from '@vueuse/core'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Chart as ChartJS,
@@ -40,6 +39,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { useChartPalette } from '@/composables/useChartPalette'
 import type { TrendDataPoint } from '@/types'
 
 ChartJS.register(
@@ -62,25 +62,21 @@ const props = defineProps<{
   mode?: 'total' | 'breakdown'
 }>()
 
-const isDarkMode = ref(document.documentElement.classList.contains('dark'))
-useMutationObserver(document.documentElement, () => {
-  isDarkMode.value = document.documentElement.classList.contains('dark')
-}, { attributes: true, attributeFilter: ['class'] })
-
+const palette = useChartPalette()
 const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: props.mode === 'total' ? (isDarkMode.value ? '#29292c' : '#e8e8ec') : (isDarkMode.value ? '#374151' : '#e5e7eb'),
-  accent: isDarkMode.value ? '#e6ac86' : '#a95e3c',
-  input: '#6486a5',
-  output: '#659b87',
-  cacheCreation: '#b29968',
-  cacheRead: '#6b9fa8',
-  cacheHitRate: '#9685af'
+  text: palette.value.text,
+  grid: palette.value.grid,
+  accent: palette.value.accent,
+  input: palette.value.blue,
+  output: palette.value.green,
+  cacheCreation: palette.value.amber,
+  cacheRead: palette.value.cyan,
+  cacheHitRate: palette.value.purple
 }))
 
 // 纵向渐变：峰顶约 18% 透明度，往下淡出到 2%，谷底透明。宽 1px 足够采样。
-const gradientCache = new WeakMap<object, CanvasGradient>()
 function makeAreaGradient(color: string) {
+  const gradientCache = new WeakMap<object, CanvasGradient>()
   return (context: { chart: { chartArea?: { top: number; bottom: number; left: number; right: number }; canvas: HTMLCanvasElement } }) => {
     const { chartArea, canvas } = context.chart
     if (!chartArea || !canvas) return `${color}0c`

@@ -46,18 +46,31 @@ describe('TokenUsageTrend', () => {
     wrapper.unmount()
   })
 
-  it('updates chart label colors when the existing theme toggle changes the root class', async () => {
+  it('updates labels, the line and its cached fill when the existing theme toggle changes', async () => {
     const wasDark = document.documentElement.classList.contains('dark')
     document.documentElement.classList.remove('dark')
-    const wrapper = mount(TokenUsageTrend, { props: { trendData: sampleTrend } })
+    const wrapper = mount(TokenUsageTrend, { props: { trendData: sampleTrend, mode: 'total' } })
+    const context = {
+      chart: {
+        chartArea: { top: 0, bottom: 100, left: 0, right: 100 },
+        canvas: { getContext: () => ({ createLinearGradient: () => ({ addColorStop: vi.fn() }) }) },
+      },
+    }
     try {
-      const lightColor = wrapper.getComponent(Line).props('options').scales.x.ticks.color
+      const chart = wrapper.getComponent(Line)
+      const lightColor = chart.props('options').scales.x.ticks.color
+      const lightLine = chart.props('data').datasets[0].borderColor
+      const lightFill = chart.props('data').datasets[0].backgroundColor(context)
       document.documentElement.classList.add('dark')
       await flushPromises()
-      expect(wrapper.getComponent(Line).props('options').scales.x.ticks.color).not.toBe(lightColor)
+      expect(chart.props('options').scales.x.ticks.color).not.toBe(lightColor)
+      expect(chart.props('data').datasets[0].borderColor).not.toBe(lightLine)
+      const darkFill = chart.props('data').datasets[0].backgroundColor(context)
+      expect(darkFill.addColorStop.mock.calls).not.toEqual(lightFill.addColorStop.mock.calls)
       document.documentElement.classList.remove('dark')
       await flushPromises()
-      expect(wrapper.getComponent(Line).props('options').scales.x.ticks.color).toBe(lightColor)
+      expect(chart.props('options').scales.x.ticks.color).toBe(lightColor)
+      expect(chart.props('data').datasets[0].borderColor).toBe(lightLine)
     } finally {
       wrapper.unmount()
       document.documentElement.classList.toggle('dark', wasDark)

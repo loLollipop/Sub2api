@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.18",
-  "imported_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
+  "imported_version": "2.3.19",
+  "imported_commit": "a16b937d6afea658434aa2c16049114c91984867",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.18",
-  "latest_observed_release_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
-  "latest_observed_main_commit": "6330f0f462512e0045d8e9e19fe7e4bcab37ddba",
+  "latest_observed_version": "2.3.19",
+  "latest_observed_release_commit": "a16b937d6afea658434aa2c16049114c91984867",
+  "latest_observed_main_commit": "2f9c7fba6797691e158b55dbe45ce4ec7223ce51",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.18",
-  "reviewed_release_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
+  "reviewed_release_tag": "v2.3.19",
+  "reviewed_release_commit": "a16b937d6afea658434aa2c16049114c91984867",
   "observed_delta_review": {
-    "from_commit": "ad1a9ea8b446b9a73613d58e7f568aed9f55816b",
-    "to_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
-    "status": "formal_v2318_selective_backport",
-    "scope": "Review 5 commits / 15 paths in formal v2.3.18. Adapt only the existing DeepSeek builtin fallback output limit and exact display names for DeepSeek 1017 and GPT Image Medium. Defer catalogue/plaza metadata and authoritative overrides: provider/alias, effective pricing, smart-routing and ETag gaps remain; Kimi envelopes lack direct per-model evidence. Retain all prior exclusions.",
-    "evidence": "maintenance/notes/upstream-sync-20261107-v2318.md"
+    "from_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
+    "to_commit": "a16b937d6afea658434aa2c16049114c91984867",
+    "status": "formal_v2319_reviewed_without_runtime_import",
+    "scope": "Review 3 commits / 6 paths in formal v2.3.19. Defer curated catalogue/file-loader/remote-refresh as one group: provider/alias ambiguity, unsupported authoritative Kimi values, effective pricing gaps and mutable upstream-main refresh remain. Record post-release whitelist fix independently without importing it. Preserve prior exclusions.",
+    "evidence": "maintenance/notes/upstream-sync-20261107-v2319.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "935e24168cb37c720bd5264be4ca290fb7841611",
+    "source_head": "a16b937d6afea658434aa2c16049114c91984867",
     "reviewed_without_runtime_changes": [
+      "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
       "Formal v2.3.14: opaque-blob folding, 2M estimated-input cap and Responses shape-dispatch repair only serve the excluded incomplete/disconnect estimated-billing policy. Review checkpoints advanced without enabling that policy; the separately user-authorized post-release GIF fix is recorded independently below.",
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
@@ -116,6 +117,13 @@
   ],
   "selected_deepseek_fix": "Formal v2304 native DeepSeek bypasses legacy call-ID/request-state rewriting and rejected-field retries; genuine reasoning and thinking-switch options are provider-gated. Existing legacy conversion empty-shell repair remains scoped. Preserve local key/conversation/requested-model replay isolation, native protocols and distinct IDs; no cache-key weakening, Hosted execution, DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2319-curated-catalogue-and-remote-refresh",
+      "upstream_commits": [
+        "e4777619e"
+      ],
+      "reason": "Keep with deferred provider-blind catalogue/authoritative metadata: alias and suffix collisions, unsupported Kimi envelopes, missing effective pricing/smart-route/ETag integration, and mutable upstream-main refresh outside release review. Post-release whitelist fix 5e163e2f5 is separately observed, not imported."
+    },
     {
       "feature": "v2310-ops-rate-history-account-reveal-and-runtime-expansion",
       "upstream_commits": ["b500c1bbe", "d14cb1376", "ac007527a", "484d24eab", "4e53e58dc"],
@@ -769,5 +777,31 @@
     "preserved": "Primary-field-wins fill-only metadata, existing discovery/allowlists/retrieve/ETags, local billing and multipliers, real terminal usage and bounded drain, independent reasoning-effort column, three pre-existing untracked Go tests.",
     "migration": "None. Dependencies, migrations and deployment configuration unchanged; personal VERSION advanced separately to 2.1.56 for the authorized release.",
     "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-07. Prepare personal v2.1.56 through PR/CI, own Release/GHCR and the existing backup/restore-validated controlled rollout, including the accepted final warm theme and title/brand gradients; final build/source/artifact/runtime acceptance is recorded separately. No migration, dependency or deployment configuration changes."
+  },
+  "sync_20261107_v2319": {
+    "evidence": "maintenance/notes/upstream-sync-20261107-v2319.md",
+    "reviewed_release_tag": "v2.3.19",
+    "reviewed_release_commit": "a16b937d6afea658434aa2c16049114c91984867",
+    "observed_main_commit": "2f9c7fba6797691e158b55dbe45ce4ec7223ce51",
+    "reviewed_releases": [
+      "v2.3.19"
+    ],
+    "selected_commits": [],
+    "selected_scope": "Advance reviewed source/update-notification checkpoints only; no catalogue runtime import.",
+    "deferred_commits": [
+      "e4777619e"
+    ],
+    "deferred_scope": "Review 3 commits / 6 paths in formal v2.3.19. Defer curated catalogue/file-loader/remote-refresh as one group: provider/alias ambiguity, unsupported authoritative Kimi values, effective pricing gaps and mutable upstream-main refresh remain. Record post-release whitelist fix independently without importing it. Preserve prior exclusions.",
+    "observed_unreleased_backports": [
+      {
+        "commit": "5e163e2f5fe2f46badc3038fee955778e93c0612",
+        "status": "recorded-only-await-formal-release",
+        "scope": "Stale same-from mappings shadow explicit whitelist identities in local combined account saves. A future complete adaptation needs modal-save filtering, hidden-mapping hints, bilingual locale and helper/modal regressions; do not globally change combined precedence."
+      }
+    ],
+    "local_ui": "Stat icons use pastel green/blue/purple/orange backgrounds; chart series/legends share light/dark palettes. React to theme changes and isolate gradient caches by color. Preserve layout, icon geometry/size, doughnut thickness, line shape, data and interactions.",
+    "preserved": "Native providers/discovery, effective local billing/multipliers, real terminal usage and bounded drain, independent reasoning-effort column after model, all prior module exclusions and three pre-existing untracked Go tests.",
+    "migration": "None. Dependencies, migrations and deployment configuration unchanged; personal VERSION 2.1.57.",
+    "release_status": "User authorized GitHub submission and deployment on 2026-11-07. Prepare personal v2.1.57 through PR/CI, own Release/GHCR and backup/restore-validated controlled rollout; final source/artifact/runtime evidence is recorded separately."
   }
 }

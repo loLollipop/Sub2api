@@ -262,6 +262,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { ModelStat, UserSpendingRankingItem, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
+import { useChartPalette } from '@/composables/useChartPalette'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -368,20 +369,7 @@ const showScrollbar = () => {
 watch(activeView, hideScrollbar)
 onBeforeUnmount(hideScrollbar)
 
-const chartColors = [
-  '#6486a5',
-  '#659b87',
-  '#b29968',
-  '#b37979',
-  '#9685af',
-  '#ae8394',
-  '#729e98',
-  '#b28c70',
-  '#7e88ac',
-  '#939d70',
-  '#6b9fa8',
-  '#a08ba9'
-]
+const palette = useChartPalette()
 
 const displayModelStats = computed(() => {
   const sourceStats = props.source === 'upstream'
@@ -403,7 +391,7 @@ const chartData = computed(() => {
     datasets: [
       {
         data: displayModelStats.value.map((m) => toFiniteNumber(props.metric === 'actual_cost' ? m.actual_cost : m.total_tokens)),
-        backgroundColor: chartColors.slice(0, displayModelStats.value.length),
+        backgroundColor: displayModelStats.value.map((_, index) => palette.value.series[index % palette.value.series.length]),
         borderWidth: 0
       }
     ]
@@ -415,12 +403,12 @@ const rankingChartData = computed(() => {
 
   const labels = props.rankingItems.map((item, index) => `#${index + 1} ${getRankingUserLabel(item)}`)
   const data = props.rankingItems.map((item) => toFiniteNumber(item.actual_cost))
-  const backgroundColor = chartColors.slice(0, props.rankingItems.length)
+  const backgroundColor = props.rankingItems.map((_, index) => palette.value.series[index % palette.value.series.length])
 
   if (otherRankingItem.value) {
     labels.push(t('admin.dashboard.spendingRankingOther'))
     data.push(otherRankingItem.value.actual_cost)
-    backgroundColor.push('#94a3b8')
+    backgroundColor.push(palette.value.other)
   }
 
   return {

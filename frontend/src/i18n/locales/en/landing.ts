@@ -18,7 +18,6 @@ export default {
       home: 'Home',
       integration: 'Integration',
       orbitEyebrow: 'Many models. One connection.',
-      orbitDescription: 'From conversations to creation, connect through familiar APIs.\nYour keys, balance and usage, all in one place.',
       exploreIntegration: 'Explore the API',
       scrollToExplore: 'Scroll to explore',
       modelEcosystem: 'Model ecosystem',

@@ -178,7 +178,7 @@ async function markAllAsRead() {
 .announcement-timeline { display: grid; gap: 2px; margin: -12px; }
 .announcement-row { display: flex; width: 100%; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; text-align: left; transition: background-color 140ms ease; }
 .announcement-row:hover { background: var(--signal-hover, #f8fafc); }
-.announcement-row:focus-visible { outline: 2px solid var(--signal-accent, #ea580c); outline-offset: -2px; }
+.announcement-row:focus-visible { outline: 2px solid var(--signal-accent, #a95e3c); outline-offset: -2px; }
 .announcement-row-icon { position: relative; display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; }
 .announcement-unread-chip { position: absolute; top: 0; right: 0; width: 7px; height: 7px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 2px var(--signal-surface, #fff); }
 .announcement-row-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -188,6 +188,6 @@ async function markAllAsRead() {
 .announcement-mark-all { padding: 5px 8px; border-radius: 6px; background: var(--signal-inset, #f8fafc); font-size: 12px; color: var(--signal-text, #111827); }
 .announcement-mark-all:hover { background: var(--signal-hover, #f1f5f9); }
 .announcement-mark-all:disabled { opacity: .5; }
-.announcement-mark-all:focus-visible { outline: 2px solid var(--signal-accent, #ea580c); outline-offset: 2px; }
+.announcement-mark-all:focus-visible { outline: 2px solid var(--signal-accent, #a95e3c); outline-offset: 2px; }
 .announcement-list-error { display: grid; justify-items: center; gap: 14px; padding-block: 48px; text-align: center; font-size: 13px; color: var(--signal-muted, #64748b); }
 </style>

@@ -1,7 +1,7 @@
 import type { LeaderboardModel, LeaderboardResponse } from '@/api/leaderboard'
 import { modelProvider } from '@/components/modelPlaza/modelPlazaProviders'
 
-export const SERIES_COLORS = ['#f97316', '#4d6bfe', '#10b981', '#8b5cf6', '#0ea5e9', '#eab308', '#ec4899', '#14b8a6', '#94a3b8']
+export const SERIES_COLORS = ['#6486a5', '#659b87', '#b29968', '#b37979', '#9685af', '#ae8394', '#729e98', '#b28c70', '#7e88ac']
 export const PROVIDER_COLORS: Record<string, string> = {
   openai: '#10b981', anthropic: '#c47754', gemini: '#4285f4', grok: '#64748b',
   deepseek: '#4d6bfe', qwen: '#8b5cf6', kimi: '#2563eb', zhipu: '#06b6d4',

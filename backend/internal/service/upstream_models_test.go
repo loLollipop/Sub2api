@@ -1227,6 +1227,7 @@ func TestBuiltinDeepSeekModelMetadataCompletesV4IDs(t *testing.T) {
 		{"deepseek-v4-flash-vision-exp", "DeepSeek V4 Flash Vision Exp", true},
 		{"deepseek-v4-pro-0813", "DeepSeek V4 Pro 0813", false},
 		{"deepseek-v4.1-flash-0910", "DeepSeek V4.1 Flash 0910", true},
+		{"deepseek-v4.1-flash-1017", "DeepSeek V4.1 Flash 1017", true},
 		{"deepseek-flash", "DeepSeek V4.1 Flash", true},
 		{"deepseek-v4-flash", "DeepSeek V4 Flash", true},
 		{"deepseek-v4-pro", "DeepSeek V4 Pro", false},
@@ -1238,7 +1239,7 @@ func TestBuiltinDeepSeekModelMetadataCompletesV4IDs(t *testing.T) {
 			require.True(t, upstreamModelMetadataIsComplete(got), "builtin entry must be persistable")
 			require.Equal(t, tc.name, got.DisplayName)
 			require.Equal(t, int64(1_048_576), got.ContextWindow)
-			require.Equal(t, int64(384_000), got.MaxOutputTokens)
+			require.Equal(t, int64(393_216), got.MaxOutputTokens)
 			require.Equal(t, "high", got.DefaultReasoningLevel)
 			require.Equal(t, []string{"none", "low", "high", "max"}, got.SupportedReasoningLevels)
 			if tc.vision {
@@ -1269,6 +1270,8 @@ func TestBuiltinCatalogModelMetadataCompletesMissingOfficialIDs(t *testing.T) {
 		{"codex-auto-review", "Codex Auto Review", true, []string{"text", "image"}, 272000, 0, "medium", []string{"low", "medium", "high", "xhigh", "max"}},
 		{"gpt-image-2", "GPT Image 2", false, []string{"text", "image"}, 16384, 16384, "", nil},
 		{"gpt-image-2-exact", "GPT Image 2 Exact", false, []string{"text", "image"}, 16384, 16384, "", nil},
+		{"gpt-image-medium", "GPT Image Medium", false, []string{"text", "image"}, 16384, 16384, "", nil},
+		{"gpt-image-medium-custom", "GPT Image 2", false, []string{"text", "image"}, 16384, 16384, "", nil},
 		{"gpt-image-2.5", "GPT Image 2.5", false, []string{"text", "image"}, 16384, 16384, "", nil},
 		{"gpt-image-2.5-flare", "GPT Image 2.5 Flare", false, []string{"text", "image"}, 16384, 16384, "", nil},
 		{"gpt-image-2.5-sunburst", "GPT Image 2.5 Sunburst", false, []string{"text", "image"}, 16384, 16384, "", nil},
@@ -1372,6 +1375,7 @@ func TestSyncUpstreamModelCatalogFillsDeepSeekV4WhenRegistryMisses(t *testing.T)
 	}, catalog.Models)
 	require.Empty(t, catalog.Warnings)
 	require.True(t, upstreamModelMetadataIsComplete(catalog.Metadata["deepseek-v4-flash-0731"]))
+	require.Equal(t, int64(393_216), catalog.Metadata["deepseek-v4-flash-0731"].MaxOutputTokens)
 	require.Equal(t, []string{"text", "image"}, catalog.Metadata["deepseek-v4-flash-0731"].InputModalities)
 	require.Equal(t, []string{"text", "image"}, catalog.Metadata["deepseek-v4-flash-vision-exp"].InputModalities)
 	require.Equal(t, []string{"text"}, catalog.Metadata["deepseek-v4-pro-0813"].InputModalities)

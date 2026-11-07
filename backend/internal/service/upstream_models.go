@@ -667,7 +667,7 @@ func upstreamModelRegistryBaseURL(account *Account) string {
 
 const (
 	deepSeekV4ContextWindow int64 = 1_048_576
-	deepSeekV4MaxOutput     int64 = 384_000
+	deepSeekV4MaxOutput     int64 = 393_216
 )
 
 func builtinDeepSeekModelMetadataForIDs(modelIDs []string) map[string]UpstreamModelMetadata {
@@ -708,6 +708,8 @@ func builtinDeepSeekModelMetadata(modelID string) (UpstreamModelMetadata, bool) 
 		display = "DeepSeek V4 Pro 0813"
 	case id == "deepseek-v4.1-flash-0910":
 		display = "DeepSeek V4.1 Flash 0910"
+	case id == "deepseek-v4.1-flash-1017":
+		display = "DeepSeek V4.1 Flash 1017"
 	case id == "deepseek-v4-flash":
 		display = "DeepSeek V4 Flash"
 	case id == "deepseek-v4.1-flash" || id == "deepseek-flash":
@@ -852,6 +854,8 @@ func gptImageCatalogDisplayName(id string) string {
 		return "GPT Image 2.5"
 	case strings.HasPrefix(id, "gpt-image-2-exact"):
 		return "GPT Image 2 Exact"
+	case id == "gpt-image-medium":
+		return "GPT Image Medium"
 	case strings.HasPrefix(id, "gpt-image-1k-th"):
 		return "GPT Image 1K TH"
 	case strings.HasPrefix(id, "gpt-image-1.5"):

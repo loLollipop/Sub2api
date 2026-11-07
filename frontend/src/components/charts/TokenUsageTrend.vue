@@ -70,12 +70,12 @@ useMutationObserver(document.documentElement, () => {
 const chartColors = computed(() => ({
   text: isDarkMode.value ? '#e5e7eb' : '#374151',
   grid: props.mode === 'total' ? (isDarkMode.value ? '#29292c' : '#e8e8ec') : (isDarkMode.value ? '#374151' : '#e5e7eb'),
-  accent: isDarkMode.value ? '#fb923c' : '#ea580c',
-  input: '#3b82f6',
-  output: '#10b981',
-  cacheCreation: '#f59e0b',
-  cacheRead: '#06b6d4',
-  cacheHitRate: '#8b5cf6'
+  accent: isDarkMode.value ? '#e6ac86' : '#a95e3c',
+  input: '#6486a5',
+  output: '#659b87',
+  cacheCreation: '#b29968',
+  cacheRead: '#6b9fa8',
+  cacheHitRate: '#9685af'
 }))
 
 // 纵向渐变：峰顶约 18% 透明度，往下淡出到 2%，谷底透明。宽 1px 足够采样。

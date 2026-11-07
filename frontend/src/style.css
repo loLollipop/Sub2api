@@ -12,23 +12,49 @@
     color-scheme: light;
     /* Keep the page and fixed header steady while dialogs lock body scrolling. */
     scrollbar-gutter: stable;
-    --brand-color: #c2410c;
-    --brand-gradient: linear-gradient(110deg, #9a3412 0%, #c2410c 55%, #b45309 100%);
+    --theme-bg: #faf9f6;
+    --theme-surface: #ffffff;
+    --theme-raised: #f2efea;
+    --theme-inset: #f5f2ee;
+    --theme-text: #292724;
+    --theme-muted: #706a62;
+    --theme-line: #e6e0d8;
+    --theme-control-line: #c6bcb0;
+    --theme-accent: #a95e3c;
+    --theme-accent-soft: #f8ebe1;
+    --theme-on-accent: #ffffff;
+    --theme-decor: #a7864e;
+    --brand-color: var(--theme-text);
+    --brand-gradient: linear-gradient(105deg, #aa4940 0%, #ac592f 52%, #946328 100%);
+    --home-title-gradient: linear-gradient(105deg, #aa4940 0%, #b76337 52%, #9c6d2c 100%);
   }
 
   .dark {
     color-scheme: dark;
-    --brand-color: #fb923c;
-    --brand-gradient: linear-gradient(110deg, #fb923c 0%, #fdba74 55%, #fbbf24 100%);
+    --theme-bg: #242321;
+    --theme-surface: #2d2c29;
+    --theme-raised: #373530;
+    --theme-inset: #292723;
+    --theme-text: #f0ece6;
+    --theme-muted: #bcb4a9;
+    --theme-line: #45413b;
+    --theme-control-line: #746c61;
+    --theme-accent: #e6ac86;
+    --theme-accent-soft: #443127;
+    --theme-on-accent: #302117;
+    --theme-decor: #b99769;
+    --brand-color: var(--theme-text);
+    --brand-gradient: var(--home-title-gradient);
+    --home-title-gradient: linear-gradient(105deg, #efa494 0%, #f0bd8b 52%, #e6cd95 100%);
   }
 
   body {
     @apply min-h-screen text-gray-900 dark:text-gray-100;
-    background: #f8f9fb;
+    background: var(--theme-bg);
   }
 
   .dark body {
-    background: #111318;
+    background: var(--theme-bg);
   }
 
   /* 自定义滚动条 - 仅针对 Firefox，避免 Chrome 取消 webkit 的全局定制 */
@@ -104,16 +130,48 @@
 }
 
 @layer components {
-  .brand-gradient {
+  .brand-gradient,
+  .home-title-gradient {
     color: var(--brand-color);
+  }
+
+  .home-title-gradient {
+    display: inline-block;
   }
 
   @supports (background-clip: text) or (-webkit-background-clip: text) {
     .brand-gradient {
       background-image: var(--brand-gradient);
-      -webkit-background-clip: text;
+    }
+
+    .home-title-gradient {
+      background-image: var(--home-title-gradient);
+    }
+
+    .brand-gradient,
+    .home-title-gradient {
       background-clip: text;
+      -webkit-background-clip: text;
       color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .brand-gradient,
+    .home-title-gradient {
+      background: none;
+      color: CanvasText;
+      -webkit-text-fill-color: CanvasText;
+    }
+  }
+
+  @media print {
+    .brand-gradient,
+    .home-title-gradient {
+      background: none;
+      color: #292724;
+      -webkit-text-fill-color: currentColor;
     }
   }
 
@@ -128,10 +186,9 @@
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-500 to-primary-600;
-    @apply text-white shadow-md shadow-primary-500/25;
-    @apply hover:from-primary-600 hover:to-primary-700 hover:shadow-lg hover:shadow-primary-500/30;
-    @apply dark:shadow-primary-500/20;
+    @apply bg-primary-600 text-white shadow-sm;
+    @apply hover:bg-primary-700;
+    @apply dark:bg-primary-400 dark:text-primary-950 dark:hover:bg-primary-300;
   }
 
   .btn-secondary {
@@ -240,12 +297,12 @@
     @apply backdrop-blur-xl;
     @apply rounded-2xl;
     @apply border border-white/70 dark:border-dark-700/60;
-    box-shadow: 0 12px 36px rgba(30, 64, 175, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 12px 36px rgba(41, 49, 59, 0.05), 0 2px 8px rgba(15, 23, 42, 0.04);
     @apply transition-all duration-300;
   }
 
   .glass-card:hover {
-    box-shadow: 0 18px 46px rgba(30, 64, 175, 0.12), 0 4px 12px rgba(15, 23, 42, 0.05);
+    box-shadow: 0 18px 46px rgba(41, 49, 59, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05);
   }
 
   /* ============ 卡片样式 ============ */
@@ -427,7 +484,7 @@
     @apply border border-white/70 dark:border-dark-700/70;
     @apply flex flex-col overflow-hidden;
     box-shadow:
-      0 24px 64px -12px rgba(30, 64, 175, 0.22),
+      0 24px 64px -12px rgba(41, 49, 59, 0.16),
       0 8px 24px -8px rgba(15, 23, 42, 0.12),
       0 1px 0 rgba(255, 255, 255, 0.6) inset;
   }

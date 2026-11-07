@@ -16,7 +16,7 @@ withDefaults(defineProps<{
 </script>
 
 <style scoped>
-.overview-stat { --metric-color: var(--signal-accent, #ea580c); min-width: 0; padding: 22px 24px; }
+.overview-stat { --metric-color: var(--signal-accent, #a95e3c); min-width: 0; padding: 22px 24px; }
 .overview-stat--blue { --metric-color: #3b82f6; }
 .overview-stat--green { --metric-color: #16a085; }
 .overview-stat--violet { --metric-color: #8b5cf6; }

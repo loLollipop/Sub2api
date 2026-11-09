@@ -603,7 +603,7 @@ func TestGroupModelAllowlistPreservesMultipartBinary(t *testing.T) {
 	for _, preamble := range []string{"", "{}\r\n", "{\"model\":\"blocked\"}\r\n"} {
 		t.Run(preamble, func(t *testing.T) {
 			var body bytes.Buffer
-			body.WriteString(preamble)
+			_, _ = body.WriteString(preamble)
 			writer := multipart.NewWriter(&body)
 			_ = writer.WriteField("model", "allowed")
 			part, err := writer.CreateFormFile("image", "fixture.png")

@@ -67,6 +67,9 @@ type JWTClaims struct {
 	SessionID string `json:"sid,omitempty"`
 	// BindingHash 会话指纹哈希（IP+UA），会话绑定开启时校验；空值表示旧 token（平滑升级）。
 	BindingHash string `json:"bnd,omitempty"`
+	// New tokens carry the current cutoff as an epoch. This distinguishes a new
+	// login even when the system clock returns the exact same time as revocation.
+	RevocationCutoff *int64 `json:"rct,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -1358,6 +1361,12 @@ func buildEmailSuffixNotAllowedError(whitelist []string) error {
 
 // ValidateToken 验证JWT token并返回用户声明
 func (s *AuthService) ValidateToken(tokenString string) (*JWTClaims, error) {
+	return s.ValidateTokenContext(context.Background(), tokenString)
+}
+
+// ValidateTokenContext checks the shared revocation cutoff for every JWT entry
+// point, including expired access tokens accepted by the legacy refresh flow.
+func (s *AuthService) ValidateTokenContext(ctx context.Context, tokenString string) (*JWTClaims, error) {
 	// 先做长度校验，尽早拒绝异常超长 token，降低 DoS 风险。
 	if len(tokenString) > maxTokenLength {
 		return nil, ErrTokenTooLarge
@@ -1379,23 +1388,69 @@ func (s *AuthService) ValidateToken(tokenString string) (*JWTClaims, error) {
 		return []byte(s.cfg.JWT.Secret), nil
 	})
 
-	if err != nil {
-		if errors.Is(err, jwt.ErrTokenExpired) {
-			// token 过期但仍返回 claims（用于 RefreshToken 等场景）
-			// jwt-go 在解析时即使遇到过期错误，token.Claims 仍会被填充
-			if claims, ok := token.Claims.(*JWTClaims); ok {
-				return claims, ErrTokenExpired
-			}
-			return nil, ErrTokenExpired
-		}
+	expired := errors.Is(err, jwt.ErrTokenExpired)
+	if err != nil && (!expired || errors.Is(err, jwt.ErrTokenSignatureInvalid) || errors.Is(err, jwt.ErrTokenNotValidYet) || errors.Is(err, jwt.ErrTokenMalformed) || errors.Is(err, jwt.ErrTokenUnverifiable)) {
 		return nil, ErrInvalidToken
 	}
 
-	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
-		return claims, nil
+	if token != nil {
+		if claims, ok := token.Claims.(*JWTClaims); ok && (token.Valid || expired) {
+			issuedAt := time.Time{}
+			if claims.IssuedAt != nil {
+				issuedAt = claims.IssuedAt.Time
+			}
+			if err := s.checkUserTokenCutoff(ctx, claims.UserID, issuedAt, claims.RevocationCutoff); err != nil {
+				return nil, err
+			}
+			if expired {
+				return claims, ErrTokenExpired
+			}
+			return claims, nil
+		}
 	}
 
 	return nil, ErrInvalidToken
+}
+
+func (s *AuthService) userTokenCutoffEpoch(ctx context.Context, userID int64) (*int64, error) {
+	cache, ok := s.refreshTokenCache.(UserTokenRevocationCache)
+	if !ok {
+		return nil, nil
+	}
+	cutoff, err := cache.GetUserTokenCutoff(ctx, userID)
+	if err != nil {
+		return nil, ErrServiceUnavailable
+	}
+	epoch := int64(0)
+	if !cutoff.IsZero() {
+		epoch = cutoff.UnixNano()
+	}
+	return &epoch, nil
+}
+
+func (s *AuthService) checkUserTokenCutoff(ctx context.Context, userID int64, issuedAt time.Time, tokenEpoch *int64) error {
+	cache, ok := s.refreshTokenCache.(UserTokenRevocationCache)
+	if !ok {
+		return nil // Compatibility with refresh-only cache implementations.
+	}
+	cutoff, err := cache.GetUserTokenCutoff(ctx, userID)
+	if err != nil {
+		return ErrServiceUnavailable
+	}
+	if tokenEpoch != nil {
+		current := int64(0)
+		if !cutoff.IsZero() {
+			current = cutoff.UnixNano()
+		}
+		if *tokenEpoch != current {
+			return ErrTokenRevoked
+		}
+		return nil
+	}
+	if !cutoff.IsZero() && !issuedAt.After(cutoff) {
+		return ErrTokenRevoked
+	}
+	return nil
 }
 
 func randomHexString(byteLength int) (string, error) {
@@ -1421,15 +1476,19 @@ func isReservedEmail(email string) bool {
 // 使用新的access_token_expire_minutes配置项（如果配置了），否则回退到expire_hour。
 // 会话指纹（IP/UA）从 ctx 中提取（由 HTTP 入口中间件注入），缺失时生成不带绑定的 token。
 func (s *AuthService) GenerateToken(ctx context.Context, user *User) (string, error) {
+	epoch, err := s.userTokenCutoffEpoch(ctx, user.ID)
+	if err != nil {
+		return "", err
+	}
 	sessionID, err := randomHexString(8)
 	if err != nil {
 		return "", fmt.Errorf("generate session id: %w", err)
 	}
-	return s.generateAccessToken(user, sessionID, sessionBindingHashFromContext(ctx))
+	return s.generateAccessToken(user, sessionID, sessionBindingHashFromContext(ctx), epoch)
 }
 
 // generateAccessToken 生成带会话 ID 与绑定指纹的 access token。
-func (s *AuthService) generateAccessToken(user *User, sessionID, bindingHash string) (string, error) {
+func (s *AuthService) generateAccessToken(user *User, sessionID, bindingHash string, epoch *int64) (string, error) {
 	now := time.Now()
 	var expiresAt time.Time
 	if s.cfg.JWT.AccessTokenExpireMinutes > 0 {
@@ -1440,12 +1499,13 @@ func (s *AuthService) generateAccessToken(user *User, sessionID, bindingHash str
 	}
 
 	claims := &JWTClaims{
-		UserID:       user.ID,
-		Email:        user.Email,
-		Role:         user.Role,
-		TokenVersion: resolvedTokenVersion(user),
-		SessionID:    sessionID,
-		BindingHash:  bindingHash,
+		UserID:           user.ID,
+		Email:            user.Email,
+		Role:             user.Role,
+		TokenVersion:     resolvedTokenVersion(user),
+		SessionID:        sessionID,
+		BindingHash:      bindingHash,
+		RevocationCutoff: epoch,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -1489,7 +1549,7 @@ func (s *AuthService) CheckPassword(password, hashedPassword string) bool {
 // RefreshToken 刷新token
 func (s *AuthService) RefreshToken(ctx context.Context, oldTokenString string) (string, error) {
 	// 验证旧token（即使过期也允许，用于刷新）
-	claims, err := s.ValidateToken(oldTokenString)
+	claims, err := s.ValidateTokenContext(ctx, oldTokenString)
 	if err != nil && !errors.Is(err, ErrTokenExpired) {
 		return "", err
 	}
@@ -1524,7 +1584,20 @@ func (s *AuthService) RefreshToken(ctx context.Context, oldTokenString string) (
 	}
 
 	// 生成新token
-	return s.GenerateToken(ctx, user)
+	token, err := s.GenerateToken(ctx, user)
+	if err != nil {
+		return "", err
+	}
+	// Revocation may race with the user lookup and signing above. A legacy
+	// access-token refresh must not turn an old credential into a new session.
+	issuedAt := time.Time{}
+	if claims.IssuedAt != nil {
+		issuedAt = claims.IssuedAt.Time
+	}
+	if err := s.checkUserTokenCutoff(ctx, user.ID, issuedAt, claims.RevocationCutoff); err != nil {
+		return "", err
+	}
+	return token, nil
 }
 
 // IsPasswordResetEnabled 检查是否启用密码重置功能
@@ -1703,6 +1776,10 @@ func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyI
 	if s.refreshTokenCache == nil {
 		return nil, errors.New("refresh token cache not configured")
 	}
+	epoch, err := s.userTokenCutoffEpoch(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
 
 	// 提前确定家族ID：作为 access token 的会话ID（sid），保证同一会话的
 	// access/refresh token 可以互相关联（单会话撤销、step-up 授权绑定）。
@@ -1715,13 +1792,13 @@ func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyI
 	}
 
 	// 生成Access Token（携带会话ID与绑定指纹）
-	accessToken, err := s.generateAccessToken(user, familyID, sessionBindingHashFromContext(ctx))
+	accessToken, err := s.generateAccessToken(user, familyID, sessionBindingHashFromContext(ctx), epoch)
 	if err != nil {
 		return nil, fmt.Errorf("generate access token: %w", err)
 	}
 
 	// 生成Refresh Token
-	refreshToken, err := s.generateRefreshToken(ctx, user, familyID)
+	refreshToken, err := s.generateRefreshToken(ctx, user, familyID, epoch)
 	if err != nil {
 		return nil, fmt.Errorf("generate refresh token: %w", err)
 	}
@@ -1734,7 +1811,7 @@ func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyI
 }
 
 // generateRefreshToken 生成并存储Refresh Token
-func (s *AuthService) generateRefreshToken(ctx context.Context, user *User, familyID string) (string, error) {
+func (s *AuthService) generateRefreshToken(ctx context.Context, user *User, familyID string, epoch *int64) (string, error) {
 	// 生成随机Token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -1758,12 +1835,13 @@ func (s *AuthService) generateRefreshToken(ctx context.Context, user *User, fami
 	ttl := time.Duration(s.cfg.JWT.RefreshTokenExpireDays) * 24 * time.Hour
 
 	data := &RefreshTokenData{
-		UserID:       user.ID,
-		TokenVersion: resolvedTokenVersion(user),
-		FamilyID:     familyID,
-		BindingHash:  sessionBindingHashFromContext(ctx),
-		CreatedAt:    now,
-		ExpiresAt:    now.Add(ttl),
+		UserID:           user.ID,
+		TokenVersion:     resolvedTokenVersion(user),
+		FamilyID:         familyID,
+		BindingHash:      sessionBindingHashFromContext(ctx),
+		CreatedAt:        now,
+		ExpiresAt:        now.Add(ttl),
+		RevocationCutoff: epoch,
 	}
 
 	// 存储Token数据
@@ -1814,6 +1892,10 @@ func (s *AuthService) RefreshTokenPair(ctx context.Context, refreshToken string)
 	}
 
 	// 检查Token是否过期
+	if err := s.checkUserTokenCutoff(ctx, data.UserID, data.CreatedAt, data.RevocationCutoff); err != nil {
+		return nil, err
+	}
+
 	if time.Now().After(data.ExpiresAt) {
 		// 删除过期Token
 		_ = s.refreshTokenCache.DeleteRefreshToken(ctx, tokenHash)
@@ -1867,6 +1949,11 @@ func (s *AuthService) RefreshTokenPair(ctx context.Context, refreshToken string)
 	if err != nil {
 		return nil, err
 	}
+	// A cutoff written while rotating must still reject the original credential,
+	// even if the replacement token was stored after refresh-session cleanup.
+	if err := s.checkUserTokenCutoff(ctx, data.UserID, data.CreatedAt, data.RevocationCutoff); err != nil {
+		return nil, err
+	}
 	return &TokenPairWithUser{
 		TokenPair: *pair,
 		UserRole:  user.Role,
@@ -1909,11 +1996,17 @@ func (s *AuthService) RevokeAllUserSessions(ctx context.Context, userID int64) e
 // 注意：users 表没有 token_version 列（resolvedTokenVersion 由 email+password_hash
 // 指纹推导），因此对 user.TokenVersion 自增只影响内存副本。之前紧跟其后的整行
 // Update 不写任何有效数据，却会用旧快照覆盖并发写入的列，故已移除。
-// 会话撤销由下面的 refresh session 清理承担；改密路径通过 password_hash 变化
-// 改变指纹，从而使旧 token 失效。
+// 先持久化 cutoff，再清理 refresh sessions；清理失败也不能换发新 token。
 func (s *AuthService) RevokeAllUserTokens(ctx context.Context, userID int64) error {
 	if _, err := s.userRepo.GetByID(ctx, userID); err != nil {
 		return fmt.Errorf("get user: %w", err)
+	}
+	cache, ok := s.refreshTokenCache.(UserTokenRevocationCache)
+	if !ok {
+		return ErrServiceUnavailable
+	}
+	if err := cache.SetUserTokenCutoff(ctx, userID, time.Now()); err != nil {
+		return fmt.Errorf("persist user token revocation: %w", err)
 	}
 
 	if err := s.RevokeAllUserSessions(ctx, userID); err != nil {

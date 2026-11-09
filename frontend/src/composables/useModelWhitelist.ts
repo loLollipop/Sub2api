@@ -625,6 +625,17 @@ export function buildModelMappingObject(
   return Object.keys(mapping).length > 0 ? mapping : null
 }
 
+// Keep an explicitly selected whitelist model from being shadowed by a stale
+// mapping when the account editor saves both restriction modes together.
+export function dropMappingsShadowedByWhitelist(
+  allowedModels: string[],
+  mappings: ModelMappingEntry[]
+): ModelMappingEntry[] {
+  if (mappings.length === 0 || allowedModels.length === 0) return mappings
+  const whitelisted = new Set(allowedModels.map((model) => model.trim()).filter((model) => model && !model.includes('*')))
+  return mappings.filter((entry) => !whitelisted.has(entry.from.trim()))
+}
+
 export function mergeUpstreamIdentityMappings(
   existing: ModelMappingEntry[],
   upstreamModels: string[]

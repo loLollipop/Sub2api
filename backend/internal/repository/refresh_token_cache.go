@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -14,6 +15,7 @@ const (
 	refreshTokenKeyPrefix   = "refresh_token:"
 	userRefreshTokensPrefix = "user_refresh_tokens:"
 	tokenFamilyPrefix       = "token_family:"
+	userTokenCutoffPrefix   = "user_token_cutoff:"
 )
 
 // refreshTokenKey generates the Redis key for a refresh token.
@@ -33,6 +35,41 @@ func tokenFamilyKey(familyID string) string {
 
 type refreshTokenCache struct {
 	rdb *redis.Client
+}
+
+var _ service.UserTokenRevocationCache = (*refreshTokenCache)(nil)
+
+// Compare fixed-width decimal strings so Lua does not round nanoseconds to a
+// floating-point number. A delayed concurrent revocation cannot lower a cutoff.
+var setUserTokenCutoffScript = redis.NewScript(`
+local current = redis.call('GET', KEYS[1])
+if not current or current < ARGV[1] then
+    redis.call('SET', KEYS[1], ARGV[1])
+else
+    redis.call('INCR', KEYS[1])
+end
+return 1
+`)
+
+func (c *refreshTokenCache) SetUserTokenCutoff(ctx context.Context, userID int64, cutoff time.Time) error {
+	key := fmt.Sprintf("%s%d", userTokenCutoffPrefix, userID)
+	return setUserTokenCutoffScript.Run(ctx, c.rdb, []string{key}, fmt.Sprintf("%019d", cutoff.UnixNano())).Err()
+}
+
+func (c *refreshTokenCache) GetUserTokenCutoff(ctx context.Context, userID int64) (time.Time, error) {
+	key := fmt.Sprintf("%s%d", userTokenCutoffPrefix, userID)
+	value, err := c.rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	ns, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse user token cutoff: %w", err)
+	}
+	return time.Unix(0, ns), nil
 }
 
 // NewRefreshTokenCache creates a new RefreshTokenCache implementation.

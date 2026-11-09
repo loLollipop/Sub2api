@@ -213,3 +213,33 @@ func TestNativeAnthropicPassthroughLeavesOtherThinkingUntouched(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeAnthropicPassthroughDeepSeekThinkingReplayUsesMappedModel(t *testing.T) {
+	for _, model := range []string{"deepseek-flash", "glm-5.2"} {
+		for _, disabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/disabled=%t", model, disabled), func(t *testing.T) {
+				preference := ""
+				if disabled {
+					preference = `"thinking":{"type":"disabled"},`
+				}
+				body := []byte(`{"model":"public-alias","max_tokens":32,` + preference + `"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"lookup","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"42"}]}]}`)
+				account := nativeAnthropicTestAccount()
+				account.Platform = PlatformDeepseek
+				account.Credentials["model_mapping"] = map[string]any{"public-alias": model}
+				upstream := &httpUpstreamRecorder{resp: nativeAnthropicBufferedResponse()}
+				svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+				result, err := svc.ForwardAsAnthropic(context.Background(), adaptiveProtocolTestContext("/v1/messages", body), account, body, "", "")
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				require.Len(t, upstream.requests, 1)
+				require.Equal(t, model, gjson.GetBytes(upstream.lastBody, "model").String())
+				if model == "deepseek-flash" && !disabled {
+					require.Equal(t, " ", gjson.GetBytes(upstream.lastBody, "messages.0.content.0.thinking").String())
+					require.Equal(t, "tool_use", gjson.GetBytes(upstream.lastBody, "messages.0.content.1.type").String())
+				} else {
+					require.Equal(t, gjson.GetBytes(body, "messages").Raw, gjson.GetBytes(upstream.lastBody, "messages").Raw)
+				}
+			})
+		}
+	}
+}

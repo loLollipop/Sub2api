@@ -36,6 +36,10 @@ var (
 
 // EmailCache defines cache operations for email service
 type EmailCache interface {
+	// Consume methods compare, count failed attempts and delete on success in one
+	// atomic operation, preserving the code's remaining TTL.
+	ConsumeVerificationCode(ctx context.Context, email, code string, maxAttempts int) error
+	ConsumeNotifyVerifyCode(ctx context.Context, email, code string, maxAttempts int) error
 	GetVerificationCode(ctx context.Context, email string) (*VerificationCodeData, error)
 	SetVerificationCode(ctx context.Context, email string, data *VerificationCodeData, ttl time.Duration) error
 	DeleteVerificationCode(ctx context.Context, email string) error
@@ -426,37 +430,7 @@ func (s *EmailService) SendVerifyCode(ctx context.Context, email, siteName strin
 
 // VerifyCode 验证验证码
 func (s *EmailService) VerifyCode(ctx context.Context, email, code string) error {
-	data, err := s.cache.GetVerificationCode(ctx, email)
-	if err != nil || data == nil {
-		return ErrInvalidVerifyCode
-	}
-
-	// 检查是否已达到最大尝试次数
-	if data.Attempts >= maxVerifyCodeAttempts {
-		return ErrVerifyCodeMaxAttempts
-	}
-
-	// 验证码不匹配 (constant-time comparison to prevent timing attacks)
-	if subtle.ConstantTimeCompare([]byte(data.Code), []byte(code)) != 1 {
-		data.Attempts++
-		remaining := time.Until(data.ExpiresAt)
-		if remaining <= 0 {
-			return ErrInvalidVerifyCode
-		}
-		if err := s.cache.SetVerificationCode(ctx, email, data, remaining); err != nil {
-			slog.Error("failed to update verification attempt count", "email", email, "error", err)
-		}
-		if data.Attempts >= maxVerifyCodeAttempts {
-			return ErrVerifyCodeMaxAttempts
-		}
-		return ErrInvalidVerifyCode
-	}
-
-	// 验证成功，删除验证码
-	if err := s.cache.DeleteVerificationCode(ctx, email); err != nil {
-		slog.Error("failed to delete verification code after success", "email", email, "error", err)
-	}
-	return nil
+	return s.cache.ConsumeVerificationCode(ctx, email, code, maxVerifyCodeAttempts)
 }
 
 // buildVerifyCodeEmailBody 构建验证码邮件HTML内容

@@ -92,7 +92,7 @@ func TestDeepSeekNativeReasoningReplayAcrossInstances(t *testing.T) {
 					c, _ := deepSeekNativeReplayContext(tc.keyID, tc.session)
 					request, err := sjson.SetBytes(replay, "model", tc.model)
 					require.NoError(t, err)
-					require.Equal(t, request, next.prepareDeepSeekNativeReasoningReplay(c, deepSeekNativeReplayAccount(), request))
+					require.Equal(t, nativeReplayPlaceholderWant(t, request, 1), next.prepareDeepSeekNativeReasoningReplay(c, deepSeekNativeReplayAccount(), request))
 				})
 			}
 		})
@@ -140,7 +140,12 @@ func TestDeepSeekNativeReasoningReplayPreservesExplicitContentAndOpaqueBinding(t
 		`{"model":"deepseek-v4.1-flash","input":[{"type":"reasoning","id":"rs_unknown","summary":[{"type":"summary_text","text":"never fabricate full reasoning from this"}]}]}`,
 	} {
 		c, _ := deepSeekNativeReplayContext(21, "binding-thread")
-		require.Equal(t, request, string(svc.prepareDeepSeekNativeReasoningReplay(c, account, []byte(request))))
+		out := svc.prepareDeepSeekNativeReasoningReplay(c, account, []byte(request))
+		if gjson.Get(request, "input.0.content.0.text").String() != "" {
+			require.Equal(t, request, string(out))
+		} else {
+			require.Equal(t, nativeReplayPlaceholderWant(t, []byte(request), 0), out)
+		}
 	}
 	request := []byte(`{"model":"deepseek-v4.1-flash","input":[{"type":"reasoning","id":"rs_1"}]}`)
 	for _, other := range []*Account{{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}, {Platform: PlatformDeepseek, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_protocol": APIProtocolChatCompletions}}} {
@@ -175,7 +180,7 @@ func TestDeepSeekNativeReasoningReplayReusedContextRechecksIdentity(t *testing.T
 			c.Request.Header.Set("thread-id", tc.thread)
 			body, err := sjson.SetBytes(request, "model", tc.model)
 			require.NoError(t, err)
-			require.Equal(t, body, svc.prepareDeepSeekNativeReasoningReplay(c, account, body))
+			require.Equal(t, nativeReplayPlaceholderWant(t, body, 0), svc.prepareDeepSeekNativeReasoningReplay(c, account, body))
 		})
 	}
 	c.Set("api_key", &APIKey{ID: 21})
@@ -213,7 +218,7 @@ func TestDeepSeekNativeReasoningReplayHasTotalRestoreBudget(t *testing.T) {
 	out := svc.prepareDeepSeekNativeReasoningReplay(c, account, request)
 	restored, restoredBytes := 0, 0
 	for _, item := range gjson.GetBytes(out, "input").Array() {
-		if content := item.Get("content"); item.Get("type").String() == "reasoning" && content.IsArray() {
+		if content := item.Get("content"); item.Get("type").String() == "reasoning" && content.IsArray() && content.Get("0.text").String() != " " {
 			restored++
 			restoredBytes += len(content.Raw)
 		}
@@ -239,7 +244,14 @@ func TestDeepSeekNativeReasoningReplayRequiresConversationAnchor(t *testing.T) {
 		// Even a prior anchored turn on this context cannot authorize an
 		// anonymous model-only turn to access its cache namespace.
 		svc.prepareDeepSeekNativeReasoningReplay(c, account, []byte(`{"model":"deepseek-v4.1-flash","input":"real question"}`))
-		require.Equal(t, request, string(svc.prepareDeepSeekNativeReasoningReplay(c, account, []byte(request))))
+		out := svc.prepareDeepSeekNativeReasoningReplay(c, account, []byte(request))
+		want := []byte(request)
+		for index, item := range gjson.Get(request, "input").Array() {
+			if item.Get("type").String() == "reasoning" {
+				want = nativeReplayPlaceholderWant(t, want, index)
+			}
+		}
+		require.Equal(t, want, out)
 		require.Nil(t, svc.newDeepSeekNativeReasoningRecorder(c, account))
 	}
 }
@@ -253,7 +265,7 @@ func TestDeepSeekNativeReasoningReplayOpaqueCannotBeAddedToPlainItem(t *testing.
 	svc.cacheDeepSeekNativeReasoningBody(c, account, []byte(`{"output":[{"type":"reasoning","id":"rs_plain","content":[{"type":"reasoning_text","text":"real"}]}]}`))
 	svc.cache = &reasoningRecordingCache{getResp: cache.snapshotSets()}
 	request := []byte(`{"model":"deepseek-v4.1-flash","input":[{"type":"reasoning","id":"rs_plain","encrypted_content":"invented"}]}`)
-	require.Equal(t, request, svc.prepareDeepSeekNativeReasoningReplay(c, account, request))
+	require.Equal(t, nativeReplayPlaceholderWant(t, request, 0), svc.prepareDeepSeekNativeReasoningReplay(c, account, request))
 }
 
 type failingNativeReasoningCache struct {
@@ -330,4 +342,13 @@ func deepSeekNativeReplaySSE(response []byte) string {
 
 func deepSeekNativeReplayAnswer() map[string]any {
 	return map[string]any{"type": "message", "id": "msg_answer", "role": "assistant", "status": "completed", "content": []any{map[string]any{"type": "output_text", "text": "The tool result is 42.", "annotations": []any{}}}}
+}
+
+// Cache isolation misses may add exactly this compatibility content, never
+// reasoning from another key, conversation, model or opaque binding.
+func nativeReplayPlaceholderWant(t *testing.T, body []byte, index int) []byte {
+	t.Helper()
+	want, err := sjson.SetRawBytes(body, fmt.Sprintf("input.%d.content", index), []byte(`[{"type":"reasoning_text","text":" "}]`))
+	require.NoError(t, err)
+	return want
 }

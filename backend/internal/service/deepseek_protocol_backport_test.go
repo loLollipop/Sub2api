@@ -44,7 +44,7 @@ func TestDeepSeekBackportNative400IsSingleTransparentRequest(t *testing.T) {
 				_, err := svc.Forward(context.Background(), c, account, body)
 				require.Error(t, err)
 				require.Len(t, upstream.requests, 1, "native protocol errors must not cause a modified retry or Chat fallback")
-				require.JSONEq(t, string(body), string(upstream.lastBody))
+				require.JSONEq(t, string(nativeReplayPlaceholderWant(t, body, 0)), string(upstream.lastBody))
 				require.Equal(t, body, RewriteInboundDeepSeekCallIDs(PlatformDeepseek, "alias", body))
 			})
 		}

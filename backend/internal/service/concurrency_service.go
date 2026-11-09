@@ -211,6 +211,11 @@ func generateRequestID() string {
 }
 
 func (s *ConcurrencyService) CleanupStaleProcessSlots(ctx context.Context) error {
+	// A different process prefix can belong to a healthy peer using this Redis.
+	// Full startup reclamation is only safe during an explicitly controlled restart.
+	if os.Getenv("SUB2API_STARTUP_SLOT_CLEANUP") != "enabled" {
+		return nil
+	}
 	if s == nil || s.cache == nil {
 		return nil
 	}

@@ -72,8 +72,33 @@ func (s *settingRepoStub) Delete(ctx context.Context, key string) error {
 }
 
 type emailCacheStub struct {
+	mu   sync.Mutex
 	data *VerificationCodeData
 	err  error
+}
+
+func (s *emailCacheStub) ConsumeVerificationCode(_ context.Context, _, code string, maxAttempts int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.err != nil || s.data == nil {
+		return ErrInvalidVerifyCode
+	}
+	if s.data.Attempts >= maxAttempts {
+		return ErrVerifyCodeMaxAttempts
+	}
+	if s.data.Code == code {
+		s.data = nil
+		return nil
+	}
+	s.data.Attempts++
+	if s.data.Attempts >= maxAttempts {
+		return ErrVerifyCodeMaxAttempts
+	}
+	return ErrInvalidVerifyCode
+}
+
+func (s *emailCacheStub) ConsumeNotifyVerifyCode(context.Context, string, string, int) error {
+	return ErrInvalidVerifyCode
 }
 
 type defaultSubscriptionAssignerStub struct {

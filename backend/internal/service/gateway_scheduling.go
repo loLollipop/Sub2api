@@ -1874,7 +1874,7 @@ func (s *GatewayService) ReleaseAccountSession(ctx context.Context, account *Acc
 	if s == nil || s.sessionLimitCache == nil || account == nil || sessionID == "" {
 		return
 	}
-	if !account.IsAnthropicOAuthOrSetupToken() {
+	if !account.IsAnthropicOAuthOrSetupToken() && account.Type != AccountTypeAPIKey {
 		return
 	}
 	if account.GetMaxSessions() <= 0 {

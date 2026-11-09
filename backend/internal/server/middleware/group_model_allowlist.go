@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 )
 
 // GroupModelAllowlist 是分组级模型白名单准入中间件。
@@ -29,7 +33,11 @@ import (
 //     `model`/`session.model` 或 multipart `model`/`session` 后回填请求体。
 //   - 拒绝：按入口协议格式返回 404，并标记运维业务限流原因
 //     local_model_configuration 与 ingress 拒绝原因 model_not_allowed。
-func GroupModelAllowlist() gin.HandlerFunc {
+func GroupModelAllowlist(maxNormalizedBytes ...int64) gin.HandlerFunc {
+	var limit int64
+	if len(maxNormalizedBytes) > 0 {
+		limit = maxNormalizedBytes[0]
+	}
 	return func(c *gin.Context) {
 		apiKey, ok := GetAPIKeyFromContext(c)
 		if !ok || apiKey == nil || apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled() {
@@ -54,7 +62,7 @@ func GroupModelAllowlist() gin.HandlerFunc {
 		} else {
 			switch c.Request.Method {
 			case http.MethodPost, http.MethodPut, http.MethodPatch:
-				candidates, done := groupModelAllowlistModelsFromBody(c)
+				candidates, done := groupModelAllowlistModelsFromBody(c, limit)
 				if !done {
 					// 请求体读取失败（如超限 413）已写出响应。
 					return
@@ -109,8 +117,27 @@ func isResponsesWebSocketRoute(c *gin.Context) bool {
 // 下游同时存在 gjson（首个、大小写敏感）、encoding/json 绑定（末值、大小写
 // 不敏感）与 multipart 表单（首/末字段）三类解析器，这里返回「任一解析器可能
 // 绑定到的全部模型值」，调用方必须逐一校验，任一未命中即拒绝。
-func groupModelAllowlistModelsFromBody(c *gin.Context) ([]string, bool) {
+func groupModelAllowlistModelsFromBody(c *gin.Context, maxNormalizedBytes int64) ([]string, bool) {
 	body, err := httputil.ReadRequestBodyWithPrealloc(c.Request)
+	mediaType, params, _ := mime.ParseMediaType(c.GetHeader("Content-Type"))
+	trimmed := bytes.TrimSpace(bytes.TrimPrefix(body, []byte{0xef, 0xbb, 0xbf}))
+	looksLikeJSON := len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[' || bytes.HasPrefix(trimmed, []byte{0xef, 0xbb, 0xbf}))
+	if err == nil && mediaType == "multipart/form-data" && looksLikeJSON && params["boundary"] != "" {
+		// A legal MIME preamble may look like JSON. Recognize the actual first
+		// part before attempting any byte repair of uploaded files.
+		_, partErr := multipart.NewReader(bytes.NewReader(body), params["boundary"]).NextPart()
+		if partErr == nil {
+			looksLikeJSON = false
+		}
+	}
+	if err == nil && (mediaType != "multipart/form-data" || looksLikeJSON) {
+		// Match the handler's BOM/control-byte normalization before selecting
+		// models. Use its configured budget so escaping does not shrink limits.
+		normalized, normalizeErr := httputil.NormalizeLenientJSONRequestBody(body, maxNormalizedBytes)
+		if mediaType != "multipart/form-data" || normalizeErr != nil || gjson.ValidBytes(normalized) {
+			body, err = normalized, normalizeErr
+		}
+	}
 	if err != nil {
 		status := http.StatusBadRequest
 		message := "Failed to read request body"

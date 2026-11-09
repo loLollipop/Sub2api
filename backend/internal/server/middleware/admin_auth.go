@@ -188,7 +188,7 @@ func validateJWTForAdmin(
 	auditService *service.AuditLogService,
 ) bool {
 	// 验证 JWT token
-	claims, err := authService.ValidateToken(token)
+	claims, err := authService.ValidateTokenContext(c.Request.Context(), token)
 	if err != nil {
 		if errors.Is(err, service.ErrTokenExpired) {
 			AbortWithError(c, 401, "TOKEN_EXPIRED", "Token has expired")

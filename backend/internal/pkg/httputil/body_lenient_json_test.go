@@ -33,6 +33,20 @@ func TestNormalizeLenientJSONRequestBody_AllControlBytes(t *testing.T) {
 	}
 }
 
+func TestNormalizeLenientJSONRequestBody_RepeatedBOMIsIdempotent(t *testing.T) {
+	for _, count := range []int{1, 2, 3} {
+		body := append(bytes.Repeat([]byte{0xef, 0xbb, 0xbf}, count), []byte("{\"model\":\"blocked\",\"input\":\"raw\x01byte\"}")...)
+		got, err := NormalizeLenientJSONRequestBody(body, 1024)
+		if err != nil || !gjson.ValidBytes(got) {
+			t.Fatalf("BOM count %d: invalid normalized JSON %q: %v", count, got, err)
+		}
+		again, err := NormalizeLenientJSONRequestBody(got, 1024)
+		if err != nil || !bytes.Equal(got, again) {
+			t.Fatalf("BOM count %d: normalization changed on a second pass: %q %q %v", count, got, again, err)
+		}
+	}
+}
+
 func TestNormalizeLenientJSONRequestBody_accepts_client_control_chars_in_strings(t *testing.T) {
 	tests := []struct {
 		name    string

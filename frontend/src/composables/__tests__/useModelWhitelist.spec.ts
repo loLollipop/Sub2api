@@ -4,7 +4,7 @@ vi.mock('@/api/admin/accounts', () => ({
   getAntigravityDefaultModelMapping: vi.fn()
 }))
 
-import { buildModelMappingObject, getModelsByPlatform, getPresetMappingsByPlatform, mergeUpstreamIdentityMappings, splitModelMappingObject } from '../useModelWhitelist'
+import { buildModelMappingObject, dropMappingsShadowedByWhitelist, getModelsByPlatform, getPresetMappingsByPlatform, mergeUpstreamIdentityMappings, splitModelMappingObject } from '../useModelWhitelist'
 
 describe('useModelWhitelist', () => {
 	 it('Claude 5.5 models are available without changing Mixed model discovery', () => {
@@ -220,5 +220,51 @@ describe('useModelWhitelist', () => {
       { from: 'gpt-5.4', to: 'gpt-5.4' },
       { from: 'gemini-3.8-flash', to: 'gemini-3.8-flash' }
     ])
+  })
+})
+
+describe('dropMappingsShadowedByWhitelist', () => {
+  it('removes only mappings with an explicitly whitelisted source without mutating the input', () => {
+    const mappings = [
+      { from: 'claude-opus-4-5', to: 'claude-opus-4-5-20251101' },
+      { from: 'claude-sonnet-4-6', to: 'claude-sonnet-5' }
+    ]
+
+    expect(dropMappingsShadowedByWhitelist(['claude-opus-4-5'], mappings)).toEqual([
+      { from: 'claude-sonnet-4-6', to: 'claude-sonnet-5' }
+    ])
+    expect(mappings).toHaveLength(2)
+    expect(mappings[0]).toEqual({ from: 'claude-opus-4-5', to: 'claude-opus-4-5-20251101' })
+  })
+
+  it('normalizes source names consistently with the combined mapping builder', () => {
+    const mappings = [
+      { from: ' claude-opus-4-5 ', to: 'claude-opus-4-5-20251101' },
+      { from: 'claude-opus-4-5-latest', to: 'claude-opus-4-5' }
+    ]
+    const allowedModels = [' claude-opus-4-5 ', '']
+
+    expect(buildModelMappingObject(
+      'combined', allowedModels, dropMappingsShadowedByWhitelist(allowedModels, mappings)
+    )).toEqual({
+      'claude-opus-4-5': 'claude-opus-4-5',
+      'claude-opus-4-5-latest': 'claude-opus-4-5'
+    })
+  })
+
+  it('leaves the mappings untouched when the whitelist is empty', () => {
+    const mappings = [{ from: 'claude-opus-4-5', to: 'claude-opus-4-5-20251101' }]
+
+    expect(dropMappingsShadowedByWhitelist([], mappings)).toBe(mappings)
+    expect(dropMappingsShadowedByWhitelist([' ', ''], mappings)).toEqual(mappings)
+  })
+
+  it('retains wildcard mappings because whitelist identities are exact models only', () => {
+    const mappings = [{ from: 'claude-*', to: 'claude-sonnet-4-5' }]
+    const allowedModels = [' claude-* ']
+
+    expect(buildModelMappingObject(
+      'combined', allowedModels, dropMappingsShadowedByWhitelist(allowedModels, mappings)
+    )).toEqual({ 'claude-*': 'claude-sonnet-4-5' })
   })
 })

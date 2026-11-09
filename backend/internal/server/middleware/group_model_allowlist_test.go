@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -506,6 +507,7 @@ func TestGroupModelAllowlistJSONWithMultipartContentType(t *testing.T) {
 		body   string
 		status int
 	}{
+		{"BOM blocked model", "\xef\xbb\xbf" + `{"model":"blocked"}`, http.StatusNotFound},
 		{"single blocked model", `{"model":"blocked"}`, http.StatusNotFound},
 		{"blocked last duplicate", `{"model":"allowed","model":"blocked"}`, http.StatusNotFound},
 		{"blocked first duplicate", `{"model":"blocked","model":"allowed"}`, http.StatusNotFound},
@@ -540,5 +542,164 @@ func TestGroupModelAllowlistJSONWithMultipartContentType(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestGroupModelAllowlistNormalizesBeforeAdmission(t *testing.T) {
+	for _, path := range []string{"/v1/messages", "/v1/responses", "/v1/chat/completions"} {
+		t.Run(path, func(t *testing.T) {
+			router, calls := newGroupModelAllowlistTestRouter(allowlistAPIKey(true, "allowed"), "/v1")
+			blocked := doJSON(t, router, http.MethodPost, path, "\xef\xbb\xbf"+`{"model":"blocked"}`)
+			if blocked.Code != http.StatusNotFound || len(*calls) != 0 {
+				t.Fatalf("BOM bypass: %d %v", blocked.Code, *calls)
+			}
+			admitted := doJSON(t, router, http.MethodPost, path, "\xef\xbb\xbf"+`{"model":"allowed","input":"raw`+"\x01"+`control"}`)
+			if admitted.Code != http.StatusOK || len(*calls) != 1 {
+				t.Fatalf("valid normalized request rejected: %d %s", admitted.Code, admitted.Body.String())
+			}
+		})
+	}
+}
+
+func TestGroupModelAllowlistJSONProfileCannotBypassNormalization(t *testing.T) {
+	router, calls := newGroupModelAllowlistTestRouter(allowlistAPIKey(true, "allowed"), "/v1")
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader("\xef\xbb\xbf"+`{"model":"blocked"}`))
+	req.Header.Set("Content-Type", `application/json; profile="multipart/foo"`)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, req)
+	if response.Code != http.StatusNotFound || len(*calls) != 0 {
+		t.Fatalf("JSON media-type parameter bypass: %d %v", response.Code, *calls)
+	}
+}
+
+func TestGroupModelAllowlistNormalizedBodyRespectsConfiguredBudget(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, limit := range []int64{48, 128} {
+		router := gin.New()
+		router.Use(func(c *gin.Context) { c.Set(string(ContextKeyAPIKey), allowlistAPIKey(true, "allowed")); c.Next() })
+		router.Use(GroupModelAllowlist(limit))
+		router.POST("/v1/responses", func(c *gin.Context) {
+			body, err := httputil.ReadRequestBodyWithPrealloc(c.Request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Contains(body, []byte{1}) || !bytes.Contains(body, []byte(`\u0001`)) {
+				t.Fatalf("downstream body not normalized: %q", body)
+			}
+			c.Status(http.StatusOK)
+		})
+		response := doJSON(t, router, http.MethodPost, "/v1/responses", `{"model":"allowed","input":"`+strings.Repeat("\x01", 8)+`"}`)
+		want := http.StatusOK
+		if limit == 48 {
+			want = http.StatusRequestEntityTooLarge
+		}
+		if response.Code != want {
+			t.Fatalf("limit=%d: got %d want %d: %s", limit, response.Code, want, response.Body.String())
+		}
+	}
+}
+
+func TestGroupModelAllowlistPreservesMultipartBinary(t *testing.T) {
+	for _, preamble := range []string{"", "{}\r\n", "{\"model\":\"blocked\"}\r\n"} {
+		t.Run(preamble, func(t *testing.T) {
+			var body bytes.Buffer
+			body.WriteString(preamble)
+			writer := multipart.NewWriter(&body)
+			_ = writer.WriteField("model", "allowed")
+			part, err := writer.CreateFormFile("image", "fixture.png")
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload := []byte{0xef, 0xbb, 0xbf, '"', 0, 1, 2, '"', 13, 10, 255}
+			_, _ = part.Write(payload)
+			_ = writer.Close()
+			original := append([]byte(nil), body.Bytes()...)
+			for _, limit := range []int64{4096, int64(len(original))} {
+				router := gin.New()
+				router.Use(func(c *gin.Context) { c.Set(string(ContextKeyAPIKey), allowlistAPIKey(true, "allowed")); c.Next() })
+				router.Use(GroupModelAllowlist(limit))
+				router.POST("/v1/images/edits", func(c *gin.Context) {
+					forwarded, err := httputil.ReadRequestBodyWithPrealloc(c.Request)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !bytes.Equal(original, forwarded) {
+						t.Fatal("multipart binary changed during admission")
+					}
+					reader := multipart.NewReader(bytes.NewReader(forwarded), writer.Boundary())
+					model, err := reader.NextPart()
+					if err != nil {
+						t.Fatal(err)
+					}
+					value, err := io.ReadAll(model)
+					if err != nil || string(value) != "allowed" {
+						t.Fatalf("multipart model changed: %q %v", value, err)
+					}
+					file, err := reader.NextPart()
+					if err != nil {
+						t.Fatal(err)
+					}
+					uploaded, err := io.ReadAll(file)
+					if err != nil || !bytes.Equal(payload, uploaded) {
+						t.Fatalf("multipart payload changed: %x %v", uploaded, err)
+					}
+					c.Status(http.StatusOK)
+				})
+				req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", bytes.NewReader(original))
+				req.Header.Set("Content-Type", writer.FormDataContentType())
+				response := httptest.NewRecorder()
+				router.ServeHTTP(response, req)
+				if response.Code != http.StatusOK {
+					t.Fatalf("multipart denied at limit %d: %d %s", limit, response.Code, response.Body.String())
+				}
+			}
+		})
+	}
+}
+
+func TestGroupModelAllowlistRepeatedBOMMatchesHandler(t *testing.T) {
+	for _, contentType := range []string{"application/json", "multipart/form-data; boundary=x"} {
+		for _, path := range []string{"/v1/messages", "/v1/responses", "/v1/chat/completions"} {
+			for _, model := range []string{"allowed", "blocked"} {
+				t.Run(contentType+path+model, func(t *testing.T) {
+					called := false
+					router := gin.New()
+					router.Use(func(c *gin.Context) { c.Set(string(ContextKeyAPIKey), allowlistAPIKey(true, "allowed")); c.Next() })
+					router.Use(GroupModelAllowlist(1024))
+					router.POST(path, func(c *gin.Context) {
+						called = true
+						body, err := httputil.ReadRequestBodyWithPrealloc(c.Request)
+						if err != nil {
+							t.Fatal(err)
+						}
+						normalized, err := httputil.NormalizeLenientJSONRequestBody(body, 1024)
+						if err != nil {
+							t.Fatal(err)
+						}
+						var parsed struct {
+							Model string `json:"model"`
+						}
+						if err := json.Unmarshal(normalized, &parsed); err != nil {
+							t.Fatal(err)
+						}
+						if parsed.Model != "allowed" {
+							t.Fatalf("blocked model reached handler: %s", parsed.Model)
+						}
+						c.Status(http.StatusOK)
+					})
+					req := httptest.NewRequest(http.MethodPost, path, strings.NewReader("\xef\xbb\xbf\xef\xbb\xbf"+`{"model":"`+model+`"}`))
+					req.Header.Set("Content-Type", contentType)
+					response := httptest.NewRecorder()
+					router.ServeHTTP(response, req)
+					want := http.StatusOK
+					if model == "blocked" {
+						want = http.StatusNotFound
+					}
+					if response.Code != want || called != (model == "allowed") {
+						t.Fatalf("status %d, called=%v, want %d: %s", response.Code, called, want, response.Body.String())
+					}
+				})
+			}
+		}
 	}
 }

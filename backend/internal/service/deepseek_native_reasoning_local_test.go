@@ -76,7 +76,7 @@ func TestDeepSeekNativeReasoningReplayResponseHandlersAcrossAccounts(t *testing.
 					if keyID == 21 {
 						require.Equal(t, "Full upstream reasoning.", gjson.GetBytes(out, "input.0.content.0.text").String())
 					} else {
-						require.Equal(t, replay, out, "changing upstream accounts must not bypass API-key isolation")
+						require.Equal(t, nativeReplayPlaceholderWant(t, replay, 0), out, "changing upstream accounts must not bypass API-key isolation")
 					}
 				}
 			})
@@ -169,10 +169,10 @@ func TestDeepSeekNativeReasoningReplayAnonymousInputShapeContinuation(t *testing
 			out := svc.prepareDeepSeekNativeReasoningReplay(next, account, replay)
 			require.Equal(t, "anonymous actual", gjson.GetBytes(out, "input.1.content.0.text").String())
 			otherKey, _ := deepSeekNativeReplayContext(22, "")
-			require.Equal(t, replay, svc.prepareDeepSeekNativeReasoningReplay(otherKey, account, replay))
+			require.Equal(t, nativeReplayPlaceholderWant(t, replay, 1), svc.prepareDeepSeekNativeReasoningReplay(otherKey, account, replay))
 			otherQuestion, err := sjson.SetBytes(replay, "input.0.content", "another question")
 			require.NoError(t, err)
-			require.Equal(t, otherQuestion, svc.prepareDeepSeekNativeReasoningReplay(next, account, otherQuestion))
+			require.Equal(t, nativeReplayPlaceholderWant(t, otherQuestion, 1), svc.prepareDeepSeekNativeReasoningReplay(next, account, otherQuestion))
 		})
 	}
 }

@@ -440,6 +440,104 @@ function mountModal(account = buildAccount(), renderGroupSelector = false) {
   })
 }
 
+describe('EditAccountModal whitelist saves', () => {
+  const accountCases = [
+    { name: 'API key', build: buildAccount },
+    { name: 'OpenAI OAuth', build: buildOpenAIOAuthParentAccount },
+    { name: 'Vertex service account', build: buildVertexAccount },
+    {
+      name: 'Bedrock',
+      build: () => ({
+        ...buildAccount(),
+        platform: 'anthropic',
+        type: 'bedrock',
+        credentials: { auth_mode: 'sigv4', aws_region: 'us-east-1', aws_access_key_id: 'test-access-key' }
+      })
+    }
+  ]
+
+  beforeEach(() => {
+    authIsSimpleMode.value = true
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+  })
+
+  it.each(accountCases)('$name saves the selected model over a stale mapping and keeps it after reopening', async ({ build }) => {
+    const account = build()
+    account.credentials.model_mapping = {
+      'gpt-5.2': 'gpt-5.2',
+      'gpt-5.2-2025-12-11': 'gpt-5.2',
+      'gpt-latest': 'gpt-5.2'
+    }
+    updateAccountMock.mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await flushPromises()
+
+    const hint = wrapper.findAll('p').find((p) => p.text() === 'admin.accounts.hiddenMappingsHint')
+    expect(hint).toBeTruthy()
+    expect(hint!.classes()).toContain('text-amber-700')
+    await wrapper.get('[data-testid="rewrite-to-snapshot"]').trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const credentials = updateAccountMock.mock.calls[0]?.[1]?.credentials
+    expect(credentials.model_mapping).toEqual({
+      'gpt-5.2-2025-12-11': 'gpt-5.2-2025-12-11',
+      'gpt-latest': 'gpt-5.2'
+    })
+
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({ account: { ...account, credentials: { ...account.credentials, ...credentials } }, show: true })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="model-whitelist-value"]').text()).toBe('gpt-5.2-2025-12-11')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock).toHaveBeenCalledTimes(2)
+    expect(updateAccountMock.mock.calls[1]?.[1]?.credentials?.model_mapping).toEqual(credentials.model_mapping)
+    wrapper.unmount()
+  })
+
+  it.each(accountCases)('$name preserves existing mappings when saving an empty whitelist', async ({ build }) => {
+    const account = build()
+    account.credentials.model_mapping = {
+      'gpt-5.2-2025-12-11': 'gpt-5.2',
+      'gpt-latest': 'gpt-5.2'
+    }
+    updateAccountMock.mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await flushPromises()
+    const whitelistButton = wrapper.findAll('button').find((button) => button.text() === 'admin.accounts.modelWhitelist')
+    expect(whitelistButton).toBeTruthy()
+    await whitelistButton!.trigger('click')
+    expect(wrapper.get('[data-testid="model-whitelist-value"]').text()).toBe('')
+    expect(wrapper.text()).toContain('admin.accounts.hiddenMappingsHint')
+    expect(wrapper.text()).not.toContain('admin.accounts.supportsAllModels')
+
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual(account.credentials.model_mapping)
+    wrapper.unmount()
+  })
+
+  it.each(accountCases)('$name keeps a wildcard mapping when a wildcard is entered in the whitelist', async ({ build }) => {
+    const account = build()
+    account.credentials.model_mapping = { 'claude-*': 'claude-sonnet-4-5' }
+    updateAccountMock.mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await flushPromises()
+    wrapper.getComponent(ModelWhitelistSelectorStub).vm.$emit('update:modelValue', ['claude-*'])
+    await flushPromises()
+
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual(account.credentials.model_mapping)
+    wrapper.unmount()
+  })
+})
+
 describe('EditAccountModal', () => {
   it.each(['', 'rotated-key'])('preserves or rotates a redacted Vertex API key (%s) without requiring SA JSON', async newKey => {
     const account = buildVertexAccount()

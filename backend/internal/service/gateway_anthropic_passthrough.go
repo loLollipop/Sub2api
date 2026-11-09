@@ -328,6 +328,9 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	//   - Claude 5.x 不接受 thinking.type="enabled"
 	body = normalizeCacheControlTTLOrder(body)
 	body = sanitizeAnthropicThinkingForModel(body, gjson.GetBytes(body, "model").String())
+	if rewritten, changed := ensureDeepSeekThinkingReplayPlaceholders(body, gjson.GetBytes(body, "model").String()); changed {
+		body = rewritten
+	}
 	targetURL := claudeAPIURL
 	baseURL := getAnthropicGatewayBaseURL(account)
 	if baseURL != "" {

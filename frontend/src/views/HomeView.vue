@@ -4,12 +4,13 @@
     <!-- iframe mode -->
     <iframe
       v-if="isHomeContentUrl"
-      :src="homeContent.trim()"
+      :src="homeContentUrl"
       class="h-screen w-full border-0"
+      sandbox="allow-scripts allow-forms allow-popups"
+      referrerpolicy="no-referrer"
       allowfullscreen
     ></iframe>
-    <!-- HTML mode - SECURITY: homeContent is admin-only setting, XSS risk is acceptable -->
-    <div v-else v-html="homeContent"></div>
+    <div v-else v-html="safeHomeContent"></div>
   </div>
 
   <!-- Compact Home Page -->
@@ -113,6 +114,7 @@ import HomeLanding from '@/components/home/HomeLanding.vue'
 import LegalFooterLinks from '@/components/legal/LegalFooterLinks.vue'
 import GGBondBackdrop from '@/components/common/GGBondBackdrop.vue'
 import { sanitizeUrl } from '@/utils/url'
+import { sanitizeHtml } from '@/utils/sanitize'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
 const { t } = useI18n()
@@ -128,14 +130,13 @@ const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const apiBaseUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.api_base_url || appStore.apiBaseUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
+const safeHomeContent = computed(() => sanitizeHtml(homeContent.value))
+const homeContentUrl = computed(() => sanitizeUrl(homeContent.value))
 const hasHomeContent = computed(() => homeContent.value.trim().length > 0)
 const compactHomeEnabled = computed(() => appStore.cachedPublicSettings?.compact_home_enabled === true)
 
 // Check if homeContent is a URL (for iframe display)
-const isHomeContentUrl = computed(() => {
-  const content = homeContent.value.trim()
-  return content.startsWith('http://') || content.startsWith('https://')
-})
+const isHomeContentUrl = computed(() => homeContentUrl.value !== '')
 
 // Theme
 const isDark = ref(document.documentElement.classList.contains('dark'))

@@ -266,8 +266,10 @@ func NormalizeLenientJSONRequestBody(body []byte, maxNormalizedBytes int64) ([]b
 }
 
 func trimUTF8BOM(body []byte) []byte {
-	if len(body) >= jsonUTF8BOMLen && body[0] == 0xef && body[1] == 0xbb && body[2] == 0xbf {
-		return body[jsonUTF8BOMLen:]
+	// Admission and handlers may normalize the same request independently.
+	// Remove the complete prefix so another pass cannot expose a new model.
+	for len(body) >= jsonUTF8BOMLen && body[0] == 0xef && body[1] == 0xbb && body[2] == 0xbf {
+		body = body[jsonUTF8BOMLen:]
 	}
 	return body
 }

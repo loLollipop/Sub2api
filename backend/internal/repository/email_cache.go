@@ -50,6 +50,54 @@ func NewEmailCache(rdb *redis.Client) service.EmailCache {
 	return &emailCache{rdb: rdb}
 }
 
+var consumeEmailCodeScript = redis.NewScript(`
+local raw = redis.call('GET', KEYS[1])
+if not raw then return 0 end
+local ttl = redis.call('PTTL', KEYS[1])
+if ttl <= 0 then return 0 end
+local data = cjson.decode(raw)
+local attempts = data.Attempts or 0
+local maxAttempts = tonumber(ARGV[2])
+if attempts >= maxAttempts then return 2 end
+local stored = data.Code
+local supplied = ARGV[1]
+local matches = #stored == #supplied
+for i = 1, #stored do
+    if string.byte(stored, i) ~= string.byte(supplied, i) then matches = false end
+end
+if matches then
+    redis.call('DEL', KEYS[1])
+    return 1
+end
+data.Attempts = attempts + 1
+redis.call('SET', KEYS[1], cjson.encode(data), 'PX', ttl)
+if data.Attempts >= maxAttempts then return 2 end
+return 0
+`)
+
+func (c *emailCache) consumeCode(ctx context.Context, key, code string, maxAttempts int) error {
+	result, err := consumeEmailCodeScript.Run(ctx, c.rdb, []string{key}, code, maxAttempts).Int()
+	if err != nil {
+		return fmt.Errorf("consume email verification code: %w", err)
+	}
+	switch result {
+	case 1:
+		return nil
+	case 2:
+		return service.ErrVerifyCodeMaxAttempts
+	default:
+		return service.ErrInvalidVerifyCode
+	}
+}
+
+func (c *emailCache) ConsumeVerificationCode(ctx context.Context, email, code string, maxAttempts int) error {
+	return c.consumeCode(ctx, verifyCodeKey(email), code, maxAttempts)
+}
+
+func (c *emailCache) ConsumeNotifyVerifyCode(ctx context.Context, email, code string, maxAttempts int) error {
+	return c.consumeCode(ctx, notifyVerifyKey(email), code, maxAttempts)
+}
+
 func (c *emailCache) GetVerificationCode(ctx context.Context, email string) (*service.VerificationCodeData, error) {
 	key := verifyCodeKey(email)
 	val, err := c.rdb.Get(ctx, key).Result()

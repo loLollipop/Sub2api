@@ -190,6 +190,7 @@ func TestCleanupStaleProcessSlots_NilCache(t *testing.T) {
 }
 
 func TestCleanupStaleProcessSlots_DelegatesPrefix(t *testing.T) {
+	t.Setenv("SUB2API_STARTUP_SLOT_CLEANUP", "enabled")
 	cache := &trackingConcurrencyCache{}
 	svc := NewConcurrencyService(cache)
 	require.NoError(t, svc.CleanupStaleProcessSlots(context.Background()))
@@ -698,4 +699,16 @@ func TestIncrementAccountWaitCount_NilCache(t *testing.T) {
 	allowed, err := svc.IncrementAccountWaitCount(context.Background(), 1, 10)
 	require.NoError(t, err)
 	require.True(t, allowed)
+}
+
+func TestCleanupStaleProcessSlots_DefaultPreservesPeerSlots(t *testing.T) {
+	for _, value := range []string{"", "true", "disabled"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("SUB2API_STARTUP_SLOT_CLEANUP", value)
+			cache := &trackingConcurrencyCache{}
+			svc := NewConcurrencyService(cache)
+			require.NoError(t, svc.CleanupStaleProcessSlots(context.Background()))
+			require.Empty(t, cache.cleanupPrefix)
+		})
+	}
 }

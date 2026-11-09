@@ -54,15 +54,15 @@ func TestReleaseAccountSession_ReleasesRegisteredSlot(t *testing.T) {
 }
 
 // TestReleaseAccountSession_NoOpForInapplicableAccounts 验证：
-// - 非 Anthropic OAuth/SetupToken 账号
+// - 非 Anthropic OAuth/SetupToken 或 API Key 账号
 // - 未启用 max_sessions 的账号
 // - 空 sessionID
 // 以上场景均为 no-op，不得触发 UnregisterSession。
 func TestReleaseAccountSession_NoOpForInapplicableAccounts(t *testing.T) {
-	apiKeyAcc := &Account{
+	inapplicableAcc := &Account{
 		ID:       43,
 		Platform: PlatformAnthropic,
-		Type:     AccountTypeAPIKey,
+		Type:     AccountTypeServiceAccount,
 		Extra:    map[string]any{"max_sessions": 1},
 	}
 	noLimitAcc := &Account{
@@ -77,7 +77,7 @@ func TestReleaseAccountSession_NoOpForInapplicableAccounts(t *testing.T) {
 		account   *Account
 		sessionID string
 	}{
-		{"api_key_account", apiKeyAcc, "session-hash"},
+		{"service_account", inapplicableAcc, "session-hash"},
 		{"max_sessions_disabled", noLimitAcc, "session-hash"},
 		{"empty_session_id", enabledAcc, ""},
 		{"nil_account", nil, "session-hash"},
@@ -118,4 +118,12 @@ func TestReleaseAccountSession_Idempotent(t *testing.T) {
 
 	// 两次调用都透传到缓存层（Redis ZREM 本身幂等，重复移除无副作用）
 	require.Len(t, cache.unregistered[42], 2)
+}
+
+func TestReleaseAccountSession_APIKeyReleasesRegisteredSlot(t *testing.T) {
+	cache := newSessionLimitReleaseCacheStub()
+	svc := &GatewayService{sessionLimitCache: cache}
+	account := &Account{ID: 43, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Extra: map[string]any{"max_sessions": 1}}
+	svc.ReleaseAccountSession(context.Background(), account, "failed-session")
+	require.Equal(t, []string{"failed-session"}, cache.unregistered[43])
 }

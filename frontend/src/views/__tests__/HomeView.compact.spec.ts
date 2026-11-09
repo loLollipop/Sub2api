@@ -82,6 +82,28 @@ function compactDestination(wrapper: ReturnType<typeof mountHome>) {
 }
 
 describe('HomeView compact mode', () => {
+  it('sanitizes custom homepage markup while keeping ordinary content', () => {
+    const wrapper = mountHome({ home_content: '<h1>Welcome</h1><p>Safe content</p><script>alert(1)</script><img src="/logo.png" onerror="alert(1)"><a href="javascript:alert(1)">bad link</a><iframe srcdoc="unsafe"></iframe>' })
+    expect(wrapper.get('h1').text()).toBe('Welcome')
+    expect(wrapper.get('p').text()).toBe('Safe content')
+    expect(wrapper.find('script, iframe, [onerror], [href^="javascript:"]').exists()).toBe(false)
+    expect(wrapper.get('img').attributes('src')).toBe('/logo.png')
+  })
+
+  it('sandboxes custom homepage URLs with no referrer or same-origin privilege', () => {
+    const wrapper = mountHome({ home_content: ' HTTPS://example.com/landing ' })
+    const frame = wrapper.get('iframe')
+    expect(frame.attributes('src')).toBe('https://example.com/landing')
+    expect(frame.attributes('sandbox')).toBe('allow-scripts allow-forms allow-popups')
+    expect(frame.attributes('referrerpolicy')).toBe('no-referrer')
+    expect(frame.attributes('sandbox')).not.toContain('allow-same-origin')
+  })
+
+  it.each(['javascript:alert(1)', 'https://'])('does not create an iframe for invalid homepage URL %s', (homeContent) => {
+    const wrapper = mountHome({ home_content: homeContent })
+    expect(wrapper.find('iframe').exists()).toBe(false)
+  })
+
   it.each([false, true])('gates home browse links while preserving compact mode=%s', compact => {
     const enabled = mountHome({ compact_home_enabled: compact, leaderboard_enabled: true, model_plaza_enabled: true })
     expect(enabled.findAllComponents(RouterLinkStub).some(link => link.props('to') === '/leaderboard')).toBe(true)

@@ -34,7 +34,10 @@ type deepSeekNativeReasoningSource struct {
 // only reasoning that this gateway actually received, in shared Redis, scoped
 // to the authenticated key, conversation and requested model. Never read the
 // older unscoped Chat fallback cache and never substitute a summary for CoT.
-func (s *OpenAIGatewayService) prepareDeepSeekNativeReasoningReplay(c *gin.Context, account *Account, body []byte) []byte {
+// After scoped restoration, empty slots receive only DeepSeek's single-space
+// compatibility placeholder, including when the cache is unavailable.
+func (s *OpenAIGatewayService) prepareDeepSeekNativeReasoningReplay(c *gin.Context, account *Account, body []byte) (result []byte) {
+	defer func() { result = ensureDeepSeekNativeReasoningPlaceholders(account, result) }()
 	if s == nil || s.cache == nil || c == nil || account == nil || account.Platform != PlatformDeepseek || !account.UsesNativeCNResponses() {
 		if c != nil {
 			c.Set(deepSeekNativeReasoningScopeKey, nil)
@@ -74,13 +77,7 @@ func (s *OpenAIGatewayService) prepareDeepSeekNativeReasoningReplay(c *gin.Conte
 	addedBytes := 0
 	lookups := 0
 	for i, item := range items {
-		if item.Get("type").String() != "reasoning" || item.Get("id").String() == "" || hasDeepSeekNativeReasoningText(item.Get("content")) {
-			continue
-		}
-		// An explicit non-empty vendor shape belongs to the client. Only fill
-		// omitted/null/empty arrays, and leave all other fields byte-for-byte.
-		content := item.Get("content")
-		if content.Exists() && content.Type != gjson.Null && (!content.IsArray() || len(content.Array()) > 0) {
+		if item.Get("type").String() != "reasoning" || item.Get("id").String() == "" || !emptyDeepSeekNativeReasoningContent(item.Get("content")) {
 			continue
 		}
 		lookups++

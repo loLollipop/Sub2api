@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -411,11 +412,49 @@ func TestUserHandlerGetProfileDoesNotInferEditedProfileSourcesWithoutMatchingIde
 }
 
 type userHandlerEmailCacheStub struct {
+	mu   sync.Mutex
 	data *service.VerificationCodeData
+}
+
+func (s *userHandlerEmailCacheStub) ConsumeVerificationCode(_ context.Context, _, code string, maxAttempts int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data == nil {
+		return service.ErrInvalidVerifyCode
+	}
+	if s.data.Attempts >= maxAttempts {
+		return service.ErrVerifyCodeMaxAttempts
+	}
+	if s.data.Code == code {
+		s.data = nil
+		return nil
+	}
+	s.data.Attempts++
+	if s.data.Attempts >= maxAttempts {
+		return service.ErrVerifyCodeMaxAttempts
+	}
+	return service.ErrInvalidVerifyCode
+}
+
+func (s *userHandlerEmailCacheStub) ConsumeNotifyVerifyCode(context.Context, string, string, int) error {
+	return service.ErrInvalidVerifyCode
 }
 
 type userHandlerRefreshTokenCacheStub struct {
 	revokedUserIDs []int64
+	cutoff         time.Time
+}
+
+func (s *userHandlerRefreshTokenCacheStub) SetUserTokenCutoff(_ context.Context, _ int64, cutoff time.Time) error {
+	if !cutoff.After(s.cutoff) {
+		cutoff = s.cutoff.Add(time.Nanosecond)
+	}
+	s.cutoff = cutoff
+	return nil
+}
+
+func (s *userHandlerRefreshTokenCacheStub) GetUserTokenCutoff(context.Context, int64) (time.Time, error) {
+	return s.cutoff, nil
 }
 
 func (s *userHandlerRefreshTokenCacheStub) StoreRefreshToken(context.Context, string, *service.RefreshTokenData, time.Duration) error {

@@ -2,27 +2,27 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.19",
-  "imported_commit": "a16b937d6afea658434aa2c16049114c91984867",
+  "imported_version": "2.3.40",
+  "imported_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.19",
-  "latest_observed_release_commit": "a16b937d6afea658434aa2c16049114c91984867",
-  "latest_observed_main_commit": "2f9c7fba6797691e158b55dbe45ce4ec7223ce51",
+  "latest_observed_version": "2.3.40",
+  "latest_observed_release_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
+  "latest_observed_main_commit": "17036fca1f3d1728ddf0cad2dec83f8b829cc867",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.19",
-  "reviewed_release_commit": "a16b937d6afea658434aa2c16049114c91984867",
+  "reviewed_release_tag": "v2.3.40",
+  "reviewed_release_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
   "observed_delta_review": {
-    "from_commit": "935e24168cb37c720bd5264be4ca290fb7841611",
-    "to_commit": "a16b937d6afea658434aa2c16049114c91984867",
-    "status": "formal_v2319_reviewed_without_runtime_import",
-    "scope": "Review 3 commits / 6 paths in formal v2.3.19. Defer curated catalogue/file-loader/remote-refresh as one group: provider/alias ambiguity, unsupported authoritative Kimi values, effective pricing gaps and mutable upstream-main refresh remain. Record post-release whitelist fix independently without importing it. Preserve prior exclusions.",
-    "evidence": "maintenance/notes/upstream-sync-20261107-v2319.md"
+    "from_commit": "a16b937d6afea658434aa2c16049114c91984867",
+    "to_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
+    "status": "formal_v2340_selective_backport",
+    "scope": "Review 118 commits / 128 paths from formal v2.3.19 to v2.3.40. Adapt whitelist saves, DeepSeek/Grok compatibility, auth/code-consumption and local safety fixes. Defer quality routing, balance-rejection emails and catalogue; exclude retired modules and source release bookkeeping.",
+    "evidence": "maintenance/notes/upstream-sync-20261109-v2340.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "a16b937d6afea658434aa2c16049114c91984867",
+    "source_head": "59136801e026eca4397ec9fe64bea791ddc6a33f",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -30,6 +30,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.20-v2.3.40: whitelist save conflict and hidden-mapping hints; DeepSeek raw-preserving Chat tool-pair repair and protocol-specific placeholders; unchanged Grok effort; durable session revocation, atomic email code consumption, idempotent body-normalized model admission with multipart-byte preservation, API-key session release, opt-in startup cleanup, homepage isolation and mandatory installation checksums. Preserve routing/billing/UI; see maintenance/notes/upstream-sync-20261109-v2340.md.",
       "Formal v2.3.18: correct missing-field DeepSeek builtin max output to 393216 and exact display names for deepseek-v4.1-flash-1017 and gpt-image-medium; no discovery, matching, pricing or precedence changes. Catalogue/Plaza and Kimi authoritative metadata remain deferred; see maintenance/notes/upstream-sync-20261107-v2318.md",
       "User-authorized post-v2.3.14 leaf 9c518bf7f: GIF frame_count/frame_duration_ms accept decimal integer strings, API-key JSON forwarding normalizes them to numbers and OAuth uses typed parsed fields. Keep bounded numeric validation, original numeric/multipart representations, native routes and GIF response budgets; see maintenance/notes/upstream-sync-20261106-v2314.md.",
       "Formal v2.3.12-v2.3.13: bounded native Images GIF frame/delay/dimension normalization; complete source-derived usage stats/chart/filter/toolbar/inflight UI for both roles and settings hierarchy. Preserve original drain/billing, local theme and all module exclusions. See maintenance/notes/upstream-sync-20261106-v2313.md.",
@@ -122,7 +123,7 @@
       "upstream_commits": [
         "e4777619e"
       ],
-      "reason": "Keep with deferred provider-blind catalogue/authoritative metadata: alias and suffix collisions, unsupported Kimi envelopes, missing effective pricing/smart-route/ETag integration, and mutable upstream-main refresh outside release review. Post-release whitelist fix 5e163e2f5 is separately observed, not imported."
+      "reason": "Keep with deferred provider-blind catalogue/authoritative metadata: alias and suffix collisions, unsupported Kimi envelopes, missing effective pricing/smart-route/ETag integration, and mutable upstream-main refresh outside release review. Whitelist fix 5e163e2f5 is now independently adapted from the formal v2.3.40 range; catalogue remains deferred."
     },
     {
       "feature": "v2310-ops-rate-history-account-reveal-and-runtime-expansion",
@@ -803,5 +804,49 @@
     "preserved": "Native providers/discovery, effective local billing/multipliers, real terminal usage and bounded drain, independent reasoning-effort column after model, all prior module exclusions and three pre-existing untracked Go tests.",
     "migration": "None. Dependencies, migrations and deployment configuration unchanged; personal VERSION 2.1.57.",
     "release_status": "User authorized GitHub submission and deployment on 2026-11-07. Prepare personal v2.1.57 through PR/CI, own Release/GHCR and backup/restore-validated controlled rollout; final source/artifact/runtime evidence is recorded separately."
+  },
+  "sync_20261109_v2340": {
+    "evidence": "maintenance/notes/upstream-sync-20261109-v2340.md",
+    "reviewed_release_tag": "v2.3.40",
+    "reviewed_release_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
+    "observed_main_commit": "17036fca1f3d1728ddf0cad2dec83f8b829cc867",
+    "reviewed_delta": {
+      "from_version": "2.3.19",
+      "commits": 118,
+      "paths": 128
+    },
+    "selected_commits": [
+      "5e163e2f5",
+      "3128b2763",
+      "bed6a8919",
+      "ee41365ae",
+      "9e711d899",
+      "703fa51f0",
+      "053c6aa78",
+      "4a472cfd0",
+      "63bc94ca7",
+      "9aa319c57",
+      "da9a1501b",
+      "8315067ff",
+      "e640ef269",
+      "23d5ee213"
+    ],
+    "selected_scope": "Formal v2.3.20-v2.3.40: whitelist save conflict and hidden-mapping hints; DeepSeek raw-preserving Chat tool-pair repair and protocol-specific placeholders; unchanged Grok effort; durable session revocation, atomic email code consumption, idempotent body-normalized model admission with multipart-byte preservation, API-key session release, opt-in startup cleanup, homepage isolation and mandatory installation checksums. Preserve routing/billing/UI; see maintenance/notes/upstream-sync-20261109-v2340.md.",
+    "deferred_commits": [
+      "b36b911f5",
+      "0b87219e6",
+      "d02e88307",
+      "7a86e799f",
+      "0830c3d5d",
+      "82dbf1f42",
+      "ce3f465b9",
+      "61ee3cf37"
+    ],
+    "deferred_scope": "Transient cooldown has no successful-observation reset; runtime health depends on incomplete observation. Quality routing silently reorders explicit RouteGroupIDs and changes the billing group. Balance-rejection emails bypass preferences and extra-email destinations with process-local/unbounded dedup; existing delivery-ledger check/send/set also needs atomic concurrency control. Catalogue seed/network tests stay with provider/alias/authoritative metadata/effective-pricing/ETag/main-refresh deferrals. Docker base and CI changes await separate deployment validation.",
+    "already_covered": "Email-existence hiding is already uniform HTTP 200 with exact/alias tests. Existing local credential export uses step-up; absent channel reveal is not imported.",
+    "excluded_scope": "Retired crypto/payment/sweeper code and migration312; Hosted, Ops/capture/timers, Nuxt SSR and MCP; estimated disconnect billing and 95%-cache policy; source VERSION and unrelated deployment files. Earlier exclusions remain.",
+    "preserved": "Native providers/discovery, credential destinations and uploader isolation; real terminal usage, bounded drain and no replay after delivery/billing; local 0.15 multiplier, frozen/zero prices and ordered routing; warm light/dark theme, gradients and chart layout/colors; independent reasoning-effort column after model; three pre-existing untracked tests.",
+    "migration": "None. Dependencies, migrations, original-source baselines and production runtime configuration unchanged. Personal VERSION advances separately to 2.1.59 for the authorized release. Installation hardening and CI regression gates are recorded separately.",
+    "release_status": "User subsequently authorized code review, GitHub submission and deployment on 2026-11-09. Prepare personal v2.1.59 through PR/CI, own Release/GHCR and existing backup/restore-validated controlled rollout; final source, artifact and runtime acceptance are recorded separately."
   }
 }

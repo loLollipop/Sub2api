@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2798,7 +2799,33 @@ func (s *oauthPendingFlowSettingRepoStub) Delete(context.Context, string) error 
 type oauthPendingFlowRefreshTokenCacheStub struct{}
 
 type oauthPendingFlowEmailCacheStub struct {
+	mu                sync.Mutex
 	verificationCodes map[string]*service.VerificationCodeData
+}
+
+func (s *oauthPendingFlowEmailCacheStub) ConsumeVerificationCode(_ context.Context, email, code string, maxAttempts int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data := s.verificationCodes[email]
+	if data == nil {
+		return service.ErrInvalidVerifyCode
+	}
+	if data.Attempts >= maxAttempts {
+		return service.ErrVerifyCodeMaxAttempts
+	}
+	if data.Code == code {
+		delete(s.verificationCodes, email)
+		return nil
+	}
+	data.Attempts++
+	if data.Attempts >= maxAttempts {
+		return service.ErrVerifyCodeMaxAttempts
+	}
+	return service.ErrInvalidVerifyCode
+}
+
+func (s *oauthPendingFlowEmailCacheStub) ConsumeNotifyVerifyCode(context.Context, string, string, int) error {
+	return service.ErrInvalidVerifyCode
 }
 
 func (s *oauthPendingFlowEmailCacheStub) GetVerificationCode(_ context.Context, email string) (*service.VerificationCodeData, error) {

@@ -811,9 +811,47 @@ func (s *emailBindSettingRepoStub) Delete(context.Context, string) error {
 }
 
 type emailBindCacheStub struct {
+	mu        sync.Mutex
 	data      *service.VerificationCodeData
+	codes     map[string]*service.VerificationCodeData
 	err       error
 	setEmails []string
+}
+
+func (s *emailBindCacheStub) ConsumeVerificationCode(_ context.Context, email, code string, maxAttempts int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.err != nil || s.data == nil {
+		return service.ErrInvalidVerifyCode
+	}
+	if s.codes == nil {
+		s.codes = make(map[string]*service.VerificationCodeData)
+	}
+	data, exists := s.codes[email]
+	if !exists {
+		cloned := *s.data
+		data = &cloned
+		s.codes[email] = data
+	}
+	if data == nil {
+		return service.ErrInvalidVerifyCode
+	}
+	if data.Attempts >= maxAttempts {
+		return service.ErrVerifyCodeMaxAttempts
+	}
+	if data.Code == code {
+		s.codes[email] = nil
+		return nil
+	}
+	data.Attempts++
+	if data.Attempts >= maxAttempts {
+		return service.ErrVerifyCodeMaxAttempts
+	}
+	return service.ErrInvalidVerifyCode
+}
+
+func (s *emailBindCacheStub) ConsumeNotifyVerifyCode(context.Context, string, string, int) error {
+	return service.ErrInvalidVerifyCode
 }
 
 func (s *emailBindCacheStub) GetVerificationCode(context.Context, string) (*service.VerificationCodeData, error) {

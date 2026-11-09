@@ -397,6 +397,19 @@ GEMINI_OAUTH_CLIENT_SECRET=GOCSPX-your-client-secret
 
 ## Binary Installation
 
+The installer requires a downloadable checksum manifest containing an exact
+match for the release archive, and verifies SHA-256 before replacing the binary.
+A missing manifest, missing entry, or mismatch stops installation. It sets
+`/etc/sub2api` to mode `0700` and an existing `sub2api.env` to `0600`, owned by the
+service user.
+
+Startup leaves concurrency slots owned by other processes intact by default.
+Set `SUB2API_STARTUP_SLOT_CLEANUP=enabled` only for a controlled single-instance
+restart after confirming that no peer using the same Redis is still running.
+Remove the override afterward; a different process prefix alone does not prove
+that its slots are stale. Existing request release and timeout cleanup remain
+active.
+
 For production servers using systemd.
 
 ### One-Line Installation

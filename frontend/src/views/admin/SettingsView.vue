@@ -802,7 +802,7 @@
                       <a
                         href="https://dash.cloudflare.com/"
                         target="_blank"
-                        class="text-primary-600 hover:text-primary-500"
+                        class="text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
                         >{{
                           t("admin.settings.turnstile.cloudflareDashboard")
                         }}</a
@@ -957,7 +957,7 @@
                       :href="tencentCaptchaLinks.console"
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="text-primary-600 hover:text-primary-500"
+                      class="text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
                     >
                       {{ t("admin.settings.tencentCaptcha.openCaptchaConsole") }}
                     </a>
@@ -965,7 +965,7 @@
                       :href="tencentCaptchaLinks.cloudKeys"
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="text-primary-600 hover:text-primary-500"
+                      class="text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
                     >
                       {{ t("admin.settings.tencentCaptcha.createCloudKeys") }}
                     </a>
@@ -973,7 +973,7 @@
                       :href="tencentCaptchaLinks.webDocs"
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="text-primary-600 hover:text-primary-500"
+                      class="text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
                     >
                       {{ t("admin.settings.tencentCaptcha.openWebDocs") }}
                     </a>
@@ -6166,7 +6166,7 @@
               <div v-for="tier in purchaseTiers" :key="tier">
                 <label :for="`external-shop-url-${tier}`" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.purchase.tierUrl", { amount: tier }) }}</label>
                 <input :id="`external-shop-url-${tier}`" v-model="form.purchase_subscription_products[tier]" type="url" class="input w-full" :placeholder="t('admin.settings.purchase.urlPlaceholder')" />
-                <a v-if="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" :href="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block text-sm text-primary-500">{{ t("admin.settings.purchase.preview") }}</a>
+                <a v-if="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" :href="safePurchaseProductUrl(form.purchase_subscription_products[tier] || '')" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block text-sm text-[var(--theme-accent)]">{{ t("admin.settings.purchase.preview") }}</a>
               </div>
               <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.purchase.urlHint") }}</p>
             </div>
@@ -9718,7 +9718,7 @@ watch(
   gap: 0.75rem;
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--console-edge, #e5e7eb);
-  background: var(--signal-bg, #faf9f6);
+  background: var(--signal-bg, var(--theme-bg));
 }
 
 .settings-navigation { flex: 1 1 40rem; }

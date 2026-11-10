@@ -457,6 +457,7 @@ import EndpointDistributionChart from '@/components/charts/EndpointDistributionC
 import Icon from '@/components/icons/Icon.vue'
 import { adminAPI } from '@/api/admin'
 import type { Account, AccountUsageStatsResponse } from '@/types'
+import { useChartPalette } from '@/composables/useChartPalette'
 
 ChartJS.register(
   CategoryScale,
@@ -483,16 +484,7 @@ const emit = defineEmits<{
 const loading = ref(false)
 const stats = ref<AccountUsageStatsResponse | null>(null)
 
-// Dark mode detection
-const isDarkMode = computed(() => {
-  return document.documentElement.classList.contains('dark')
-})
-
-// Chart colors
-const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb'
-}))
+const chartColors = useChartPalette()
 
 // Line chart data
 const trendChartData = computed(() => {
@@ -504,8 +496,8 @@ const trendChartData = computed(() => {
       {
         label: t('usage.accountBilled') + ' (USD)',
         data: stats.value.history.map((h) => h.actual_cost),
-        borderColor: '#6486a5',
-        backgroundColor: 'rgba(100, 134, 165, 0.1)',
+        borderColor: chartColors.value.blue,
+        backgroundColor: `${chartColors.value.blue}1a`,
         fill: true,
         tension: 0.3,
         yAxisID: 'y'
@@ -513,8 +505,8 @@ const trendChartData = computed(() => {
       {
         label: t('usage.userBilled') + ' (USD)',
         data: stats.value.history.map((h) => h.user_cost),
-        borderColor: '#659b87',
-        backgroundColor: 'rgba(101, 155, 135, 0.08)',
+        borderColor: chartColors.value.green,
+        backgroundColor: `${chartColors.value.green}14`,
         fill: false,
         tension: 0.3,
         borderDash: [5, 5],
@@ -523,8 +515,8 @@ const trendChartData = computed(() => {
       {
         label: t('admin.accounts.stats.requests'),
         data: stats.value.history.map((h) => h.requests),
-        borderColor: '#b29968',
-        backgroundColor: 'rgba(178, 153, 104, 0.1)',
+        borderColor: chartColors.value.amber,
+        backgroundColor: `${chartColors.value.amber}1a`,
         fill: false,
         tension: 0.3,
         yAxisID: 'y1'
@@ -555,6 +547,7 @@ const lineChartOptions = computed(() => ({
       }
     },
     tooltip: {
+      ...chartColors.value.tooltip,
       callbacks: {
         label: (context: any) => {
           const label = context.dataset.label || ''
@@ -589,7 +582,7 @@ const lineChartOptions = computed(() => ({
         color: chartColors.value.grid
       },
       ticks: {
-        color: '#6486a5',
+        color: chartColors.value.text,
         font: {
           size: 10
         },
@@ -598,7 +591,7 @@ const lineChartOptions = computed(() => ({
       title: {
         display: true,
         text: t('usage.accountBilled') + ' (USD)',
-        color: '#6486a5',
+        color: chartColors.value.text,
         font: {
           size: 11
         }
@@ -612,7 +605,7 @@ const lineChartOptions = computed(() => ({
         drawOnChartArea: false
       },
       ticks: {
-        color: '#b29968',
+        color: chartColors.value.text,
         font: {
           size: 10
         },
@@ -621,7 +614,7 @@ const lineChartOptions = computed(() => ({
       title: {
         display: true,
         text: t('admin.accounts.stats.requests'),
-        color: '#b29968',
+        color: chartColors.value.text,
         font: {
           size: 11
         }

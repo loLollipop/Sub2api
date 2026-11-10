@@ -75,6 +75,7 @@ import { Line } from 'vue-chartjs'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Icon from '@/components/icons/Icon.vue'
 import type { MonitorCoverage, MonitorMetric, MonitorHealth } from '@/api/channelMonitorV2'
+import { useChartPalette } from '@/composables/useChartPalette'
 import { formatMonitorMs, formatMonitorPercent } from '@/features/channel-monitor-v2/monitorFormat'
 import {
   applyWheelZoom,
@@ -98,9 +99,7 @@ const chartRef = ref<HTMLElement | null>(null)
 const zoom = ref<ZoomState>(resetZoom())
 const zoomed = computed(() => isZoomed(zoom.value))
 
-const isDark = computed(() =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-)
+const palette = useChartPalette()
 
 const bucketLabel = computed(() => {
   const seconds = props.coverage?.bucket_seconds || 60
@@ -145,8 +144,8 @@ const chartData = computed(() => {
       {
         label: t('channelMonitorV2.chart.cacheDataset'),
         data: cacheRates,
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        borderColor: palette.value.green,
+        backgroundColor: `${palette.value.green}14`,
         yAxisID: 'yPct',
         tension: 0.4,
         cubicInterpolationMode: 'monotone' as const,
@@ -159,8 +158,8 @@ const chartData = computed(() => {
       {
         label: t('channelMonitorV2.chart.ttftDataset'),
         data: ttftP50,
-        borderColor: '#0ea5e9',
-        backgroundColor: 'rgba(14, 165, 233, 0.08)',
+        borderColor: palette.value.blue,
+        backgroundColor: `${palette.value.blue}14`,
         yAxisID: 'yTtft',
         tension: 0.4,
         cubicInterpolationMode: 'monotone' as const,
@@ -205,11 +204,7 @@ function smoothTrend(values: Array<number | null>): Array<number | null> {
 }
 
 const chartOptions = computed(() => {
-  const text = isDark.value ? '#9ca3af' : '#6b7280'
-  const grid = isDark.value ? '#374151' : '#f3f4f6'
-  const tooltipBg = isDark.value ? '#1f2937' : '#ffffff'
-  const tooltipTitle = isDark.value ? '#f3f4f6' : '#111827'
-  const tooltipBody = isDark.value ? '#d1d5db' : '#4b5563'
+  const { text, grid } = palette.value
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -217,11 +212,7 @@ const chartOptions = computed(() => {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: tooltipBg,
-        titleColor: tooltipTitle,
-        bodyColor: tooltipBody,
-        borderColor: grid,
-        borderWidth: 1,
+        ...palette.value.tooltip,
         padding: 10,
         displayColors: true,
         callbacks: {
@@ -260,12 +251,12 @@ const chartOptions = computed(() => {
         position: 'right' as const,
         min: 0,
         ticks: {
-          color: '#0ea5e9',
+          color: text,
           font: { size: 10 },
           callback: (v: string | number) => formatMonitorMs(Number(v)),
         },
         grid: { display: false },
-        title: { display: true, text: t('channelMonitorV2.metrics.ttftP50'), color: '#0ea5e9', font: { size: 11 } },
+        title: { display: true, text: t('channelMonitorV2.metrics.ttftP50'), color: text, font: { size: 11 } },
       },
     },
   }

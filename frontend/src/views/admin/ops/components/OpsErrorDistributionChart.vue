@@ -8,6 +8,7 @@ import type { OpsErrorDistributionResponse } from '@/api/admin/ops'
 import type { ChartState } from '../types'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import { useChartPalette } from '@/composables/useChartPalette'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -22,13 +23,11 @@ const emit = defineEmits<{
 }>()
 const { t } = useI18n()
 
-const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
+const palette = useChartPalette()
 const colors = computed(() => ({
-  blue: '#3b82f6',
+  ...palette.value,
   red: '#ef4444',
-  orange: '#f59e0b',
-  gray: '#9ca3af',
-  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
+  orange: '#f59e0b'
 }))
 
 const totalSlaErrors = computed(() =>
@@ -72,7 +71,7 @@ const categories = computed<ErrorCategory[]>(() => {
   if (upstream > 0) out.push({ label: t('admin.ops.upstream'), count: upstream, color: colors.value.orange })
   if (client > 0) out.push({ label: t('admin.ops.client'), count: client, color: colors.value.blue })
   if (system > 0) out.push({ label: t('admin.ops.system'), count: system, color: colors.value.red })
-  if (other > 0) out.push({ label: t('admin.ops.other'), count: other, color: colors.value.gray })
+  if (other > 0) out.push({ label: t('admin.ops.other'), count: other, color: colors.value.other })
   return out
 })
 
@@ -100,11 +99,7 @@ const options = computed(() => ({
   maintainAspectRatio: false,
   plugins: {
     legend: { display: false },
-    tooltip: {
-      backgroundColor: isDarkMode.value ? '#1f2937' : '#ffffff',
-      titleColor: isDarkMode.value ? '#f3f4f6' : '#111827',
-      bodyColor: isDarkMode.value ? '#d1d5db' : '#4b5563'
-    }
+    tooltip: colors.value.tooltip
   }
 }))
 </script>

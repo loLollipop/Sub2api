@@ -1,4 +1,4 @@
-/* Public account flows share the console's quiet surfaces and terracotta accent. */
+/* Public account flows share the console's neutral surfaces and blue accent. */
 :is(.auth-shell, body:has(.auth-shell) > .modal-overlay) {
   --auth-bg: var(--theme-bg);
   --auth-panel: var(--theme-surface);

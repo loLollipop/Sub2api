@@ -6,10 +6,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 )
 
-// accountsSupportingRequestedModel keeps mapped accounts that actually serve
-// the model. Ordinary empty-mapping accounts are used only when no mapped
-// sibling in this pool advertises the model. That stops an empty OpenAI mapping
-// from stealing traffic meant for a mapped Gemini/OpenAI-compat account.
+// accountsSupportingRequestedModel keeps supporting non-OpenAI accounts eligible
+// alongside mapped siblings, including accounts without a model restriction.
+// Ordinary empty-mapping OpenAI accounts are used only when no mapped sibling
+// advertises the model, preserving mapped Gemini/OpenAI-compat destinations.
 // Explicit OpenAI passthrough accounts stay eligible alongside mapped siblings:
 // their model semantics belong to the upstream, not a local mapping allowlist.
 //
@@ -42,7 +42,7 @@ func accountsSupportingRequestedModel(accounts []Account, requestedModel string,
 		if len(mapping) == 0 {
 			if supported {
 				unmapped = append(unmapped, account)
-				if account.IsOpenAIPassthroughEnabled() {
+				if account.Platform != PlatformOpenAI || account.IsOpenAIPassthroughEnabled() {
 					matched = append(matched, account)
 				}
 			}

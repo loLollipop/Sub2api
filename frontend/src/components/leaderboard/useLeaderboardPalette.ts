@@ -9,7 +9,7 @@ export function useLeaderboardPalette() {
     const providers: Record<string, string> = {
       openai: colors.accent,
       anthropic: colors.purple,
-      gemini: colors.blue,
+      gemini: colors.orange,
       grok: colors.series[11],
       deepseek: colors.cyan,
       qwen: colors.series[7],

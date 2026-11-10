@@ -29,6 +29,46 @@ func TestAccountsSupportingRequestedModel_EmptyMappingFallbackWhenNobodyMapped(t
 	require.Equal(t, int64(1), got[0].ID)
 }
 
+func TestAccountsSupportingRequestedModel_UnrestrictedNonOpenAICompetesWithMappedSibling(t *testing.T) {
+	for _, tc := range []struct {
+		platform string
+		model    string
+	}{
+		{PlatformAnthropic, "claude-sonnet-4-6"},
+		{PlatformGemini, "gemini-3.8-flash"},
+		{PlatformDeepseek, "deepseek-v4.1-flash-1017"},
+	} {
+		t.Run(tc.platform, func(t *testing.T) {
+			accounts := []Account{
+				{ID: 1, Platform: tc.platform, Type: AccountTypeAPIKey},
+				{ID: 2, Platform: tc.platform, Type: AccountTypeAPIKey, Credentials: map[string]any{"model_mapping": map[string]any{}}},
+				{ID: 3, Platform: tc.platform, Type: AccountTypeAPIKey, Credentials: map[string]any{"model_mapping": map[string]any{tc.model: tc.model}}},
+				{ID: 4, Platform: tc.platform, Type: AccountTypeAPIKey, Credentials: map[string]any{"model_mapping": map[string]any{"other-model": "other-model"}}},
+				{ID: 5, Platform: PlatformOpenAI, Type: AccountTypeAPIKey},
+			}
+			got, unsupported := filterAccountsSupportingRequestedModel(accounts, tc.model)
+			ids := make([]int64, 0, len(got))
+			for _, account := range got {
+				ids = append(ids, account.ID)
+			}
+			require.Equal(t, []int64{1, 2, 3}, ids)
+			require.Equal(t, 2, unsupported)
+		})
+	}
+}
+
+func TestAccountsSupportingRequestedModel_UnrestrictedNativeDoesNotHideOrdinaryFallback(t *testing.T) {
+	accounts := []Account{
+		{ID: 1, Platform: PlatformGemini, Type: AccountTypeAPIKey},
+		{ID: 2, Platform: PlatformOpenAI, Type: AccountTypeAPIKey},
+	}
+	got, unsupported := filterAccountsSupportingRequestedModel(accounts, "gemini-3.8-flash")
+	require.Len(t, got, 2)
+	require.Equal(t, int64(1), got[0].ID)
+	require.Equal(t, int64(2), got[1].ID)
+	require.Zero(t, unsupported)
+}
+
 func TestAccountsSupportingRequestedModel_NormalizesAnthropicOAuthModelID(t *testing.T) {
 	account := Account{
 		ID:       1,
@@ -115,7 +155,7 @@ func TestAccountsSupportingRequestedModel_PassthroughFlagValidation(t *testing.T
 
 func TestAccountsSupportingRequestedModel_PassthroughFlagDoesNotApplyToOtherPlatforms(t *testing.T) {
 	accounts := []Account{
-		{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Extra: map[string]any{"openai_passthrough": true}},
+		{ID: 1, Platform: PlatformZhipu, Type: AccountTypeAPIKey, Extra: map[string]any{"openai_passthrough": true}},
 		{ID: 2, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"model_mapping": map[string]any{"gpt-6.1-sol": "gpt-6.1-sol"}}},
 	}
 	got, unsupported := filterAccountsSupportingRequestedModel(accounts, "gpt-6.1-sol")

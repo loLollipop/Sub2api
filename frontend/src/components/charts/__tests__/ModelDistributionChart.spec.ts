@@ -183,8 +183,8 @@ describe('ModelDistributionChart', () => {
       'Others',
     ])
     expect(chartData.datasets[0].data).toEqual([12, 8, 0, 10])
-    expect(chartData.datasets[0].backgroundColor[0]).toBe('#e56c45')
-    expect(chartData.datasets[0].backgroundColor[3]).toBe('#a39789')
+    expect(chartData.datasets[0].backgroundColor[0]).toBe('#397fde')
+    expect(chartData.datasets[0].backgroundColor[3]).toBe('#808898')
     expect(chartData.datasets[0].backgroundColor[3]).not.toBe(chartData.datasets[0].backgroundColor[0])
 
     const rows = wrapper.findAll('tbody tr')

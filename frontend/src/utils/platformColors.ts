@@ -104,7 +104,7 @@ const ACCENT: Record<Platform, string> = {
   minimax: '#f43f5e', // rose-500
   composite: '#06b6d4', // cyan-500
 }
-const ACCENT_DEFAULT = '#14b8a6' // primary-500 (teal)
+const ACCENT_DEFAULT = '#3468e8' // primary-500
 
 // ── Accent bar (gradient) ───────────────────────────────────────────
 const ACCENT_BAR: Record<Platform, string> = {

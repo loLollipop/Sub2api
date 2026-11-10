@@ -1,4 +1,4 @@
-/* Shared neutral surfaces and terracotta accents for every console page. */
+/* Shared neutral surfaces and blue accents for every console page. */
 :is(.console-signal, body:has(.console-signal) > .modal-overlay, body:has(.console-signal) > .dialog-overlay, body:has(.console-signal) > .select-dropdown-portal, body:has(.console-signal) > .account-popover, body:has(.console-signal) > .version-popover-header, body:has(.console-signal) > .console-action-menu) {
   --signal-bg: var(--theme-bg);
   --signal-surface: var(--theme-surface);

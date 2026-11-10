@@ -5,47 +5,47 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Terracotta accents add warmth to public and console controls
+        // Blue accents shared by public pages and console controls
         primary: {
-          50: '#fcf4ee',
-          100: '#f8e6d9',
-          200: '#efceb7',
-          300: '#efc6a8',
-          400: '#e6ac86',
-          500: '#ad5d37',
-          600: '#a95e3c',
-          700: '#8f4e32',
-          800: '#75412c',
-          900: '#603727',
-          950: '#342119'
+          50: '#eff4ff',
+          100: '#dde8ff',
+          200: '#c0d4ff',
+          300: '#9bbbff',
+          400: '#729cfb',
+          500: '#3468e8',
+          600: '#2858d6',
+          700: '#2149b8',
+          800: '#203f97',
+          900: '#1f3878',
+          950: '#14244f'
         },
-        // 辅助色 - 中性暖灰
+        // 辅助色 - 中性冷灰
         accent: {
-          50: '#faf9f7',
-          100: '#f2efea',
-          200: '#e6e0d8',
-          300: '#d1c8bd',
-          400: '#b3a89a',
-          500: '#82786e',
-          600: '#625a51',
-          700: '#47423c',
-          800: '#302d29',
-          900: '#242321',
-          950: '#1b1a18'
+          50: '#f6f7f9',
+          100: '#eceef2',
+          200: '#dcdfe6',
+          300: '#c5cad3',
+          400: '#a4abb8',
+          500: '#808898',
+          600: '#505767',
+          700: '#313640',
+          800: '#1d2027',
+          900: '#15171c',
+          950: '#0e1014'
         },
         // 深色模式背景
         dark: {
-          50: '#faf9f7',
-          100: '#f0ece6',
-          200: '#e1dad0',
-          300: '#d1c8bd',
-          400: '#bcb4a9',
-          500: '#968c7f',
-          600: '#746c61',
-          700: '#45413b',
-          800: '#2d2c29',
-          900: '#242321',
-          950: '#1b1a18'
+          50: '#f6f7f9',
+          100: '#eceef2',
+          200: '#dcdfe6',
+          300: '#c5cad3',
+          400: '#a4abb8',
+          500: '#808898',
+          600: '#505767',
+          700: '#313640',
+          800: '#1d2027',
+          900: '#15171c',
+          950: '#0e1014'
         }
       },
       fontFamily: {
@@ -67,20 +67,20 @@ export default {
       boxShadow: {
         glass: '0 8px 32px rgba(0, 0, 0, 0.08)',
         'glass-sm': '0 4px 16px rgba(0, 0, 0, 0.06)',
-        glow: '0 0 20px rgba(169, 94, 60, 0.08)',
-        'glow-lg': '0 0 40px rgba(169, 94, 60, 0.10)',
+        glow: '0 0 20px rgba(40, 88, 214, 0.08)',
+        'glow-lg': '0 0 40px rgba(40, 88, 214, 0.10)',
         card: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
         'card-hover': '0 10px 40px rgba(0, 0, 0, 0.08)',
         'inner-glow': 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-primary': 'linear-gradient(135deg, #e6ac86 0%, #a95e3c 55%, #8f4e32 100%)',
-        'gradient-dark': 'linear-gradient(135deg, #373530 0%, #242321 100%)',
+        'gradient-primary': 'linear-gradient(135deg, #3468e8 0%, #2858d6 55%, #2149b8 100%)',
+        'gradient-dark': 'linear-gradient(135deg, #272b34 0%, #15171c 100%)',
         'gradient-glass':
           'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
         'mesh-gradient':
-          'radial-gradient(at 40% 20%, rgba(169, 94, 60, 0.04) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(167, 134, 78, 0.03) 0px, transparent 50%)'
+          'radial-gradient(at 40% 20%, rgba(40, 88, 214, 0.04) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(10, 122, 144, 0.03) 0px, transparent 50%)'
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
@@ -118,8 +118,8 @@ export default {
           '100%': { backgroundPosition: '200% 0' }
         },
         glow: {
-          '0%': { boxShadow: '0 0 20px rgba(169, 94, 60, 0.10)' },
-          '100%': { boxShadow: '0 0 30px rgba(169, 94, 60, 0.16)' }
+          '0%': { boxShadow: '0 0 20px rgba(40, 88, 214, 0.10)' },
+          '100%': { boxShadow: '0 0 30px rgba(40, 88, 214, 0.16)' }
         }
       },
       backdropBlur: {

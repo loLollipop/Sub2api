@@ -272,7 +272,7 @@ async function saveAllSettings() {
 
 <template>
   <BaseDialog :show="show" :title="t('admin.ops.settings.title')" width="extra-wide" @close="handleClose">
-    <div v-if="loading" class="py-10 text-center text-sm text-gray-500">
+    <div v-if="loading" class="py-10 text-center text-sm text-[var(--theme-muted)]">
       {{ t('common.loading') }}
     </div>
 
@@ -297,7 +297,7 @@ async function saveAllSettings() {
             max="86400"
             class="input"
           />
-          <p class="mt-1 text-xs text-gray-500">{{ t('admin.ops.settings.evaluationIntervalHint') }}</p>
+          <p class="mt-1 text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.evaluationIntervalHint') }}</p>
         </div>
       </div>
 
@@ -425,7 +425,7 @@ async function saveAllSettings() {
               step="0.1"
               class="input"
             />
-            <p class="mt-1 text-xs text-gray-500">{{ t('admin.ops.settings.slaMinPercentHint') }}</p>
+            <p class="mt-1 text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.slaMinPercentHint') }}</p>
           </div>
 
 
@@ -438,7 +438,7 @@ async function saveAllSettings() {
               step="50"
               class="input"
             />
-            <p class="mt-1 text-xs text-gray-500">{{ t('admin.ops.settings.ttftP99MaxMsHint') }}</p>
+            <p class="mt-1 text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.ttftP99MaxMsHint') }}</p>
           </div>
 
           <div>
@@ -451,7 +451,7 @@ async function saveAllSettings() {
               step="0.1"
               class="input"
             />
-            <p class="mt-1 text-xs text-gray-500">{{ t('admin.ops.settings.requestErrorRateMaxPercentHint') }}</p>
+            <p class="mt-1 text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.requestErrorRateMaxPercentHint') }}</p>
           </div>
 
           <div>
@@ -464,7 +464,7 @@ async function saveAllSettings() {
               step="0.1"
               class="input"
             />
-            <p class="mt-1 text-xs text-gray-500">{{ t('admin.ops.settings.upstreamErrorRateMaxPercentHint') }}</p>
+            <p class="mt-1 text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.upstreamErrorRateMaxPercentHint') }}</p>
           </div>
         </div>
       </div>
@@ -492,7 +492,7 @@ async function saveAllSettings() {
                 class="input"
                 placeholder="0 2 * * *"
               />
-              <p class="mt-1 text-xs text-gray-500">{{ t('admin.ops.settings.cleanupScheduleHint') }}</p>
+              <p class="mt-1 text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.cleanupScheduleHint') }}</p>
             </div>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -527,7 +527,7 @@ async function saveAllSettings() {
                 />
               </div>
             </div>
-            <p class="text-xs text-gray-500">{{ t('admin.ops.settings.retentionDaysHint') }}</p>
+            <p class="text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.retentionDaysHint') }}</p>
           </div>
 
           <!-- 预聚合任务 -->
@@ -537,7 +537,7 @@ async function saveAllSettings() {
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.enableAggregation') }}</label>
-                <p class="mt-1 text-xs text-gray-500">{{ t('admin.ops.settings.aggregationHint') }}</p>
+                <p class="mt-1 text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.aggregationHint') }}</p>
               </div>
               <Toggle v-model="advancedSettings.aggregation.aggregation_enabled" />
             </div>
@@ -546,7 +546,7 @@ async function saveAllSettings() {
           <!-- OpenAI 账号配额自动暂停（全局默认阈值） -->
           <div class="space-y-3">
             <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.openaiQuotaAutoPause') }}</h5>
-            <p class="text-xs text-gray-500">{{ t('admin.ops.settings.openaiQuotaAutoPauseHint') }}</p>
+            <p class="text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.openaiQuotaAutoPauseHint') }}</p>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
@@ -574,7 +574,7 @@ async function saveAllSettings() {
                 />
               </div>
             </div>
-            <p class="text-xs text-gray-500">{{ t('admin.ops.settings.openaiQuotaAutoPauseThresholdHint') }}</p>
+            <p class="text-xs text-[var(--theme-muted)]">{{ t('admin.ops.settings.openaiQuotaAutoPauseThresholdHint') }}</p>
           </div>
 
           <!-- Error Filtering -->
@@ -584,7 +584,7 @@ async function saveAllSettings() {
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.ignoreCountTokensErrors') }}</label>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-[var(--theme-muted)]">
                   {{ t('admin.ops.settings.ignoreCountTokensErrorsHint') }}
                 </p>
               </div>
@@ -594,7 +594,7 @@ async function saveAllSettings() {
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.ignoreContextCanceled') }}</label>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-[var(--theme-muted)]">
                   {{ t('admin.ops.settings.ignoreContextCanceledHint') }}
                 </p>
               </div>
@@ -604,7 +604,7 @@ async function saveAllSettings() {
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.ignoreNoAvailableAccounts') }}</label>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-[var(--theme-muted)]">
                   {{ t('admin.ops.settings.ignoreNoAvailableAccountsHint') }}
                 </p>
               </div>
@@ -614,7 +614,7 @@ async function saveAllSettings() {
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.ignoreInsufficientBalanceErrors') }}</label>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-[var(--theme-muted)]">
                   {{ t('admin.ops.settings.ignoreInsufficientBalanceErrorsHint') }}
                 </p>
               </div>
@@ -629,7 +629,7 @@ async function saveAllSettings() {
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.enableAutoRefresh') }}</label>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-[var(--theme-muted)]">
                   {{ t('admin.ops.settings.enableAutoRefreshHint') }}
                 </p>
               </div>
@@ -656,7 +656,7 @@ async function saveAllSettings() {
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.displayAlertEvents') }}</label>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-[var(--theme-muted)]">
                   {{ t('admin.ops.settings.displayAlertEventsHint') }}
                 </p>
               </div>
@@ -666,7 +666,7 @@ async function saveAllSettings() {
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.displayOpenAITokenStats') }}</label>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-[var(--theme-muted)]">
                   {{ t('admin.ops.settings.displayOpenAITokenStatsHint') }}
                 </p>
               </div>

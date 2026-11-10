@@ -12,40 +12,40 @@
     color-scheme: light;
     /* Keep the page and fixed header steady while dialogs lock body scrolling. */
     scrollbar-gutter: stable;
-    --theme-bg: #faf9f6;
+    --theme-bg: #f6f7f9;
     --theme-surface: #ffffff;
-    --theme-raised: #f2efea;
-    --theme-inset: #f5f2ee;
-    --theme-text: #292724;
-    --theme-muted: #706a62;
-    --theme-line: #e6e0d8;
-    --theme-control-line: #c6bcb0;
-    --theme-accent: #a95e3c;
-    --theme-accent-soft: #f8ebe1;
+    --theme-raised: #eaedf2;
+    --theme-inset: #f1f3f6;
+    --theme-text: #171a21;
+    --theme-muted: #5d6573;
+    --theme-line: #e2e5eb;
+    --theme-control-line: #c2c8d2;
+    --theme-accent: #2858d6;
+    --theme-accent-soft: #e8efff;
     --theme-on-accent: #ffffff;
-    --theme-decor: #a7864e;
+    --theme-decor: #6088b8;
     --brand-color: var(--theme-text);
-    --brand-gradient: linear-gradient(105deg, #aa4940 0%, #ac592f 52%, #946328 100%);
-    --home-title-gradient: linear-gradient(105deg, #aa4940 0%, #b76337 52%, #9c6d2c 100%);
+    --brand-gradient: linear-gradient(105deg, #2149b8 0%, #2866d4 52%, #0a7a90 100%);
+    --home-title-gradient: var(--brand-gradient);
   }
 
   .dark {
     color-scheme: dark;
-    --theme-bg: #242321;
-    --theme-surface: #2d2c29;
-    --theme-raised: #373530;
-    --theme-inset: #292723;
-    --theme-text: #f0ece6;
-    --theme-muted: #bcb4a9;
-    --theme-line: #45413b;
-    --theme-control-line: #746c61;
-    --theme-accent: #e6ac86;
-    --theme-accent-soft: #443127;
-    --theme-on-accent: #302117;
-    --theme-decor: #b99769;
+    --theme-bg: #15171c;
+    --theme-surface: #1d2027;
+    --theme-raised: #272b34;
+    --theme-inset: #181a20;
+    --theme-text: #eceef2;
+    --theme-muted: #a4abb8;
+    --theme-line: #313640;
+    --theme-control-line: #505767;
+    --theme-accent: #8fb1ff;
+    --theme-accent-soft: #1e2b49;
+    --theme-on-accent: #0d1b3e;
+    --theme-decor: #7396c4;
     --brand-color: var(--theme-text);
-    --brand-gradient: var(--home-title-gradient);
-    --home-title-gradient: linear-gradient(105deg, #efa494 0%, #f0bd8b 52%, #e6cd95 100%);
+    --brand-gradient: linear-gradient(105deg, #9bbbff 0%, #7fc4f8 52%, #7fe0cf 100%);
+    --home-title-gradient: var(--brand-gradient);
   }
 
   body {
@@ -170,7 +170,7 @@
     .brand-gradient,
     .home-title-gradient {
       background: none;
-      color: #292724;
+      color: #171a21;
       -webkit-text-fill-color: currentColor;
     }
   }

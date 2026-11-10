@@ -2,27 +2,27 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.40",
-  "imported_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
+  "imported_version": "2.3.47",
+  "imported_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.40",
-  "latest_observed_release_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
-  "latest_observed_main_commit": "17036fca1f3d1728ddf0cad2dec83f8b829cc867",
+  "latest_observed_version": "2.3.47",
+  "latest_observed_release_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
+  "latest_observed_main_commit": "c11beef756a1ce0eb02a3312992d9506f79066ec",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.40",
-  "reviewed_release_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
+  "reviewed_release_tag": "v2.3.47",
+  "reviewed_release_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
   "observed_delta_review": {
-    "from_commit": "a16b937d6afea658434aa2c16049114c91984867",
-    "to_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
-    "status": "formal_v2340_selective_backport",
-    "scope": "Review 118 commits / 128 paths from formal v2.3.19 to v2.3.40. Adapt whitelist saves, DeepSeek/Grok compatibility, auth/code-consumption and local safety fixes. Defer quality routing, balance-rejection emails and catalogue; exclude retired modules and source release bookkeeping.",
-    "evidence": "maintenance/notes/upstream-sync-20261109-v2340.md"
+    "from_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
+    "to_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
+    "status": "formal_v2347_selective_backport",
+    "scope": "Review 28 commits / 17 paths from formal v2.3.40 to v2.3.47; independently adapt non-OpenAI unrestricted model scheduling. Preserve local fallback, provider and billing contracts; defer automatic whitelist writes and reject unrelated permission expansion.",
+    "evidence": "maintenance/notes/upstream-sync-20261110-v2347.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "59136801e026eca4397ec9fe64bea791ddc6a33f",
+    "source_head": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -30,6 +30,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.41-v2.3.47: independently adapt unrestricted non-OpenAI model-pool eligibility; preserve ordinary OpenAI mapping preference, explicit passthrough, no-match mixed fallback, compact/retirement and provider-family guards. Retain local UI/billing; automatic whitelist writes/CAS, iframe permission expansion and removed sweeper remain excluded or deferred. See maintenance/notes/upstream-sync-20261110-v2347.md.",
       "Formal v2.3.20-v2.3.40: whitelist save conflict and hidden-mapping hints; DeepSeek raw-preserving Chat tool-pair repair and protocol-specific placeholders; unchanged Grok effort; durable session revocation, atomic email code consumption, idempotent body-normalized model admission with multipart-byte preservation, API-key session release, opt-in startup cleanup, homepage isolation and mandatory installation checksums. Preserve routing/billing/UI; see maintenance/notes/upstream-sync-20261109-v2340.md.",
       "Formal v2.3.18: correct missing-field DeepSeek builtin max output to 393216 and exact display names for deepseek-v4.1-flash-1017 and gpt-image-medium; no discovery, matching, pricing or precedence changes. Catalogue/Plaza and Kimi authoritative metadata remain deferred; see maintenance/notes/upstream-sync-20261107-v2318.md",
       "User-authorized post-v2.3.14 leaf 9c518bf7f: GIF frame_count/frame_duration_ms accept decimal integer strings, API-key JSON forwarding normalizes them to numbers and OAuth uses typed parsed fields. Keep bounded numeric validation, original numeric/multipart representations, native routes and GIF response budgets; see maintenance/notes/upstream-sync-20261106-v2314.md.",
@@ -118,6 +119,17 @@
   ],
   "selected_deepseek_fix": "Formal v2304 native DeepSeek bypasses legacy call-ID/request-state rewriting and rejected-field retries; genuine reasoning and thinking-switch options are provider-gated. Existing legacy conversion empty-shell repair remains scoped. Preserve local key/conversation/requested-model replay isolation, native protocols and distinct IDs; no cache-key weakening, Hosted execution, DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2343-default-on-whitelist-sync-and-cas",
+      "upstream_commits": [
+        "36c76cb70",
+        "4b1d97048",
+        "f8cf836b5",
+        "ead04521b"
+      ],
+      "reason": "Keep absent auto-sync runner/repository/UI deferred: default-on remote writes and clearing manual model mappings after failure alter operator restrictions. Source retry retains fetchErr across its wait and exits before a second fetch. CAS default/empty-config followups have no local caller. Independently adapt only scheduler eligibility; retain provider support and local OpenAI fallback.",
+      "evidence": "maintenance/notes/upstream-sync-20261110-v2347.md"
+    },
     {
       "feature": "v2319-curated-catalogue-and-remote-refresh",
       "upstream_commits": [
@@ -848,5 +860,36 @@
     "preserved": "Native providers/discovery, credential destinations and uploader isolation; real terminal usage, bounded drain and no replay after delivery/billing; local 0.15 multiplier, frozen/zero prices and ordered routing; warm light/dark theme, gradients and chart layout/colors; independent reasoning-effort column after model; three pre-existing untracked tests.",
     "migration": "None. Dependencies, migrations, original-source baselines and production runtime configuration unchanged. Personal VERSION advances separately to 2.1.59 for the authorized release. Installation hardening and CI regression gates are recorded separately.",
     "release_status": "User subsequently authorized code review, GitHub submission and deployment on 2026-11-09. Prepare personal v2.1.59 through PR/CI, own Release/GHCR and existing backup/restore-validated controlled rollout; final source, artifact and runtime acceptance are recorded separately."
+  },
+  "sync_20261110_v2347": {
+    "evidence": "maintenance/notes/upstream-sync-20261110-v2347.md",
+    "reviewed_release_tag": "v2.3.47",
+    "reviewed_release_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
+    "observed_main_commit": "c11beef756a1ce0eb02a3312992d9506f79066ec",
+    "reviewed_delta": {
+      "from_version": "2.3.40",
+      "commits": 28,
+      "paths": 17
+    },
+    "selected_commits": [
+      "36c76cb70"
+    ],
+    "selected_scope": "Formal v2.3.41-v2.3.47: independently adapt unrestricted non-OpenAI model-pool eligibility; preserve ordinary OpenAI mapping preference, explicit passthrough, no-match mixed fallback, compact/retirement and provider-family guards. Retain local UI/billing; automatic whitelist writes/CAS, iframe permission expansion and removed sweeper remain excluded or deferred. See maintenance/notes/upstream-sync-20261110-v2347.md.",
+    "deferred_commits": [
+      "36c76cb70",
+      "4b1d97048",
+      "f8cf836b5",
+      "ead04521b"
+    ],
+    "deferred_scope": "Only the scheduler hunk from 36c76cb70 is adapted. Default-on auto-sync, destructive failure clearing and CAS/UI followups remain deferred with the absent module.",
+    "already_covered": "f92867936 fixes the unimported rejection-email path. Existing local deduction notifications already gate on canNotifyBalance; preserve opt-out and extra recipients without restoring rejection notifications.",
+    "excluded_commits": [
+      "541c7e5b6",
+      "9e1bee7a0"
+    ],
+    "excluded_scope": "Retired crypto/sweeper; iframe same-origin/download/modal permission expansion; source UI/VERSION/release bookkeeping. All previous exclusions remain.",
+    "preserved": "All 36 pre-existing modified/untracked files, including cold gray/blue frontend work and three unrelated Go tests; native providers, discovery, credential destinations, uploader isolation, billing, group order, compact and retired-model behavior.",
+    "migration": "None. Dependencies, migrations, original-source checkpoint, personal VERSION 2.1.59 and deployment configuration unchanged.",
+    "release_status": "Local adaptation and source review only. No commit, push, release or deployment authorized in this task."
   }
 }

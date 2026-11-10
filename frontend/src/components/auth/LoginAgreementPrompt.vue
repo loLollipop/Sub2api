@@ -176,7 +176,7 @@ function documentIcon(index: number, title: string): 'document' | 'shield' | 'gl
 .agreement-document > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .agreement-document > svg { flex-shrink: 0; color: var(--auth-muted, #6b7280); }
 .agreement-document:hover { background: var(--auth-inset, #f3f4f6); }
-.agreement-document:focus-visible { outline: 2px solid var(--auth-accent, #a95e3c); outline-offset: 3px; }
+.agreement-document:focus-visible { outline: 2px solid var(--auth-accent, var(--theme-accent)); outline-offset: 3px; }
 :global(.dark) .agreement-document { border-color: var(--auth-edge, #343943); color: var(--auth-text, #f3f4f6); }
 :global(.dark) .agreement-document:hover { background: var(--auth-inset, #242830); }
 </style>

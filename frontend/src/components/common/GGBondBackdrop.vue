@@ -29,8 +29,8 @@ withDefaults(defineProps<{ variant?: 'shell' | 'home' | 'auth' }>(), { variant: 
 
 <style scoped>
 .ggbond-backdrop {
-  --hero-outline: #b9604e;
-  --hero-detail: #a7864e;
+  --hero-outline: var(--theme-accent);
+  --hero-detail: var(--theme-decor);
   position: fixed;
   inset: 0;
   z-index: -1;

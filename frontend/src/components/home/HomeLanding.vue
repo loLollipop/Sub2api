@@ -150,17 +150,17 @@ const brands = [
   --home-accent: var(--theme-accent);
   --home-accent-soft: var(--theme-accent-soft);
   --home-on-accent: var(--theme-on-accent);
-  --home-shadow: #3028201a;
-  --home-orbit-line: #b8987426;
+  --home-shadow: #17253d1a;
+  --home-orbit-line: #6088b826;
   --home-orbit-point: var(--theme-decor);
-  --home-orbit-halo: #b8987405;
+  --home-orbit-halo: #6088b805;
   --home-brand-line: var(--theme-line);
   --home-brand-surface: #ffffffb8;
-  --syntax-command: #725d80;
-  --syntax-url: #a95e3c;
-  --syntax-key: #75613f;
-  --syntax-string: #3e776b;
-  --syntax-placeholder: #70675d;
+  --syntax-command: #6d4bb3;
+  --syntax-url: #2858d6;
+  --syntax-key: #0f6f8a;
+  --syntax-string: #1f7a5c;
+  --syntax-placeholder: #5d6573;
   --signal-text: var(--home-ink);
   display: flex;
   position: relative;
@@ -173,14 +173,14 @@ const brands = [
 }
 .home-landing--dark {
   --home-shadow: #00000090;
-  --home-orbit-line: #b9976921;
-  --home-orbit-halo: #b9976905;
-  --home-brand-surface: #2d2c29b8;
-  --syntax-command: #b7a8c7;
-  --syntax-url: #e6ac86;
-  --syntax-key: #c6b58f;
-  --syntax-string: #99bbb0;
-  --syntax-placeholder: #c8b8a5;
+  --home-orbit-line: #7396c421;
+  --home-orbit-halo: #7396c405;
+  --home-brand-surface: #1d2027b8;
+  --syntax-command: #b9a6f2;
+  --syntax-url: #8fb1ff;
+  --syntax-key: #7fd0e6;
+  --syntax-string: #86d3b0;
+  --syntax-placeholder: #a4abb8;
 }
 .landing-container { width: min(1240px, calc(100% - 96px)); margin-inline: auto; }
 .landing-header { position: relative; z-index: 10; }

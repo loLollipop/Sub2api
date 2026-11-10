@@ -61,7 +61,7 @@ const options = computed<ChartOptions<'bar'>>(() => ({
   plugins: {
     legend: { display: false },
     tooltip: {
-      backgroundColor: palette.value.isDark ? '#302c27' : '#3b342d', padding: 12,
+      backgroundColor: palette.value.isDark ? '#272b34' : '#313640', padding: 12,
       callbacks: { label: context => `${context.dataset.label}: ${props.share ? `${Number(context.raw).toFixed(1)}%` : compactTokens(Number(context.raw))}` },
     },
   },

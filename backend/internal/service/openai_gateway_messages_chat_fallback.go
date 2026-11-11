@@ -51,6 +51,26 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	applyOpenAICompatModelNormalization(&anthropicReq)
 	clientStream := anthropicReq.Stream
 
+	// Resolve capability before converting tool definitions to Chat format.
+	billingModel := resolveOpenAIForwardModel(account, anthropicReq.Model, defaultMappedModel)
+	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if geminiImageGenerationDenied(c, nil, originalModel, anthropicReq.Model, billingModel, upstreamModel) {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", ImageGenerationPermissionMessage())
+		return nil, errGeminiImageGenerationDenied
+	}
+	if err := validateGPT61RawEffort(body, upstreamModel); err != nil {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
+	if openai.IsGPT61SolModelSpelling(upstreamModel) && len(anthropicReq.Tools) > 0 {
+		if s.accountRepo != nil {
+			return nil, newOpenAIResponsesToolsUnsupportedFailoverError(upstreamModel)
+		}
+		err := fmt.Errorf("gpt-6.1-sol requires Responses for tool calls; this account only supports Chat Completions")
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
+
 	// 2. Anthropic → Chat Completions (direct, no Responses intermediary)
 	chatReq, err := apicompat.AnthropicToChatCompletionsRequestWithOptions(
 		&anthropicReq,
@@ -62,23 +82,17 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 		return nil, fmt.Errorf("convert anthropic to chat completions: %w", err)
 	}
 
-	billingModel := resolveOpenAIForwardModel(account, anthropicReq.Model, defaultMappedModel)
-	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-	if geminiImageGenerationDenied(c, nil, originalModel, anthropicReq.Model, billingModel, upstreamModel) {
-		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", ImageGenerationPermissionMessage())
-		return nil, errGeminiImageGenerationDenied
-	}
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
-		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
-		return nil, err
-	}
-	if openai.IsGPT61SolModelSpelling(upstreamModel) && len(anthropicReq.Tools) > 0 {
-		err := fmt.Errorf("gpt-6.1-sol requires Responses for tool calls; this account only supports Chat Completions")
-		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
-		return nil, err
-	}
 	chatReq.Model = upstreamModel
+	if openai.IsGPT61SolModelSpelling(upstreamModel) {
+		chatReq.Temperature = nil
+		chatReq.TopP = nil
+	}
 	chatReq.ReasoningEffort = openAICompatAnthropicReasoningEffort(&anthropicReq, upstreamModel, chatReq.ReasoningEffort)
+	if account.Platform == PlatformOpenAI && anthropicReq.Thinking != nil && anthropicReq.Thinking.Type == "disabled" {
+		// The direct Chat bridge retains its provider defaults. OpenAI group
+		// policy must see the explicit disabled preference as synthesized none.
+		chatReq.ReasoningEffort = "none"
+	}
 	if account.Platform == PlatformDeepseek {
 		if anthropicReq.OutputConfig != nil && anthropicReq.OutputConfig.Effort == "max" {
 			chatReq.ReasoningEffort = "max"
@@ -116,6 +130,10 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 		if changed {
 			chatBody = policyBody
 		}
+	}
+	if err := validateGPT61SolCompatRequest(chatBody, upstreamModel); err != nil {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
 	}
 	// Unlike forwardResponsesViaRawChatCompletions, applyOpenAIFastPolicyToBody
 	// is intentionally skipped: Anthropic Messages bodies carry no service_tier,

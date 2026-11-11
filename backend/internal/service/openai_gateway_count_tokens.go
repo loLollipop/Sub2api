@@ -249,7 +249,8 @@ func estimateAnthropicCountTokensLocally(body []byte) (int, error) {
 		return 0, fmt.Errorf("parse anthropic count_tokens request: model is required")
 	}
 
-	responsesReq, err := apicompat.AnthropicToResponses(&anthropicReq)
+	// This endpoint counts input and never sends an output reasoning policy.
+	responsesReq, err := apicompat.AnthropicToResponsesWithOptions(&anthropicReq, &apicompat.AnthropicToResponsesOptions{DeferReasoningEffortValidation: true})
 	if err != nil {
 		return 0, fmt.Errorf("convert anthropic request to responses: %w", err)
 	}
@@ -437,7 +438,7 @@ func prepareOpenAIInputTokensCountRequest(
 	billingModel := resolveOpenAIForwardModel(account, normalizedModel, strings.TrimSpace(defaultMappedModel))
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
 
-	responsesReq, err := apicompat.AnthropicToResponses(&anthropicReq)
+	responsesReq, err := apicompat.AnthropicToResponsesWithOptions(&anthropicReq, &apicompat.AnthropicToResponsesOptions{DeferReasoningEffortValidation: true})
 	if err != nil {
 		return nil, fmt.Errorf("convert anthropic request to responses: %w", err)
 	}

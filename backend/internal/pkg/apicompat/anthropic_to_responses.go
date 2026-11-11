@@ -20,6 +20,9 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 // has resolved a compatible target platform.
 type AnthropicToResponsesOptions struct {
 	PreserveThinkingContent bool
+	// The caller validates explicit input before conversion and the final
+	// synthesized effort after its group policy has been applied.
+	DeferReasoningEffortValidation bool
 }
 
 func AnthropicToResponsesWithOptions(req *AnthropicRequest, opts *AnthropicToResponsesOptions) (*ResponsesRequest, error) {
@@ -28,8 +31,11 @@ func AnthropicToResponsesWithOptions(req *AnthropicRequest, opts *AnthropicToRes
 
 // AnthropicToResponsesWithMinOutputTokens retains the configured token floor.
 func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTokens int, options ...*AnthropicToResponsesOptions) (*ResponsesRequest, error) {
-	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, anthropicReasoningEffort(req)); err != nil {
-		return nil, err
+	deferValidation := len(options) > 0 && options[0] != nil && options[0].DeferReasoningEffortValidation
+	if !deferValidation {
+		if err := openai.ValidateGPT61SolReasoningEffort(req.Model, anthropicReasoningEffort(req)); err != nil {
+			return nil, err
+		}
 	}
 	preserveThinking := len(options) > 0 && options[0] != nil && options[0].PreserveThinkingContent
 	input, err := convertAnthropicToResponsesInputWithThinking(req.System, req.Messages, preserveThinking)
@@ -329,7 +335,7 @@ func anthropicAssistantToResponsesWithThinking(raw json.RawMessage, preserveThin
 		}
 		// Only replay provider ciphertext. Skip GPT/Codex-style gAAAA blobs and
 		// empty placeholders — xAI returns 400 on decrypt for foreign signatures.
-		if sig == "" || strings.HasPrefix(sig, "gAAAA") {
+		if sig == "" || strings.HasPrefix(sig, "gAAAA") || strings.HasPrefix(sig, "ccswitch-openai-reasoning-v1:") {
 			continue
 		}
 		items = append(items, ResponsesInputItem{

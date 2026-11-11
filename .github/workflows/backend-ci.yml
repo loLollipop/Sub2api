@@ -35,7 +35,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
-          go version | grep -q 'go1.27.3'
+          go version | grep -q 'go1.27.4'
       - name: Offline VPS release updater tests
         run: |
           sudo /bin/bash deploy/tests/vps-release-update-test.sh
@@ -119,6 +119,10 @@ jobs:
         working-directory: backend
         run: go test -race -p 1 -parallel 1 -tags=unit ./internal/service ./internal/handler ./internal/handler/admin ./internal/repository ./internal/server/middleware ./internal/integration -run 'Test(.*Totp|.*TOTP|AdminService_UpdateUser_Demotion|AnthropicCompat|ForwardAsCompat|HandleCCStreamingFromAnthropic|HandleResponsesStreamingResponse|GatewayHandlers_.*(Image|Gemini)|GeminiImage|GeminiForward.*Image|GeminiCompatForward.*Image|AntigravityForwards_Image|ImageResultUploader|UpstreamAffinityLocalImage|.*ModelRateLimit.*Snapshot)' -count=1
 
+      - name: Dual upstream token and protocol concurrency regression
+        working-directory: backend
+        run: go test -race -p 1 -parallel 1 -tags=unit ./internal/repository ./internal/service ./internal/handler ./internal/securityaudit ./internal/service/openai_ws_v2 -run 'Test(RefreshTokenCacheConsumeIsAtomic|AuthServiceRefreshTokenPairConsumesTokenOnce|GatewayServiceNewSelectionResult|OpenAIWSIngressWebSearchActivation|OpenAIWSConnWebSearchInitialization|OpenAIWSPassthroughFirstTokenFollowsTTFTMode|MessagesEffortPolicyHTTP|MessagesRawEffortValidation|MessagesGLMMappedEffortPolicyHTTP|MessagesDisabledThinkingCountTokensHTTP|ResponsesSol|EnqueuerNotifiesOnlyAfterPublish|WorkerClaimsWithoutWaitingForIdlePoll)' -count=1
+
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -161,7 +165,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
-          go version | grep -q 'go1.27.3'
+          go version | grep -q 'go1.27.4'
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:

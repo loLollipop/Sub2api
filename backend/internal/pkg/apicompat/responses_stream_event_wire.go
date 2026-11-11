@@ -204,6 +204,9 @@ func responsesItemWire(item *ResponsesOutput) map[string]any {
 		if item.Namespace != "" {
 			m["namespace"] = item.Namespace
 		}
+		if len(item.EncryptedFunctionArgs) > 0 {
+			m["encrypted_function_args"] = item.EncryptedFunctionArgs
+		}
 	case "custom_tool_call":
 		// custom/freeform 工具调用（如 codex 的 exec）：input 为自由文本。缺少
 		// call_id/name 时 codex 无法路由该调用（表现为 unsupported call）。

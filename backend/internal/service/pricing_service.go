@@ -648,10 +648,10 @@ func (s *PricingService) downloadPricingData() error {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to save file: %v", err)
 	}
 
-	// 使用远程哈希作为同步锚点，防止重复下载
-	// 当远程哈希不可用时，回退到数据本身的哈希
+	// Only a hash matching the downloaded body can mark it as current. A remote
+	// hash served ahead of the catalogue must allow the next poll to retry.
 	syncHash := dataHashStr
-	if remoteHash != "" {
+	if strings.EqualFold(remoteHash, dataHashStr) {
 		syncHash = remoteHash
 	}
 	hashFile := s.getHashFilePath()

@@ -56,6 +56,21 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	namespaceTools := apicompat.NamespaceToolNames(effectiveTools)
 	localShellTools := apicompat.LocalShellToolNames(effectiveTools)
 
+	billingModel := resolveOpenAIForwardModel(account, originalModel, "")
+	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
+	if openai.IsGPT61SolModelSpelling(upstreamModel) && len(effectiveTools) > 0 {
+		if s.accountRepo != nil {
+			return nil, newOpenAIResponsesToolsUnsupportedFailoverError(upstreamModel)
+		}
+		err := fmt.Errorf("gpt-6.1-sol requires Responses for tool calls; this account only supports Chat Completions")
+		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
+
 	// 自愈回写：历史里带真实 reasoning_text 的 item 刷新进缓存，覆盖 Redis
 	// 被 flush / 跨实例漂移后同 id 的 encrypted-only 副本无法再取明文的情况。
 	s.recacheReasoningItemsFromInput(responsesReq.Input)
@@ -69,17 +84,6 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 		return nil, fmt.Errorf("convert responses to chat completions: %w", err)
 	}
 
-	billingModel := resolveOpenAIForwardModel(account, originalModel, "")
-	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
-		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
-		return nil, err
-	}
-	if openai.IsGPT61SolModelSpelling(upstreamModel) && len(effectiveTools) > 0 {
-		err := fmt.Errorf("gpt-6.1-sol requires Responses for tool calls; this account only supports Chat Completions")
-		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
-		return nil, err
-	}
 	chatReq.Model = upstreamModel
 	if clientStream {
 		chatReq.StreamOptions = &apicompat.ChatStreamOptions{IncludeUsage: true}

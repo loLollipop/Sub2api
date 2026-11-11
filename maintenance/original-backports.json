@@ -8,12 +8,13 @@
     "v0.2.17": "060d0160417782cd962a0c7f460f6cd4565d4916",
     "v0.2.18": "ac1b8f1271be0d674fa6f074403c1410f30a3a81",
     "v0.2.19": "dece26153621959ccd7635814f4b2d08304e681a",
-    "v0.2.20": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0"
+    "v0.2.20": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
+    "v0.2.21": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10"
   },
-  "latest_reviewed_main_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+  "latest_reviewed_main_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v0.2.20",
-  "reviewed_release_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
+  "reviewed_release_tag": "v0.2.21",
+  "reviewed_release_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
@@ -161,11 +162,11 @@
     "2026-11-07: image-size-tier stickiness6b565e45a depends on excluded size routing. Empty-instructions/response-echo a699c2bae changes existing Codex validation/default injection across protocols and remains deferred as a complete policy group."
   ],
   "observed_delta_review": {
-    "from_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
-    "to_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
-    "reviewed_release_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
-    "status": "formal_v0220_selective_backport_version_only_postrelease_main_reviewed",
-    "evidence": "maintenance/notes/upstream-sync-20261107-v0220.md"
+    "from_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
+    "to_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
+    "reviewed_release_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
+    "status": "formal_v0221_selective_backport",
+    "evidence": "maintenance/notes/upstream-sync-20261111.md"
   },
   "sync_20261022": {
     "evidence": "maintenance/notes/upstream-sync-20261022.md",
@@ -215,5 +216,59 @@
     ],
     "main_only_delta": "VERSION sync only; no unreleased business code imported",
     "release_status": "User subsequently authorized code review, GitHub submission and deployment on 2026-11-07. Prepare personal v2.1.58; final PR/CI, artifact and deployment gates recorded separately."
+  },
+  "sync_20261111_v0221": {
+    "evidence": "maintenance/notes/upstream-sync-20261111.md",
+    "personal_version": "2.1.61",
+    "preserved": "Native provider routing and credential destinations; local theme; final-wire pricing, explicit zero prices and 0.15 multiplier; bounded real terminal usage drain; three pre-existing untracked usage tests.",
+    "migration": "None; third-party dependencies, database migrations and runtime settings unchanged. Release security gate requires Go 1.27.4 (GO-2026-6859), with CI/Docker build versions updated.",
+    "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-11. Prepare personal v2.1.61 through PR/CI, own Release/GHCR and backup/restore verification; final evidence recorded separately.",
+    "reviewed_release_tag": "v0.2.21",
+    "reviewed_release_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
+    "observed_main_commit": "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484",
+    "reviewed_delta": {
+      "from_version": "0.2.20",
+      "commits": 82,
+      "paths": 200
+    },
+    "selected_source_commits": [
+      "7122efee9",
+      "4ac713c4d",
+      "090c58f66",
+      "36484727c",
+      "e2ce0b43d",
+      "7796a2d57",
+      "92d35a694",
+      "85f43b640",
+      "cf1ba819b",
+      "e401c5805",
+      "ebf016808",
+      "88b7090a3",
+      "a1395eeaf",
+      "f2b0a32b1",
+      "552d1ab4b",
+      "63f117229",
+      "b2a695d61",
+      "142d22cc4",
+      "0578fb160",
+      "fab3ec251",
+      "eb4ccd173",
+      "6f2faba29",
+      "aa245176a",
+      "f6ea845c5",
+      "390ba9905"
+    ],
+    "selected_scope": "Atomic refresh rotation; hydrated-account slot release; compatibility error policy; Gemini thought filtering; Antigravity media ordering and Pro Argon quotas; catalog hash retry; stable session seeds; Codex image/error/metadata/page context; sealed function metadata; foreign reasoning envelope filtering; UTF-8 rejection; WS search activation, TTFT and later-turn failover; synthesized reasoning policy with final validation and GLM semantics; immediate local audit-worker wake.",
+    "already_covered": [
+      "Sonnet5.5 fallback cache-read price508bb9560 already equals0.1e-6.",
+      "Local final-wire repricing and native provider safeguards retained."
+    ],
+    "deferred_scope": [
+      "New cache-write30m/12h usage and billing chain, including migrations and Fast free-input fix7156213cc.",
+      "Adaptive request body memory budget and cgroup reader.",
+      "Fable/Mythos5.2 capability/catalog/pricing expansion.",
+      "Keys async30-day usage plus covering index, retained-refresh-row UI, Antigravity query button and settings save dock require separate local UI adaptation."
+    ],
+    "excluded_scope": "Retired payment changes, source release/deployment bookkeeping and original-catalog image documentation. Observed main after the official release is recorded only, not imported."
   }
 }

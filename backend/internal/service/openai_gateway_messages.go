@@ -109,7 +109,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", ImageGenerationPermissionMessage())
 		return nil, errGeminiImageGenerationDenied
 	}
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+	if err := validateGPT61RawEffort(body, upstreamModel); err != nil {
 		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
@@ -164,7 +164,10 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 
 	// 3. Convert Anthropic → Responses after compatibility-only replay guard.
-	responsesReq, err := apicompat.AnthropicToResponsesWithMinOutputTokens(&anthropicReq, configuredMinOutputTokens(s.cfg), &apicompat.AnthropicToResponsesOptions{PreserveThinkingContent: account.Platform == PlatformDeepseek})
+	responsesReq, err := apicompat.AnthropicToResponsesWithMinOutputTokens(&anthropicReq, configuredMinOutputTokens(s.cfg), &apicompat.AnthropicToResponsesOptions{
+		PreserveThinkingContent:        account.Platform == PlatformDeepseek,
+		DeferReasoningEffortValidation: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("convert anthropic to responses: %w", err)
 	}
@@ -180,7 +183,9 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 
 	responsesReq.Model = upstreamModel
 	if responsesReq.Reasoning != nil && account.Platform != PlatformDeepseek {
-		responsesReq.Reasoning.Effort = openAICompatAnthropicReasoningEffort(&anthropicReq, upstreamModel, responsesReq.Reasoning.Effort)
+		if account.Platform != PlatformOpenAI || anthropicReq.Thinking == nil || anthropicReq.Thinking.Type != "disabled" {
+			responsesReq.Reasoning.Effort = openAICompatAnthropicReasoningEffort(&anthropicReq, upstreamModel, responsesReq.Reasoning.Effort)
+		}
 	}
 	if previousResponseID != "" {
 		responsesReq.PreviousResponseID = previousResponseID
@@ -322,6 +327,11 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 				responsesReq.Reasoning.Effort = gjson.GetBytes(responsesBody, "reasoning.effort").String()
 			}
 		}
+	}
+
+	if err := validateGPT61SolCompatRequest(responsesBody, upstreamModel); err != nil {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
 	}
 
 	// 4c. Apply OpenAI fast policy (may filter service_tier or block the request).

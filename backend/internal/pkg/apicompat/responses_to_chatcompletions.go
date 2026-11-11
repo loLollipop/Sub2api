@@ -696,10 +696,12 @@ func generateChatCmplID() string {
 // ---------------------------------------------------------------------------
 
 type bufferedFuncCall struct {
-	OutputIndex int
-	CallID      string
-	Name        string
-	Args        strings.Builder
+	OutputIndex           int
+	CallID                string
+	Name                  string
+	Namespace             string
+	EncryptedFunctionArgs json.RawMessage
+	Args                  strings.Builder
 }
 
 type bufferedReasoningContent struct {
@@ -754,6 +756,12 @@ func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) 
 			}
 			if event.Item.Name != "" {
 				call.Name = event.Item.Name
+			}
+			if event.Item.Namespace != "" {
+				call.Namespace = event.Item.Namespace
+			}
+			if len(event.Item.EncryptedFunctionArgs) > 0 {
+				call.EncryptedFunctionArgs = event.Item.EncryptedFunctionArgs
 			}
 			arguments := event.Item.Arguments
 			if event.Item.Type == "custom_tool_call" {
@@ -835,10 +843,12 @@ func (a *BufferedResponseAccumulator) BuildOutput() []ResponsesOutput {
 
 	for i := range a.funcCalls {
 		out = append(out, ResponsesOutput{
-			Type:      "function_call",
-			CallID:    a.funcCalls[i].CallID,
-			Name:      a.funcCalls[i].Name,
-			Arguments: a.funcCalls[i].Args.String(),
+			Type:                  "function_call",
+			CallID:                a.funcCalls[i].CallID,
+			Name:                  a.funcCalls[i].Name,
+			Namespace:             a.funcCalls[i].Namespace,
+			EncryptedFunctionArgs: a.funcCalls[i].EncryptedFunctionArgs,
+			Arguments:             a.funcCalls[i].Args.String(),
 		})
 	}
 

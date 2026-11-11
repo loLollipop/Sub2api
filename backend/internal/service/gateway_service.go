@@ -653,6 +653,11 @@ type GatewayFailureStage string
 const (
 	GatewayFailureStageInference   GatewayFailureStage = "inference"
 	GatewayFailureStageAccountAuth GatewayFailureStage = "account_auth"
+	// GatewayFailureStageRequestCompatibility marks a request/account capability
+	// mismatch detected locally, before any upstream call. The request may still
+	// succeed on another account, but the mismatch says nothing about the
+	// selected account's health.
+	GatewayFailureStageRequestCompatibility GatewayFailureStage = "request_compatibility"
 )
 
 // GatewayFailureScope identifies whether selecting another account can help.
@@ -702,6 +707,9 @@ func (e *UpstreamFailoverError) Error() string {
 	if e != nil && e.Stage == GatewayFailureStageAccountAuth {
 		return fmt.Sprintf("credential failure: %s (failover)", e.Reason)
 	}
+	if e != nil && e.Stage == GatewayFailureStageRequestCompatibility {
+		return fmt.Sprintf("request compatibility failure: %s (failover)", e.Reason)
+	}
 	return fmt.Sprintf("upstream error: %d (failover)", e.StatusCode)
 }
 
@@ -714,10 +722,11 @@ func (e *UpstreamFailoverError) IsCredentialFailure() bool {
 }
 
 // ShouldReportAccountScheduleFailure prevents provider- and request-scoped
-// credential failures from being misattributed to the selected account. Legacy
-// and inference failures retain their existing scheduler-health behavior.
+// credential failures and local request incompatibility from being misattributed
+// to the selected account. Legacy and inference failures retain their existing
+// scheduler-health behavior.
 func (e *UpstreamFailoverError) ShouldReportAccountScheduleFailure() bool {
-	if e == nil {
+	if e == nil || e.Stage == GatewayFailureStageRequestCompatibility {
 		return false
 	}
 	// A model-specific quality rejection must not mark an otherwise healthy

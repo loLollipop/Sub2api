@@ -2560,9 +2560,19 @@ func supportsOpenAIReasoningEffortMax(model string) bool {
 	}
 }
 
-// validateGPT61SolCompatRequest runs after model mapping, before conversion can
-// discard unsupported explicit effort selections or disabled thinking.
+// Validate the final converted effort after the group policy has been applied.
 func validateGPT61SolCompatRequest(body []byte, model string) error {
+	if err := validateGPT61RawEffort(body, model); err != nil {
+		return err
+	}
+	if gjson.GetBytes(body, "thinking.type").String() == "disabled" {
+		return openai.ValidateGPT61SolReasoningEffort(model, "none")
+	}
+	return nil
+}
+
+// Explicit unsupported values remain request errors even when a mapping exists.
+func validateGPT61RawEffort(body []byte, model string) error {
 	if !openai.IsGPT61SolModelSpelling(model) {
 		return nil
 	}
@@ -2571,10 +2581,7 @@ func validateGPT61SolCompatRequest(body []byte, model string) error {
 			return err
 		}
 	}
-	if gjson.GetBytes(body, "thinking.type").String() == "disabled" {
-		return openai.ValidateGPT61SolReasoningEffort(model, "none")
-	}
-	requestedModel := gjson.GetBytes(body, "model").String()
+	requestedModel := strings.ReplaceAll(gjson.GetBytes(body, "model").String(), "_", "-")
 	for _, effort := range []string{"none", "minimal"} {
 		if strings.HasSuffix(strings.ToLower(requestedModel), "-"+effort) {
 			return openai.ValidateGPT61SolReasoningEffort(model, effort)

@@ -2,21 +2,21 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.47",
-  "imported_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
+  "imported_version": "2.3.50",
+  "imported_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.47",
-  "latest_observed_release_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
-  "latest_observed_main_commit": "c11beef756a1ce0eb02a3312992d9506f79066ec",
+  "latest_observed_version": "2.3.50",
+  "latest_observed_release_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
+  "latest_observed_main_commit": "cabd7dd5510a45a927f297e544bb9279fbca8b35",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.47",
-  "reviewed_release_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
+  "reviewed_release_tag": "v2.3.50",
+  "reviewed_release_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
   "observed_delta_review": {
-    "from_commit": "59136801e026eca4397ec9fe64bea791ddc6a33f",
-    "to_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
-    "status": "formal_v2347_selective_backport",
-    "scope": "Review 28 commits / 17 paths from formal v2.3.40 to v2.3.47; independently adapt non-OpenAI unrestricted model scheduling. Preserve local fallback, provider and billing contracts; defer automatic whitelist writes and reject unrelated permission expansion.",
-    "evidence": "maintenance/notes/upstream-sync-20261110-v2347.md"
+    "from_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
+    "to_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
+    "status": "formal_v2350_selective_backport",
+    "scope": "Review 15 commits / 18 paths from v2.3.47 to v2.3.50. Adapt request-scoped Sol tools capability failover without Terra expansion; do not import retired sweep or automatic model-sync changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261111.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
@@ -891,5 +891,26 @@
     "preserved": "All 36 pre-existing modified/untracked files, including cold gray/blue frontend work and three unrelated Go tests; native providers, discovery, credential destinations, uploader isolation, billing, group order, compact and retired-model behavior.",
     "migration": "None. Dependencies, migrations, original-source checkpoint, personal VERSION 2.1.59 and deployment configuration unchanged.",
     "release_status": "Local adaptation and source review only. No commit, push, release or deployment authorized in this task."
+  },
+  "sync_20261111_v2350": {
+    "evidence": "maintenance/notes/upstream-sync-20261111.md",
+    "personal_version": "2.1.61",
+    "preserved": "Native provider routing and credential destinations; local theme; final-wire pricing, explicit zero prices and 0.15 multiplier; bounded real terminal usage drain; three pre-existing untracked usage tests.",
+    "migration": "None; third-party dependencies, database migrations and runtime settings unchanged. Release security gate requires Go 1.27.4 (GO-2026-6859), with CI/Docker build versions updated.",
+    "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-11. Prepare personal v2.1.61 through PR/CI, own Release/GHCR and backup/restore verification; final evidence recorded separately.",
+    "reviewed_release_tag": "v2.3.50",
+    "reviewed_release_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
+    "observed_main_commit": "cabd7dd5510a45a927f297e544bb9279fbca8b35",
+    "reviewed_delta": {
+      "from_version": "2.3.47",
+      "commits": 15,
+      "paths": 18
+    },
+    "selected_commits": [
+      "73231859864aece93e28e1a62cc70922a7564225"
+    ],
+    "selected_scope": "Sol tools requests can switch away from Chat-only accounts before lossy conversion or upstream invocation. The final local 400 does not penalize account health.",
+    "deferred_scope": "Terra capability expansion and automatic whitelist sync/hourly defaults remain deferred.",
+    "excluded_scope": "Retired sweeper fix858cd4da2, source VERSION and release notes. Grok Nuxt layout664e776c1 is not portable to the local Vue settings layout."
   }
 }

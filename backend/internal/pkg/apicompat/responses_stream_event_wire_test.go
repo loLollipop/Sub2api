@@ -63,6 +63,32 @@ func TestWire_FunctionCallItemAlwaysComplete(t *testing.T) {
 	require.Equal(t, "", item["arguments"])
 }
 
+// TestWire_SealedFunctionCallMetadata preserves routing and encryption metadata.
+func TestWire_SealedFunctionCallMetadata(t *testing.T) {
+	for _, eventType := range []string{"response.output_item.added", "response.output_item.done"} {
+		for _, marker := range []string{"", "null", "[]", `["message"]`} {
+			t.Run(eventType+"/"+marker, func(t *testing.T) {
+				m := marshalEvent(t, ResponsesStreamEvent{
+					Type: eventType,
+					Item: &ResponsesOutput{Type: "function_call", ID: "fc_sealed", CallID: "call_sealed",
+						Name: "send_message", Namespace: "collaboration", Arguments: `{"message":"sealed"}`,
+						EncryptedFunctionArgs: json.RawMessage(marker)},
+				})
+				item := m["item"].(map[string]any)
+				require.Equal(t, "collaboration", item["namespace"])
+				if marker == "" {
+					require.NotContains(t, item, "encrypted_function_args")
+				} else {
+					require.Contains(t, item, "encrypted_function_args")
+					encoded, err := json.Marshal(item["encrypted_function_args"])
+					require.NoError(t, err)
+					require.JSONEq(t, marker, string(encoded))
+				}
+			})
+		}
+	}
+}
+
 // TestWire_MessageItemContentAlwaysArray guards content:[] presence.
 func TestWire_MessageItemContentAlwaysArray(t *testing.T) {
 	m := marshalEvent(t, ResponsesStreamEvent{

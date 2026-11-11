@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -105,6 +106,32 @@ func (c *refreshTokenCache) GetRefreshToken(ctx context.Context, tokenHash strin
 func (c *refreshTokenCache) DeleteRefreshToken(ctx context.Context, tokenHash string) error {
 	key := refreshTokenKey(tokenHash)
 	return c.rdb.Del(ctx, key).Err()
+}
+
+// Reading and deleting must be one operation so concurrent rotations cannot
+// exchange the same credential twice.
+var consumeRefreshTokenScript = redis.NewScript(`
+local value = redis.call('GET', KEYS[1])
+if not value then
+    return nil
+end
+redis.call('DEL', KEYS[1])
+return value
+`)
+
+func (c *refreshTokenCache) ConsumeRefreshToken(ctx context.Context, tokenHash string) (*service.RefreshTokenData, error) {
+	val, err := consumeRefreshTokenScript.Run(ctx, c.rdb, []string{refreshTokenKey(tokenHash)}).Text()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, service.ErrRefreshTokenNotFound
+		}
+		return nil, err
+	}
+	var data service.RefreshTokenData
+	if err := json.Unmarshal([]byte(val), &data); err != nil {
+		return nil, fmt.Errorf("unmarshal refresh token data: %w", err)
+	}
+	return &data, nil
 }
 
 func (c *refreshTokenCache) DeleteUserRefreshTokens(ctx context.Context, userID int64) error {

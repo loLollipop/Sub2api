@@ -74,7 +74,8 @@ func TestWire_SealedFunctionCallMetadata(t *testing.T) {
 						Name: "send_message", Namespace: "collaboration", Arguments: `{"message":"sealed"}`,
 						EncryptedFunctionArgs: json.RawMessage(marker)},
 				})
-				item := m["item"].(map[string]any)
+				item, ok := m["item"].(map[string]any)
+				require.True(t, ok)
 				require.Equal(t, "collaboration", item["namespace"])
 				if marker == "" {
 					require.NotContains(t, item, "encrypted_function_args")

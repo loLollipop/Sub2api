@@ -221,7 +221,7 @@
     "evidence": "maintenance/notes/upstream-sync-20261111.md",
     "personal_version": "2.1.61",
     "preserved": "Native provider routing and credential destinations; local theme; final-wire pricing, explicit zero prices and 0.15 multiplier; bounded real terminal usage drain; three pre-existing untracked usage tests.",
-    "migration": "None; dependencies, database migrations and deployment settings unchanged.",
+    "migration": "None; third-party dependencies, database migrations and runtime settings unchanged. Release security gate requires Go 1.27.4 (GO-2026-6859), with CI/Docker build versions updated.",
     "release_status": "User subsequently authorized GitHub submission and deployment on 2026-11-11. Prepare personal v2.1.61 through PR/CI, own Release/GHCR and backup/restore verification; final evidence recorded separately.",
     "reviewed_release_tag": "v0.2.21",
     "reviewed_release_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",

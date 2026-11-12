@@ -4,10 +4,10 @@
       <template #trigger>
         <span
           class="cursor-help border-b border-dotted border-gray-300 text-sm font-medium dark:border-dark-600"
-          :class="sameAsAccount ? 'text-gray-500 dark:text-gray-400' : hasEffectiveRate ? 'font-mono text-gray-800 dark:text-gray-200' : statusClass || 'text-gray-400 dark:text-gray-500'"
+          :class="hasEffectiveRate ? 'font-mono text-gray-800 dark:text-gray-200' : statusClass || 'text-gray-400 dark:text-gray-500'"
           data-testid="upstream-billing-rate"
         >
-          {{ sameAsAccount ? t('admin.accounts.upstreamBilling.sameAsAccount') : primaryValue }}
+          {{ primaryValue }}
         </span>
       </template>
       <div class="space-y-1">
@@ -210,12 +210,6 @@ const statusClass = computed(() => {
   return ''
 })
 const hasEffectiveRate = computed(() => effectiveRate.value !== '-')
-const sameAsAccount = computed(() =>
-  props.accountRateVisible === true &&
-  props.account.extra?.upstream_billing_rate_sync_enabled === true &&
-  hasEffectiveRate.value && !statusLabel.value &&
-  currentEffectiveRate.value === (props.account.rate_multiplier ?? 1)
-)
 const primaryValue = computed(() => hasEffectiveRate.value ? effectiveRate.value : statusLabel.value || '-')
 const formatDate = (value?: string) => value
   ? new Date(value).toLocaleString(undefined, {

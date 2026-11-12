@@ -68,18 +68,25 @@ describe('UpstreamBillingRateCell', () => {
     vi.useRealTimers()
   })
 
-  it('deduplicates only with a visible account-rate column and restores the number for peak or failed data', async () => {
+  it('keeps the numeric declared rate with either account-rate column visibility and for peak or failed data', async () => {
     const account = makeAccount({ rate_multiplier: 0.6, extra: {
       upstream_billing_rate_sync_enabled: true,
       upstream_billing_probe: { status: 'ok', data: billingData, received_at: '2026-07-13T00:00:00Z', fresh_until: '2026-07-14T00:00:00Z' }
     } })
     const wrapper = mount(UpstreamBillingRateCell, { props: { account, now: Date.now(), accountRateVisible: true } })
     const value = () => wrapper.get('[data-testid="upstream-billing-rate"]').text()
-    expect(value()).toBe('admin.accounts.upstreamBilling.sameAsAccount')
+    expect(value()).toBe('0.60x')
     await wrapper.setProps({ accountRateVisible: false }); expect(value()).toBe('0.60x')
     await wrapper.setProps({ accountRateVisible: true, now: Date.parse('2026-07-13T01:00:00Z') }); expect(value()).toBe('0.90x')
     await wrapper.setProps({ now: Date.now(), account: { ...account, extra: { ...account.extra, upstream_billing_probe: { ...account.extra!.upstream_billing_probe!, status: 'failed' } } } });
     expect(value()).toBe('0.60x')
+    await wrapper.setProps({ account: { ...account, rate_multiplier: 0.15, extra: {
+      ...account.extra,
+      upstream_billing_probe: { ...account.extra!.upstream_billing_probe!, data: {
+        ...billingData, resolved_rate_multiplier: 0.15, effective_rate_multiplier: 0.15, peak_rate_enabled: false
+      } }
+    } } })
+    expect(value()).toBe('0.15x')
     wrapper.unmount()
   })
 

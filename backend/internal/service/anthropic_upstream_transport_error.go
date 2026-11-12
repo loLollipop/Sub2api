@@ -101,6 +101,10 @@ func (s *GatewayService) tempUnscheduleAnthropicTransportError(ctx context.Conte
 	if s == nil || account == nil {
 		return
 	}
+	// No HTTP status was received, so the operator's selected codes cannot match.
+	if account.IsCustomErrorCodesEnabled() {
+		return
+	}
 
 	until := time.Now().Add(anthropicTransportErrorTempUnschedDuration)
 	reason := "upstream transport error (proxy/network): " + safeErr

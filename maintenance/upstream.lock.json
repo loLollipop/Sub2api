@@ -2,27 +2,27 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.50",
-  "imported_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
+  "imported_version": "2.3.54",
+  "imported_commit": "e30c61bb257b0c5840260b9d2cabcde0c3bd6369",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.50",
-  "latest_observed_release_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
-  "latest_observed_main_commit": "cabd7dd5510a45a927f297e544bb9279fbca8b35",
+  "latest_observed_version": "2.3.54",
+  "latest_observed_release_commit": "e30c61bb257b0c5840260b9d2cabcde0c3bd6369",
+  "latest_observed_main_commit": "e0ebb4ee41529421048e70d04e8df1aa643d9389",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.50",
-  "reviewed_release_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
+  "reviewed_release_tag": "v2.3.54",
+  "reviewed_release_commit": "e30c61bb257b0c5840260b9d2cabcde0c3bd6369",
   "observed_delta_review": {
-    "from_commit": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
-    "to_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
-    "status": "formal_v2350_selective_backport",
-    "scope": "Review 15 commits / 18 paths from v2.3.47 to v2.3.50. Adapt request-scoped Sol tools capability failover without Terra expansion; do not import retired sweep or automatic model-sync changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261111.md"
+    "from_commit": "c21d39aec58d323f75014e276e96f1517b959bb6",
+    "to_commit": "e30c61bb257b0c5840260b9d2cabcde0c3bd6369",
+    "status": "formal_v2354_selective_backport",
+    "scope": "Review v2.3.50 to v2.3.54 (75 commits including merges, 44 non-merge commits / 176 paths). Adapt Msh cache-header forwarding/CORS, manual relay model-list retention and custom-error-code transport cooldown semantics. Preserve local billing, native providers and UI.",
+    "evidence": "maintenance/notes/upstream-sync-20261112-v2354.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "ea59efb6dd61d451b6dac66c4dd0690c3f1b508b",
+    "source_head": "e30c61bb257b0c5840260b9d2cabcde0c3bd6369",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -30,6 +30,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.51-v2.3.54: Msh cache headers and CORS exposure, manual relay model-list retention and custom-code transport policy. Retain official default/regional filtering, privacy/ForceRemove and other durable-fault cooldowns. See maintenance/notes/upstream-sync-20261112-v2354.md for deferrals and validation.",
       "Formal v2.3.41-v2.3.47: independently adapt unrestricted non-OpenAI model-pool eligibility; preserve ordinary OpenAI mapping preference, explicit passthrough, no-match mixed fallback, compact/retirement and provider-family guards. Retain local UI/billing; automatic whitelist writes/CAS, iframe permission expansion and removed sweeper remain excluded or deferred. See maintenance/notes/upstream-sync-20261110-v2347.md.",
       "Formal v2.3.20-v2.3.40: whitelist save conflict and hidden-mapping hints; DeepSeek raw-preserving Chat tool-pair repair and protocol-specific placeholders; unchanged Grok effort; durable session revocation, atomic email code consumption, idempotent body-normalized model admission with multipart-byte preservation, API-key session release, opt-in startup cleanup, homepage isolation and mandatory installation checksums. Preserve routing/billing/UI; see maintenance/notes/upstream-sync-20261109-v2340.md.",
       "Formal v2.3.18: correct missing-field DeepSeek builtin max output to 393216 and exact display names for deepseek-v4.1-flash-1017 and gpt-image-medium; no discovery, matching, pricing or precedence changes. Catalogue/Plaza and Kimi authoritative metadata remain deferred; see maintenance/notes/upstream-sync-20261107-v2318.md",
@@ -912,5 +913,31 @@
     "selected_scope": "Sol tools requests can switch away from Chat-only accounts before lossy conversion or upstream invocation. The final local 400 does not penalize account health.",
     "deferred_scope": "Terra capability expansion and automatic whitelist sync/hourly defaults remain deferred.",
     "excluded_scope": "Retired sweeper fix858cd4da2, source VERSION and release notes. Grok Nuxt layout664e776c1 is not portable to the local Vue settings layout."
+  },
+  "sync_20261112_v2354": {
+    "evidence": "maintenance/notes/upstream-sync-20261112-v2354.md",
+    "reviewed_release_tag": "v2.3.54",
+    "reviewed_release_commit": "e30c61bb257b0c5840260b9d2cabcde0c3bd6369",
+    "observed_main_commit": "e0ebb4ee41529421048e70d04e8df1aa643d9389",
+    "reviewed_delta": {
+      "from_version": "2.3.50",
+      "commits": 75,
+      "non_merge_commits": 44,
+      "paths": 176
+    },
+    "selected_commits": [
+      "37b7806a80e24a99f6889ab0bc49e3f504bc1a90",
+      "5b2a30db6259b23957761e493ce5d7fada538843",
+      "7d0251da2a1b9967ff05fd529cd7e7799c2e56e2"
+    ],
+    "partially_adapted_commits": {
+      "9146e89c8e3f8b91b3d23c3210a3abe8af50baa8": "Honor explicit custom error codes before transport cooldown on all three local paths. Preserve durable-fault cooldown for relays without that policy; do not classify scheduling health via the balance-probe domain list or import its modal changes."
+    },
+    "local_adaptations": "Manual model filtering uses the effective discovery URL including api_base_urls, retains official defaults and recognises existing Kimi/MiniMax regional/coding origins. Keep privacy/ForceRemove, native destinations, failover/no-replay, ordinary custom-code 30-day pauses and existing auth/429 policies.",
+    "already_covered": "Local Go 1.27.4 already exceeds source 1.26.11 security bump; keep CI/Docker pins.",
+    "deferred_scope": "Dense settings/account UI, mobile/motion/theme changes and draft persistence; upstream-kind/balance auto-probing and retry/default-prefill chain; external IP classification, API-key autoblock and migration313; cache TTL billing precedence/body buckets; automatic model whitelist worker/failure fix and catalogue extensions.",
+    "excluded_scope": "Source VERSION/release prose and unrelated deployment changes; retired payment/Hosted/Ops/capture/timer modules. Existing explicit exclusions remain.",
+    "preserved": "Local native provider routing, effective billing/rates, real terminal usage, cool gray-blue Vue SPA and the three existing untracked usage tests. Personal VERSION was 2.1.61 during sync; user-authorized release advances to 2.1.62.",
+    "release_status": "User authorized code review, GitHub submission and deployment on 2026-11-12. Prepare personal v2.1.62 through PR/CI, own Release/GHCR and backup/restore-validated controlled rollout; final evidence is stored separately."
   }
 }

@@ -1014,6 +1014,11 @@ func filterUpstreamModelsByAccountPlatform(account *Account, models []string) []
 	if platform == "" || platform == "openai" || platform == "anthropic" || platform == "gemini" {
 		return models
 	}
+	// A custom (aggregator / relay) base URL can legitimately serve models from
+	// other vendors; manual sync must retain that upstream list.
+	if !isOfficialProviderBaseURL(account, platform) {
+		return models
+	}
 	filtered := make([]string, 0, len(models))
 	for _, modelID := range models {
 		if upstreamModelMatchesPlatform(platform, modelID) {
@@ -1021,6 +1026,50 @@ func filterUpstreamModelsByAccountPlatform(account *Account, models []string) []
 		}
 	}
 	return filtered
+}
+
+// isOfficialProviderBaseURL reports whether the account points at the
+// provider's own API host. Only official hosts are safe to filter to one
+// vendor's model family; custom relays and aggregators may serve many vendors.
+func isOfficialProviderBaseURL(account *Account, platform string) bool {
+	if account == nil {
+		return false
+	}
+	hosts := map[string][]string{
+		"deepseek": {"api.deepseek.com"},
+		"zhipu":    {"open.bigmodel.cn", "api.z.ai"},
+		"glm":      {"open.bigmodel.cn"},
+		"chatglm":  {"open.bigmodel.cn"},
+		"kimi":     {"api.moonshot.cn", "api.moonshot.ai", "api.kimi.com", "api.kimi.ai"},
+		"moonshot": {"api.moonshot.cn", "api.moonshot.ai", "api.kimi.com", "api.kimi.ai"},
+		"minimax":  {"api.minimax.chat", "api.minimaxi.com", "api.minimax.io", "api.minimax.com"},
+		"grok":     {"api.x.ai", "cli-chat-proxy.grok.com"},
+		"xai":      {"api.x.ai", "cli-chat-proxy.grok.com"},
+	}
+	allowed, ok := hosts[platform]
+	if !ok {
+		return false
+	}
+	base := strings.ToLower(strings.TrimSpace(account.GetCredential("base_url")))
+	if account.IsMultiProtocolAPIKey() {
+		// Match the effective discovery destination, including per-protocol overrides.
+		base = strings.TrimSpace(account.GetOpenAIFormatBaseURL())
+	}
+	if base == "" {
+		// An omitted override uses the provider's existing official default.
+		return true
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Hostname() == "" {
+		return false
+	}
+	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+	for _, candidate := range allowed {
+		if host == candidate || strings.HasSuffix(host, "."+candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func upstreamModelMatchesPlatform(platform, modelID string) bool {

@@ -48,6 +48,29 @@ func TestFilterHeadersAllowsReasoningIncludedByDefault(t *testing.T) {
 	}
 }
 
+func TestFilterHeadersAllowsMshCacheWriteTTLHeaders(t *testing.T) {
+	src := http.Header{}
+	src.Set("Msh-Usage-Cache-Write-Tokens-5m", "5376")
+	src.Set("Msh-Usage-Cache-Write-Tokens-1h", "0")
+	src.Set("Msh-Context-Cache-Token-Saved", "14848")
+
+	for key, want := range src {
+		if got := FilterHeaders(src, nil).Values(key); len(got) != 1 || got[0] != want[0] {
+			t.Fatalf("expected %s=%q, got %q", key, want, got)
+		}
+		filter := CompileHeaderFilter(config.ResponseHeaderConfig{Enabled: true, ForceRemove: []string{key}})
+		if got := FilterHeaders(src, filter).Get(key); got != "" {
+			t.Fatalf("ForceRemove did not remove %s", key)
+		}
+	}
+
+	// New metadata must keep the existing value-privacy boundary.
+	src.Set("Msh-Context-Cache-Token-Saved", "https://private-upstream.example/diagnostic")
+	if got := FilterHeaders(src, nil).Get("Msh-Context-Cache-Token-Saved"); got != "" {
+		t.Fatal("private upstream metadata survived the header filter")
+	}
+}
+
 func TestFilterHeadersForceRemoveOverridesReasoningIncluded(t *testing.T) {
 	src := http.Header{}
 	src.Set("X-Reasoning-Included", "1")

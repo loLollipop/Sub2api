@@ -1027,6 +1027,7 @@ defineExpose({ requestedModelStats, refreshData })
 <style scoped>
 .admin-usage-workbench {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: 18px;
 }

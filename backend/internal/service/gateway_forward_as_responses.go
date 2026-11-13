@@ -307,7 +307,7 @@ func mergeAnthropicUsage(dst *ClaudeUsage, src apicompat.AnthropicUsage) {
 	if dst == nil {
 		return
 	}
-	if src.HasInputTokens() {
+	if src.HasInputTokens() && (src.InputTokens != 0 || src.HasCacheTokenFields()) {
 		dst.InputTokens = src.InputTokens
 	}
 	if src.HasCacheReadInputTokens() {

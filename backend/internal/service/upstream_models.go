@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/urljoin"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
 
@@ -1700,14 +1701,7 @@ func upstreamModelsProxyURL(account *Account) string {
 }
 
 func buildV1ModelsURL(base string) string {
-	normalized := strings.TrimRight(strings.TrimSpace(base), "/")
-	if strings.HasSuffix(normalized, "/v1/models") {
-		return normalized
-	}
-	if strings.HasSuffix(normalized, "/v1") {
-		return normalized + "/models"
-	}
-	return normalized + "/v1/models"
+	return urljoin.APIPath(base, "/v1/models")
 }
 
 func buildOpenAIModelsURL(base string) string {

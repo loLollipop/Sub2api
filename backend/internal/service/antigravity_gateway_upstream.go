@@ -13,6 +13,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/urljoin"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 )
@@ -43,7 +44,7 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 	originalModel := claudeReq.Model
 
 	// 构建上游请求 URL
-	upstreamURL := baseURL + "/v1/messages"
+	upstreamURL := urljoin.APIPath(baseURL, "/v1/messages")
 
 	// 能力维度 sanitize：Anthropic-compatible 上游透传路径也需要保证 body↔beta header
 	// 对称。客户端 anthropic-beta header 不含 context-management-2025-06-27 但 body 带

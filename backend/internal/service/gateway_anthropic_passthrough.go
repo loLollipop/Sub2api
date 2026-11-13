@@ -847,7 +847,9 @@ func parseSSEUsagePassthrough(data string, usage *ClaudeUsage) {
 	switch parsed.Get("type").String() {
 	case "message_start", "message_delta":
 		if v := usageNode.Get("input_tokens"); v.Exists() && v.Type != gjson.Null {
-			usage.InputTokens = int(v.Int())
+			if parsed.Get("type").String() != "message_delta" || v.Int() != 0 || hasAnthropicCacheTokenFields(usageNode) {
+				usage.InputTokens = int(v.Int())
+			}
 		}
 		if v := usageNode.Get("output_tokens"); v.Exists() && v.Type != gjson.Null {
 			usage.OutputTokens = int(v.Int())
@@ -870,9 +872,9 @@ func parseSSEUsagePassthrough(data string, usage *ClaudeUsage) {
 		}
 	}
 
-	if usage.CacheReadInputTokens == 0 {
-		if cached := usageNode.Get("cached_tokens").Int(); cached > 0 {
-			usage.CacheReadInputTokens = int(cached)
+	if usageNode.Get("cache_read_input_tokens").Int() == 0 {
+		if cached, ok := anthropicCacheReadAlias(usageNode); ok {
+			usage.CacheReadInputTokens = cached
 		}
 	}
 	// A cumulative aggregate is authoritative, including zero. Split-only
@@ -896,7 +898,35 @@ func parseSSEUsagePassthrough(data string, usage *ClaudeUsage) {
 	// uncached input. prompt_tokens remains the total in both events. Normalize
 	// to ClaudeUsage's mutually-exclusive buckets so downstream billing does not
 	// subtract cache tokens from an already-uncached value.
-	normalizeAnthropicCompatiblePromptUsage(usageNode, usage)
+	// A cache alias alone is not a prompt total. Only recompute uncached input
+	// when the event actually reports a total or an explicit miss count.
+	if usageNode.Get("prompt_tokens").Int() > 0 || usageNode.Get("prompt_cache_miss_tokens").Exists() {
+		normalizeAnthropicCompatiblePromptUsage(usageNode, usage)
+	}
+}
+
+// Cache counters establish a reported usage split, including explicit zeroes.
+// Empty/null/invalid counters cannot turn an input placeholder into final usage.
+func hasAnthropicCacheTokenFields(usageNode gjson.Result) bool {
+	for _, path := range []string{"cache_creation_input_tokens", "cache_read_input_tokens", "cache_creation.ephemeral_5m_input_tokens", "cache_creation.ephemeral_1h_input_tokens"} {
+		if _, ok := parseSSEUsageInt(usageNode.Get(path).Value()); ok {
+			return true
+		}
+	}
+	cached, _ := anthropicCacheReadAlias(usageNode)
+	return cached > 0
+}
+
+func anthropicCacheReadAlias(usageNode gjson.Result) (int, bool) {
+	for _, path := range []string{"cached_tokens", "prompt_tokens_details.cached_tokens"} {
+		if value, ok := parseSSEUsageInt(usageNode.Get(path).Value()); ok && value > 0 {
+			return value, true
+		}
+	}
+	if value, ok := parseSSEUsageInt(usageNode.Get("prompt_cache_hit_tokens").Value()); ok {
+		return max(value, 0), true
+	}
+	return 0, false
 }
 
 // normalizeAnthropicCompatiblePromptUsage converts provider-native OpenAI-style

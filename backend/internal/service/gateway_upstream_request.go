@@ -12,6 +12,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/urljoin"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
@@ -975,7 +976,7 @@ func truncateForLog(b []byte, maxBytes int) string {
 // buildCustomRelayURL 构建自定义中继转发 URL
 // 在 path 后附加 beta=true 和可选的 proxy 查询参数
 func (s *GatewayService) buildCustomRelayURL(baseURL, path string, account *Account) string {
-	u := strings.TrimRight(baseURL, "/") + path + "?beta=true"
+	u := urljoin.WithQueryParam(urljoin.APIPath(baseURL, path), "beta", "true")
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL := account.Proxy.URL()
 		if proxyURL != "" {

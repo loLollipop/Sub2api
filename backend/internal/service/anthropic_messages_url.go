@@ -3,9 +3,11 @@ package service
 import (
 	"net/url"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/urljoin"
 )
 
-// buildAnthropicMessagesURL appends the Messages endpoint to an already validated
+// buildAnthropicMessagesURL joins the Messages endpoint to an already validated
 // base URL. Cloudflare's account REST endpoint rejects the beta query parameter;
 // all other upstreams, including Cloudflare's native gateway, keep it.
 func buildAnthropicMessagesURL(baseURL string) string {
@@ -13,13 +15,14 @@ func buildAnthropicMessagesURL(baseURL string) string {
 	if err != nil {
 		return strings.TrimRight(baseURL, "/") + "/v1/messages?beta=true"
 	}
-	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/v1/messages"
-	if parsed.RawPath != "" {
-		parsed.RawPath = strings.TrimRight(parsed.RawPath, "/") + "/v1/messages"
+	original := parsed
+	parsed, err = url.Parse(urljoin.APIPath(baseURL, "/v1/messages"))
+	if err != nil {
+		return strings.TrimRight(baseURL, "/") + "/v1/messages?beta=true"
 	}
 	omitBeta := false
 	if strings.EqualFold(parsed.Scheme, "https") && parsed.User == nil &&
-		parsed.Fragment == "" && parsed.RawPath == "" {
+		original.Fragment == "" && original.RawPath == "" {
 		host := strings.ToLower(parsed.Host)
 		parts := strings.Split(parsed.Path, "/")
 		if (host == "api.cloudflare.com" || host == "api.cloudflare.com:443") &&
@@ -38,4 +41,8 @@ func buildAnthropicMessagesURL(baseURL string) string {
 		parsed.RawQuery += "beta=true"
 	}
 	return parsed.String()
+}
+
+func buildAnthropicCountTokensURL(baseURL string) string {
+	return urljoin.WithQueryParam(urljoin.APIPath(baseURL, "/v1/messages/count_tokens"), "beta", "true")
 }

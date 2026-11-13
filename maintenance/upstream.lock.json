@@ -2,27 +2,27 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.58",
-  "imported_commit": "28ff1b3d41dddb2959892e66f4b410b064a266d4",
+  "imported_version": "2.3.66",
+  "imported_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.58",
-  "latest_observed_release_commit": "28ff1b3d41dddb2959892e66f4b410b064a266d4",
-  "latest_observed_main_commit": "c9d72b46bff8f7fcf596473d05f9125fc6f5a8ec",
+  "latest_observed_version": "2.3.66",
+  "latest_observed_release_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
+  "latest_observed_main_commit": "524f1af7cd31a30398fc6ebcef1076ca610e6921",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.58",
-  "reviewed_release_commit": "28ff1b3d41dddb2959892e66f4b410b064a266d4",
+  "reviewed_release_tag": "v2.3.66",
+  "reviewed_release_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
   "observed_delta_review": {
-    "from_commit": "e30c61bb257b0c5840260b9d2cabcde0c3bd6369",
-    "to_commit": "28ff1b3d41dddb2959892e66f4b410b064a266d4",
-    "status": "formal_v2358_selective_backport",
-    "scope": "Review v2.3.54 to v2.3.58 (39 commits including merges, 29 non-merge commits / 121 paths). Adapt numeric upstream-declared rates and cache-detail popover alignment. Defer repository stats cache, automatic IP/key risk control and upstream balance/type probing; retain local native providers, live user stats and UI.",
-    "evidence": "maintenance/notes/upstream-sync-20261112-v2358.md"
+    "from_commit": "28ff1b3d41dddb2959892e66f4b410b064a266d4",
+    "to_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
+    "status": "formal_v2366_selective_backport",
+    "scope": "Review formal v2.3.58 to v2.3.66 (60 commits including merges, 46 non-merge commits / 104 paths). Adapt versioned API URL joining, placeholder-zero input handling with explicit-zero cache fidelity, and 30s public-settings failure backoff. Retain native routes, terminal billing, configured monitor thresholds and UI; defer HTTP cache and managed proxy/IP/kind chains; exclude retired payments.",
+    "evidence": "maintenance/notes/upstream-sync-20261113-v2366.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "28ff1b3d41dddb2959892e66f4b410b064a266d4",
+    "source_head": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -30,6 +30,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.59-v2.3.66: idempotent API path joins preserving Cloudflare beta exceptions, native version routing and escaped boundaries; placeholder-zero input handling preserving explicit-zero cache/TTL and terminal billing; failed public-settings 30s retry cooldown with force/coalescing/injected config intact. See maintenance/notes/upstream-sync-20261113-v2366.md for scope and validation.",
       "Formal v2.3.55-v2.3.58: always show numeric upstream-declared rates, including synchronized 0.15x; right-align cache-detail popovers on both usage pages after reproducing narrow-screen overflow. Preserve local theme, freshness/peak semantics and existing callers. See maintenance/notes/upstream-sync-20261112-v2358.md for deferrals and validation.",
       "Formal v2.3.51-v2.3.54: Msh cache headers and CORS exposure, manual relay model-list retention and custom-code transport policy. Retain official default/regional filtering, privacy/ForceRemove and other durable-fault cooldowns. See maintenance/notes/upstream-sync-20261112-v2354.md for deferrals and validation.",
       "Formal v2.3.41-v2.3.47: independently adapt unrestricted non-OpenAI model-pool eligibility; preserve ordinary OpenAI mapping preference, explicit passthrough, no-match mixed fallback, compact/retirement and provider-family guards. Retain local UI/billing; automatic whitelist writes/CAS, iframe permission expansion and removed sweeper remain excluded or deferred. See maintenance/notes/upstream-sync-20261110-v2347.md.",
@@ -122,23 +123,77 @@
   "selected_deepseek_fix": "Formal v2304 native DeepSeek bypasses legacy call-ID/request-state rewriting and rejected-field retries; genuine reasoning and thinking-switch options are provider-gated. Existing legacy conversion empty-shell repair remains scoped. Preserve local key/conversation/requested-model replay isolation, native protocols and distinct IDs; no cache-key weakening, Hosted execution, DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
     {
+      "feature": "v2365-public-settings-http-cache",
+      "upstream_commits": [
+        "d455a8fb26985d404ce7467c413b5fa31be741f2"
+      ],
+      "reason": "Public settings carry captcha/auth/privacy gates; admin force refresh shares the same URL and does not ensure bypass of browser/CDN max-age. Adapt only the independent failed-request cooldown.",
+      "evidence": "maintenance/notes/upstream-sync-20261113-v2366.md"
+    },
+    {
+      "feature": "v2366-fixed-cache-critical-threshold",
+      "upstream_commits": [
+        "16b1ff835b3e0a5ab97446a3c77d470aabe373d1",
+        "e7181c7c6ead2dde75684a9dd38fa6a12325a211"
+      ],
+      "reason": "Local configurable cache thresholds default to zero intentionally. A fixed 30 percent critical rule would override operator-selected thresholds. Retain existing scored configuration.",
+      "evidence": "maintenance/notes/upstream-sync-20261113-v2366.md"
+    },
+    {
+      "feature": "v2359-managed-proxy-password-import",
+      "upstream_commits": [
+        "90f90021c8cb09a7d0dbe1f356e7f19032e48660"
+      ],
+      "reason": "Mihomo managed proxy import and encrypted password widening are part of an absent deferred module. Do not add migration313, ent changes or unused import helpers.",
+      "evidence": "maintenance/notes/upstream-sync-20261113-v2366.md"
+    },
+    {
+      "feature": "v2360-shared-ip-observe-only-counters-and-kind-glyphs",
+      "upstream_commits": [
+        "fd435a7d7f2344b9b7bb2420a5350d485961e27d",
+        "fff3f994247f9c6ddfe493ca507e0f0e3d8998d4",
+        "72ed19adbac2c7c24ed9d8c6851e0c9aaf5d2fac"
+      ],
+      "reason": "Observe-only/key opt-in, peak users/accumulated keys and IP fixture updates remain with deferred automatic risk-control detector. Upstream kind/balance badges and glyph lookup fixes have no local component/caller.",
+      "evidence": "maintenance/notes/upstream-sync-20261113-v2366.md"
+    },
+    {
       "feature": "v2358-repository-usage-stats-cache",
-      "upstream_commits": ["e1b17b1719108ddadab68479af88f08123f275a2"],
+      "upstream_commits": [
+        "e1b17b1719108ddadab68479af88f08123f275a2"
+      ],
       "reason": "Local admin report/dashboard/snapshot caches already cover overlapping queries and support nocache. The source default-on repository cache does not invalidate on writes and adds up to 60 seconds of staleness to user stats too; defer until measured database load justifies a targeted cache with explicit freshness semantics."
     },
     {
       "feature": "v2357-ip-sharing-key-disable-and-rotation",
-      "upstream_commits": ["832307f25", "a89fc310b", "c2d658e05", "ff6ce64cd", "336c9d68b", "e1b17b171", "99559e55a"],
+      "upstream_commits": [
+        "832307f25",
+        "a89fc310b",
+        "c2d658e05",
+        "ff6ce64cd",
+        "336c9d68b",
+        "e1b17b171",
+        "99559e55a"
+      ],
       "reason": "Keep the shared-IP detector, external IP classification gate, default automatic notice/key disabling, risk store/DTO/UI and key rotation together with deferred automatic access-control policy. Lua write coalescing and ZRangeArgs only serve the absent detector, so neither is an independent local fix."
     },
     {
       "feature": "v2358-upstream-type-balance-sentinel-and-fallback",
-      "upstream_commits": ["a3e79bc61", "83b0c1942", "d48232b7d"],
+      "upstream_commits": [
+        "a3e79bc61",
+        "83b0c1942",
+        "d48232b7d"
+      ],
       "reason": "New API fingerprints/1e8 billing sentinel, same-origin redirect handling, used-only balances, custom extractor fallback and ten-minute retries remain with the absent upstream-kind/balance chain. Existing explicitly enabled Sub2API rate probes retain their destinations and retry policy; local probe buttons already use type=button."
     },
     {
       "feature": "v2355-auth-quiet-and-timer-dialog",
-      "upstream_commits": ["b636d85f9", "3480d346b", "ef4638ca7", "ee94dd4ff"],
+      "upstream_commits": [
+        "b636d85f9",
+        "3480d346b",
+        "ef4638ca7",
+        "ee94dd4ff"
+      ],
       "reason": "Retain the local cool gray-blue Vue SPA and current auth interaction. Auth Quiet/multi-step registration need separate UI work; timer modal/trigger changes have no local module and remain deferred."
     },
     {
@@ -161,7 +216,13 @@
     },
     {
       "feature": "v2310-ops-rate-history-account-reveal-and-runtime-expansion",
-      "upstream_commits": ["b500c1bbe", "d14cb1376", "ac007527a", "484d24eab", "4e53e58dc"],
+      "upstream_commits": [
+        "b500c1bbe",
+        "d14cb1376",
+        "ac007527a",
+        "484d24eab",
+        "4e53e58dc"
+      ],
       "reason": "Defer monitoring/channel/rate-history modules and source migrations 307-311. Plaintext credential reveal conflicts with local redacted account details and optional step-up; immediate account edit skeleton is separate. Removed crypto/payment/canvas, absent requestcapture/timers and Nuxt/SSR/CI/deployment changes remain excluded. Source router5 and theme-specific tooltip fixes do not apply. See v2310 note."
     },
     {
@@ -748,7 +809,10 @@
         "scope": "Quoted GIF control parsing and API-key JSON normalization, retaining local exact non-negative integer/overflow validation, OAuth/native behavior and existing resource limits."
       }
     ],
-    "excluded_commits": ["40fff03b9", "308bdd3e7"],
+    "excluded_commits": [
+      "40fff03b9",
+      "308bdd3e7"
+    ],
     "excluded_scope": "Incomplete/disconnect estimated billing and its opaque-blob/shape-dispatch corrections; no immediate-disconnect or 95%-cache billing policy imported.",
     "preserved": "Current adaptive usage-table edits and saved column preferences, local real-terminal-usage settlement, GIF rendering/resource bounds, prior module exclusions and the official-release-only monitoring policy.",
     "migration": "None. Existing migrations, dependency manifests, personal VERSION and deployment configuration unchanged.",
@@ -758,7 +822,11 @@
     "evidence": "maintenance/notes/upstream-sync-20261106-v2315.md",
     "reviewed_release_tag": "v2.3.15",
     "reviewed_release_commit": "a17cc8118ffdd1dc5931a3462aabf30685994630",
-    "reviewed_commits": ["01d3b5db7", "9c518bf7f", "a17cc8118"],
+    "reviewed_commits": [
+      "01d3b5db7",
+      "9c518bf7f",
+      "a17cc8118"
+    ],
     "already_adapted": "GIF frame_count/frame_duration_ms accept numeric strings and API-key forwarding normalizes them to JSON numbers. Local exact integer, non-negative and overflow validation, OAuth/native routes and GIF resource budgets remain in place.",
     "excluded_scope": "Source VERSION bookkeeping; previous estimated-disconnect billing and other recorded module exclusions remain unchanged.",
     "preserved": "All 31 pre-existing changed paths, including the compact time-range fix, independent effort column immediately after model, search/error-list race fixes and verified unused-code removals.",
@@ -966,8 +1034,15 @@
     "reviewed_release_tag": "v2.3.58",
     "reviewed_release_commit": "28ff1b3d41dddb2959892e66f4b410b064a266d4",
     "observed_main_commit": "c9d72b46bff8f7fcf596473d05f9125fc6f5a8ec",
-    "reviewed_delta": { "from_version": "2.3.54", "commits": 39, "non_merge_commits": 29, "paths": 121 },
-    "selected_commits": ["6a51d9bea690dbf39d8cf4411584ff4923dd8b6e"],
+    "reviewed_delta": {
+      "from_version": "2.3.54",
+      "commits": 39,
+      "non_merge_commits": 29,
+      "paths": 121
+    },
+    "selected_commits": [
+      "6a51d9bea690dbf39d8cf4411584ff4923dd8b6e"
+    ],
     "partially_adapted_commits": {
       "af6ec72640e8de32fb9a8f1472c413abb7fc62df": "Right-align the shared cache-detail popover after reproducing 320px overflow in both local workspaces. The user strip already lacks overflow-hidden; preserve the local grid/theme and validate real hover/focus geometry."
     },
@@ -976,5 +1051,30 @@
     "excluded_scope": "Retired native crypto deposits/prices/sweeper and source migration314; upstream VERSION/release prose, unreleased main and previously excluded Hosted/Ops/capture modules.",
     "preserved": "Native provider routing, credential destinations, terminal usage/billing, existing user-stat freshness, local cool gray-blue theme and accountRateVisible prop compatibility. No migration/dependency/runtime-config change; personal VERSION was 2.1.62 during sync and advances to 2.1.63 for the user-authorized release. Three pre-existing untracked usage tests remain untouched and excluded from the commit.",
     "release_status": "User authorized code review, GitHub submission and deployment on 2026-11-12. Prepare personal v2.1.63 through PR/CI, own Release/GHCR and backup/restore-validated controlled rollout; final evidence is stored separately."
+  },
+  "sync_20261113_v2366": {
+    "evidence": "maintenance/notes/upstream-sync-20261113-v2366.md",
+    "reviewed_release_tag": "v2.3.66",
+    "reviewed_release_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
+    "observed_main_commit": "524f1af7cd31a30398fc6ebcef1076ca610e6921",
+    "reviewed_delta": {
+      "from_version": "2.3.58",
+      "commits": 60,
+      "non_merge_commits": 46,
+      "paths": 104
+    },
+    "selected_commits": [],
+    "partially_adapted_commits": {
+      "f337251f8a9b2684b89a20afa6bda9f9609e1998": "Adapt shared URL joining into existing local helpers/callers; retain native OpenAI/Gemini provider-specific version semantics, strict Cloudflare REST beta exception, original Antigravity no-beta behavior and local credential/SSRF validation.",
+      "621bfa1a20f65edb832d93224e7788bdd82ab1a2": "Reuse shared URL table and security-audit regressions; add actual local Messages/count/account-test/relay/Antigravity path regressions instead of replacing local native helpers.",
+      "5d52ece17ada590ce54036840517837ea2277c52": "Ignore bare input zero in delta merges; any explicit canonical cache/TTL counter, including zero, makes input zero authoritative. Preserve existing all-zero final usage and aggregate-zero-over-TTL behavior across native/general/converted paths. Positive cache-read aliases remain authoritative and are normalized into canonical stream buckets even without prompt totals; missing prompt totals do not zero a separately reported input count. Non-streaming normalization is unchanged.",
+      "a265dfd313aadeb62fe8a5c352d5c0f8ea9f8011": "Add bounded 30s failed-load backoff only; preserve active-request coalescing, force bypass, successful cache and injected config. No public HTTP caching."
+    },
+    "already_covered": "Account tests reuse the local Messages helper. Native OpenAI/Gemini target/model joining retains provider-specific versions and escaped paths; no source helper replacement. Go 1.27.4 exceeds source 1.26.11.",
+    "deferred_scope": "Public HTTP/CDN settings cache, fixed cache-critical threshold, managed proxy/Mihomo import/password migration313, shared-IP automatic risk policy/observe-only/counters, upstream kind/balance badge chain; all prior deferrals retained.",
+    "excluded_scope": "Retired crypto/native deposit pricing, txlist polling, gas floor, sweep replacement/recovery, payment/navigation previews; source release numbering/prose, unpublished main and previously retired modules.",
+    "preserved": "Personal VERSION was 2.1.63 during selective sync and advances to 2.1.64 for this user-authorized release, original v0.2.21 checkpoint, native provider routing and credential destinations, real terminal usage/local billing, cool gray-blue Vue SPA. No migration, dependency or runtime-config change. Three pre-existing untracked usage tests remain untouched.",
+    "release_status": "User authorized code review, fixes, GitHub submission and deployment on 2026-11-13. Prepare personal v2.1.64 through reviewed PR/CI, own Release/GHCR and backup/restore-validated rollout; final acceptance evidence is stored separately.",
+    "release_review_fixes": "Bound admin usage grid columns to minmax(0,1fr) after reproducing English 320px document width336; normalize provider prompt totals/explicit cache misses in stream event merges and preserve explicit cache-hit zero across all four usage paths."
   }
 }

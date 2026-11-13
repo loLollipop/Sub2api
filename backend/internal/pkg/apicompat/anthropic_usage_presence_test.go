@@ -131,3 +131,44 @@ func TestAnthropicUsagePresenceEmptyTTLDoesNotClearAggregate(t *testing.T) {
 		require.Nil(t, usage.CacheCreation)
 	}
 }
+
+func TestAnthropicUsagePresencePlaceholderAndExplicitCacheZero(t *testing.T) {
+	for _, tc := range []struct {
+		name, delta string
+		wantInput   int
+	}{
+		{"bare zero", `{"input_tokens":0,"output_tokens":8}`, 11},
+		{"null cache", `{"input_tokens":0,"output_tokens":8,"cache_read_input_tokens":null}`, 11},
+		{"empty cache details", `{"input_tokens":0,"output_tokens":8,"cache_creation":{}}`, 11},
+		{"positive cache", `{"input_tokens":0,"output_tokens":8,"cache_read_input_tokens":600}`, 0},
+		{"explicit zero cache", `{"input_tokens":0,"output_tokens":8,"cache_read_input_tokens":0}`, 0},
+		{"explicit zero TTL", `{"input_tokens":0,"output_tokens":8,"cache_creation":{"ephemeral_1h_input_tokens":0}}`, 0},
+		{"cache alias", `{"input_tokens":0,"output_tokens":8,"cached_tokens":600}`, 0},
+		{"prompt detail alias", `{"input_tokens":0,"output_tokens":8,"prompt_tokens_details":{"cached_tokens":600}}`, 0},
+		{"cache hit alias", `{"input_tokens":0,"output_tokens":8,"prompt_cache_hit_tokens":600}`, 0},
+		{"bare alias zero", `{"input_tokens":0,"output_tokens":8,"cached_tokens":0}`, 11},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			usage := AnthropicUsage{InputTokens: 11}
+			var delta AnthropicUsage
+			require.NoError(t, json.Unmarshal([]byte(tc.delta), &delta))
+			usage.Merge(delta)
+			require.Equal(t, tc.wantInput, usage.InputTokens)
+			require.Equal(t, 8, usage.OutputTokens)
+
+			state := NewAnthropicEventToResponsesState()
+			for _, raw := range []string{
+				`{"type":"message_start","message":{"id":"msg_placeholder","model":"claude-test","usage":{"input_tokens":11}}}`,
+				`{"type":"message_delta","usage":` + tc.delta + `,"delta":{"stop_reason":"end_turn"}}`,
+			} {
+				var event AnthropicStreamEvent
+				require.NoError(t, json.Unmarshal([]byte(raw), &event))
+				AnthropicEventToResponsesEvents(&event, state)
+			}
+			events := AnthropicEventToResponsesEvents(&AnthropicStreamEvent{Type: "message_stop"}, state)
+			require.Len(t, events, 1)
+			require.Equal(t, tc.wantInput+usage.CacheReadInputTokens, events[0].Response.Usage.InputTokens)
+			require.Equal(t, 8, events[0].Response.Usage.OutputTokens)
+		})
+	}
+}

@@ -147,4 +147,9 @@ const cacheDetailLabel = () => t('usage.cacheBreakdown')
   .usage-metric-value { font-size: 23px; line-height: 30px; }
   .usage-stat-icon :deep(svg) { width: 16px; height: 16px; }
 }
+@media (max-width: 359px) {
+  .usage-metric { flex-direction: column; }
+  .usage-metric > div:last-child { align-self: stretch; }
+  .usage-metric-cost { font-size: 20px; }
+}
 </style>

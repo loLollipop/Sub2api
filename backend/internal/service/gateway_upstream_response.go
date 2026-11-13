@@ -1328,6 +1328,13 @@ func (s *GatewayService) extractSSEUsagePatch(event map[string]any) *sseUsagePat
 				patch.providerUsage = gjson.ParseBytes(raw)
 			}
 		}
+		// A delta's bare input zero may be a relay placeholder. Explicit cache
+		// counters, even zeroes, and positive aliases establish a final split.
+		if eventType == "message_delta" && patch.inputTokens == 0 &&
+			!patch.hasCacheCreationInput && !patch.hasCacheReadInput && !patch.hasCacheCreation5m && !patch.hasCacheCreation1h &&
+			!hasAnthropicCacheTokenFields(patch.providerUsage) {
+			patch.hasInputTokens = false
+		}
 		return patch
 	}
 
@@ -1365,10 +1372,12 @@ func mergeSSEUsagePatch(usage *ClaudeUsage, patch *sseUsagePatch) {
 		usage.CacheCreationInputTokens = usage.CacheCreation5mTokens + usage.CacheCreation1hTokens
 	}
 	if patch.providerUsage.Exists() {
-		if v := patch.providerUsage.Get("cached_tokens"); usage.CacheReadInputTokens == 0 && v.Int() > 0 {
-			usage.CacheReadInputTokens = int(v.Int())
+		if cached, ok := anthropicCacheReadAlias(patch.providerUsage); (!patch.hasCacheReadInput || patch.cacheReadInputTokens == 0) && ok {
+			usage.CacheReadInputTokens = cached
 		}
-		normalizeAnthropicCompatiblePromptUsage(patch.providerUsage, usage)
+		if patch.providerUsage.Get("prompt_tokens").Int() > 0 || patch.providerUsage.Get("prompt_cache_miss_tokens").Exists() {
+			normalizeAnthropicCompatiblePromptUsage(patch.providerUsage, usage)
+		}
 	}
 }
 

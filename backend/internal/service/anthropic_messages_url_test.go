@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -16,6 +17,65 @@ import (
 )
 
 const cloudflareMessagesTestBaseURL = "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai"
+
+func TestAnthropicVersionedURL_RelayAndAntigravity(t *testing.T) {
+	proxyID := int64(1)
+	account := &Account{ID: 1, ProxyID: &proxyID, Proxy: &Proxy{Protocol: "http", Host: "proxy.example", Port: 8080}}
+	svc := &GatewayService{}
+	relayURL, err := url.Parse(svc.buildCustomRelayURL("https://relay.example/prefix/v1?tenant=a", "/v1/messages", account))
+	require.NoError(t, err)
+	require.Equal(t, "/prefix/v1/messages", relayURL.Path)
+	require.Equal(t, "a", relayURL.Query().Get("tenant"))
+	require.Equal(t, "true", relayURL.Query().Get("beta"))
+	require.Equal(t, "http://proxy.example:8080", relayURL.Query().Get("proxy"))
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"usage":{"input_tokens":2,"output_tokens":3}}`))}}
+	antigravity := &AntigravityGatewayService{httpUpstream: upstream, settingService: &SettingService{cfg: &config.Config{}}}
+	account.Credentials = map[string]any{"base_url": "https://relay.example/prefix/v1?tenant=a", "api_key": "synthetic"}
+	c, _ := newTestContext()
+	result, err := antigravity.ForwardUpstream(context.Background(), c, account, []byte(`{"model":"claude-test","messages":[{"role":"user","content":"hi"}]}`))
+	require.NoError(t, err)
+	require.Equal(t, "https://relay.example/prefix/v1/messages?tenant=a", upstream.lastReq.URL.String())
+	require.Equal(t, 2, result.Usage.InputTokens)
+}
+
+func TestAnthropicVersionedURL_Requests(t *testing.T) {
+	for _, tc := range []struct {
+		base, messages, count string
+	}{
+		{"https://relay.example/claude/v1/", "https://relay.example/claude/v1/messages?beta=true", "https://relay.example/claude/v1/messages/count_tokens?beta=true"},
+		{"https://relay.example/claude/v1?tenant=a", "https://relay.example/claude/v1/messages?tenant=a&beta=true", "https://relay.example/claude/v1/messages/count_tokens?tenant=a&beta=true"},
+		{"https://relay.example/claude/v1/messages", "https://relay.example/claude/v1/messages?beta=true", "https://relay.example/claude/v1/messages/count_tokens?beta=true"},
+		{"https://relay.example/tenant%2Fv1", "https://relay.example/tenant%2Fv1/v1/messages?beta=true", "https://relay.example/tenant%2Fv1/v1/messages/count_tokens?beta=true"},
+		{cloudflareMessagesTestBaseURL + "/v1", cloudflareMessagesTestBaseURL + "/v1/messages", cloudflareMessagesTestBaseURL + "/v1/messages/count_tokens?beta=true"},
+		{cloudflareMessagesTestBaseURL + "/v1/messages", cloudflareMessagesTestBaseURL + "/v1/messages", cloudflareMessagesTestBaseURL + "/v1/messages/count_tokens?beta=true"},
+	} {
+		t.Run(tc.base, func(t *testing.T) {
+			account := newAnthropicAPIKeyAccountForTest()
+			account.Credentials["base_url"] = tc.base
+			body := []byte(`{"model":"claude-haiku-4-5","max_tokens":64,"messages":[{"role":"user","content":"hi"}]}`)
+			svc := &GatewayService{cfg: &config.Config{}}
+			c := gatewayAnthropicBaseURLContext(t)
+			req, _, err := svc.buildUpstreamRequest(context.Background(), c, account, body, "upstream-anthropic-key", "apikey", "claude-haiku-4-5", false, false)
+			require.NoError(t, err)
+			require.Equal(t, tc.messages, req.URL.String())
+			req, _, err = svc.buildUpstreamRequestAnthropicAPIKeyPassthrough(context.Background(), c, account, body, "upstream-anthropic-key")
+			require.NoError(t, err)
+			require.Equal(t, tc.messages, req.URL.String())
+			req, _, err = svc.buildCountTokensRequest(context.Background(), c, account, body, "upstream-anthropic-key", "apikey", "claude-haiku-4-5", false)
+			require.NoError(t, err)
+			require.Equal(t, tc.count, req.URL.String())
+			req, err = svc.buildCountTokensRequestAnthropicAPIKeyPassthrough(context.Background(), c, account, body, "upstream-anthropic-key")
+			require.NoError(t, err)
+			require.Equal(t, tc.count, req.URL.String())
+			upstream := &anthropicHTTPUpstreamRecorder{resp: adaptiveCNAnthropicTestResponse()}
+			testSvc := &AccountTestService{validateTestTarget: allowFakeAccountTestTarget, cfg: &config.Config{}, httpUpstream: upstream}
+			c, _ = newTestContext()
+			require.NoError(t, testSvc.testClaudeAccountConnection(c, account, "claude-haiku-4-5", ""))
+			require.Equal(t, tc.messages, upstream.lastReq.URL.String())
+		})
+	}
+}
 
 func TestAnthropicMessagesURL_EntryPoints(t *testing.T) {
 	for _, tt := range []struct {

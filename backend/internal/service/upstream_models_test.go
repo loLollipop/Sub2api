@@ -70,6 +70,9 @@ func TestBuildV1ModelsURL(t *testing.T) {
 	require.Equal(t, "https://api.anthropic.com/v1/models", buildV1ModelsURL("https://api.anthropic.com/v1"))
 	require.Equal(t, "https://api.anthropic.com/v1/models", buildV1ModelsURL("https://api.anthropic.com/v1/models"))
 	require.Equal(t, "https://gateway.example.com/antigravity/v1/models", buildV1ModelsURL("https://gateway.example.com/antigravity/"))
+	require.Equal(t, "https://relay.example/claude/v1/models?tenant=a", buildV1ModelsURL("https://relay.example/claude/v1/?tenant=a"))
+	require.Equal(t, "https://relay.example/claude/v1/models?tenant=a", buildV1ModelsURL("https://relay.example/claude/v1/models?tenant=a"))
+	require.Equal(t, "https://relay.example/tenant%2Fv1/v1/models", buildV1ModelsURL("https://relay.example/tenant%2Fv1"))
 }
 
 func TestBuildOpenAIModelsURL(t *testing.T) {

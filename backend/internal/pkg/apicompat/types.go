@@ -242,10 +242,21 @@ func (u AnthropicUsage) HasCacheReadInputTokens() bool {
 	return u.cacheReadInputTokensPresent || u.CacheReadInputTokens != 0
 }
 
+// HasCacheTokenFields distinguishes a reported cache split, including explicit
+// zeroes, from a relay's input-only placeholder. Positive provider cache aliases
+// also establish a split. Null and empty details do not report any counters.
+func (u AnthropicUsage) HasCacheTokenFields() bool {
+	return u.HasCacheCreationInputTokens() || u.HasCacheReadInputTokens() ||
+		(u.CacheCreation != nil && (u.CacheCreation.Ephemeral5mInputTokens != nil || u.CacheCreation.Ephemeral1hInputTokens != nil)) ||
+		u.CachedTokens > 0 || (u.PromptTokensDetails != nil && u.PromptTokensDetails.CachedTokens > 0) ||
+		(u.PromptCacheHitTokens != nil && *u.PromptCacheHitTokens > 0)
+}
+
 // Merge applies cumulative usage from a streaming event. Missing fields retain
-// their preceding values; explicit zeroes clear them rather than double billing.
+// their preceding values. A bare input zero is a relay placeholder; a reported
+// cache split makes it authoritative, including an explicitly all-zero split.
 func (u *AnthropicUsage) Merge(src AnthropicUsage) {
-	if src.HasInputTokens() {
+	if src.HasInputTokens() && (src.InputTokens != 0 || src.HasCacheTokenFields()) {
 		u.InputTokens, u.inputTokensPresent = src.InputTokens, true
 	}
 	if src.HasOutputTokens() {
@@ -259,6 +270,18 @@ func (u *AnthropicUsage) Merge(src AnthropicUsage) {
 	}
 	if src.HasCacheReadInputTokens() {
 		u.CacheReadInputTokens, u.cacheReadInputTokensPresent = src.CacheReadInputTokens, true
+	}
+	// Normalize reported cache-read aliases into the canonical bucket consumed
+	// by event converters, even when the event omits the prompt total.
+	if src.CacheReadInputTokens == 0 {
+		switch {
+		case src.CachedTokens > 0:
+			u.CacheReadInputTokens, u.cacheReadInputTokensPresent = src.CachedTokens, true
+		case src.PromptTokensDetails != nil && src.PromptTokensDetails.CachedTokens > 0:
+			u.CacheReadInputTokens, u.cacheReadInputTokensPresent = src.PromptTokensDetails.CachedTokens, true
+		case src.PromptCacheHitTokens != nil:
+			u.CacheReadInputTokens, u.cacheReadInputTokensPresent = max(*src.PromptCacheHitTokens, 0), true
+		}
 	}
 	// A zero aggregate rules out any billable TTL bucket, even when an
 	// incomplete or contradictory detail object accompanies it. An empty
@@ -285,6 +308,13 @@ func (u *AnthropicUsage) Merge(src AnthropicUsage) {
 				u.CacheCreationInputTokens += max(*detail.Ephemeral1hInputTokens, 0)
 			}
 		}
+	}
+	// Provider prompt totals include cache reads/writes. Keep the event
+	// converter's uncached input identical to the service billing buckets.
+	if src.PromptCacheMissTokens != nil {
+		u.InputTokens, u.inputTokensPresent = max(*src.PromptCacheMissTokens, 0), true
+	} else if src.PromptTokens > 0 {
+		u.InputTokens, u.inputTokensPresent = max(src.PromptTokens-u.CacheReadInputTokens-u.CacheCreationInputTokens, 0), true
 	}
 }
 

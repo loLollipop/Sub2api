@@ -405,6 +405,84 @@ describe('useAppStore', () => {
   // --- 公开设置 ---
 
   describe('公开设置加载', () => {
+    it('失败后 30 秒内不重复请求，到期后可重试', async () => {
+      vi.setSystemTime(0)
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      vi.mocked(getPublicSettings).mockRejectedValueOnce(new Error('offline'))
+      const store = useAppStore()
+      await expect(store.fetchPublicSettings()).resolves.toBeNull()
+      await expect(store.fetchPublicSettings()).resolves.toBeNull()
+      vi.advanceTimersByTime(29_999)
+      await expect(store.fetchPublicSettings()).resolves.toBeNull()
+      expect(getPublicSettings).toHaveBeenCalledTimes(1)
+      expect(store.publicSettingsLoaded).toBe(false)
+
+      const settings = createPublicSettings()
+      vi.mocked(getPublicSettings).mockResolvedValueOnce(settings)
+      vi.advanceTimersByTime(1)
+      await expect(store.fetchPublicSettings()).resolves.toEqual(settings)
+      expect(getPublicSettings).toHaveBeenCalledTimes(2)
+      vi.mocked(console.error).mockRestore()
+    })
+
+    it('冷却期间 force 立即重试，普通和 force 并发调用合并', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      vi.mocked(getPublicSettings).mockRejectedValueOnce(new Error('offline'))
+      const store = useAppStore()
+      await store.fetchPublicSettings()
+      const deferred = createDeferred<PublicSettings>()
+      vi.mocked(getPublicSettings).mockReturnValueOnce(deferred.promise)
+      const forced = store.fetchPublicSettings(true)
+      const ordinary = store.fetchPublicSettings()
+      const otherForced = store.fetchPublicSettings(true)
+      expect(getPublicSettings).toHaveBeenCalledTimes(2)
+      const settings = createPublicSettings({ site_name: 'Recovered' })
+      deferred.resolve(settings)
+      await expect(Promise.all([forced, ordinary, otherForced])).resolves.toEqual([
+        settings, settings, settings,
+      ])
+      expect(store.siteName).toBe('Recovered')
+      vi.mocked(console.error).mockRestore()
+    })
+
+    it('同步异常同样触发冷却，清除缓存后可立即重新请求', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      vi.mocked(getPublicSettings).mockImplementationOnce(() => { throw new Error('sync failure') })
+      const store = useAppStore()
+      await expect(store.fetchPublicSettings()).resolves.toBeNull()
+      await expect(store.fetchPublicSettings()).resolves.toBeNull()
+      expect(getPublicSettings).toHaveBeenCalledTimes(1)
+      store.clearPublicSettingsCache()
+      const settings = createPublicSettings()
+      vi.mocked(getPublicSettings).mockResolvedValueOnce(settings)
+      await expect(store.fetchPublicSettings()).resolves.toEqual(settings)
+      expect(getPublicSettings).toHaveBeenCalledTimes(2)
+      vi.mocked(console.error).mockRestore()
+    })
+
+    it('失败刷新保留成功缓存，冷却期间仍可应用服务端注入配置', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const initial = createPublicSettings({ site_name: 'Cached' })
+      vi.mocked(getPublicSettings).mockResolvedValueOnce(initial)
+      const store = useAppStore()
+      await store.fetchPublicSettings()
+      vi.mocked(getPublicSettings).mockRejectedValueOnce(new Error('offline'))
+      await expect(store.fetchPublicSettings(true)).resolves.toBeNull()
+      await expect(store.fetchPublicSettings()).resolves.toEqual(initial)
+      expect(getPublicSettings).toHaveBeenCalledTimes(2)
+
+      store.clearPublicSettingsCache()
+      delete window.__APP_CONFIG__
+      vi.mocked(getPublicSettings).mockRejectedValueOnce(new Error('still offline'))
+      await store.fetchPublicSettings()
+      const injected = createPublicSettings({ site_name: 'Injected' })
+      window.__APP_CONFIG__ = injected
+      await expect(store.fetchPublicSettings()).resolves.toEqual(injected)
+      expect(store.siteName).toBe('Injected')
+      expect(getPublicSettings).toHaveBeenCalledTimes(3)
+      vi.mocked(console.error).mockRestore()
+    })
+
     it('并发调用复用并等待同一个请求，包括 force 调用', async () => {
       const deferred = createDeferred<PublicSettings>()
       vi.mocked(getPublicSettings).mockReturnValue(deferred.promise)

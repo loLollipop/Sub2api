@@ -16,6 +16,7 @@ import {
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
 
 export const VERSION_CACHE_TTL_MS = 20 * 60 * 1000
+const PUBLIC_SETTINGS_RETRY_COOLDOWN_MS = 30_000
 
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
@@ -38,6 +39,7 @@ export const useAppStore = defineStore('app', () => {
   const docUrl = ref<string>('')
   const cachedPublicSettings = ref<PublicSettings | null>(null)
   let publicSettingsRequest: Promise<PublicSettings | null> | null = null
+  let publicSettingsRetryAfter = 0
 
   // Version cache state
   const versionLoaded = ref<boolean>(false)
@@ -340,6 +342,7 @@ export const useAppStore = defineStore('app', () => {
     apiBaseUrl.value = normalizedConfig.api_base_url || ''
     docUrl.value = normalizedConfig.doc_url || ''
     publicSettingsLoaded.value = true
+    publicSettingsRetryAfter = 0
   }
 
   function normalizeSiteLogo(value: string | undefined): string {
@@ -426,12 +429,18 @@ export const useAppStore = defineStore('app', () => {
       })
     }
 
+    // Failed page mounts share a bounded cooldown; explicit refresh can retry.
+    if (!force && Date.now() < publicSettingsRetryAfter) {
+      return Promise.resolve(cachedPublicSettings.value)
+    }
+
     publicSettingsLoading.value = true
     let apiRequest: Promise<PublicSettings>
     try {
       apiRequest = fetchPublicSettingsAPI()
     } catch (error) {
       console.error('Failed to fetch public settings:', error)
+      publicSettingsRetryAfter = Date.now() + PUBLIC_SETTINGS_RETRY_COOLDOWN_MS
       publicSettingsLoading.value = false
       return Promise.resolve(null)
     }
@@ -443,6 +452,7 @@ export const useAppStore = defineStore('app', () => {
       })
       .catch((error) => {
         console.error('Failed to fetch public settings:', error)
+        publicSettingsRetryAfter = Date.now() + PUBLIC_SETTINGS_RETRY_COOLDOWN_MS
         return null
       })
       .finally(() => {
@@ -462,6 +472,7 @@ export const useAppStore = defineStore('app', () => {
   function clearPublicSettingsCache(): void {
     publicSettingsLoaded.value = false
     cachedPublicSettings.value = null
+    publicSettingsRetryAfter = 0
   }
 
   /**

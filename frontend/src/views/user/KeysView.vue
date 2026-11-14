@@ -481,7 +481,27 @@
               :searchable="true"
               :search-placeholder="t('keys.searchGroup')"
               @update:model-value="addSmartRoute"
-            />
+              @click.capture="loadGroupStatuses"
+              @keydown.capture="loadGroupStatusesOnKeydown"
+            >
+              <template #option="{ option, selected }">
+                <GroupOptionItem
+                  :name="(option as unknown as GroupOption).label"
+                  :platform="(option as unknown as GroupOption).platform"
+                  :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                  :rate-multiplier="(option as unknown as GroupOption).rate"
+                  :user-rate-multiplier="(option as unknown as GroupOption).userRate"
+                  :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
+                  :peak-start="(option as unknown as GroupOption).peakStart"
+                  :peak-end="(option as unknown as GroupOption).peakEnd"
+                  :peak-rate-multiplier="(option as unknown as GroupOption).peakRateMultiplier"
+                  :description="(option as unknown as GroupOption).description"
+                  :status-class="groupStatusClass((option as unknown as GroupOption).value)"
+                  :status-title="groupStatusTitle((option as unknown as GroupOption).value)"
+                  :selected="selected"
+                />
+              </template>
+            </Select>
             <p v-if="formData.group_ids.length === 0" class="text-xs text-gray-400">{{ t('keys.smartRoutingEmpty') }}</p>
           </div>
           <Select
@@ -492,6 +512,8 @@
             :searchable="true"
             :search-placeholder="t('keys.searchGroup')"
             data-tour="key-form-group"
+            @click.capture="loadGroupStatuses"
+            @keydown.capture="loadGroupStatusesOnKeydown"
           >
             <template #selected="{ option }">
               <GroupBadge
@@ -520,6 +542,8 @@
                 :peak-end="(option as unknown as GroupOption).peakEnd"
                 :peak-rate-multiplier="(option as unknown as GroupOption).peakRateMultiplier"
                 :description="(option as unknown as GroupOption).description"
+                :status-class="groupStatusClass((option as unknown as GroupOption).value)"
+                :status-title="groupStatusTitle((option as unknown as GroupOption).value)"
                 :selected="selected"
               />
             </template>
@@ -1150,6 +1174,8 @@
               :peak-end="option.peakEnd"
               :peak-rate-multiplier="option.peakRateMultiplier"
               :description="option.description"
+              :status-class="groupStatusClass(option.value)"
+              :status-title="groupStatusTitle(option.value)"
               :selected="
                 selectedKeyForGroup?.group_id === option.value ||
                 (!selectedKeyForGroup?.group_id && option.value === null)
@@ -1193,6 +1219,8 @@ import PageHeader from '@/components/layout/PageHeader.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
+import { bucketStatusClass, createGroupStatusLoader, type GroupStatusBuckets } from '@/features/channel-monitor-v2/groupStatusDot'
+import { formatMonitorPercent } from '@/features/channel-monitor-v2/monitorFormat'
 	import PlatformIcon from '@/components/common/PlatformIcon.vue'
 	import type { ApiKey, CustomEndpoint, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'
 import type { Column } from '@/components/common/types'
@@ -1408,6 +1436,24 @@ const ccsModelOptions = computed(() => {
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
+const loadGroupStatusBuckets = createGroupStatusLoader()
+const groupStatusBuckets = ref<GroupStatusBuckets>({})
+const loadGroupStatuses = async () => {
+  groupStatusBuckets.value = await loadGroupStatusBuckets()
+}
+const loadGroupStatusesOnKeydown = (event: KeyboardEvent) => {
+  if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) void loadGroupStatuses()
+}
+const groupStatusClass = (groupId: number) => {
+  const bucket = groupStatusBuckets.value[groupId]
+  return bucket ? bucketStatusClass(bucket) : null
+}
+const groupStatusTitle = (groupId: number) => {
+  const bucket = groupStatusBuckets.value[groupId]
+  if (!bucket) return null
+  if (bucket.health.overall === 'unknown') return t('channelMonitorV3.unknown')
+  return `${t('channelMonitorV3.successRate')} ${formatMonitorPercent(1 - bucket.metrics.error_rate, locale.value)}`
+}
 const publicSettings = ref<PublicSettings | null>(null)
 const customEndpoints = ref<CustomEndpoint[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -1843,6 +1889,7 @@ const openGroupSelector = (key: ApiKey) => {
     }
     groupSelectorKeyId.value = key.id
     groupSearchQuery.value = ''
+    void loadGroupStatuses()
   }
 }
 

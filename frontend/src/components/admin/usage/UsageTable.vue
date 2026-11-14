@@ -263,7 +263,7 @@
                 class="font-medium tabular-nums text-violet-600 dark:text-violet-400"
                 :title="t('usage.outputRateHint')"
               >
-                {{ formatOutputRate(row.output_tokens, row.first_token_ms, displayDuration(row)) }}
+                {{ formatOutputRate(row.output_tokens, displayDuration(row)) }}
               </span>
             </div>
           </div>
@@ -768,31 +768,22 @@ const formatDuration = (ms: number | null | undefined): string => {
   return `${Math.floor(totalSec / 3600)}h ${Math.floor((totalSec % 3600) / 60)}m`
 }
 
-/** Average generated-token throughput after the first token, in output tokens/sec. */
+/** Average output tokens/sec over the whole request, including time to first token. */
 const MIN_OUTPUT_TOKENS_FOR_RATE = 20
-const MIN_GENERATION_WINDOW_MS_FOR_RATE = 500
+const MIN_DURATION_MS_FOR_RATE = 500
 
 const formatOutputRate = (
   outputTokens: number | null | undefined,
-  firstTokenMs: number | null | undefined,
   durationMs: number | null | undefined,
 ): string => {
-  if (outputTokens == null || firstTokenMs == null || durationMs == null) return '-'
+  if (outputTokens == null || durationMs == null) return '-'
   const tokens = Number(outputTokens)
-  const firstToken = Number(firstTokenMs)
   const duration = Number(durationMs)
-  const generationDuration = duration - firstToken
-  const durationsRoundToSameDisplay = formatDuration(firstTokenMs) === formatDuration(durationMs)
   if (
     !Number.isFinite(tokens) || tokens < MIN_OUTPUT_TOKENS_FOR_RATE
-    || !Number.isFinite(firstToken) || firstToken < 0
-    || !Number.isFinite(duration) || duration <= 0
-    || generationDuration < MIN_GENERATION_WINDOW_MS_FOR_RATE
-    || durationsRoundToSameDisplay
+    || !Number.isFinite(duration) || duration < MIN_DURATION_MS_FOR_RATE
   ) return '-'
-  const outputRate = tokens * 1000 / generationDuration
-  if (outputRate > tokens) return '-'
-  return `${outputRate.toFixed(1)} t/s`
+  return `${(tokens * 1000 / duration).toFixed(1)} t/s`
 }
 
 type TooltipKind = 'cost' | 'token'

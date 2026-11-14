@@ -47,6 +47,24 @@ function bucket(overall: MonitorHealth['overall'], errorRate: number, start: str
 }
 
 describe('ChannelMonitorV3Timeline unknown bars', () => {
+  it('keeps missing slots empty while drawing real unknown buckets grey', () => {
+    const wrapper = mount(ChannelMonitorV3Timeline, {
+      props: { buckets: [bucket('unknown', 1, '2026-09-11T12:00:00Z')], countdownSeconds: 0, length: 4 },
+    })
+    expect(wrapper.findAll('.v3-bar-slot')).toHaveLength(4)
+    expect(wrapper.findAll('.v3-soft-glass-bar')).toHaveLength(1)
+    expect(wrapper.get('.v3-soft-glass-bar').classes()).toContain('bg-gray-300')
+    expect(wrapper.findAll('.v3-bar-slot').slice(1).every(slot => !slot.find('.v3-soft-glass-bar').exists())).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('draws no grey columns before the first bucket arrives', () => {
+    const wrapper = mount(ChannelMonitorV3Timeline, { props: { countdownSeconds: 0, length: 18 } })
+    expect(wrapper.findAll('.v3-bar-slot')).toHaveLength(18)
+    expect(wrapper.find('.v3-soft-glass-bar').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('paints insufficient-sample bars gray instead of availability black', () => {
     const wrapper = mount(ChannelMonitorV3Timeline, {
       props: {

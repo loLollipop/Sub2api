@@ -26,7 +26,7 @@
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
       <div class="flex shrink-0 flex-col items-end gap-1">
         <!-- Rate pill (platform color) -->
-        <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
+        <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
           <template v-if="hasCustomRate">
             <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>
             <span class="font-bold">{{ userRateMultiplier }}x</span>
@@ -34,6 +34,15 @@
           <template v-else>
             {{ rateMultiplier }}x {{ t('admin.groups.rateLabel') }}
           </template>
+          <span
+            v-if="statusClass"
+            class="size-1.5 shrink-0 rounded-full ring-2 ring-white/70 dark:ring-dark-900/70"
+            :class="statusClass"
+            role="img"
+            :title="statusTitle || undefined"
+            :aria-label="statusTitle || undefined"
+            data-testid="group-option-status-dot"
+          />
         </span>
         <span
           v-if="hasPeakRate"
@@ -74,6 +83,9 @@ interface Props {
   description?: string | null
   selected?: boolean
   showCheckmark?: boolean
+  /** Colour of the newest monitor bucket; null hides the dot when no bucket exists. */
+  statusClass?: string | null
+  statusTitle?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -81,7 +93,9 @@ const props = withDefaults(defineProps<Props>(), {
   selected: false,
   showCheckmark: true,
   userRateMultiplier: null,
-  peakRateEnabled: false
+  peakRateEnabled: false,
+  statusClass: null,
+  statusTitle: null
 })
 
 // Whether user has a custom rate different from default

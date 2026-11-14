@@ -42,3 +42,32 @@ describe('GroupOptionItem description layout', () => {
     expect(wrapper.find('[title]').attributes('title')).toBe(description)
   })
 })
+
+describe('GroupOptionItem status dot', () => {
+  const mountOption = (statusClass: string | null = null) => mount(GroupOptionItem, {
+    props: {
+      name: 'OpenAI', platform: 'openai', rateMultiplier: 1, userRateMultiplier: 0.5,
+      statusClass, statusTitle: 'Availability 98.0%',
+    },
+    global: { stubs: { GroupBadge: true, Icon: true } },
+  })
+
+  it('places a labelled dot after the rate inside the pill', () => {
+    const wrapper = mountOption('bg-emerald-600 dark:bg-emerald-400')
+    const dot = wrapper.get('[data-testid="group-option-status-dot"]')
+    expect(dot.classes()).toContain('bg-emerald-600')
+    expect(dot.attributes('title')).toBe('Availability 98.0%')
+    expect(dot.attributes('aria-label')).toBe('Availability 98.0%')
+    expect(dot.attributes('role')).toBe('img')
+    expect(dot.element.parentElement?.textContent).toContain('0.5x')
+    expect(dot.element.parentElement?.lastElementChild).toBe(dot.element)
+    wrapper.unmount()
+  })
+
+  it('hides the dot entirely without monitor buckets', () => {
+    const wrapper = mountOption()
+    expect(wrapper.find('[data-testid="group-option-status-dot"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('0.5x')
+    wrapper.unmount()
+  })
+})

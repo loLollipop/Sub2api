@@ -27,7 +27,7 @@
           <DashboardStat icon="cube" :label="t('admin.dashboard.todayTokens')">{{ formatTokens(stats.today_tokens) }}<template #detail><span>{{ t('admin.dashboard.actual') }} <strong>${{ formatCost(stats.today_actual_cost) }}</strong></span><span>{{ t('admin.dashboard.accountCost') }} <strong>${{ formatCost(stats.today_account_cost) }}</strong></span><span>{{ t('admin.dashboard.standard') }} ${{ formatCost(stats.today_cost) }}</span></template></DashboardStat>
           <DashboardStat icon="database" tone="violet" :label="t('admin.dashboard.totalTokens')">{{ formatTokens(stats.total_tokens) }}<template #detail><span>{{ t('admin.dashboard.actual') }} <strong>${{ formatCost(stats.total_actual_cost) }}</strong></span><span>{{ t('admin.dashboard.accountCost') }} <strong>${{ formatCost(stats.total_account_cost) }}</strong></span><span>{{ t('admin.dashboard.standard') }} ${{ formatCost(stats.total_cost) }}</span></template></DashboardStat>
           <DashboardStat icon="bolt" tone="blue" :label="t('admin.dashboard.performance')">{{ formatTokens(stats.rpm) }} <small>RPM</small><template #detail><span><strong>{{ formatTokens(stats.tpm) }}</strong> TPM</span></template></DashboardStat>
-          <DashboardStat icon="clock" tone="purple" :label="t('admin.dashboard.avgResponse')">{{ formatDuration(stats.average_duration_ms) }}<template #detail><span>{{ stats.active_users }} {{ t('admin.dashboard.activeUsers') }}</span></template></DashboardStat>
+          <DashboardStat icon="banknotes" tone="purple" :label="t('admin.dashboard.usersWithBalance')" data-testid="users-with-balance">${{ formatCost(stats.users_with_balance_total) }}<template #detail><span>{{ formatNumber(stats.users_with_balance) }} {{ t('admin.dashboard.usersWithBalanceUnit') }}</span></template></DashboardStat>
         </DashboardStatGrid>
 
         <nav class="admin-dashboard-shortcuts" :aria-label="t('admin.dashboard.quickActions')">
@@ -329,13 +329,6 @@ const formatCost = (value: number | null | undefined): string => {
     return safeValue.toFixed(3)
   }
   return safeValue.toFixed(4)
-}
-
-const formatDuration = (ms: number): string => {
-  if (ms >= 1000) {
-    return `${(ms / 1000).toFixed(2)}s`
-  }
-  return `${Math.round(ms)}ms`
 }
 
 const goToUserUsage = (item: UserSpendingRankingItem) => {

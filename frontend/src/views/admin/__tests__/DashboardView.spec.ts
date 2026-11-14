@@ -58,6 +58,8 @@ const createDashboardStats = (): DashboardStats => ({
   today_new_users: 0,
   active_users: 0,
   hourly_active_users: 0,
+  users_with_balance: 0,
+  users_with_balance_total: 0,
   stats_updated_at: '',
   stats_stale: false,
   total_api_keys: 0,
@@ -146,6 +148,26 @@ describe('admin DashboardView', () => {
     expect(getSnapshotV2).toHaveBeenCalledTimes(2)
     expect(getUserUsageTrend).toHaveBeenCalledTimes(2)
     expect(getUserSpendingRanking).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it.each([
+    [0, 0, '$0.0000'],
+    [1234, 12345.67, '$12.35K'],
+    [2, 12.3456, '$12.35'],
+  ])('shows positive-balance user totals and count (%s users)', async (count, total, formatted) => {
+    getSnapshotV2.mockResolvedValueOnce({
+      stats: { ...createDashboardStats(), users_with_balance: count, users_with_balance_total: total, average_duration_ms: 9876 },
+      trend: [], models: [],
+    })
+    const wrapper = mountDashboard()
+    await flushPromises()
+    const card = wrapper.get('[data-testid="users-with-balance"]')
+    expect(card.get('.overview-stat-heading').text()).toBe('admin.dashboard.usersWithBalance')
+    expect(card.get('.overview-stat-value').text()).toBe(formatted)
+    expect(card.get('.overview-stat-detail').text()).toBe(`${count.toLocaleString()} admin.dashboard.usersWithBalanceUnit`)
+    expect(wrapper.text()).not.toContain('admin.dashboard.avgResponse')
+    expect(wrapper.findAll('.overview-stat')).toHaveLength(8)
     wrapper.unmount()
   })
 

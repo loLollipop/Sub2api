@@ -21,6 +21,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/admin/group/__tests__/GroupRateMultipliersModal.requests.spec.ts \
 	src/components/admin/user/__tests__/UserAllowedGroupsModal.rates.spec.ts \
 	src/components/common/__tests__/PlatformIcon.spec.ts \
+	src/components/common/__tests__/GroupOptionItem.spec.ts \
 	src/components/modelPlaza/__tests__/PlazaModelPricingTable.spec.ts \
 	src/components/modelPlaza/__tests__/ModelPlazaContent.spec.ts \
 	src/components/admin/group/__tests__/GroupRPMOverridesModal.edit.spec.ts \
@@ -86,7 +87,10 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/auth/__tests__/RegisterView.spec.ts \
 	src/components/account/__tests__/AccountUsageCell.spec.ts \
 	src/views/admin/__tests__/SettingsView.spec.ts \
+	src/views/admin/__tests__/DashboardView.spec.ts \
 	src/views/admin/__tests__/UsageView.spec.ts \
+	src/components/user/monitor/__tests__/ChannelMonitorV3Timeline.unknownBar.spec.ts \
+	src/features/channel-monitor-v2/__tests__/groupStatusDot.spec.ts \
 	src/features/channel-monitor-v2/__tests__/designSystem.structure.spec.ts \
 	src/features/channel-monitor-v2/__tests__/monitorFormat.spec.ts \
 	src/features/channel-monitor-v2/__tests__/monitorZoom.spec.ts

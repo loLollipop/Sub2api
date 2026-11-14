@@ -3,6 +3,8 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 import type { ApiKey } from '@/types'
+import type { MonitorMatrixBucket } from '@/api/channelMonitorV2'
+import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import KeysView from '../KeysView.vue'
 import SearchInput from '@/components/common/SearchInput.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -15,6 +17,7 @@ const {
   getDashboardApiKeysUsage,
   getAvailableGroups,
   getUserGroupRates,
+  getMatrix,
   showError,
   showSuccess,
   copyToClipboard,
@@ -28,6 +31,7 @@ const {
   getDashboardApiKeysUsage: vi.fn(),
   getAvailableGroups: vi.fn(),
   getUserGroupRates: vi.fn(),
+  getMatrix: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
   copyToClipboard: vi.fn(),
@@ -88,6 +92,8 @@ vi.mock('@/api', () => ({
     getCustomEndpoints: vi.fn().mockResolvedValue([]),
   },
 }))
+
+vi.mock('@/api/channelMonitorV2', () => ({ getMatrix }))
 
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({
@@ -290,6 +296,8 @@ describe('user KeysView column settings', () => {
     getDashboardApiKeysUsage.mockReset()
     getAvailableGroups.mockReset()
     getUserGroupRates.mockReset()
+    getMatrix.mockReset()
+    getMatrix.mockResolvedValue({ items: [] })
     showError.mockReset()
     showSuccess.mockReset()
     copyToClipboard.mockReset()
@@ -310,6 +318,109 @@ describe('user KeysView column settings', () => {
     isCurrentStep.mockReturnValue(false)
   })
 
+
+  it.each(['click', 'keyboard', 'edit'])('loads status on the first %s group-picker interaction and shares it with inline changes', async interaction => {
+    getAvailableGroups.mockResolvedValue([
+      { id: 1, name: 'Healthy', platform: 'anthropic', rate_multiplier: 1 },
+      { id: 2, name: 'Unknown', platform: 'anthropic', rate_multiplier: 1 },
+      { id: 3, name: 'No buckets', platform: 'anthropic', rate_multiplier: 1 },
+      { id: 4, name: 'Subscription', platform: 'anthropic', rate_multiplier: 1, subscription_type: 'subscription' },
+    ])
+    const makeBucket = (overall: string, errorRate: number) => ({
+      bucket_start: '2026-11-14T12:00:00Z', health: { overall }, metrics: { error_rate: errorRate },
+    } as MonitorMatrixBucket)
+    getMatrix.mockResolvedValue({ items: [
+      { group_id: 1, buckets: [makeBucket('healthy', 0)] },
+      { group_id: 2, buckets: [makeBucket('unknown', 1)] },
+      { group_id: 3, buckets: [] },
+      { group_id: 4, buckets: [makeBucket('critical', 0.8)] },
+    ] })
+    const wrapper = await mountView(true)
+    expect(getMatrix).not.toHaveBeenCalled()
+    if (interaction === 'edit') await getButtonByText(wrapper, 'common.edit').trigger('click')
+    else await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+    expect(getMatrix).not.toHaveBeenCalled()
+    const picker = wrapper.get('[data-tour="key-form-group"]')
+    if (interaction === 'keyboard') await picker.trigger('keydown', { key: 'ArrowDown' })
+    else await picker.trigger('click')
+    await flushPromises()
+    expect(getMatrix).toHaveBeenCalledTimes(1)
+    const options = wrapper.findAllComponents(GroupOptionItem)
+    expect(options.map(option => option.props('statusClass'))).toEqual([
+      'bg-emerald-600 dark:bg-emerald-400', 'bg-gray-300 dark:bg-dark-600', null, 'bg-gray-950 dark:bg-black',
+    ])
+    expect(options[0].props('statusTitle')).toBe('channelMonitorV3.successRate 100.0%')
+    expect(options[1].props('statusTitle')).toBe('channelMonitorV3.unknown')
+    expect(options[2].props('statusTitle')).toBeNull()
+    await picker.trigger('click')
+    await wrapper.get('button[title="Click to change group"]').trigger('click')
+    await flushPromises()
+    expect(getMatrix).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAllComponents(GroupOptionItem).slice(-4).map(option => option.props('statusClass')))
+      .toEqual(options.map(option => option.props('statusClass')))
+    wrapper.unmount()
+
+    const nextSession = await mountView(true)
+    await nextSession.get('[data-tour="keys-create-btn"]').trigger('click')
+    await nextSession.get('[data-tour="key-form-group"]').trigger('click')
+    await flushPromises()
+    expect(getMatrix).toHaveBeenCalledTimes(2)
+    nextSession.unmount()
+  })
+
+  it('adds labelled status decoration to the smart-route group picker', async () => {
+    getAvailableGroups.mockResolvedValue([
+      { id: 1, name: 'First', platform: 'anthropic', rate_multiplier: 1 },
+      { id: 2, name: 'Second', platform: 'anthropic', rate_multiplier: 1 },
+      { id: 3, name: 'Third', platform: 'anthropic', rate_multiplier: 1 },
+    ])
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 1, group_ids: [1, 2] }], total: 1 })
+    getMatrix.mockResolvedValue({ items: [{ group_id: 3, buckets: [{
+      bucket_start: '2026-11-14T12:00:00Z', health: { overall: 'healthy' }, metrics: { error_rate: 0.15 },
+    }] }] })
+    const wrapper = await mountView(true)
+    await getButtonByText(wrapper, 'common.edit').trigger('click')
+    expect(getMatrix).not.toHaveBeenCalled()
+    const picker = wrapper.findAllComponents({ name: 'Select' }).find(select => select.attributes('placeholder') === 'keys.smartRoutingAdd')!
+    await picker.trigger('click')
+    await flushPromises()
+    const option = picker.getComponent(GroupOptionItem)
+    expect(option.props('name')).toBe('Third')
+    expect(option.props('statusClass')).toBe('bg-emerald-400 dark:bg-emerald-300')
+    expect(option.props('statusTitle')).toBe('channelMonitorV3.successRate 85.0%')
+    expect(getMatrix).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('discards an old healthy colour after a failed refresh and backs off without blocking the picker', async () => {
+    getAvailableGroups.mockResolvedValue([{ id: 1, name: 'Claude', platform: 'anthropic', rate_multiplier: 1 }])
+    getMatrix.mockResolvedValueOnce({ items: [{ group_id: 1, buckets: [{
+      bucket_start: '2026-11-14T12:00:00Z', health: { overall: 'healthy' }, metrics: { error_rate: 0 },
+    }] }] })
+    const wrapper = await mountView(true)
+    const now = Date.now()
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(now)
+    try {
+      await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+      const picker = wrapper.get('[data-tour="key-form-group"]')
+      await picker.trigger('click')
+      await flushPromises()
+      expect(wrapper.getComponent(GroupOptionItem).props('statusClass')).toContain('bg-emerald-600')
+      dateNow.mockReturnValue(now + 60_000)
+      getMatrix.mockRejectedValueOnce(new Error('monitor unavailable'))
+      await picker.trigger('click')
+      await flushPromises()
+      expect(wrapper.getComponent(GroupOptionItem).props('statusClass')).toBeNull()
+      await picker.trigger('click')
+      await flushPromises()
+      expect(getMatrix).toHaveBeenCalledTimes(2)
+      expect(showError).not.toHaveBeenCalled()
+      expect(wrapper.get('#key-form').exists()).toBe(true)
+    } finally {
+      dateNow.mockRestore()
+      wrapper.unmount()
+    }
+  })
 
   it('distinguishes an empty library from filtered results and resets every filter including group zero', async () => {
     listKeys.mockResolvedValue({ items: [], total: 0, pages: 0 })

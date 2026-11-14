@@ -26,6 +26,7 @@
         >
           <span class="v3-bar-visual" :style="barMotionStyle(index)" aria-hidden="true">
             <span
+              v-if="bar.colorClass"
               class="v3-soft-glass-bar"
               :class="bar.colorClass"
               :style="{ height: `${bar.heightPct}%`, animationDelay: `${index * 18}ms` }"
@@ -59,7 +60,8 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { MonitorMatrixBucket } from '@/api/channelMonitorV2'
-import { availabilityBarClass, formatMonitorMs, formatMonitorPercent } from '@/features/channel-monitor-v2/monitorFormat'
+import { formatMonitorMs, formatMonitorPercent } from '@/features/channel-monitor-v2/monitorFormat'
+import { bucketStatusClass } from '@/features/channel-monitor-v2/groupStatusDot'
 
 const props = withDefaults(defineProps<{
   buckets?: MonitorMatrixBucket[]
@@ -161,12 +163,11 @@ const displayBars = computed<TimelineBar[]>(() => {
     const state = bucket.health.overall === 'healthy' || bucket.health.overall === 'warning' || bucket.health.overall === 'critical'
       ? bucket.health.overall
       : 'unknown'
-    const availabilityPercent = (1 - bucket.metrics.error_rate) * 100
     const style = state === 'unknown'
       ? { ...STATUS_STYLE.unknown }
       : {
           ...(STATUS_STYLE[state]),
-          colorClass: availabilityBarClass(availabilityPercent),
+          colorClass: bucketStatusClass(bucket),
         }
     bars.push({
       key: bucket.bucket_start,
@@ -180,9 +181,10 @@ const displayBars = computed<TimelineBar[]>(() => {
     })
   }
 
+  // Missing aggregation slots keep their spacing; only real unknown buckets draw grey.
   const missing = Math.max(0, props.length - real.length)
   for (let index = 0; index < missing; index += 1) {
-    bars.push({ key: `empty-${index}`, ...STATUS_STYLE.unknown, title: '' })
+    bars.push({ key: `empty-${index}`, colorClass: '', heightPct: 0, title: '' })
   }
   return bars
 })

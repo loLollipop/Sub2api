@@ -435,7 +435,7 @@ export default {
     latencyFirstToken: 'First',
     latencyDuration: 'Total',
     outputRate: 'Output rate',
-    outputRateHint: 'Average output tokens per second',
+    outputRateHint: 'Average output tokens per second over the whole request (including time to first token)',
     time: 'Time',
     ws: 'WS',
     stream: 'Stream',

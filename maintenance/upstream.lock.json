@@ -2,27 +2,27 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.66",
-  "imported_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
+  "imported_version": "2.3.76",
+  "imported_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.66",
-  "latest_observed_release_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
-  "latest_observed_main_commit": "524f1af7cd31a30398fc6ebcef1076ca610e6921",
+  "latest_observed_version": "2.3.76",
+  "latest_observed_release_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
+  "latest_observed_main_commit": "6a8b8d1197cf2e48cb99cc31dc0a1d8c89bec5d1",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.66",
-  "reviewed_release_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
+  "reviewed_release_tag": "v2.3.76",
+  "reviewed_release_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
   "observed_delta_review": {
-    "from_commit": "28ff1b3d41dddb2959892e66f4b410b064a266d4",
-    "to_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
-    "status": "formal_v2366_selective_backport",
-    "scope": "Review formal v2.3.58 to v2.3.66 (60 commits including merges, 46 non-merge commits / 104 paths). Adapt versioned API URL joining, placeholder-zero input handling with explicit-zero cache fidelity, and 30s public-settings failure backoff. Retain native routes, terminal billing, configured monitor thresholds and UI; defer HTTP cache and managed proxy/IP/kind chains; exclude retired payments.",
-    "evidence": "maintenance/notes/upstream-sync-20261113-v2366.md"
+    "from_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
+    "to_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
+    "status": "formal_v2376_selective_backport",
+    "scope": "Review formal v2.3.66 to v2.3.76 (60 commits including merges, 45 non-merge commits / 60 paths). Adapt whole-request average output rate, funded-user balance dashboard card, latest-monitor-bucket group status dots and absent timeline slots. Preserve native routing, billing and local theme; defer unsafe rollup clamp/migration, raw dumps and previous risk/balance chains; exclude retired payments.",
+    "evidence": "maintenance/notes/upstream-sync-20261114-v2376.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
+    "source_head": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -30,6 +30,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.67-v2.3.76: whole-request average output rate without TTFT dependence; positive-balance user totals from one non-deleted population; lazy latest-monitor-bucket group dots with per-view cache, failure backoff and accessible descriptions; distinguish absent timeline slots from actual unknown buckets. See maintenance/notes/upstream-sync-20261114-v2376.md.",
       "Formal v2.3.59-v2.3.66: idempotent API path joins preserving Cloudflare beta exceptions, native version routing and escaped boundaries; placeholder-zero input handling preserving explicit-zero cache/TTL and terminal billing; failed public-settings 30s retry cooldown with force/coalescing/injected config intact. See maintenance/notes/upstream-sync-20261113-v2366.md for scope and validation.",
       "Formal v2.3.55-v2.3.58: always show numeric upstream-declared rates, including synchronized 0.15x; right-align cache-detail popovers on both usage pages after reproducing narrow-screen overflow. Preserve local theme, freshness/peak semantics and existing callers. See maintenance/notes/upstream-sync-20261112-v2358.md for deferrals and validation.",
       "Formal v2.3.51-v2.3.54: Msh cache headers and CORS exposure, manual relay model-list retention and custom-code transport policy. Retain official default/regional filtering, privacy/ForceRemove and other durable-fault cooldowns. See maintenance/notes/upstream-sync-20261112-v2354.md for deferrals and validation.",
@@ -1076,5 +1077,30 @@
     "preserved": "Personal VERSION was 2.1.63 during selective sync and advances to 2.1.64 for this user-authorized release, original v0.2.21 checkpoint, native provider routing and credential destinations, real terminal usage/local billing, cool gray-blue Vue SPA. No migration, dependency or runtime-config change. Three pre-existing untracked usage tests remain untouched.",
     "release_status": "User authorized code review, fixes, GitHub submission and deployment on 2026-11-13. Prepare personal v2.1.64 through reviewed PR/CI, own Release/GHCR and backup/restore-validated rollout; final acceptance evidence is stored separately.",
     "release_review_fixes": "Bound admin usage grid columns to minmax(0,1fr) after reproducing English 320px document width336; normalize provider prompt totals/explicit cache misses in stream event merges and preserve explicit cache-hit zero across all four usage paths."
+  },
+  "sync_20261114_v2376": {
+    "evidence": "maintenance/notes/upstream-sync-20261114-v2376.md",
+    "reviewed_release_tag": "v2.3.76",
+    "reviewed_release_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
+    "observed_main_commit": "6a8b8d1197cf2e48cb99cc31dc0a1d8c89bec5d1",
+    "reviewed_delta": {
+      "from_version": "2.3.66",
+      "commits": 60,
+      "non_merge_commits": 45,
+      "paths": 60
+    },
+    "selected_commits": [
+      "bfc0bdc38ff9af36f42e2e92bb71328c85bbe2f1",
+      "03edaac0dfcead691b6028aea454095aca4cf8ae",
+      "409bd447603c4f306565f1ded8f4ed3db42884b8",
+      "4a07d7bd5d610ef94e32e1fdde2c257858ae0925",
+      "1687505ff8209377578b2220fa7d712acd8cae73",
+      "e15e34504ba9d14e89de97a5d1bc065f6db7d4f7"
+    ],
+    "local_adaptations": "Use existing dashboard components/theme and API fields; count and sum positive balances in the same non-deleted-user scan. Explain rate as whole-request average without altering ops generation rate. Scope group-status result caching to KeysView, fetch on both create/edit selectors, back off empty/failed loads and hide stale results; expose status descriptions. Keep real unknown timeline buckets grey and omit only missing placeholders.",
+    "deferred_scope": "Rollup trim clamp/SQL315 skips retained first-day edits, hardcodes timezone and loses mixed-batch/historical backfill invalidation; do not partially import. Raw outbound/error body dumps, automatic shared-IP/key risk policy and New-API balance/kind chain deferred. All earlier deferrals retained.",
+    "excluded_scope": "Native crypto gas-topup/deposit/scanner changes, source VERSION/release prose and unreleased main.",
+    "preserved": "Personal VERSION was 2.1.64 during selective sync and advances to 2.1.65 for this user-authorized release, original v0.2.21 checkpoint, native provider routing, effective rates and terminal usage/billing, cool gray-blue UI and narrow-screen fixes. No migration, dependency, runtime configuration or production account changes; preserve all three pre-existing untracked tests.",
+    "release_status": "User authorized code review, fixes, GitHub submission and deployment on 2026-11-14. Prepare personal v2.1.65 through reviewed PR/CI, own Release/GHCR and backup/restore-validated rollout; final acceptance evidence is stored separately."
   }
 }

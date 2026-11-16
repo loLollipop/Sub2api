@@ -2,27 +2,27 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.76",
-  "imported_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
+  "imported_version": "2.3.89",
+  "imported_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.76",
-  "latest_observed_release_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
-  "latest_observed_main_commit": "6a8b8d1197cf2e48cb99cc31dc0a1d8c89bec5d1",
+  "latest_observed_version": "2.3.89",
+  "latest_observed_release_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
+  "latest_observed_main_commit": "cf769dbac37dfc8ddc2de57dd584e4968e065bc3",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.76",
-  "reviewed_release_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
+  "reviewed_release_tag": "v2.3.89",
+  "reviewed_release_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
   "observed_delta_review": {
-    "from_commit": "00e1d64b7e5a12375507f8a31958297d7f6f99b8",
-    "to_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
-    "status": "formal_v2376_selective_backport",
-    "scope": "Review formal v2.3.66 to v2.3.76 (60 commits including merges, 45 non-merge commits / 60 paths). Adapt whole-request average output rate, funded-user balance dashboard card, latest-monitor-bucket group status dots and absent timeline slots. Preserve native routing, billing and local theme; defer unsafe rollup clamp/migration, raw dumps and previous risk/balance chains; exclude retired payments.",
-    "evidence": "maintenance/notes/upstream-sync-20261114-v2376.md"
+    "from_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
+    "to_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
+    "status": "formal_v2389_selective_backport",
+    "scope": "Review formal v2.3.76-v2.3.89: 66 commits including merges, 49 non-merge commits / 96 paths. Adapt editable registration fields before consent, opt-out transport cooldown (default false) and checked-fields-only key bulk edits to local components/API. Existing Antigravity /hub UA retained. Defer blacklist with missing MCP OAuth SQL, unsafe DeepSeek schema/reasoning changes, raw dumps and absent trace module. Exclude retired payments and global theme changes.",
+    "evidence": "maintenance/notes/upstream-sync-20261116-v2389.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
+    "source_head": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -30,6 +30,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.77-v2.3.89: separate editable registration fields from consent-gated actions; add default-false OpenAI transport cooldown opt-out preserving prior blocks/failover/custom-code policy; adapt checked-fields-only key bulk edits with explicit zero, expiry clearing and smart-route replacement. Keep local /hub UA, protocols, billing and theme. See maintenance/notes/upstream-sync-20261116-v2389.md.",
       "Formal v2.3.67-v2.3.76: whole-request average output rate without TTFT dependence; positive-balance user totals from one non-deleted population; lazy latest-monitor-bucket group dots with per-view cache, failure backoff and accessible descriptions; distinguish absent timeline slots from actual unknown buckets. See maintenance/notes/upstream-sync-20261114-v2376.md.",
       "Formal v2.3.59-v2.3.66: idempotent API path joins preserving Cloudflare beta exceptions, native version routing and escaped boundaries; placeholder-zero input handling preserving explicit-zero cache/TTL and terminal billing; failed public-settings 30s retry cooldown with force/coalescing/injected config intact. See maintenance/notes/upstream-sync-20261113-v2366.md for scope and validation.",
       "Formal v2.3.55-v2.3.58: always show numeric upstream-declared rates, including synchronized 0.15x; right-align cache-detail popovers on both usage pages after reproducing narrow-screen overflow. Preserve local theme, freshness/peak semantics and existing callers. See maintenance/notes/upstream-sync-20261112-v2358.md for deferrals and validation.",
@@ -123,6 +124,46 @@
   ],
   "selected_deepseek_fix": "Formal v2304 native DeepSeek bypasses legacy call-ID/request-state rewriting and rejected-field retries; genuine reasoning and thinking-switch options are provider-gated. Existing legacy conversion empty-shell repair remains scoped. Preserve local key/conversation/requested-model replay isolation, native protocols and distinct IDs; no cache-key weakening, Hosted execution, DSML parser or live SSE ID rewrite.",
   "deferred_changes": [
+    {
+      "feature": "v2389-email-blacklist-batch-disable",
+      "upstream_commits": [
+        "b379205828bcef5b3a88064fea11c5e6ade5e80b",
+        "e8eedd37f1f5c0d2ac24535ef8c2611f686e32f4",
+        "e02d58fe82669ee7c89356724142eebcce49b481"
+      ],
+      "reason": "Batch-disable transaction unconditionally updates mcp_oauth_grants, absent locally; source later removes dependent integration cases. Defer entire blacklist/disable API, auth/settings/UI chain until adapted and validated against local schema, session/cache revocation and disable semantics.",
+      "evidence": "maintenance/notes/upstream-sync-20261116-v2389.md"
+    },
+    {
+      "feature": "v2377-v2381-deepseek-reasoning-and-schema-rewrite",
+      "upstream_commits": [
+        "cfbf70ff13a6c4c0db7e5b4a5ac33c3c0c4450c2",
+        "6c7b12e85f9bd880e6dfe02ed4c3f621bc0e0e2b",
+        "f9491a34553d0baace1994e09ba6b1e01e9889d4",
+        "ca0fa5b59dbcb74616a30447e03ef07fde8886b9",
+        "c26e1d813713a041fad99d966005b48fab4be39a"
+      ],
+      "reason": "Unconditional JSON Schema removal changes caller output constraints; generated reasoning IDs do not avoid pre-existing rs_sub2api_N; one reasoning item suppresses missing-turn placeholder repair across history. Served-model prefix broadens native routing scope. Retain existing isolated/raw-preserving local behavior and regressions.",
+      "evidence": "maintenance/notes/upstream-sync-20261116-v2389.md"
+    },
+    {
+      "feature": "v2377-v2381-error-dump-expansion",
+      "upstream_commits": [
+        "cfbf70ff13a6c4c0db7e5b4a5ac33c3c0c4450c2",
+        "6c7b12e85f9bd880e6dfe02ed4c3f621bc0e0e2b"
+      ],
+      "reason": "Continues previously deferred raw-content capture, now including error-body files without dump opt-in. No local raw-body diagnostic capture or download module imported.",
+      "evidence": "maintenance/notes/upstream-sync-20261116-v2389.md"
+    },
+    {
+      "feature": "v2382-connection-trace-retention",
+      "upstream_commits": [
+        "1f69e37e35afa3c43dd31602fb32291ce593deaa",
+        "c56f3c6d762efd16dc2b1f7b951db5c702844511"
+      ],
+      "reason": "Trace retention and repeated protocol metadata fixes have no local usage-connection diagnostic module/table. Do not introduce absent diagnostic schema/callers.",
+      "evidence": "maintenance/notes/upstream-sync-20261116-v2389.md"
+    },
     {
       "feature": "v2365-public-settings-http-cache",
       "upstream_commits": [
@@ -1102,5 +1143,32 @@
     "excluded_scope": "Native crypto gas-topup/deposit/scanner changes, source VERSION/release prose and unreleased main.",
     "preserved": "Personal VERSION was 2.1.64 during selective sync and advances to 2.1.65 for this user-authorized release, original v0.2.21 checkpoint, native provider routing, effective rates and terminal usage/billing, cool gray-blue UI and narrow-screen fixes. No migration, dependency, runtime configuration or production account changes; preserve all three pre-existing untracked tests.",
     "release_status": "User authorized code review, fixes, GitHub submission and deployment on 2026-11-14. Prepare personal v2.1.65 through reviewed PR/CI, own Release/GHCR and backup/restore-validated rollout; final acceptance evidence is stored separately."
+  },
+  "sync_20261116_v2389": {
+    "evidence": "maintenance/notes/upstream-sync-20261116-v2389.md",
+    "reviewed_release_tag": "v2.3.89",
+    "reviewed_release_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
+    "observed_main_commit": "cf769dbac37dfc8ddc2de57dd584e4968e065bc3",
+    "reviewed_delta": {
+      "from_version": "2.3.76",
+      "commits": 66,
+      "non_merge_commits": 49,
+      "paths": 96
+    },
+    "selected_commits": [
+      "045df70299ac667d7bf518739673160c73654976",
+      "57509a60f8a5d2b886f3dc995aa1f818d20525ef",
+      "e4afee4a08d53cd3c6c258379fcdbe5c9f7a972a",
+      "52241ce8e3c2d4f5fa43c3a58c58aad89ddc597f"
+    ],
+    "already_covered": {
+      "f6cc7ee498d074bc26feb465b061d95093423582": "Local /hub User-Agent implementation already supports configured version and validation."
+    },
+    "local_adaptations": "Reuse Vue DataTable/BaseDialog/Select and existing authorized per-key update API. Snapshot visible selections; unchecked fields omitted; zero retained; blank expiry explicitly clears via empty string; group_ids replaces smart routes with clear bilingual hint. Validate selected inputs; lock saving/closure/duplicate submission; continue after per-key failures and report counts. Add env passthrough to all four Compose examples with false default.",
+    "deferred_scope": "Email blacklist/batch-disable chain with absent MCP OAuth table, unsafe DeepSeek request/schema/reasoning rewrites, raw error dumps and absent connection traces. Preserve every prior deferral.",
+    "excluded_scope": "Retired cryptopay/EasyPay/native payments, payment tab ordering, global squircle restyling, source VERSION/release prose and unreleased main.",
+    "preserved": "Personal VERSION was 2.1.65 during selective sync and advances to 2.1.66 for this user-authorized release. Preserve original v0.2.21 checkpoint, native protocols, local billing/rates and theme. No migration, dependency or production/runtime configuration changes; all three pre-existing untracked usage tests remain untouched.",
+    "release_status": "User authorized GitHub submission and deployment on 2026-11-16. Prepare v2.1.66 via reviewed PR/CI, own Release/GHCR and backup/restore-validated rollout; final acceptance stored separately.",
+    "release_review": "Independent implementation review found no blocking issues. Advance runtime source baseline to v2.3.89 and add bulk-edit modal test to the critical frontend CI list; existing source-checkpoint regressions pass."
   }
 }

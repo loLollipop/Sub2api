@@ -174,8 +174,8 @@ const TablePageLayoutStub = {
 
 const DataTableStub = {
   name: 'DataTable',
-  props: ['columns', 'data'],
-  emits: ['sort'],
+  props: ['columns', 'data', 'selectedKeys'],
+  emits: ['sort', 'update:selectedKeys'],
   template: `
     <div>
       <div data-test="columns">{{ columns.map((col) => col.key).join(',') }}</div>
@@ -259,6 +259,7 @@ const mountView = async (renderSelectSlots = false, realSearch = false) => {
         SearchInput: realSearch ? false : SearchInputStub,
         Icon: IconStub,
         UseKeyModal: true,
+        BulkEditKeysModal: true,
         EndpointPopover: true,
         GroupBadge: true,
         GroupOptionItem: true,
@@ -316,6 +317,25 @@ describe('user KeysView column settings', () => {
     getAvailableGroups.mockResolvedValue([])
     getUserGroupRates.mockResolvedValue({})
     isCurrentStep.mockReturnValue(false)
+  })
+
+  it('limits bulk targets to visible rows and clears selection when reloading', async () => {
+    const wrapper = await mountView()
+    const table = wrapper.findComponent({ name: 'DataTable' })
+    const id = createApiKey().id
+    table.vm.$emit('update:selectedKeys', [id, 999999, id])
+    await nextTick()
+    expect(table.props('selectedKeys')).toEqual([id])
+    await wrapper.get('[data-test="keys-bulk-edit"]').trigger('click')
+    const modal = wrapper.findComponent({ name: 'BulkEditKeysModal' })
+    expect(modal.props('selectedIds')).toEqual([id])
+    modal.vm.$emit('close')
+    await nextTick()
+    await wrapper.get('[aria-label="Refresh"]').trigger('click')
+    await flushPromises()
+    expect(table.props('selectedKeys')).toEqual([])
+    expect(wrapper.find('[data-test="keys-bulk-edit"]').exists()).toBe(false)
+    wrapper.unmount()
   })
 
 

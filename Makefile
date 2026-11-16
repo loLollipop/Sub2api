@@ -44,6 +44,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/utils/__tests__/featureFlags.spec.ts \
 	src/views/user/__tests__/ChannelStatusView.mode.spec.ts \
 	src/views/user/__tests__/KeysView.spec.ts \
+	src/components/keys/__tests__/BulkEditKeysModal.spec.ts \
 	src/views/user/__tests__/UsageView.spec.ts \
 	src/components/layout/__tests__/ConsoleSignal.spec.ts \
 	src/components/layout/__tests__/UserTopNav.spec.ts \

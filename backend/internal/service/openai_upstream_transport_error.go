@@ -178,6 +178,10 @@ func (s *OpenAIGatewayService) tempUnscheduleOpenAITransportErrorFor(ctx context
 	if s == nil || account == nil {
 		return
 	}
+	// Disable only this transport cooldown; preserve existing blocks and failover.
+	if s.cfg != nil && s.cfg.Gateway.DisableOpenAITransportErrorCooldown {
+		return
+	}
 	if account.IsCustomErrorCodesEnabled() {
 		return
 	}

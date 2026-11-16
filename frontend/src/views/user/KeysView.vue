@@ -39,6 +39,16 @@
         <PageHeader :title="t('keys.title')" :count="pagination.total">
           <template #actions>
           <button
+            v-if="selectedKeyIds.length > 0"
+            type="button"
+            class="btn btn-secondary"
+            :disabled="loading"
+            data-test="keys-bulk-edit"
+            @click="bulkEditTargets = [...selectedKeyIds]"
+          >
+            {{ t('keys.bulkEdit.entry') }} ({{ selectedKeyIds.length }})
+          </button>
+          <button
             @click="loadApiKeys"
             :disabled="loading"
             class="btn btn-secondary btn-icon"
@@ -88,6 +98,10 @@
 
       <template #table>
         <DataTable
+          row-key="id"
+          selectable
+          :selected-keys="selectedKeyIds"
+          @update:selected-keys="handleKeySelection"
           :columns="columns"
           :data="apiKeys"
           :loading="loading"
@@ -376,6 +390,14 @@
         />
       </template>
     </TablePageLayout>
+
+    <BulkEditKeysModal
+      v-if="bulkEditTargets.length > 0"
+      :selected-ids="bulkEditTargets"
+      :group-options="groupOptions"
+      @close="bulkEditTargets = []"
+      @applied="handleBulkEditApplied"
+    />
 
     <!-- Create/Edit Modal -->
     <BaseDialog
@@ -1201,6 +1223,7 @@ import '@/styles/console-workspace.css'
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 
 const { t, locale } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI, endpointsAPI } from '@/api'
@@ -1365,6 +1388,21 @@ const columns = computed<Column[]>(() =>
 )
 
 const apiKeys = ref<ApiKey[]>([])
+const selectedKeyIds = ref<number[]>([])
+const bulkEditTargets = ref<number[]>([])
+
+const handleKeySelection = (ids: Array<string | number>) => {
+  if (loading.value) return
+  const visible = new Set(apiKeys.value.map(key => key.id))
+  selectedKeyIds.value = [...new Set(ids.filter((id): id is number => typeof id === 'number' && visible.has(id)))]
+}
+
+const handleBulkEditApplied = async (result: { updated: number; failed: number }) => {
+  bulkEditTargets.value = []
+  if (result.failed === 0) appStore.showSuccess(t('keys.bulkEdit.appliedOk', { count: result.updated }))
+  else appStore.showError(t('keys.bulkEdit.appliedPartial', result))
+  await loadApiKeys()
+}
 const groups = ref<Group[]>([])
 const loading = ref(false)
 const submitting = ref(false)
@@ -1694,6 +1732,7 @@ const isAbortError = (error: unknown) => {
 }
 
 const loadApiKeys = async () => {
+  selectedKeyIds.value = []
   abortController?.abort()
   const controller = new AbortController()
   abortController = controller

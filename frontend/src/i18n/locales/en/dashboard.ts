@@ -76,6 +76,36 @@ export default {
 
   // API Keys
   keys: {
+    bulkEdit: {
+      entry: 'Bulk edit',
+      title: '{count} keys selected',
+      hint: 'Tick the fields to change; unticked fields keep their current value.',
+      fields: {
+        group: 'Group',
+        status: 'Status',
+        quota: 'Quota (USD)',
+        rateLimit5h: '5-hour limit (USD)',
+        rateLimit1d: 'Daily limit (USD)',
+        rateLimit7d: '7-day limit (USD)',
+        expiresAt: 'Expiry',
+        ipWhitelist: 'IP allowlist'
+      },
+      statusActive: 'Active',
+      statusInactive: 'Disabled',
+      quotaPlaceholder: '0 means unlimited',
+      limitPlaceholder: '0 means unlimited',
+      expiresHint: 'Leaving it empty clears the expiry, making the key permanent.',
+      ipPlaceholder: 'One per line, or comma/space separated; empty clears the list',
+      ipHint: 'Submitting an empty value clears the allowlist.',
+      apply: 'Apply to {count} keys',
+      emptySelection: 'Tick at least one field.',
+      appliedOk: 'Updated {count} keys',
+      appliedPartial: '{updated} updated, {failed} failed',
+      groupHint: "Replaces all group routes, including smart routing, with the selected group.",
+      invalidGroup: "Select an available group.",
+      invalidNumber: "Enter a non-negative number for each selected amount.",
+      invalidExpiry: "Choose a future expiry or leave it empty for no expiry."
+    },
     noMatchingKeys: 'No matching API keys',
     noMatchingKeysHint: 'Try clearing the filters to see your API keys.',
     clearFilters: 'Clear filters',

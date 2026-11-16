@@ -250,6 +250,35 @@ describe('RegisterView invitation layout', () => {
     expect(showErrorMock).not.toHaveBeenCalled()
   })
 
+  it.each(['checkbox', 'modal'])('keeps fields editable but requires consent before registering (%s)', async mode => {
+    localStorage.removeItem('sub2api_login_agreement_consent')
+    getPublicSettingsMock.mockResolvedValueOnce({
+      ...publicSettings,
+      turnstile_enabled: false,
+      login_agreement_enabled: true,
+      login_agreement_mode: mode,
+      login_agreement_revision: 'sync-terms',
+      login_agreement_documents: [{ id: 'terms', title: 'Terms', content_md: '# Terms' }]
+    })
+    const wrapper = mountRegister()
+    await flushPromises()
+    expect(wrapper.get('#email').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('#password').attributes('disabled')).toBeUndefined()
+    await wrapper.get('#email').setValue('user@example.com')
+    await wrapper.get('#password').setValue('secret-123')
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('form').trigger('submit.prevent')
+    expect(registerMock).not.toHaveBeenCalled()
+    wrapper.findComponent({ name: 'LoginAgreementPrompt' }).vm.$emit('accept')
+    await flushPromises()
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(registerMock).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+    localStorage.removeItem('sub2api_login_agreement_consent')
+  })
+
   // 与后端 ValidateRegistrationEmailFormat 同口径：超长/特殊字符邮箱在本地就拦下。
   it('rejects emails with special characters or invalid local parts locally', async () => {
     getPublicSettingsMock.mockResolvedValueOnce({

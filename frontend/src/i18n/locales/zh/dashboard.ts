@@ -76,6 +76,36 @@ export default {
 
   // API Keys
   keys: {
+    bulkEdit: {
+      entry: '批量编辑',
+      title: '已选择 {count} 个密钥',
+      hint: '勾选要修改的字段，未勾选的字段保持原值。',
+      fields: {
+        group: '分组',
+        status: '状态',
+        quota: '额度金额 (USD)',
+        rateLimit5h: '5 小时限额 (USD)',
+        rateLimit1d: '日限额 (USD)',
+        rateLimit7d: '7 天限额 (USD)',
+        expiresAt: '密钥有效期',
+        ipWhitelist: 'IP 白名单'
+      },
+      statusActive: '启用',
+      statusInactive: '禁用',
+      quotaPlaceholder: '0 表示不限额',
+      limitPlaceholder: '0 表示不限额',
+      expiresHint: '留空会清空过期时间，改为永不过期。',
+      ipPlaceholder: '每行一个，或用逗号/空格分隔；留空表示清空白名单',
+      ipHint: '勾选后提交空内容等于清空白名单。',
+      apply: '应用到 {count} 个密钥',
+      emptySelection: '至少勾选一个字段。',
+      appliedOk: '已更新 {count} 个密钥',
+      appliedPartial: '成功 {updated} 个，失败 {failed} 个',
+      groupHint: "将所选密钥的全部分组（含智能路由）替换为此分组。",
+      invalidGroup: "请选择可用分组。",
+      invalidNumber: "请为勾选的金额填写非负数。",
+      invalidExpiry: "请选择未来时间；留空表示永不过期。"
+    },
     noMatchingKeys: '没有匹配的 API 密钥',
     noMatchingKeysHint: '清除筛选后可查看您的 API 密钥。',
     clearFilters: '清除筛选',

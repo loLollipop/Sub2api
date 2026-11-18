@@ -120,7 +120,7 @@ func TestRelayPrivacyIngressRealWebSocketKeepsRawTerminalAndUsage(t *testing.T) 
 			done <- err
 			return
 		}
-		defer conn.CloseNow()
+		defer func() { _ = conn.CloseNow() }()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_, first, err := conn.Read(ctx)
@@ -141,7 +141,7 @@ func TestRelayPrivacyIngressRealWebSocketKeepsRawTerminalAndUsage(t *testing.T) 
 	defer cancel()
 	conn, _, err := coderws.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
 	require.NoError(t, err)
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 	require.NoError(t, conn.Write(ctx, coderws.MessageText, []byte(`{"type":"response.create","model":"gpt-5.1","input":[]}`)))
 	_, message, err := conn.Read(ctx)
 	require.NoError(t, err)
@@ -162,7 +162,7 @@ func TestRelayPrivacyIngressRealWebSocketKeepsRawTerminalAndUsage(t *testing.T) 
 	case <-ctx.Done():
 		t.Fatal("websocket turn did not finish")
 	}
-	conn.CloseNow()
+	_ = conn.CloseNow()
 	select {
 	case <-done:
 	case <-ctx.Done():

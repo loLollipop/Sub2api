@@ -22,7 +22,7 @@ func TestUsageLogCompactAssociationsProjectsDisplayFields(t *testing.T) {
 		return nil
 	})))
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
 	repo := &usageLogRepository{client: client, sql: db}
 	deleted := time.Now().UTC()
@@ -57,7 +57,7 @@ func TestUsageLogLegacyAssociationsKeepFullAPIKey(t *testing.T) {
 	var query string
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherFunc(func(_, actual string) error { query = actual; return nil })))
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
 	repo := &usageLogRepository{client: client, sql: db}
 	mock.ExpectQuery("api keys").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "key"}).AddRow(2, "legacy", "synthetic-test-key"))

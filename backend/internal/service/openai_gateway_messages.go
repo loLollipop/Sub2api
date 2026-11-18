@@ -1116,7 +1116,7 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 	clientCtx, cancelClient := context.WithCancel(c.Request.Context())
 	defer cancelClient()
 	resp.Body = s.openAIBufferedBodyWithCancel(clientCtx, resp.Body)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	markClientDisconnected := func() {
 		clientDisconnected = true
 		cancelClient()

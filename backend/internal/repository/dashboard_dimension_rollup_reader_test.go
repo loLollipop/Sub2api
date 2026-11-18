@@ -78,7 +78,7 @@ func TestUsageStatsRollupEndpointsKeepAccountCostAcrossHoursAndRawTail(t *testin
 		t.Run(map[bool]string{false: "whole_hours", true: "with_raw_tail"}[withTail], func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			now := time.Now().UTC()
 			cutoff := now.Truncate(time.Hour)
 			start, end := cutoff.Add(-2*time.Hour), cutoff

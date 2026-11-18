@@ -39,7 +39,7 @@ func TestRelayPrivacyRealWebSocketPreservesFramesAndRawObservation(t *testing.T)
 				if err != nil {
 					return
 				}
-				defer conn.CloseNow()
+				defer func() { _ = conn.CloseNow() }()
 				upstream := newPassthroughTestFrameConn([]passthroughTestFrame{{kind, []byte(success)}, {kind, []byte(official)}, {kind, []byte(failure)}}, true)
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
@@ -52,7 +52,7 @@ func TestRelayPrivacyRealWebSocketPreservesFramesAndRawObservation(t *testing.T)
 			defer cancel()
 			conn, _, err := coderws.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
 			require.NoError(t, err)
-			defer conn.CloseNow()
+			defer func() { _ = conn.CloseNow() }()
 			for i, want := range []string{success, official, ""} {
 				actualKind, payload, err := conn.Read(ctx)
 				require.NoError(t, err)

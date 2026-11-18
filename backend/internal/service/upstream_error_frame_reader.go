@@ -151,14 +151,14 @@ func compactUpstreamSSEErrorData(frame, payload []byte) []byte {
 		text := strings.TrimRight(string(line), "\r\n")
 		if _, ok := extractOpenAISSEDataLine(text); ok {
 			if !wroteData {
-				result.WriteString("data: ")
-				result.Write(payload)
-				result.Write(line[len(text):])
+				_, _ = result.WriteString("data: ")
+				_, _ = result.Write(payload)
+				_, _ = result.Write(line[len(text):])
 				wroteData = true
 			}
 			continue
 		}
-		result.Write(line)
+		_, _ = result.Write(line)
 	}
 	return result.Bytes()
 }

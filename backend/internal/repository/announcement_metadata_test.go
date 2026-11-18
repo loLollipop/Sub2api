@@ -17,7 +17,7 @@ func TestAnnouncementMetadataDoesNotSelectBodies(t *testing.T) {
 	var query string
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherFunc(func(_, actual string) error { query = actual; return nil })))
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
 	repo := &announcementRepository{client: client}
 	mock.ExpectQuery("active metadata").WillReturnRows(sqlmock.NewRows([]string{"id", "title", "status", "notify_mode", "targeting"}).AddRow(1, "Title", "active", "popup", []byte(`{}`)))

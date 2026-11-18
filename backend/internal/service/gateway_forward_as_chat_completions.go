@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -74,7 +75,11 @@ func (s *GatewayService) ForwardAsChatCompletions(
 		}
 	}
 	responsesReq.Model = mappedModel
-	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(responsesReq)
+	var anthropicReq *apicompat.AnthropicRequest
+	err = validateClaude52BridgeRequest(body, mappedModel)
+	if err == nil {
+		anthropicReq, err = apicompat.ResponsesToAnthropicRequest(responsesReq)
+	}
 	if err != nil {
 		if StopOpenAICompactSSEKeepaliveCommitted(c) {
 			MarkResponseCommitted(c)
@@ -585,8 +590,8 @@ func writeGatewayCCError(c *gin.Context, statusCode int, errType, message string
 	MarkResponseCommitted(c)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clientprivacy.ErrorType(statusCode, errType),
+			"message": ClientUpstreamErrorMessage(message),
 		},
 	})
 }

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -1870,8 +1871,8 @@ func writeGrokMediaErrorResponse(c *gin.Context, statusCode int, errType, messag
 	}
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
-			"type":    strings.TrimSpace(errType),
-			"message": strings.TrimSpace(message),
+			"type":    clientprivacy.ErrorType(statusCode, strings.TrimSpace(errType)),
+			"message": ClientUpstreamErrorMessage(strings.TrimSpace(message)),
 		},
 	})
 }

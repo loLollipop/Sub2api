@@ -114,8 +114,9 @@ type EndpointStat struct {
 	Endpoint    string  `json:"endpoint"`
 	Requests    int64   `json:"requests"`
 	TotalTokens int64   `json:"total_tokens"`
-	Cost        float64 `json:"cost"`        // 标准计费
-	ActualCost  float64 `json:"actual_cost"` // 实际扣除
+	Cost        float64 `json:"cost"`                   // 标准计费
+	ActualCost  float64 `json:"actual_cost"`            // 实际扣除
+	AccountCost float64 `json:"account_cost,omitempty"` // 账号成本（仅管理员接口返回）
 }
 
 // GroupUsageSummary represents today's, yesterday's, and cumulative cost for a single group.
@@ -128,6 +129,7 @@ type GroupUsageSummary struct {
 
 // GroupStat represents usage statistics for a single group
 type GroupStat struct {
+	Deleted     bool    `json:"deleted"`
 	GroupID     int64   `json:"group_id"`
 	GroupName   string  `json:"group_name"`
 	Requests    int64   `json:"requests"`
@@ -290,6 +292,11 @@ type UsageLogFilters struct {
 	EndTime               *time.Time
 	// ExactTotal requests exact COUNT(*) for pagination. Default false for fast large-table paging.
 	ExactTotal bool
+	// CompactAssociations loads only display summaries for user/api key/account/group
+	// and skips subscriptions. Admin list endpoints should set this; user-facing
+	// endpoints keep the full association objects.
+	CompactAssociations bool
+	AccountNameOnly     bool
 }
 
 // UsageStats represents usage statistics

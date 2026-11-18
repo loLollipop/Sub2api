@@ -63,7 +63,7 @@ vi.mock('vue-i18n', async () => {
 })
 
 const DataTableStub = defineComponent({
-  props: { data: { type: Array, default: () => [] } },
+  props: { data: { type: Array, default: () => [] }, loading: Boolean },
   template: `
     <div>
       <div v-for="row in data" :key="row.id">
@@ -179,6 +179,26 @@ describe('admin AccountsView lite account list', () => {
     vi.restoreAllMocks()
   })
 
+  it('retains existing rows while refreshing and blocks actions until the replacement arrives', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    let finish!: (value: unknown) => void
+    listAccounts.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const pending = (wrapper.vm as any).load()
+    await flushPromises()
+    expect(wrapper.get('[data-test="account-name"]').text()).toBe(listRow.name)
+    expect(wrapper.getComponent(DataTableStub).props('loading')).toBe(false)
+    expect(wrapper.get('.accounts-table-stage').attributes('aria-busy')).toBe('true')
+    expect(wrapper.get('.accounts-table-stage').attributes('inert')).toBeDefined()
+    finish({ items: [{ ...listRow, name: 'updated row' }], total: 1, page: 1, page_size: 20, pages: 1 })
+    await pending
+    await flushPromises()
+    expect(wrapper.get('[data-test="account-name"]').text()).toBe('updated row')
+    expect(wrapper.get('.accounts-table-stage').attributes('aria-busy')).toBe('false')
+    expect(wrapper.get('.accounts-table-stage').attributes('inert')).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('patches the refreshed account and displays the temporary warning after clicking refresh', async () => {
     refreshCredentials.mockResolvedValue({
       ...fullAccount,
@@ -209,6 +229,40 @@ describe('admin AccountsView lite account list', () => {
       expect.objectContaining({ lite: '1' }),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
+    wrapper.unmount()
+  })
+
+  it('shows the edit skeleton immediately and ignores a response after close', async () => {
+    let resolve!: (value: typeof fullAccount) => void
+    getById.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    const wrapper = mountView()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    const pending = vm.handleEdit(listRow)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="edit-account-shell"]').exists()).toBe(true)
+    vm.closeEdit()
+    resolve(fullAccount)
+    await pending
+    await flushPromises()
+    expect(wrapper.find('[data-test="edit-account"]').exists()).toBe(false)
+    expect(vm.edAcc).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('keeps the newest account when detail responses arrive out of order', async () => {
+    let resolve!: (value: typeof fullAccount) => void
+    getById.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    getById.mockResolvedValueOnce({ ...fullAccount, id: 43, name: 'new account' })
+    const wrapper = mountView()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    const first = vm.handleEdit(listRow)
+    await vm.handleEdit({ ...listRow, id: 43 })
+    resolve(fullAccount)
+    await first
+    await flushPromises()
+    expect(wrapper.get('[data-test="edit-account"]').text()).toContain('new account')
     wrapper.unmount()
   })
 

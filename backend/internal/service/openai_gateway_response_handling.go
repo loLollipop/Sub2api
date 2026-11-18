@@ -256,14 +256,14 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		streamInterval = resolveGrokStreamIdleTimeout(cfgSec)
 	}
 	// 仅监控上游数据间隔超时，不被下游写入阻塞影响
-	var intervalTicker *time.Ticker
+	var intervalTimer *time.Timer
 	if streamInterval > 0 {
-		intervalTicker = time.NewTicker(streamInterval)
-		defer intervalTicker.Stop()
+		intervalTimer = time.NewTimer(streamInterval)
+		defer intervalTimer.Stop()
 	}
 	var intervalCh <-chan time.Time
-	if intervalTicker != nil {
-		intervalCh = intervalTicker.C
+	if intervalTimer != nil {
+		intervalCh = intervalTimer.C
 	}
 
 	keepaliveInterval := time.Duration(0)
@@ -729,7 +729,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 							c.JSON(status, gin.H{
 								"error": gin.H{
 									"type":    errType,
-									"message": clientprivacy.Text(errMsg),
+									"message": ClientUpstreamErrorMessage(clientprivacy.Text(errMsg)),
 								},
 							})
 							streamEarlyErr = fmt.Errorf("upstream response failed: passthrough rule matched message=%s", errMsg)
@@ -798,6 +798,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				frame = parseTrustedOpenAISSEDataFrame(restoredData, eventType)
 			}
 			restoredData = restoreCodexToolNamesFromSSEFrame(c, frame)
+			restoredData = restoreOpenAIResponsesInstructionsEchoInEvent(c, restoredData)
 			if !bytes.Equal(restoredData, dataBytes) {
 				dataBytes = restoredData
 				data = string(restoredData)
@@ -1068,7 +1069,8 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				return resultWithUsage(), fmt.Errorf("upstream response failed: %s", failedMessage)
 			}
 			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
-			if time.Since(lastRead) < streamInterval {
+			if remaining := streamInterval - time.Since(lastRead); remaining > 0 {
+				intervalTimer.Reset(remaining)
 				continue
 			}
 			if codexFailureTerminal && sawBareError && !sawResponseFailed {
@@ -1080,6 +1082,17 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			// 处理流超时，可能标记账户为临时不可调度或错误状态
 			if s.rateLimitService != nil {
 				s.rateLimitService.HandleStreamTimeout(ctx, account, originalModel)
+			}
+			if account != nil && account.Platform == PlatformOpenAI &&
+				!openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush && !observedBillingUnits() {
+				failoverErr := s.newOpenAIStreamFailoverErrorWithModel(
+					c, account, false, upstreamRequestID, nil,
+					"OpenAI upstream stream idle timeout before model output", mappedModel, resp.Header,
+				)
+				// Share the one-switch first-output budget, including attempts that
+				// have only sent keepalive comments. Billable attempts cannot replay.
+				failoverErr.SafeToFailoverAfterWrite = true
+				return resultWithUsage(), failoverErr
 			}
 			// Grok: short cool + account failover when no client-visible bytes
 			// were committed yet (pre-commit). After output started we keep the
@@ -1437,6 +1450,8 @@ func mergeOpenAIUsageNonZero(dst *OpenAIUsage, src OpenAIUsage) {
 	}
 	if src.CacheCreationInputTokens > 0 {
 		dst.CacheCreationInputTokens = src.CacheCreationInputTokens
+		dst.CacheCreation30mInputTokens = src.CacheCreation30mInputTokens
+		dst.CacheCreation12hInputTokens = src.CacheCreation12hInputTokens
 	}
 	if src.CacheCreation5mTokens > 0 {
 		dst.CacheCreation5mTokens = src.CacheCreation5mTokens
@@ -1725,6 +1740,7 @@ func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 	}
 	cacheReadTokens := openAICacheReadTokensFromUsage(value)
 	cacheCreationTokens := openAICacheCreationTokensFromUsage(value)
+	cache30m, cache12h := openAICacheCreationTTLTokensFromUsage(value, cacheCreationTokens)
 	imageOutputTokens := value.Get("output_tokens_details.image_tokens").Int()
 	if imageOutputTokens == 0 {
 		imageOutputTokens = value.Get("completion_tokens_details.image_tokens").Int()
@@ -1739,11 +1755,13 @@ func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 	cachedDetails := openAIImageCacheDetails(value)
 	imageCached, _ := boundedJSONNonNegativeInt(cachedDetails.Get("image_tokens"))
 	return OpenAIUsage{
-		InputTokens:              int(inputTokens),
-		ImageInputTokens:         imageInputTokens,
-		ImageCacheReadTokens:     min(imageCached, max(imageInputTokens, 0), max(cacheReadTokens, 0)),
-		OutputTokens:             int(outputTokens),
-		CacheCreationInputTokens: cacheCreationTokens,
+		InputTokens:                 int(inputTokens),
+		ImageInputTokens:            imageInputTokens,
+		ImageCacheReadTokens:        min(imageCached, max(imageInputTokens, 0), max(cacheReadTokens, 0)),
+		OutputTokens:                int(outputTokens),
+		CacheCreationInputTokens:    cacheCreationTokens,
+		CacheCreation30mInputTokens: cache30m,
+		CacheCreation12hInputTokens: cache12h,
 		CacheCreation5mTokens: cacheCreationTTLTokensFromUsage(
 			value.Get("cache_creation_5m_tokens"),
 			value.Get("cache_creation.ephemeral_5m_input_tokens"),
@@ -1834,6 +1852,19 @@ func openAICacheCreationTokensFromUsage(value gjson.Result) int {
 	// bucket before being billed as cache writes.
 	return cacheCreationTTLTokensFromUsage(value.Get("cache_creation_5m_tokens"), value.Get("cache_creation.ephemeral_5m_input_tokens")) +
 		cacheCreationTTLTokensFromUsage(value.Get("cache_creation_1h_tokens"), value.Get("cache_creation.ephemeral_1h_input_tokens"))
+}
+
+// Only reported usage determines the lifetime. Missing, partial or inconsistent
+// details keep the aggregate's legacy price; request TTLs cannot prove writes.
+func openAICacheCreationTTLTokensFromUsage(value gjson.Result, aggregate int) (int, int) {
+	for _, path := range []string{"input_tokens_details", "prompt_tokens_details"} {
+		details := value.Get(path + ".cache_write_tokens_details")
+		if !details.Exists() {
+			continue
+		}
+		return openAICacheCreationTTLTokensFromDetails(details, aggregate)
+	}
+	return 0, 0
 }
 
 func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
@@ -1935,6 +1966,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		return nil, fmt.Errorf("restore OpenAI namespace response: %w", err)
 	}
 	body = restoreCodexToolNamesFromContext(c, body)
+	body = restoreOpenAIResponsesInstructionsEchoInResponse(c, body)
 	body = ensureOpenAIResponseObjectCreatedAt(body)
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	// Codex 协议要求 /responses/compact JSON 响应携带 x-codex-turn-state
@@ -2038,11 +2070,13 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 			return nil, fmt.Errorf("restore OpenAI namespace response: %w", restoreErr)
 		}
 		restoredBody = restoreCodexToolNamesFromContext(c, restoredBody)
+		restoredBody = restoreOpenAIResponsesInstructionsEchoInResponse(c, restoredBody)
 		body = ensureOpenAIResponseObjectCreatedAt(restoredBody)
 	} else {
 		if originalModel != mappedModel {
 			bodyText = s.replaceModelInSSEBody(bodyText, mappedModel, originalModel)
 		}
+		bodyText = restoreOpenAIResponsesInstructionsEchoInSSEBody(c, bodyText)
 		body = []byte(bodyText)
 	}
 
@@ -2275,7 +2309,7 @@ func (s *OpenAIGatewayService) writeOpenAINonStreamingProtocolError(resp *http.R
 	c.JSON(http.StatusBadGateway, gin.H{
 		"error": gin.H{
 			"type":    "upstream_error",
-			"message": clientprivacy.Text(message),
+			"message": ClientUpstreamErrorMessage(clientprivacy.Text(message)),
 		},
 	})
 	return fmt.Errorf("non-streaming openai protocol error: %s", message)
@@ -2724,4 +2758,17 @@ func (s *OpenAIGatewayService) replaceModelInSSEBody(body, fromModel, toModel st
 		lines[i] = s.replaceModelInSSELine(line, fromModel, toModel)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func openAICacheCreationTTLTokensFromDetails(details gjson.Result, aggregate int) (int, int) {
+	short, long := details.Get("ttl_30m_tokens"), details.Get("ttl_12h_tokens")
+	if short.Type != gjson.Number || long.Type != gjson.Number {
+		return 0, 0
+	}
+	a, b := short.Int(), long.Int()
+	if a < 0 || b < 0 || float64(a) != short.Float() || float64(b) != long.Float() ||
+		a > int64(aggregate) || b != int64(aggregate)-a {
+		return 0, 0
+	}
+	return int(a), int(b)
 }

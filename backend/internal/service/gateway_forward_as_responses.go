@@ -85,7 +85,11 @@ func (s *GatewayService) ForwardAsResponses(
 		}
 	}
 	responsesReq.Model = mappedModel
-	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(&responsesReq)
+	var anthropicReq *apicompat.AnthropicRequest
+	err = validateClaude52BridgeRequest(body, mappedModel)
+	if err == nil {
+		anthropicReq, err = apicompat.ResponsesToAnthropicRequest(&responsesReq)
+	}
 	if err != nil {
 		if StopOpenAICompactSSEKeepaliveCommitted(c) {
 			MarkResponseCommitted(c)
@@ -309,28 +313,14 @@ func mergeAnthropicUsage(dst *ClaudeUsage, src apicompat.AnthropicUsage) {
 	}
 	if src.HasInputTokens() && (src.InputTokens != 0 || src.HasCacheTokenFields()) {
 		dst.InputTokens = src.InputTokens
+		if src.PromptTokens <= 0 {
+			dst.promptTotalPresent = false
+		}
 	}
 	if src.HasCacheReadInputTokens() {
 		dst.CacheReadInputTokens = src.CacheReadInputTokens
 	}
-	if src.HasCacheCreationInputTokens() {
-		dst.CacheCreationInputTokens = src.CacheCreationInputTokens
-	}
-	if src.HasCacheCreationInputTokens() && src.CacheCreationInputTokens == 0 {
-		// Never retain billable TTL details behind an authoritative zero.
-		dst.CacheCreation5mTokens = 0
-		dst.CacheCreation1hTokens = 0
-	} else if src.CacheCreation != nil && (src.CacheCreation.Ephemeral5mInputTokens != nil || src.CacheCreation.Ephemeral1hInputTokens != nil) {
-		if value := src.CacheCreation.Ephemeral5mInputTokens; value != nil {
-			dst.CacheCreation5mTokens = max(*value, 0)
-		}
-		if value := src.CacheCreation.Ephemeral1hInputTokens; value != nil {
-			dst.CacheCreation1hTokens = max(*value, 0)
-		}
-		if !src.HasCacheCreationInputTokens() {
-			dst.CacheCreationInputTokens = dst.CacheCreation5mTokens + dst.CacheCreation1hTokens
-		}
-	}
+	mergeAnthropicCacheCreationUsage(dst, src)
 
 	// Preserve provider-native prompt/cache aliases while keeping billing
 	// buckets mutually exclusive. A canonical read zero still permits Kimi's
@@ -345,14 +335,66 @@ func mergeAnthropicUsage(dst *ClaudeUsage, src apicompat.AnthropicUsage) {
 			dst.CacheReadInputTokens = max(*src.PromptCacheHitTokens, 0)
 		}
 	}
-	if src.PromptCacheMissTokens != nil {
-		dst.InputTokens = max(*src.PromptCacheMissTokens, 0)
-	} else if src.PromptTokens > 0 {
-		dst.InputTokens = max(src.PromptTokens-dst.CacheReadInputTokens-dst.CacheCreationInputTokens, 0)
-	}
+	normalizeAnthropicPromptTotal(dst, src.PromptTokens, src.PromptCacheMissTokens)
 	if src.HasOutputTokens() {
 		dst.OutputTokens = src.OutputTokens
 	}
+}
+
+func normalizeAnthropicPromptTotal(usage *ClaudeUsage, promptTokens int, promptCacheMissTokens *int) {
+	if promptCacheMissTokens != nil {
+		usage.promptTotalPresent = false
+		usage.InputTokens = max(*promptCacheMissTokens, 0)
+		return
+	}
+	if promptTokens > 0 {
+		usage.promptTotalTokens, usage.promptTotalPresent = promptTokens, true
+	}
+	if usage.promptTotalPresent {
+		usage.InputTokens = max(usage.promptTotalTokens-usage.CacheReadInputTokens-usage.CacheCreationInputTokens, 0)
+	}
+}
+
+func mergeAnthropicCacheCreationUsage(dst *ClaudeUsage, src apicompat.AnthropicUsage) {
+	mergeAnthropicCacheCreationCounters(dst, src.CacheCreationInputTokens, src.HasCacheCreationInputTokens(), src.CacheCreation)
+}
+
+func mergeAnthropicCacheCreationCounters(dst *ClaudeUsage, aggregate int, present bool, details *apicompat.AnthropicCacheCreation) {
+	if present {
+		dst.CacheCreationInputTokens = max(aggregate, 0)
+		dst.cacheCreationInputTokensPresent = true
+		dst.cacheCreationInputTokensFromDetails = false
+	}
+	if dst.cacheCreationInputTokensPresent && dst.CacheCreationInputTokens == 0 {
+		// A zero aggregate clears previous writes and cannot be resurrected by TTL-only patches.
+		dst.CacheCreation5mTokens, dst.CacheCreation1hTokens = 0, 0
+		return
+	}
+	if details == nil || (details.Ephemeral5mInputTokens == nil && details.Ephemeral1hInputTokens == nil) {
+		return
+	}
+	if value := details.Ephemeral5mInputTokens; value != nil {
+		dst.CacheCreation5mTokens = max(*value, 0)
+	}
+	if value := details.Ephemeral1hInputTokens; value != nil {
+		dst.CacheCreation1hTokens = max(*value, 0)
+	}
+	if (!dst.cacheCreationInputTokensPresent && dst.CacheCreationInputTokens == 0) || dst.cacheCreationInputTokensFromDetails {
+		dst.CacheCreationInputTokens = dst.CacheCreation5mTokens + dst.CacheCreation1hTokens
+		dst.cacheCreationInputTokensFromDetails = true
+	}
+}
+
+func mergeRawAnthropicCacheCreationUsage(node gjson.Result, dst *ClaudeUsage) {
+	aggregate, present := parseSSEUsageInt(node.Get("cache_creation_input_tokens").Value())
+	var details apicompat.AnthropicCacheCreation
+	if value, ok := parseSSEUsageInt(node.Get("cache_creation.ephemeral_5m_input_tokens").Value()); ok {
+		details.Ephemeral5mInputTokens = &value
+	}
+	if value, ok := parseSSEUsageInt(node.Get("cache_creation.ephemeral_1h_input_tokens").Value()); ok {
+		details.Ephemeral1hInputTokens = &value
+	}
+	mergeAnthropicCacheCreationCounters(dst, aggregate, present, &details)
 }
 
 func claudeUsageToAnthropicUsage(usage ClaudeUsage) apicompat.AnthropicUsage {
@@ -735,7 +777,7 @@ func writeResponsesError(c *gin.Context, statusCode int, code, message string) {
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
 			"code":    code,
-			"message": message,
+			"message": ClientUpstreamErrorMessage(message),
 		},
 	})
 }

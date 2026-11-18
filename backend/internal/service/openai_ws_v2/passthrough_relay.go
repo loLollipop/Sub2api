@@ -16,6 +16,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 )
 
 type FrameConn interface {
@@ -243,7 +244,11 @@ func Relay(
 		// 分支的显式 Close/CloseNow 兜底。
 		writeCtx, cancel := context.WithTimeout(context.Background(), writeTimeout)
 		defer cancel()
-		return clientConn.WriteFrame(writeCtx, msgType, payload)
+		clientPayload := payload
+		if (msgType == coderws.MessageText || msgType == coderws.MessageBinary) && clientprivacy.IsErrorJSON(payload) {
+			clientPayload = clientprivacy.JSONWithStatus(payload, 0)
+		}
+		return clientConn.WriteFrame(writeCtx, msgType, clientPayload)
 	}
 
 	clientToUpstreamFrames := &atomic.Int64{}

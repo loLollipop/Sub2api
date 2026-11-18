@@ -1534,7 +1534,7 @@
 
 
         <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
-          <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0 flex-1">
               <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.title") }}</h4>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.modelPricing.description") }}</p>
@@ -1548,7 +1548,7 @@
             <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
           </label>
           <div class="mt-3 space-y-2">
-            <PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" hide-token-intervals @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
+            <PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" hide-token-intervals enable-ultrafast-multiplier @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
           </div>
         </div>
 
@@ -1635,6 +1635,11 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {{ t("admin.groups.openaiFast.hint") }}
           </p>
+          <div class="flex items-center justify-between gap-4 mt-4">
+            <label class="text-sm text-gray-600 dark:text-gray-400">{{ t("admin.groups.openaiFast.forceUltrafast") }}</label>
+            <Toggle data-testid="create-force-openai-ultrafast" :aria-label="t('admin.groups.openaiFast.forceUltrafast')" v-model="createForm.force_openai_ultrafast" />
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ t("admin.groups.openaiFast.ultrafastHint") }}</p>
           <div class="flex items-center justify-between gap-4 mt-4">
             <label class="text-sm text-gray-600 dark:text-gray-400">
               {{ t("admin.groups.openaiFast.free") }}
@@ -3228,7 +3233,7 @@
 
 
         <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
-          <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0 flex-1">
               <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.title") }}</h4>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.modelPricing.description") }}</p>
@@ -3242,7 +3247,7 @@
             <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
           </label>
           <div class="mt-3 space-y-2">
-            <PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" hide-token-intervals @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
+            <PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" hide-token-intervals enable-ultrafast-multiplier @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
           </div>
         </div>
 
@@ -3329,6 +3334,11 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {{ t("admin.groups.openaiFast.hint") }}
           </p>
+          <div class="flex items-center justify-between gap-4 mt-4">
+            <label class="text-sm text-gray-600 dark:text-gray-400">{{ t("admin.groups.openaiFast.forceUltrafast") }}</label>
+            <Toggle data-testid="edit-force-openai-ultrafast" :aria-label="t('admin.groups.openaiFast.forceUltrafast')" v-model="editForm.force_openai_ultrafast" />
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ t("admin.groups.openaiFast.ultrafastHint") }}</p>
           <div class="flex items-center justify-between gap-4 mt-4">
             <label class="text-sm text-gray-600 dark:text-gray-400">
               {{ t("admin.groups.openaiFast.free") }}
@@ -4504,7 +4514,9 @@ const emptyGroupPricing = (): PricingFormEntry => ({
   output_price: null,
   cache_write_price: null,
   cache_write_1h_price: null,
+  cache_write_12h_price: null,
   cache_read_price: null,
+  ultrafast_multiplier: null,
   image_input_price: null,
   image_output_price: null,
   per_request_price: null,
@@ -4525,7 +4537,9 @@ const groupPricingFromAPI = (
     output_price: perTokenToMTok(entry.output_price),
     cache_write_price: perTokenToMTok(entry.cache_write_price),
     cache_write_1h_price: perTokenToMTok(entry.cache_write_1h_price),
+    cache_write_12h_price: perTokenToMTok(entry.cache_write_12h_price),
     cache_read_price: perTokenToMTok(entry.cache_read_price),
+    ultrafast_multiplier: entry.ultrafast_multiplier ?? null,
     image_input_price: perTokenToMTok(entry.image_input_price),
     image_output_price: perTokenToMTok(entry.image_output_price),
     per_request_price: entry.per_request_price,
@@ -4547,7 +4561,9 @@ const groupPricingToAPI = (
       output_price: mTokToPerToken(entry.output_price),
       cache_write_price: mTokToPerToken(entry.cache_write_price),
       cache_write_1h_price: mTokToPerToken(entry.cache_write_1h_price),
+      cache_write_12h_price: mTokToPerToken(entry.cache_write_12h_price),
       cache_read_price: mTokToPerToken(entry.cache_read_price),
+      ultrafast_multiplier: platform === "openai" ? toNullableNumber(entry.ultrafast_multiplier) : null,
       image_input_price: mTokToPerToken(entry.image_input_price),
       image_output_price: mTokToPerToken(entry.image_output_price),
       per_request_price: toNullableNumber(entry.per_request_price),
@@ -5072,6 +5088,7 @@ const createForm = reactive({
   monthly_limit_usd: null as number | null,
   long_context_pricing_enabled: true,
   force_openai_fast: false,
+  force_openai_ultrafast: false,
   free_openai_fast: false,
   model_pricing: [] as PricingFormEntry[],
   // 图片生成计费配置
@@ -5410,28 +5427,40 @@ const convertRoutingRulesToApiFormat = (
   return hasValidRules ? result : null;
 };
 
-// 将 API 格式的路由规则转换为 UI 格式（需要加载账号名称）
-const convertApiFormatToRoutingRules = async (
+// Routing IDs are immediately editable; account names are hydrated after opening.
+const buildRoutingRulesFromApiFormat = (
   apiFormat: Record<string, number[]> | null,
-): Promise<ModelRoutingRule[]> => {
-  if (!apiFormat) return [];
+): ModelRoutingRule[] => Object.entries(apiFormat ?? {}).map(([pattern, ids]) => ({
+  pattern,
+  accounts: ids.map((id) => ({ id, name: `#${id}` })),
+}));
 
-  const rules: ModelRoutingRule[] = [];
-  for (const [pattern, accountIds] of Object.entries(apiFormat)) {
-    // 加载账号信息
-    const accounts: SimpleAccount[] = [];
-    for (const id of accountIds) {
+const hydrateEditAccountNames = async (isCurrent: () => boolean) => {
+  const ids = [...new Set([
+    ...editCodexManifestConfig.value.account_ids,
+    ...editModelRoutingRules.value.flatMap((rule) => rule.accounts.map((account) => account.id)),
+  ])];
+  let next = 0;
+  const worker = async () => {
+    while (isCurrent() && next < ids.length) {
+      const id = ids[next++];
       try {
         const account = await adminAPI.accounts.getById(id);
-        accounts.push({ id: account.id, name: account.name });
+        if (!isCurrent()) return;
+        if (editCodexManifestConfig.value.account_ids.includes(id)) {
+          editCodexManifestAccountNames.value = { ...editCodexManifestAccountNames.value, [id]: account.name };
+        }
+        for (const rule of editModelRoutingRules.value) {
+          for (const target of rule.accounts) {
+            if (target.id === id && target.name === `#${id}`) target.name = account.name;
+          }
+        }
       } catch {
-        // 如果账号不存在，仍然显示 ID
-        accounts.push({ id, name: `#${id}` });
+        // Missing accounts remain visible by ID so the admin can remove them.
       }
     }
-    rules.push({ pattern, accounts });
-  }
-  return rules;
+  };
+  await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
 };
 
 const editForm = reactive({
@@ -5448,6 +5477,7 @@ const editForm = reactive({
   monthly_limit_usd: null as number | null,
   long_context_pricing_enabled: true,
   force_openai_fast: false,
+  force_openai_ultrafast: false,
   free_openai_fast: false,
   model_pricing: [] as PricingFormEntry[],
   // 图片生成计费配置
@@ -5941,6 +5971,7 @@ const closeCreateModal = () => {
   createForm.video_model_prices = createVideoModelPricesForm();
   createForm.long_context_pricing_enabled = true;
   createForm.force_openai_fast = false;
+  createForm.force_openai_ultrafast = false;
   createForm.free_openai_fast = false;
   createForm.model_pricing = [];
   createForm.web_search_price_per_call = null;
@@ -6055,6 +6086,10 @@ const handleCreateGroup = async () => {
       force_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
         createForm.force_openai_fast,
+      ),
+      force_openai_ultrafast: normalizeGroupOpenAIFast(
+        createForm.platform,
+        createForm.force_openai_ultrafast,
       ),
       free_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
@@ -6212,6 +6247,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.long_context_pricing_enabled =
     group.long_context_pricing_enabled ?? true;
   editForm.force_openai_fast = group.force_openai_fast ?? false;
+  editForm.force_openai_ultrafast = group.force_openai_ultrafast ?? false;
   editForm.free_openai_fast = group.free_openai_fast ?? false;
   editForm.model_pricing = groupPricingFromAPI(group.model_pricing);
   editForm.allow_image_generation = group.allow_image_generation ?? false;
@@ -6301,26 +6337,8 @@ const handleEdit = async (group: AdminGroup) => {
     fallback_to_scheduler: savedCodexManifestConfig.fallback_to_scheduler ?? false,
   };
   editCodexManifestAccountNames.value = {};
-  for (const id of editCodexManifestConfig.value.account_ids) {
-    adminAPI.accounts
-      .getById(id)
-      .then((account) => {
-        if (!isCurrentEdit()) return;
-        editCodexManifestAccountNames.value = {
-          ...editCodexManifestAccountNames.value,
-          [id]: account.name,
-        };
-      })
-      .catch(() => {
-        // 无法解析名称时由组件回退展示 #<id>，提示管理员清理脏 ID。
-      });
-  }
-  // 加载模型路由规则（异步加载账号名称）
-  const routingRules = await convertApiFormatToRoutingRules(
-    group.model_routing,
-  );
-  if (!isCurrentEdit()) return;
-  editModelRoutingRules.value = routingRules;
+  editModelRoutingRules.value = buildRoutingRulesFromApiFormat(group.model_routing);
+  void hydrateEditAccountNames(isCurrentEdit);
   loadModelAllowlistCandidates("edit", group.id, group.platform);
   showEditModal.value = true;
 };
@@ -6355,6 +6373,7 @@ const closeEditModal = () => {
   editForm.video_model_prices = createVideoModelPricesForm();
   editForm.long_context_pricing_enabled = true;
   editForm.force_openai_fast = false;
+  editForm.force_openai_ultrafast = false;
   editForm.free_openai_fast = false;
   editForm.model_pricing = [];
   editForm.web_search_price_per_call = null;
@@ -6415,6 +6434,10 @@ const handleUpdateGroup = async () => {
       force_openai_fast: normalizeGroupOpenAIFast(
         editForm.platform,
         editForm.force_openai_fast,
+      ),
+      force_openai_ultrafast: normalizeGroupOpenAIFast(
+        editForm.platform,
+        editForm.force_openai_ultrafast,
       ),
       free_openai_fast: normalizeGroupOpenAIFast(
         editForm.platform,

@@ -10,17 +10,25 @@ import (
 )
 
 type upstreamErrorFrameReader struct {
-	reader     *bufio.Reader
-	limit      int64
-	pending    []byte
-	err        error
-	errorLimit int64
+	reader           *bufio.Reader
+	limit            int64
+	pending          []byte
+	err              error
+	errorLimit       int64
+	compactErrorData bool
 }
 
 var errUpstreamErrorFrameTooLarge = errors.New("upstream error event exceeds size limit")
 
 func newUpstreamErrorFrameReader(reader io.Reader, limit int64) io.Reader {
 	return &upstreamErrorFrameReader{reader: bufio.NewReader(reader), limit: limit}
+}
+
+// Line-oriented consumers need a complete error JSON document before recording
+// diagnostics, classifying the failure and sanitizing their client copy. Keep
+// successful frames unchanged and leave raw-frame consumers on the normal reader.
+func newUpstreamErrorFrameReaderForLineProcessing(reader io.Reader, limit int64) io.Reader {
+	return &upstreamErrorFrameReader{reader: bufio.NewReader(reader), limit: limit, compactErrorData: true}
 }
 
 // A separate optional limit bounds named SSE errors before the frame buffer
@@ -110,7 +118,7 @@ func (reader *upstreamErrorFrameReader) readFrame() ([]byte, error) {
 			// Keep a bounded named error together through its event boundary.
 			// Otherwise a valid first data line would reset namedError before a
 			// later oversized line, bypassing the smaller diagnostic limit.
-			if dataLines == 1 && (!namedError || reader.errorLimit == 0) && (data == "[DONE]" || json.Valid([]byte(data))) {
+			if dataLines == 1 && (!namedError || reader.errorLimit == 0 && !reader.compactErrorData) && (data == "[DONE]" || json.Valid([]byte(data))) {
 				return frame.Bytes(), err
 			}
 		}
@@ -119,13 +127,38 @@ func (reader *upstreamErrorFrameReader) readFrame() ([]byte, error) {
 			parsed, ready = parser.Finish()
 		}
 		if text == "" || err != nil {
-			if ready && dataLines > 1 && (upstreamFinancialFailureEnvelope([]byte(parsed.Data)) || parsed.EventType == "error" && IsUpstreamFinancialError(0, []byte(parsed.Data))) {
+			if ready && dataLines > 1 && (upstreamFinancialFailureEnvelope([]byte(parsed.Data)) || parsed.EventType == "error" && IsUpstreamFinancialError(0, []byte(parsed.Data)) ||
+				reader.compactErrorData && (parsed.EventType == "error" || clientUpstreamBodyIsError([]byte(parsed.Data)))) {
 				var compact bytes.Buffer
 				if json.Compact(&compact, []byte(parsed.Data)) == nil {
+					if reader.compactErrorData {
+						return compactUpstreamSSEErrorData(frame.Bytes(), compact.Bytes()), err
+					}
 					return []byte("event: error\ndata: " + compact.String() + "\n\n"), err
 				}
 			}
 			return frame.Bytes(), err
 		}
 	}
+}
+
+// Replace only the data lines. Event names, IDs, retry hints, comments and line
+// endings retain their original framing; the payload itself is still raw JSON.
+func compactUpstreamSSEErrorData(frame, payload []byte) []byte {
+	var result bytes.Buffer
+	wroteData := false
+	for _, line := range bytes.SplitAfter(frame, []byte("\n")) {
+		text := strings.TrimRight(string(line), "\r\n")
+		if _, ok := extractOpenAISSEDataLine(text); ok {
+			if !wroteData {
+				result.WriteString("data: ")
+				result.Write(payload)
+				result.Write(line[len(text):])
+				wroteData = true
+			}
+			continue
+		}
+		result.Write(line)
+	}
+	return result.Bytes()
 }

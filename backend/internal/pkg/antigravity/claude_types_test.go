@@ -36,6 +36,7 @@ func TestDefaultModels_ContainsNewAndLegacyImageModels(t *testing.T) {
 	}
 
 	requiredIDs := []string{
+		"gemini-4-carbon",
 		"claude-fable-5-1",
 		"claude-fable-5",
 		"claude-opus-4-8",
@@ -76,4 +77,8 @@ func TestDefaultModels_ContainsNewAndLegacyImageModels(t *testing.T) {
 			t.Fatalf("expected model %q to be exposed in DefaultModels", id)
 		}
 	}
+}
+
+func TestIsGeminiReasoningModel_Carbon(t *testing.T) {
+	require.True(t, IsGeminiReasoningModel("gemini-4-carbon"))
 }

@@ -58,6 +58,8 @@ func TestAdminUsageListRequestTypePriority(t *testing.T) {
 	require.NotNil(t, repo.listFilters.RequestType)
 	require.Equal(t, int16(service.RequestTypeWSV2), *repo.listFilters.RequestType)
 	require.Nil(t, repo.listFilters.Stream)
+	require.True(t, repo.listFilters.CompactAssociations)
+	require.True(t, repo.listFilters.AccountNameOnly)
 }
 
 func TestAdminUsageListUsesRequestedModelForDisplayModelFilter(t *testing.T) {

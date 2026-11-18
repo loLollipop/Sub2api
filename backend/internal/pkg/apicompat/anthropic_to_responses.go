@@ -33,7 +33,7 @@ func AnthropicToResponsesWithOptions(req *AnthropicRequest, opts *AnthropicToRes
 func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTokens int, options ...*AnthropicToResponsesOptions) (*ResponsesRequest, error) {
 	deferValidation := len(options) > 0 && options[0] != nil && options[0].DeferReasoningEffortValidation
 	if !deferValidation {
-		if err := openai.ValidateGPT61SolReasoningEffort(req.Model, anthropicReasoningEffort(req)); err != nil {
+		if err := openai.ValidateGPT61ReasoningEffort(req.Model, anthropicReasoningEffort(req)); err != nil {
 			return nil, err
 		}
 	}
@@ -86,13 +86,13 @@ func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTok
 	// 其余情况只看 output_config.effort，默认 medium。
 	// Anthropic levels map 1:1 to OpenAI: low->low, medium->medium, high->high, max->xhigh.
 	effort := anthropicReasoningEffort(req)
-	if openai.IsGPT61SolModelSpelling(req.Model) && req.OutputConfig != nil && req.OutputConfig.Effort == "max" && effort != "none" {
+	if (openai.GPT62ModelID(req.Model) != "" || openai.IsGPT61SolModelSpelling(req.Model) || openai.IsGPT61TerraModelSpelling(req.Model)) && req.OutputConfig != nil && req.OutputConfig.Effort == "max" && effort != "none" {
 		effort = "max"
 	}
 	out.Reasoning = &ResponsesReasoning{
 		Effort: mapAnthropicEffortToResponses(effort),
 	}
-	if preserveThinking && effort == "max" {
+	if effort == "max" && (preserveThinking || openai.RequiresResponsesForToolCalls(req.Model)) {
 		out.Reasoning.Effort = "max"
 	}
 	if effort != "none" {

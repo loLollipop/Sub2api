@@ -1616,12 +1616,13 @@ func ChatUsageToResponsesUsage(usage *ChatUsage) *ResponsesUsage {
 	}
 	if usage.PromptTokensDetails != nil && (usage.PromptTokensDetails.CachedTokens > 0 ||
 		usage.PromptTokensDetails.CacheCreationTokens > 0 || usage.PromptTokensDetails.CacheWriteTokens > 0 ||
-		usage.PromptTokensDetails.AudioTokens != 0) {
+		usage.PromptTokensDetails.AudioTokens != 0 || len(usage.PromptTokensDetails.CacheWriteTokensDetails) > 0) {
 		out.InputTokensDetails = &ResponsesInputTokensDetails{
-			CachedTokens:        usage.PromptTokensDetails.CachedTokens,
-			AudioTokens:         usage.PromptTokensDetails.AudioTokens,
-			CacheCreationTokens: usage.PromptTokensDetails.CacheCreationTokens,
-			CacheWriteTokens:    usage.PromptTokensDetails.CacheWriteTokens,
+			CachedTokens:            usage.PromptTokensDetails.CachedTokens,
+			AudioTokens:             usage.PromptTokensDetails.AudioTokens,
+			CacheCreationTokens:     usage.PromptTokensDetails.CacheCreationTokens,
+			CacheWriteTokens:        usage.PromptTokensDetails.CacheWriteTokens,
+			CacheWriteTokensDetails: append(json.RawMessage(nil), usage.PromptTokensDetails.CacheWriteTokensDetails...),
 		}
 		if usage.PromptTokensDetails.CacheWriteTokens > 0 {
 			out.CacheCreationInputTokens = usage.PromptTokensDetails.CacheWriteTokens

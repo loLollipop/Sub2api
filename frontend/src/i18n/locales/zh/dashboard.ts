@@ -283,6 +283,7 @@ export default {
         errorDescription: '无法使用当前 API Key 获取模型目录。'
       },
       opencode: {
+        mythosEligibilityHint: 'Mythos 5.2 需要 Anthropic 授予账号访问资格；添加配置不会开通模型权限。',
         title: 'OpenCode 配置示例',
         subtitle: 'opencode.json',
         hint: '配置文件路径：~/.config/opencode/opencode.json（或 opencode.jsonc），不存在需手动创建。可使用默认 provider（openai/anthropic/google）或自定义 provider_id。API Key 支持直接配置或通过客户端 /connect 命令配置。示例仅供参考，模型与选项可按需调整。'
@@ -730,7 +731,9 @@ export default {
       outputPrice: '输出',
       cacheWritePrice: '缓存写入',
       cacheWrite5mPrice: '缓存写入（5m）',
+      cacheWrite30mPrice: '缓存写入（30m）',
       cacheWrite1hPrice: '缓存写入（1h）',
+      cacheWrite12hPrice: '缓存写入（12h）',
       cacheReadPrice: '缓存读取',
       imageInputPrice: '图片输入',
       imageOutputPrice: '图片输出',

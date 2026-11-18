@@ -264,7 +264,7 @@ func normalizeClaudeOAuthRequestBody(body []byte, modelID string, opts claudeOAu
 	// 之前的实现直接 delete 会导致 payload 缺字段，与真实 CLI 字节级不一致。
 	// 策略：客户端传了什么就透传；没传则补默认 1。
 	samplingLocked := claude.IsSonnet55(modelID) || claude.IsHaiku55(modelID)
-	if !gjson.GetBytes(out, "temperature").Exists() && !claude.IsOpus55(modelID) &&
+	if !gjson.GetBytes(out, "temperature").Exists() && !claude.IsOpus55(modelID) && !claude.IsFable52(modelID) && !claude.IsMythos52(modelID) &&
 		(!samplingLocked || !gjson.GetBytes(out, "top_p").Exists()) {
 		if next, ok := setJSONValueBytes(out, "temperature", 1); ok {
 			out = next

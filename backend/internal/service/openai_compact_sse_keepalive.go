@@ -110,7 +110,12 @@ func ResetOpenAIStreamSSEKeepaliveForRetry(c *gin.Context) bool {
 			k.mu.Lock()
 			defer k.mu.Unlock()
 			if k.ordinaryStream && k.writer.Written() {
-				return false
+				streamBytes, _ := c.Get(openAIStreamKeepaliveBytesKey)
+				streamKeepaliveBytes, _ := streamBytes.(int)
+				keepaliveBytes := k.bytes + streamKeepaliveBytes
+				if k.writeFailed || keepaliveBytes <= 0 || k.writer.Size() > keepaliveBytes {
+					return false
+				}
 			}
 			if k.gateUntilUpstream {
 				k.upstreamReady = false

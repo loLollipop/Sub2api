@@ -14,6 +14,12 @@ import {
 } from '../types'
 
 describe('interval multiplier conversion', () => {
+  it.each([null, 0, 2e-6])('round-trips the 12h price %s without losing free pricing', price => {
+    const form = apiIntervalsToForm([{ ...makeInterval({}), cache_write_12h_price: price } as any])
+    expect(form[0].cache_write_12h_price).toBe(price === null ? null : price * 1e6)
+    expect(formIntervalsToAPI(form)[0].cache_write_12h_price).toBe(price)
+  })
+
   it('preserves component multipliers without MTok conversion', () => {
     const form = apiIntervalsToForm([{
       min_tokens: 272000,

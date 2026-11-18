@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/urljoin"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
@@ -156,12 +157,7 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 		FirstTokenMs:                  firstTokenMs,
 		ClientDisconnect:              clientDisconnect,
 		UpstreamHeaders:               resp.Header,
-		Usage: ClaudeUsage{
-			InputTokens:              usage.InputTokens,
-			OutputTokens:             usage.OutputTokens,
-			CacheReadInputTokens:     usage.CacheReadInputTokens,
-			CacheCreationInputTokens: usage.CacheCreationInputTokens,
-		},
+		Usage:                         *usage,
 	}, nil
 }
 
@@ -312,77 +308,25 @@ func (s *AntigravityGatewayService) streamUpstreamResponse(c *gin.Context, resp 
 // 仅读取顶层 event.usage 会漏掉 message_start 的输入侧字段，导致流式透传请求落库的
 // usage_logs 记录 input_tokens=0。
 func (s *AntigravityGatewayService) extractSSEUsage(line string, usage *ClaudeUsage) {
-	if !strings.HasPrefix(line, "data: ") {
+	data, ok := extractAnthropicSSEDataLine(line)
+	if !ok {
 		return
 	}
-	dataStr := strings.TrimPrefix(line, "data: ")
-	var event map[string]any
-	if json.Unmarshal([]byte(dataStr), &event) != nil {
+	var event apicompat.AnthropicStreamEvent
+	if json.Unmarshal([]byte(data), &event) != nil {
 		return
 	}
-	var u map[string]any
-	if eventType, _ := event["type"].(string); eventType == "message_start" {
-		if msg, ok := event["message"].(map[string]any); ok {
-			u, _ = msg["usage"].(map[string]any)
-		}
-	} else {
-		u, _ = event["usage"].(map[string]any)
-	}
-	if u == nil {
-		return
-	}
-	if v, ok := u["input_tokens"].(float64); ok && int(v) > 0 {
-		usage.InputTokens = int(v)
-	}
-	if v, ok := u["output_tokens"].(float64); ok && int(v) > 0 {
-		usage.OutputTokens = int(v)
-	}
-	if v, ok := u["cache_read_input_tokens"].(float64); ok && int(v) > 0 {
-		usage.CacheReadInputTokens = int(v)
-	}
-	if v, ok := u["cache_creation_input_tokens"].(float64); ok && int(v) > 0 {
-		usage.CacheCreationInputTokens = int(v)
-	}
-	// 解析嵌套的 cache_creation 对象中的 5m/1h 明细
-	if cc, ok := u["cache_creation"].(map[string]any); ok {
-		if v, ok := cc["ephemeral_5m_input_tokens"].(float64); ok {
-			usage.CacheCreation5mTokens = int(v)
-		}
-		if v, ok := cc["ephemeral_1h_input_tokens"].(float64); ok {
-			usage.CacheCreation1hTokens = int(v)
-		}
+	if event.Type == "message_start" && event.Message != nil {
+		mergeAnthropicUsage(usage, event.Message.Usage)
+	} else if event.Usage != nil {
+		mergeAnthropicUsage(usage, *event.Usage)
 	}
 }
 
 // extractClaudeUsage 从非流式 Claude 响应提取 usage
 func (s *AntigravityGatewayService) extractClaudeUsage(body []byte) *ClaudeUsage {
-	usage := &ClaudeUsage{}
-	var resp map[string]any
-	if json.Unmarshal(body, &resp) != nil {
-		return usage
+	if !json.Valid(body) {
+		return &ClaudeUsage{}
 	}
-	if u, ok := resp["usage"].(map[string]any); ok {
-		if v, ok := u["input_tokens"].(float64); ok {
-			usage.InputTokens = int(v)
-		}
-		if v, ok := u["output_tokens"].(float64); ok {
-			usage.OutputTokens = int(v)
-		}
-		if v, ok := u["cache_read_input_tokens"].(float64); ok {
-			usage.CacheReadInputTokens = int(v)
-		}
-		if v, ok := u["cache_creation_input_tokens"].(float64); ok {
-			usage.CacheCreationInputTokens = int(v)
-		}
-		// 解析嵌套的 cache_creation 对象中的 5m/1h 明细
-		if cc, ok := u["cache_creation"].(map[string]any); ok {
-			if v, ok := cc["ephemeral_5m_input_tokens"].(float64); ok {
-				usage.CacheCreation5mTokens = int(v)
-			}
-			if v, ok := cc["ephemeral_1h_input_tokens"].(float64); ok {
-				usage.CacheCreation1hTokens = int(v)
-			}
-		}
-	}
-	return usage
+	return parseClaudeUsageFromResponseBody(body)
 }

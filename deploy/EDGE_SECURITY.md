@@ -27,6 +27,33 @@ legitimately occupy it for many minutes. Apply connection and unauthenticated
 request controls at the edge; authenticated user/API-key concurrency remains
 the application's responsibility.
 
+## Request body memory budget
+
+`gateway.request_body_memory_budget_bytes` shares an ingress allocation budget
+across gateway routes and aliases. With neither a YAML value nor a non-empty
+`GATEWAY_REQUEST_BODY_MEMORY_BUDGET_BYTES`, startup selects one quarter of the
+smallest physical RAM, cgroup v1/v2 limit (including parents), and `GOMEMLIMIT`,
+with a 1 GiB minimum, and logs the selected value. Explicit values, including
+`0` to disable admission, take precedence. An empty environment value is ignored.
+
+Chunks, their contiguous copy, decompressed output, lenient JSON replacement,
+and an 8 MiB Zstd decoder window reservation are charged before allocation.
+Temporary allocations are released after each phase. Final bodies and retained
+preread buffers stay charged until the handler returns, including while waiting
+for a user slot or streaming a response. Exhaustion returns protocol-appropriate
+HTTP 503 with `Retry-After: 1`; the existing per-request size limit still returns
+413. Canceled and failed reads release their temporary allocations.
+
+This covers HTTP request bodies. Frames after a WebSocket upgrade continue to
+use the existing WebSocket frame-size, idle-timeout and ingress-lease controls;
+they are not accumulated against the HTTP handler's body reservation.
+
+The budget accounts for live ingress buffers, not RSS: GC need not immediately
+reclaim released storage. Leave memory for conversion state, SSE frames, caches
+and connections. Long-lived streams retain their input; 200 streams with 4 MiB
+inputs retain about 800 MiB, before concurrent upload/decode work. Deployments
+that explicitly pin 1 GiB can remove the key to use automatic sizing.
+
 ## Trusted client IPs
 
 `security.trust_forwarded_ip_for_api_key_acl` is enabled by default for upgrade

@@ -66,6 +66,10 @@ func (s *OpenAIGatewayService) forwardResponsesViaNativeAnthropic(
 	// Resolve the effective model before model-specific protocol conversion.
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if err := validateClaude52BridgeRequest(body, upstreamModel); err != nil {
+		writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
 	responsesReq.Model = upstreamModel
 	// 3. Convert Responses → Anthropic
 	anthropicReq, err := apicompat.ResponsesToAnthropicRequestWithOptions(&responsesReq, &apicompat.ResponsesToAnthropicOptions{PreserveReasoningText: account.Platform == PlatformDeepseek})

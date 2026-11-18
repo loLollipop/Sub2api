@@ -849,47 +849,23 @@ func parseSSEUsagePassthrough(data string, usage *ClaudeUsage) {
 		if v := usageNode.Get("input_tokens"); v.Exists() && v.Type != gjson.Null {
 			if parsed.Get("type").String() != "message_delta" || v.Int() != 0 || hasAnthropicCacheTokenFields(usageNode) {
 				usage.InputTokens = int(v.Int())
+				if usageNode.Get("prompt_tokens").Int() <= 0 {
+					usage.promptTotalPresent = false
+				}
 			}
 		}
 		if v := usageNode.Get("output_tokens"); v.Exists() && v.Type != gjson.Null {
 			usage.OutputTokens = int(v.Int())
 		}
-		if v := usageNode.Get("cache_creation_input_tokens"); v.Exists() && v.Type != gjson.Null {
-			usage.CacheCreationInputTokens = int(v.Int())
-		}
 		if v := usageNode.Get("cache_read_input_tokens"); v.Exists() && v.Type != gjson.Null {
 			usage.CacheReadInputTokens = int(v.Int())
 		}
-		if v := usageNode.Get("cache_creation.ephemeral_5m_input_tokens"); v.Exists() && v.Type != gjson.Null {
-			usage.CacheCreation5mTokens = int(v.Int())
-		}
-		if v := usageNode.Get("cache_creation.ephemeral_1h_input_tokens"); v.Exists() && v.Type != gjson.Null {
-			usage.CacheCreation1hTokens = int(v.Int())
-		}
-		if v := usageNode.Get("cache_creation_input_tokens"); v.Exists() && v.Type != gjson.Null && v.Int() == 0 {
-			usage.CacheCreation5mTokens = 0
-			usage.CacheCreation1hTokens = 0
-		}
 	}
+	mergeRawAnthropicCacheCreationUsage(usageNode, usage)
 
 	if usageNode.Get("cache_read_input_tokens").Int() == 0 {
 		if cached, ok := anthropicCacheReadAlias(usageNode); ok {
 			usage.CacheReadInputTokens = cached
-		}
-	}
-	// A cumulative aggregate is authoritative, including zero. Split-only
-	// updates derive their aggregate from both retained TTL buckets.
-	aggregate := usageNode.Get("cache_creation_input_tokens")
-	cc5m := usageNode.Get("cache_creation.ephemeral_5m_input_tokens")
-	cc1h := usageNode.Get("cache_creation.ephemeral_1h_input_tokens")
-	if !aggregate.Exists() || aggregate.Type == gjson.Null {
-		if (cc5m.Exists() && cc5m.Type != gjson.Null) || (cc1h.Exists() && cc1h.Type != gjson.Null) {
-			if parsed.Get("type").String() != "message_start" && parsed.Get("type").String() != "message_delta" {
-				// Preserve the legacy fallback on providers' non-message usage frames.
-				usage.CacheCreationInputTokens = int(cc5m.Int() + cc1h.Int())
-			} else {
-				usage.CacheCreationInputTokens = usage.CacheCreation5mTokens + usage.CacheCreation1hTokens
-			}
 		}
 	}
 
@@ -898,11 +874,7 @@ func parseSSEUsagePassthrough(data string, usage *ClaudeUsage) {
 	// uncached input. prompt_tokens remains the total in both events. Normalize
 	// to ClaudeUsage's mutually-exclusive buckets so downstream billing does not
 	// subtract cache tokens from an already-uncached value.
-	// A cache alias alone is not a prompt total. Only recompute uncached input
-	// when the event actually reports a total or an explicit miss count.
-	if usageNode.Get("prompt_tokens").Int() > 0 || usageNode.Get("prompt_cache_miss_tokens").Exists() {
-		normalizeAnthropicCompatiblePromptUsage(usageNode, usage)
-	}
+	normalizeAnthropicCompatiblePromptUsage(usageNode, usage)
 }
 
 // Cache counters establish a reported usage split, including explicit zeroes.
@@ -940,7 +912,7 @@ func normalizeAnthropicCompatiblePromptUsage(usageNode gjson.Result, usage *Clau
 	promptCacheHitTokens := usageNode.Get("prompt_cache_hit_tokens")
 	promptCacheMissTokens := usageNode.Get("prompt_cache_miss_tokens")
 	if (!promptTokens.Exists() || promptTokens.Int() <= 0) &&
-		!promptCacheHitTokens.Exists() && !promptCacheMissTokens.Exists() {
+		!promptCacheHitTokens.Exists() && !promptCacheMissTokens.Exists() && !usage.promptTotalPresent {
 		return false
 	}
 
@@ -962,18 +934,12 @@ func normalizeAnthropicCompatiblePromptUsage(usageNode gjson.Result, usage *Clau
 		cacheReadTokens = max(int(promptCacheHitTokens.Int()), 0)
 	}
 
-	cacheCreationTokens := usage.CacheCreationInputTokens
-	if v := usageNode.Get("cache_creation_input_tokens"); v.Exists() && v.Type != gjson.Null {
-		cacheCreationTokens = int(v.Int())
-	}
-
-	if promptCacheMissTokens.Exists() {
-		usage.InputTokens = max(int(promptCacheMissTokens.Int()), 0)
-	} else {
-		usage.InputTokens = max(int(promptTokens.Int())-cacheReadTokens-cacheCreationTokens, 0)
-	}
 	usage.CacheReadInputTokens = cacheReadTokens
-	usage.CacheCreationInputTokens = cacheCreationTokens
+	var miss *int
+	if value, ok := parseSSEUsageInt(promptCacheMissTokens.Value()); ok {
+		miss = &value
+	}
+	normalizeAnthropicPromptTotal(usage, int(promptTokens.Int()), miss)
 	return true
 }
 
@@ -991,18 +957,9 @@ func parseClaudeUsageFromResponseBody(body []byte) *ClaudeUsage {
 
 	usage.InputTokens = int(usageNode.Get("input_tokens").Int())
 	usage.OutputTokens = int(usageNode.Get("output_tokens").Int())
-	usage.CacheCreationInputTokens = int(usageNode.Get("cache_creation_input_tokens").Int())
+	usage.ImageOutputTokens = int(usageNode.Get("image_output_tokens").Int())
 	usage.CacheReadInputTokens = int(usageNode.Get("cache_read_input_tokens").Int())
-
-	cc5m := usageNode.Get("cache_creation.ephemeral_5m_input_tokens").Int()
-	cc1h := usageNode.Get("cache_creation.ephemeral_1h_input_tokens").Int()
-	if cc5m > 0 || cc1h > 0 {
-		usage.CacheCreation5mTokens = int(cc5m)
-		usage.CacheCreation1hTokens = int(cc1h)
-	}
-	if usage.CacheCreationInputTokens == 0 && (cc5m > 0 || cc1h > 0) {
-		usage.CacheCreationInputTokens = int(cc5m + cc1h)
-	}
+	mergeRawAnthropicCacheCreationUsage(usageNode, usage)
 	if usage.CacheReadInputTokens == 0 {
 		if cached := usageNode.Get("cached_tokens").Int(); cached > 0 {
 			usage.CacheReadInputTokens = int(cached)

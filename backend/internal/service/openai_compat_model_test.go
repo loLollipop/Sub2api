@@ -2140,6 +2140,10 @@ func TestForwardAsAnthropic_MissingTerminalAfterClientDisconnectSkipsOpsAndFailo
 	upstreamBody := strings.Join([]string{
 		`data: {"type":"response.created","response":{"id":"resp_1","model":"gpt-5.4","status":"in_progress","output":[]}}`,
 		"",
+		// A held prelude no longer writes to the client. A content delta must
+		// reach the failing writer to simulate an observed disconnect.
+		`data: {"type":"response.output_text.delta","delta":"partial"}`,
+		"",
 	}, "\n")
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusOK,

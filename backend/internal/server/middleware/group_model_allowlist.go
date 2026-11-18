@@ -118,8 +118,14 @@ func isResponsesWebSocketRoute(c *gin.Context) bool {
 // 不敏感）与 multipart 表单（首/末字段）三类解析器，这里返回「任一解析器可能
 // 绑定到的全部模型值」，调用方必须逐一校验，任一未命中即拒绝。
 func groupModelAllowlistModelsFromBody(c *gin.Context, maxNormalizedBytes int64) ([]string, bool) {
-	body, err := httputil.ReadRequestBodyWithPrealloc(c.Request)
 	mediaType, params, _ := mime.ParseMediaType(c.GetHeader("Content-Type"))
+	var body []byte
+	var err error
+	if mediaType == "multipart/form-data" {
+		body, err = httputil.ReadRequestBodyWithPrealloc(c.Request)
+	} else {
+		body, err = httputil.ReadLenientJSONRequestBodyWithPrealloc(c.Request, maxNormalizedBytes)
+	}
 	trimmed := bytes.TrimSpace(bytes.TrimPrefix(body, []byte{0xef, 0xbb, 0xbf}))
 	looksLikeJSON := len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[' || bytes.HasPrefix(trimmed, []byte{0xef, 0xbb, 0xbf}))
 	if err == nil && mediaType == "multipart/form-data" && looksLikeJSON && params["boundary"] != "" {
@@ -130,15 +136,20 @@ func groupModelAllowlistModelsFromBody(c *gin.Context, maxNormalizedBytes int64)
 			looksLikeJSON = false
 		}
 	}
-	if err == nil && (mediaType != "multipart/form-data" || looksLikeJSON) {
+	if err == nil && mediaType == "multipart/form-data" && looksLikeJSON {
 		// Match the handler's BOM/control-byte normalization before selecting
 		// models. Use its configured budget so escaping does not shrink limits.
-		normalized, normalizeErr := httputil.NormalizeLenientJSONRequestBody(body, maxNormalizedBytes)
-		if mediaType != "multipart/form-data" || normalizeErr != nil || gjson.ValidBytes(normalized) {
+		normalized, release, normalizeErr := httputil.NormalizeLenientJSONRequestBodyWithContext(c.Request.Context(), body, maxNormalizedBytes)
+		if normalizeErr != nil || gjson.ValidBytes(normalized) {
 			body, err = normalized, normalizeErr
+		} else {
+			release()
 		}
 	}
 	if err != nil {
+		if RejectRequestBodyReadError(c, err) {
+			return nil, false
+		}
 		status := http.StatusBadRequest
 		message := "Failed to read request body"
 		var maxErr *http.MaxBytesError

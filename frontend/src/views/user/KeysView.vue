@@ -206,13 +206,22 @@
             <div class="text-sm">
               <div class="flex items-center gap-1.5">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('keys.today') }}:</span>
-                <span class="font-medium text-gray-900 dark:text-white">
+                <span
+                  v-if="usageLoading && !usageStats[row.id]"
+                  data-test="usage-pending"
+                  class="inline-block h-3 w-14 animate-pulse rounded bg-gray-200 dark:bg-dark-600"
+                />
+                <span v-else class="font-medium text-gray-900 dark:text-white">
                   ${{ (usageStats[row.id]?.today_actual_cost ?? 0).toFixed(4) }}
                 </span>
               </div>
               <div class="mt-0.5 flex items-center gap-1.5">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('keys.total') }}:</span>
-                <span class="font-medium text-gray-900 dark:text-white">
+                <span
+                  v-if="usageLoading && !usageStats[row.id]"
+                  class="inline-block h-3 w-14 animate-pulse rounded bg-gray-200 dark:bg-dark-600"
+                />
+                <span v-else class="font-medium text-gray-900 dark:text-white">
                   ${{ (usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4) }}
                 </span>
               </div>
@@ -1409,6 +1418,7 @@ const submitting = ref(false)
 const now = ref(new Date())
 let resetTimer: ReturnType<typeof setInterval> | null = null
 const usageStats = ref<Record<string, BatchApiKeyUsageStats>>({})
+const usageLoading = ref(false)
 const userGroupRates = ref<Record<number, number>>({})
 
 const pagination = ref({
@@ -1499,6 +1509,7 @@ const columnDropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
+let usageAbortController: AbortController | null = null
 
 // Get the currently selected key for group change
 const selectedKeyForGroup = computed(() => {
@@ -1734,10 +1745,12 @@ const isAbortError = (error: unknown) => {
 const loadApiKeys = async () => {
   selectedKeyIds.value = []
   abortController?.abort()
+  usageAbortController?.abort()
   const controller = new AbortController()
   abortController = controller
   const { signal } = controller
   loading.value = true
+  usageLoading.value = false
   try {
     // Build filters
     const filters: {
@@ -1764,17 +1777,9 @@ const loadApiKeys = async () => {
 
     // Usage numbers are secondary; don't keep the key table spinning while
     // 30-day aggregates scan usage_logs.
+    usageLoading.value = response.items.length > 0
     if (response.items.length > 0) {
-      const keyIds = response.items.map((k) => k.id)
-      try {
-        const usageResponse = await usageAPI.getDashboardApiKeysUsage(keyIds, { signal })
-        if (signal.aborted) return
-        usageStats.value = usageResponse.stats
-      } catch (e) {
-        if (!isAbortError(e)) {
-          console.error('Failed to load usage stats:', e)
-        }
-      }
+      void loadUsageStats(response.items.map((key) => key.id), controller)
     }
   } catch (error) {
     if (isAbortError(error)) {
@@ -1784,6 +1789,25 @@ const loadApiKeys = async () => {
   } finally {
     if (abortController === controller) {
       loading.value = false
+    }
+  }
+}
+
+const loadUsageStats = async (keyIds: number[], owner: AbortController) => {
+  const controller = new AbortController()
+  usageAbortController = controller
+  try {
+    const result = await usageAPI.getDashboardApiKeysUsage(keyIds, { signal: controller.signal })
+    if (controller.signal.aborted || abortController !== owner) return
+    usageStats.value = result.stats
+  } catch (error) {
+    if (!controller.signal.aborted && abortController === owner && !isAbortError(error)) {
+      console.error('Failed to load usage stats:', error)
+    }
+  } finally {
+    if (usageAbortController === controller) {
+      usageAbortController = null
+      usageLoading.value = false
     }
   }
 }
@@ -2337,6 +2361,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  abortController?.abort()
+  usageAbortController?.abort()
   document.removeEventListener('click', closeGroupSelector)
   if (resetTimer) clearInterval(resetTimer)
   ccsModelsAbort?.abort()

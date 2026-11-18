@@ -7,6 +7,7 @@ const messages: Record<string, string> = {
   'admin.dashboard.groupDistribution': 'Group Distribution',
   'admin.dashboard.group': 'Group',
   'admin.dashboard.noGroup': 'No Group',
+  'admin.dashboard.deletedGroup': 'Deleted',
   'admin.dashboard.requests': 'Requests',
   'admin.dashboard.tokens': 'Tokens',
   'admin.dashboard.actual': 'Actual',
@@ -35,6 +36,22 @@ vi.mock('vue-chartjs', () => ({
 }))
 
 describe('GroupDistributionChart', () => {
+  it('keeps deleted and ungrouped usage in the chart with distinct labels', () => {
+    const wrapper = mount(GroupDistributionChart, {
+      props: { groupStats: [
+        { group_id: 42, group_name: '', deleted: true, requests: 3, total_tokens: 50, cost: 1, actual_cost: 0.15 },
+        { group_id: 0, group_name: '', deleted: false, requests: 2, total_tokens: 10, cost: 0, actual_cost: 0 },
+      ] },
+    })
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows[0].text()).toContain('#42')
+    expect(rows[0].text()).toContain('Deleted')
+    expect(rows[1].text()).toContain('No Group')
+    expect(rows[1].text()).not.toContain('Deleted')
+    const chart = JSON.parse(wrapper.find('.chart-data').text())
+    expect(chart.labels).toEqual(['#42', 'No Group'])
+    expect(chart.datasets[0].data).toEqual([50, 10])
+  })
   const groupStats = [
     {
       group_id: 1,

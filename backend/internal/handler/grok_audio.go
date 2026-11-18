@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -216,6 +216,9 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 
 	body, err := readGrokVoiceGatewayBody(c)
 	if err != nil {
+		if handleRequestBodyReadError(c, err) {
+			return
+		}
 		if errors.Is(err, errGrokVoiceBodyRequired) {
 			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 			return
@@ -409,7 +412,7 @@ func readGrokVoiceGatewayBody(c *gin.Context) ([]byte, error) {
 		}
 		return nil, errGrokVoiceBodyRequired
 	}
-	body, err := io.ReadAll(c.Request.Body)
+	body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 	if err == nil && len(body) == 0 && c.Request.Method != http.MethodGet && c.Request.Method != http.MethodDelete {
 		return nil, errGrokVoiceBodyRequired
 	}

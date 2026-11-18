@@ -207,12 +207,18 @@ func privateField(key string) bool {
 // cannot survive in the original bytes returned by the unchanged fast path.
 // Malformed JSON is treated as free-form diagnostic text.
 func JSON(input []byte) []byte {
+	return JSONWithStatus(input, 0)
+}
+
+// JSONWithStatus also supplies the HTTP status for relay-owned error types.
+// A stream without an error HTTP status uses the neutral upstream_error type.
+func JSONWithStatus(input []byte, status int) []byte {
 	if len(input) > maxInputBytes {
 		return []byte(fallbackJSON)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(input))
 	decoder.UseNumber()
-	value, changed, err := readJSONValue(decoder, 0)
+	value, changed, err := readJSONValue(decoder, 0, status)
 	if err != nil {
 		// JSON-valid but excessively nested diagnostics fail closed.
 		trimmed := bytes.TrimSpace(input)
@@ -234,7 +240,7 @@ func JSON(input []byte) []byte {
 	return result
 }
 
-func readJSONValue(decoder *json.Decoder, depth int) (any, bool, error) {
+func readJSONValue(decoder *json.Decoder, depth, status int) (any, bool, error) {
 	if depth > maxDepth {
 		return nil, true, errTooDeep
 	}
@@ -260,9 +266,19 @@ func readJSONValue(decoder *json.Decoder, depth int) (any, bool, error) {
 				if !ok {
 					return nil, changed, errInvalidJSON
 				}
-				item, itemChanged, err := readJSONValue(decoder, depth+1)
+				item, itemChanged, err := readJSONValue(decoder, depth+1, status)
 				if err != nil {
 					return nil, changed, err
+				}
+				if text, ok := item.(string); ok {
+					safe := text
+					switch key {
+					case "type":
+						safe = ErrorType(status, text)
+					case "message":
+						safe = ErrorMessage(text)
+					}
+					item, itemChanged = safe, itemChanged || safe != text
 				}
 				if privateField(key) {
 					item, itemChanged = redacted, true
@@ -280,7 +296,7 @@ func readJSONValue(decoder *json.Decoder, depth int) (any, bool, error) {
 			result := make([]any, 0)
 			changed := false
 			for decoder.More() {
-				item, itemChanged, err := readJSONValue(decoder, depth+1)
+				item, itemChanged, err := readJSONValue(decoder, depth+1, status)
 				if err != nil {
 					return nil, changed, err
 				}
@@ -309,14 +325,19 @@ const errInvalidJSON parseError = "invalid error JSON payload"
 // SSE sanitizes only error events in a mixed stream. Successful content,
 // including generated URLs and search results, remains byte-for-byte intact.
 func SSE(input string) string {
-	return sanitizeSSE(input, false)
+	return sanitizeSSE(input, false, 0)
 }
 
 // ErrorSSE sanitizes an already identified error stream/event. Callers handling
 // an HTTP non-2xx body or a protocol-confirmed error may use this variant when
 // its payload does not itself contain a named error event.
 func ErrorSSE(input string) string {
-	return sanitizeSSE(input, true)
+	return ErrorSSEWithStatus(input, 0)
+}
+
+// ErrorSSEWithStatus supplies the HTTP status of an identified error stream.
+func ErrorSSEWithStatus(input string, status int) string {
+	return sanitizeSSE(input, true, status)
 }
 
 // IsErrorJSON inspects protocol envelope fields, including duplicate keys.
@@ -358,7 +379,7 @@ func errorEnvelope(node gjson.Result, depth int) bool {
 	return isError
 }
 
-func sanitizeSSE(input string, knownError bool) string {
+func sanitizeSSE(input string, knownError bool, status int) string {
 	if len(input) > maxInputBytes && knownError {
 		return "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"upstream_error\",\"message\":\"Upstream error details redacted\"}}\n\n"
 	}
@@ -367,17 +388,17 @@ func sanitizeSSE(input string, knownError bool) string {
 	for _, line := range strings.SplitAfter(input, "\n") {
 		event = append(event, line)
 		if strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r") == "" && line != "" {
-			_, _ = output.WriteString(sanitizeEvent(event, knownError))
+			_, _ = output.WriteString(sanitizeEvent(event, knownError, status))
 			event = event[:0]
 		}
 	}
 	if len(event) > 0 {
-		_, _ = output.WriteString(sanitizeEvent(event, knownError))
+		_, _ = output.WriteString(sanitizeEvent(event, knownError, status))
 	}
 	return output.String()
 }
 
-func sanitizeEvent(lines []string, knownError bool) string {
+func sanitizeEvent(lines []string, knownError bool, status int) string {
 	var data []string
 	for _, line := range lines {
 		content := strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
@@ -404,14 +425,14 @@ func sanitizeEvent(lines []string, knownError bool) string {
 	if len(data) == 0 {
 		joined := strings.Join(lines, "")
 		trimmed := strings.TrimSpace(joined)
-		safe := string(JSON([]byte(trimmed)))
+		safe := string(JSONWithStatus([]byte(trimmed), status))
 		if safe != trimmed {
 			return strings.Replace(joined, trimmed, safe, 1)
 		}
 		return joined
 	}
 	originalData := strings.Join(data, "\n")
-	safeData := string(JSON([]byte(originalData)))
+	safeData := string(JSONWithStatus([]byte(originalData), status))
 	var output strings.Builder
 	wroteData := false
 	for _, line := range lines {

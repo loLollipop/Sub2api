@@ -223,12 +223,12 @@
           @select-all-results="handleSelectAllResults"
           @toggle-schedulable="handleBulkToggleSchedulable"
         />
-        <div ref="accountTableRef" class="accounts-table-stage">
+        <div ref="accountTableRef" class="accounts-table-stage" :aria-busy="loading" :inert="loading && accounts.length > 0 ? true : undefined">
         <DataTable
           ref="dataTableRef"
           :columns="cols"
           :data="accounts"
-          :loading="loading"
+          :loading="loading && accounts.length === 0"
           row-key="id"
           :server-side-sort="true"
           @sort="handleSort"
@@ -484,7 +484,8 @@
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
     <CreateAccountModal v-if="showCreate" :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
-    <EditAccountModal v-if="showEdit" :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
+    <EditAccountModalShell v-if="showEdit && editDetailLoading" :show="showEdit" @close="closeEdit" />
+    <EditAccountModal v-else-if="showEdit" :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="closeEdit" @updated="handleAccountUpdated" />
     <ReAuthAccountModal v-if="showReAuth" :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal v-if="showTest" :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountBatchTestModal v-if="showBatchTest" :show="showBatchTest" :accounts="batchTestAccounts" @close="closeBatchTestModal" />
@@ -577,7 +578,12 @@ import { fetchAllAccountIds } from '@/utils/accountSelection'
 // 弹窗只在点开时才需要：异步组件 + 模板里的 v-if 一起用，才能既拆出
 // AccountsView 的 829KB 主块，又不让它们在页面挂载时就预取。
 const CreateAccountModal = defineAsyncComponent(() => import('@/components/account/CreateAccountModal.vue'))
-const EditAccountModal = defineAsyncComponent(() => import('@/components/account/EditAccountModal.vue'))
+import EditAccountModalShell from '@/components/account/EditAccountModalShell.vue'
+const EditAccountModal = defineAsyncComponent({
+  loader: () => import('@/components/account/EditAccountModal.vue'),
+  loadingComponent: EditAccountModalShell,
+  delay: 0,
+})
 const BulkEditAccountModal = defineAsyncComponent(() => import('@/components/account/BulkEditAccountModal.vue'))
 const SyncFromCrsModal = defineAsyncComponent(() => import('@/components/account/SyncFromCrsModal.vue'))
 const TempUnschedStatusModal = defineAsyncComponent(() => import('@/components/account/TempUnschedStatusModal.vue'))
@@ -1979,11 +1985,30 @@ const loadAccountDetails = async (account: Pick<AccountListItem, 'id'>): Promise
   }
 }
 
+const editDetailLoading = ref(false)
+let editDetailRequest = 0
+const closeEdit = () => {
+  editDetailRequest++
+  showEdit.value = false
+  editDetailLoading.value = false
+  edAcc.value = null
+}
 const handleEdit = async (a: AccountListItem) => {
-  const account = await loadAccountDetails(a)
-  if (!account) return
-  edAcc.value = account
+  const request = ++editDetailRequest
+  edAcc.value = null
+  editDetailLoading.value = true
   showEdit.value = true
+  try {
+    const account = await adminAPI.accounts.getById(a.id)
+    if (request !== editDetailRequest || !showEdit.value) return
+    edAcc.value = account
+  } catch (error) {
+    if (request !== editDetailRequest || !showEdit.value) return
+    closeEdit()
+    appStore.showError(extractApiErrorMessage(error, t('common.error')))
+  } finally {
+    if (request === editDetailRequest) editDetailLoading.value = false
+  }
 }
 const openMenu = (a: Account, e: MouseEvent | KeyboardEvent) => {
   menu.acc = a

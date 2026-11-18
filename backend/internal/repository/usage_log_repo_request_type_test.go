@@ -102,6 +102,8 @@ func TestUsageLogRepositoryCreateSyncRequestTypeAndLegacyFields(t *testing.T) {
 			sqlmock.AnyArg(), // upstream_request_id
 			sqlmock.AnyArg(), // session_id
 			log.NativeCompactionV2,
+			log.CacheCreation30mTokens,
+			log.CacheCreation12hTokens,
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(99), createdAt))
@@ -197,6 +199,8 @@ func TestUsageLogRepositoryCreate_PersistsServiceTier(t *testing.T) {
 			sqlmock.AnyArg(), // upstream_request_id
 			sqlmock.AnyArg(), // session_id
 			log.NativeCompactionV2,
+			log.CacheCreation30mTokens,
+			log.CacheCreation12hTokens,
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(100), createdAt))
@@ -278,8 +282,8 @@ func TestPrepareUsageLogInsert_PersistsNativeCompactionV2WithoutChangingRequestT
 	prepared := prepareUsageLogInsert(log)
 
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
-	require.Equal(t, "boolean", usageLogInsertArgTypes[len(usageLogInsertArgTypes)-2])
-	require.Equal(t, true, prepared.args[len(prepared.args)-2])
+	require.Equal(t, "boolean", usageLogInsertArgTypes[len(usageLogInsertArgTypes)-4])
+	require.Equal(t, true, prepared.args[len(prepared.args)-4])
 	require.Equal(t, int16(service.RequestTypeStream), prepared.args[30])
 	require.Equal(t, service.RequestTypeStream, log.RequestType)
 	require.True(t, log.Stream)
@@ -592,7 +596,7 @@ func TestUsageLogRepositoryUsageAggregatesFilterNativeCompactionV2(t *testing.T)
 		repo := &usageLogRepository{sql: db}
 		mock.ExpectQuery("(?s)FROM usage_logs ul.*AND ul.native_compaction_v2 = \\$3").
 			WithArgs(start, end, true).
-			WillReturnRows(sqlmock.NewRows([]string{"group_id", "group_name", "requests", "total_tokens", "cost", "actual_cost", "account_cost"}))
+			WillReturnRows(sqlmock.NewRows([]string{"group_id", "group_name", "deleted", "requests", "total_tokens", "cost", "actual_cost", "account_cost"}))
 
 		_, err := repo.GetGroupStatsWithUsageFilters(context.Background(), start, end, filters)
 		require.NoError(t, err)
@@ -786,11 +790,11 @@ func TestUsageLogRepositoryGetGroupStatsAccountCostColumn(t *testing.T) {
 	mock.ExpectQuery("FROM usage_logs").
 		WithArgs(start, end).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"group_id", "group_name", "requests", "total_tokens",
+			"group_id", "group_name", "deleted", "requests", "total_tokens",
 			"cost", "actual_cost", "account_cost",
 		}).
-			AddRow(int64(1), "azure-cc", int64(100), int64(5000), 10.0, 8.5, 7.2).
-			AddRow(int64(2), "max", int64(50), int64(2000), 5.0, 4.0, 3.5))
+			AddRow(int64(1), "azure-cc", false, int64(100), int64(5000), 10.0, 8.5, 7.2).
+			AddRow(int64(2), "max", true, int64(50), int64(2000), 5.0, 4.0, 3.5))
 
 	results, err := repo.GetGroupStatsWithFilters(context.Background(), start, end, 0, 0, 0, 0, nil, nil, nil)
 	require.NoError(t, err)
@@ -800,6 +804,8 @@ func TestUsageLogRepositoryGetGroupStatsAccountCostColumn(t *testing.T) {
 	require.Equal(t, 10.0, results[0].Cost)
 	require.Equal(t, 8.5, results[0].ActualCost)
 	require.Equal(t, 7.2, results[0].AccountCost)
+	require.False(t, results[0].Deleted)
+	require.True(t, results[1].Deleted)
 	require.Equal(t, int64(2), results[1].GroupID)
 	require.Equal(t, 3.5, results[1].AccountCost)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -816,9 +822,9 @@ func TestUsageLogRepositoryGetGroupStatsWithUsageFiltersAppliesRequestedModelFil
 	mock.ExpectQuery("AND COALESCE\\(NULLIF\\(TRIM\\(ul.requested_model\\), ''\\), ul.model\\) = \\$3").
 		WithArgs(start, end, "gpt-5").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"group_id", "group_name", "requests", "total_tokens",
+			"group_id", "group_name", "deleted", "requests", "total_tokens",
 			"cost", "actual_cost", "account_cost",
-		}).AddRow(int64(1), "default", int64(1), int64(30), 0.1, 0.08, 0.07))
+		}).AddRow(int64(1), "default", false, int64(1), int64(30), 0.1, 0.08, 0.07))
 
 	results, err := repo.GetGroupStatsWithUsageFilters(context.Background(), start, end, filters)
 	require.NoError(t, err)
@@ -993,6 +999,8 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{}, // upstream_request_id
 			sql.NullString{},
 			false, // native_compaction_v2
+			0,     // cache_creation_30m_tokens
+			0,     // cache_creation_12h_tokens
 			now,
 		}})
 		require.NoError(t, err)
@@ -1073,6 +1081,8 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			false,             // native_compaction_v2
+			0,                 // cache_creation_30m_tokens
+			0,                 // cache_creation_12h_tokens
 			now,
 		}})
 		require.NoError(t, err)
@@ -1136,6 +1146,8 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			true,              // native_compaction_v2
+			0,                 // cache_creation_30m_tokens
+			0,                 // cache_creation_12h_tokens
 			now,
 		}})
 		require.NoError(t, err)
@@ -1200,6 +1212,8 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			false,             // native_compaction_v2
+			0,                 // cache_creation_30m_tokens
+			0,                 // cache_creation_12h_tokens
 			now,
 		}})
 		require.NoError(t, err)
@@ -1207,4 +1221,91 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 		require.Equal(t, "priority", *log.ServiceTier)
 	})
 
+}
+
+func TestUsageLogRepositoryGetModelStatsAccountFilterKeepsActualCost(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+
+	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	accountID := int64(42)
+
+	mock.ExpectQuery("COALESCE\\(SUM\\(actual_cost\\), 0\\) as actual_cost,\\s+COALESCE\\(SUM\\(COALESCE\\(account_stats_cost, total_cost\\) \\* COALESCE\\(account_rate_multiplier, 1\\)\\), 0\\) as account_cost").
+		WithArgs(start, end, accountID).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"model", "requests", "input_tokens", "output_tokens",
+			"cache_creation_tokens", "cache_read_tokens", "total_tokens",
+			"cost", "actual_cost", "account_cost",
+		}).AddRow("gemini-4-argon", int64(3), int64(10), int64(20), int64(0), int64(0), int64(30), 6.0, 2.4, 0.9))
+
+	results, err := repo.GetModelStatsWithUsageFiltersBySource(context.Background(), start, end, usagestats.UsageLogFilters{AccountID: accountID}, usagestats.ModelSourceRequested)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, 2.4, results[0].ActualCost)
+	require.Equal(t, 0.9, results[0].AccountCost)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUsageLogRepositoryGetEndpointStatsAccountFilterKeepsActualCost(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+
+	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	accountID := int64(42)
+
+	mock.ExpectQuery("COALESCE\\(SUM\\(actual_cost\\), 0\\) as actual_cost,\\s+COALESCE\\(SUM\\(COALESCE\\(account_stats_cost, total_cost\\) \\* COALESCE\\(account_rate_multiplier, 1\\)\\), 0\\) as account_cost").
+		WithArgs(start, end, accountID).
+		WillReturnRows(sqlmock.NewRows([]string{"endpoint", "requests", "total_tokens", "cost", "actual_cost", "account_cost"}).
+			AddRow("/v1beta/models", int64(3), int64(30), 6.0, 2.4, 0.9))
+
+	results, err := repo.GetEndpointStatsWithFilters(context.Background(), start, end, 0, 0, accountID, 0, "", nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, 2.4, results[0].ActualCost)
+	require.Equal(t, 0.9, results[0].AccountCost)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUsageLogRepositoryAccountFilteredEndpointGroupingSeparatesCosts(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+	mock.ExpectQuery("(?s)FROM usage_logs.*account_id = \\$1.*GROUP BY GROUPING SETS").
+		WithArgs(int64(42)).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"inbound_grouped", "upstream_grouped", "inbound_endpoint", "upstream_endpoint",
+			"requests", "input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens",
+			"cost", "actual_cost", "account_cost", "avg_duration_ms",
+		}).
+			AddRow(1, 1, nil, nil, 1, 2, 3, 0, 0, 1, .15, .4, 20).
+			AddRow(0, 1, "/v1/messages", nil, 1, 2, 3, 0, 0, 1, .15, .4, 20).
+			AddRow(1, 0, nil, "/v1/responses", 1, 2, 3, 0, 0, 1, .15, .4, 20).
+			AddRow(0, 0, "/v1/messages", "/v1/responses", 1, 2, 3, 0, 0, 1, .15, .4, 20))
+	stats, err := repo.GetStatsWithFilters(context.Background(), usagestats.UsageLogFilters{AccountID: 42})
+	require.NoError(t, err)
+	require.Equal(t, .15, stats.TotalActualCost)
+	require.Equal(t, .4, *stats.TotalAccountCost)
+	for _, rows := range [][]EndpointStat{stats.Endpoints, stats.UpstreamEndpoints, stats.EndpointPaths} {
+		require.Len(t, rows, 1)
+		require.Equal(t, .15, rows[0].ActualCost)
+		require.Equal(t, .4, rows[0].AccountCost)
+	}
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUsageLogRepositoryGeminiQuotaBatchUsesAccountCost(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+	start := time.Date(2026, 11, 18, 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	mock.ExpectQuery("(?s)THEN COALESCE\\(account_stats_cost, total_cost\\) \\* COALESCE\\(account_rate_multiplier, 1\\) ELSE 0 END.*AS flash_cost,.*THEN 0 ELSE COALESCE\\(account_stats_cost, total_cost\\) \\* COALESCE\\(account_rate_multiplier, 1\\) END.*AS pro_cost").
+		WithArgs(sqlmock.AnyArg(), start, end).
+		WillReturnRows(sqlmock.NewRows([]string{"account_id", "flash_requests", "pro_requests", "flash_tokens", "pro_tokens", "flash_cost", "pro_cost"}).
+			AddRow(42, 2, 1, 20, 10, .4, 0))
+	totals, err := repo.GetGeminiUsageTotalsBatch(context.Background(), []int64{42}, start, end)
+	require.NoError(t, err)
+	require.Equal(t, .4, totals[42].FlashCost)
+	require.Zero(t, totals[42].ProCost)
+	require.NoError(t, mock.ExpectationsWereMet())
 }

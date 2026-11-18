@@ -43,7 +43,10 @@ func TestBuiltinGeminiCacheStoragePrice(t *testing.T) {
 		require.NoError(t, err, tc.model)
 		require.Equal(t, tc.want, price, tc.model)
 	}
-	for _, model := range []string{"", "customer-alias", "gemini-3.9-flash", "gemini-3.9-pro-preview", "gemini-3.8-flash-lite", "gemini-pro-latest", "gemini-embedding-001", "gemini-2.5-pro-unrecognized", "claude-sonnet-5-5"} {
+	for _, model := range []string{"", "customer-alias", "gemini-3.9-flash", "gemini-3.9-pro-preview", "gemini-3.8-flash-lite", "gemini-pro-latest", "gemini-embedding-001", "gemini-2.5-pro-unrecognized", "claude-sonnet-5-5",
+		// Implicit-only models do not publish an explicit-cache storage rate.
+		"gemini-4-carbon", "gemini-4-carbon-high", "gemini-4-hydrogen", "models/gemini-4-hydrogen",
+	} {
 		_, err := billing.CacheStoragePricePerTokenHour(model)
 		require.ErrorIs(t, err, ErrModelPricingUnavailable, model)
 	}

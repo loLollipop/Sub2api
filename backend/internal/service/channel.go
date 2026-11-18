@@ -96,9 +96,11 @@ type ChannelModelPricing struct {
 	OutputPrice                  *float64            `json:"output_price"`
 	CacheWritePrice              *float64            `json:"cache_write_price"`
 	CacheWrite1hPrice            *float64            `json:"cache_write_1h_price"`
+	CacheWrite12hPrice           *float64            `json:"cache_write_12h_price"`
 	CacheReadPrice               *float64            `json:"cache_read_price"`
 	FastMultiplier               *float64            `json:"fast_multiplier"`
 	FlexMultiplier               *float64            `json:"flex_multiplier"`
+	UltrafastMultiplier          *float64            `json:"ultrafast_multiplier"`
 	MaxReasoningEffortMultiplier *float64            `json:"max_reasoning_effort_multiplier"`
 	ImageInputPrice              *float64            `json:"image_input_price"`
 	ImageOutputPrice             *float64            `json:"image_output_price"`
@@ -134,6 +136,7 @@ type PricingInterval struct {
 	OutputPrice          *float64  `json:"output_price"`
 	CacheWritePrice      *float64  `json:"cache_write_price"`
 	CacheWrite1hPrice    *float64  `json:"cache_write_1h_price"`
+	CacheWrite12hPrice   *float64  `json:"cache_write_12h_price"`
 	CacheReadPrice       *float64  `json:"cache_read_price"`
 	InputMultiplier      *float64  `json:"input_multiplier"`
 	OutputMultiplier     *float64  `json:"output_multiplier"`
@@ -239,9 +242,11 @@ func (p ChannelModelPricing) Clone() ChannelModelPricing {
 	cp.OutputPrice = clonePricingFloat64(p.OutputPrice)
 	cp.CacheWritePrice = clonePricingFloat64(p.CacheWritePrice)
 	cp.CacheWrite1hPrice = clonePricingFloat64(p.CacheWrite1hPrice)
+	cp.CacheWrite12hPrice = clonePricingFloat64(p.CacheWrite12hPrice)
 	cp.CacheReadPrice = clonePricingFloat64(p.CacheReadPrice)
 	cp.FastMultiplier = clonePricingFloat64(p.FastMultiplier)
 	cp.FlexMultiplier = clonePricingFloat64(p.FlexMultiplier)
+	cp.UltrafastMultiplier = clonePricingFloat64(p.UltrafastMultiplier)
 	cp.MaxReasoningEffortMultiplier = clonePricingFloat64(p.MaxReasoningEffortMultiplier)
 	cp.ImageInputPrice = clonePricingFloat64(p.ImageInputPrice)
 	cp.ImageOutputPrice = clonePricingFloat64(p.ImageOutputPrice)
@@ -271,6 +276,7 @@ func clonePricingInterval(value PricingInterval) PricingInterval {
 	value.OutputPrice = clonePricingFloat64(value.OutputPrice)
 	value.CacheWritePrice = clonePricingFloat64(value.CacheWritePrice)
 	value.CacheWrite1hPrice = clonePricingFloat64(value.CacheWrite1hPrice)
+	value.CacheWrite12hPrice = clonePricingFloat64(value.CacheWrite12hPrice)
 	value.CacheReadPrice = clonePricingFloat64(value.CacheReadPrice)
 	value.InputMultiplier = clonePricingFloat64(value.InputMultiplier)
 	value.OutputMultiplier = clonePricingFloat64(value.OutputMultiplier)
@@ -430,6 +436,7 @@ func validateIntervalPrices(iv *PricingInterval, idx int) error {
 		{"output_price", iv.OutputPrice},
 		{"cache_write_price", iv.CacheWritePrice},
 		{"cache_write_1h_price", iv.CacheWrite1hPrice},
+		{"cache_write_12h_price", iv.CacheWrite12hPrice},
 		{"cache_read_price", iv.CacheReadPrice},
 		{"per_request_price", iv.PerRequestPrice},
 	}

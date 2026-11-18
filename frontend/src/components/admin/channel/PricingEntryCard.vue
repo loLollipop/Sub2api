@@ -68,8 +68,8 @@
     >
       <div class="collapsible-inner">
         <!-- Header: Models + Billing Mode -->
-        <div class="mt-3 flex items-start gap-2">
-          <div class="flex-1">
+        <div class="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:gap-2">
+          <div class="min-w-0 flex-1">
             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
               {{ t('admin.channels.form.models') }} <span class="text-red-500">*</span>
             </label>
@@ -81,7 +81,7 @@
               class="mt-1"
             />
           </div>
-          <div class="w-40">
+          <div class="w-full sm:w-40">
             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
               {{ t('admin.channels.form.billingMode') }}
             </label>
@@ -118,11 +118,16 @@
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
             <div>
-              <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWrite5mPrice') }}</label>
+              <label class="text-xs text-gray-400">{{ t(props.platform === 'openai' ? 'admin.channels.form.cacheWrite30mPrice' : 'admin.channels.form.cacheWrite5mPrice') }}</label>
               <input :value="entry.cache_write_price" @input="emitField('cache_write_price', ($event.target as HTMLInputElement).value)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
-            <div>
+            <div v-if="props.platform === 'openai'">
+              <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWrite12hPrice') }}</label>
+              <input :value="entry.cache_write_12h_price" @input="emitField('cache_write_12h_price', ($event.target as HTMLInputElement).value)"
+                type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
+            </div>
+            <div v-else>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWrite1hPrice') }}</label>
               <input :value="entry.cache_write_1h_price" @input="emitField('cache_write_1h_price', ($event.target as HTMLInputElement).value)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
@@ -144,7 +149,13 @@
             </div>
           </div>
 
-          <div v-if="enableTierMultipliers" class="mt-3 grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-3">
+          <div v-if="enableTierMultipliers || (enableUltrafastMultiplier && props.platform === 'openai')" class="mt-3 grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
+            <div v-if="(enableTierMultipliers || enableUltrafastMultiplier) && props.platform === 'openai'">
+              <label class="text-xs text-gray-400">{{ t('admin.channels.form.ultrafastMultiplier') }}</label>
+              <input :value="entry.ultrafast_multiplier" @input="emitField('ultrafast_multiplier', ($event.target as HTMLInputElement).value)"
+                type="number" step="any" min="0.000001" :aria-label="t('admin.channels.form.ultrafastMultiplier')" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.multiplierPlaceholder')" />
+            </div>
+            <template v-if="enableTierMultipliers">
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.fastMultiplier') }}</label>
               <input :value="entry.fast_multiplier" @input="emitField('fast_multiplier', ($event.target as HTMLInputElement).value)"
@@ -160,6 +171,7 @@
               <input :value="entry.max_reasoning_effort_multiplier" @input="emitField('max_reasoning_effort_multiplier', ($event.target as HTMLInputElement).value)"
                 type="number" step="any" min="0.000001" class="input mt-0.5 text-sm" :placeholder="maxReasoningEffortMultiplierPlaceholder" />
             </div>
+            </template>
           </div>
 
           <!-- Channel token intervals; the group long-context toggle controls whether tiers apply. -->
@@ -179,6 +191,7 @@
                 :key="idx"
                 :interval="iv"
                 :mode="entry.billing_mode"
+                :platform="props.platform"
                 :enable-multipliers="enableTierMultipliers"
                 @update="updateInterval(idx, $event)"
                 @remove="removeInterval(idx)"
@@ -220,6 +233,7 @@
               :key="idx"
               :interval="iv"
               :mode="entry.billing_mode"
+                :platform="props.platform"
               @update="updateInterval(idx, $event)"
               @remove="removeInterval(idx)"
             />
@@ -256,6 +270,7 @@
               :key="idx"
               :interval="iv"
               :mode="entry.billing_mode"
+                :platform="props.platform"
               @update="updateInterval(idx, $event)"
               @remove="removeInterval(idx)"
             />
@@ -287,10 +302,12 @@ const props = withDefaults(defineProps<{
   hideTokenIntervals?: boolean
   enableTimePricing?: boolean
   enableTierMultipliers?: boolean
+  enableUltrafastMultiplier?: boolean
 }>(), {
   hideTokenIntervals: false,
   enableTimePricing: false,
   enableTierMultipliers: false,
+  enableUltrafastMultiplier: false,
 })
 
 const emit = defineEmits<{
@@ -344,6 +361,7 @@ function addInterval() {
     min_tokens: 0, max_tokens: null, tier_label: '',
     input_price: null, output_price: null, cache_write_price: null,
     cache_write_1h_price: null,
+    cache_write_12h_price: null,
     cache_read_price: null, per_request_price: null,
     input_multiplier: null, output_multiplier: null,
     cache_write_multiplier: null, cache_read_multiplier: null,
@@ -361,6 +379,7 @@ function addMediaTier() {
     min_tokens: 0, max_tokens: null, tier_label: labels[intervals.length] || '',
     input_price: null, output_price: null, cache_write_price: null,
     cache_write_1h_price: null,
+    cache_write_12h_price: null,
     cache_read_price: null, per_request_price: null,
     input_multiplier: null, output_multiplier: null,
     cache_write_multiplier: null, cache_read_multiplier: null,
@@ -396,7 +415,7 @@ async function onModelsUpdate(newModels: string[]) {
   // 检查是否所有价格字段都为空
   const e = props.entry
   const hasPrice = e.input_price != null || e.output_price != null ||
-                   e.cache_write_price != null || e.cache_write_1h_price != null || e.cache_read_price != null ||
+                   e.cache_write_price != null || e.cache_write_1h_price != null || e.cache_write_12h_price != null || e.cache_read_price != null ||
                    e.image_input_price != null || e.image_output_price != null || e.per_request_price != null ||
                    e.max_reasoning_effort_multiplier != null
   if (hasPrice) return
@@ -415,6 +434,7 @@ async function onModelsUpdate(newModels: string[]) {
         output_price: perTokenToMTok(result.output_price ?? null),
         cache_write_price: perTokenToMTok(result.cache_write_price ?? null),
         cache_write_1h_price: perTokenToMTok(result.cache_write_1h_price ?? null),
+        cache_write_12h_price: perTokenToMTok(result.cache_write_12h_price ?? null),
         cache_read_price: perTokenToMTok(result.cache_read_price ?? null),
         image_input_price: perTokenToMTok(result.image_input_price ?? null),
         image_output_price: perTokenToMTok(result.image_output_price ?? null),

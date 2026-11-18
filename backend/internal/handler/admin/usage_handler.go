@@ -211,6 +211,8 @@ func (h *UsageHandler) List(c *gin.Context) {
 		StartTime:             startTime,
 		EndTime:               endTime,
 		ExactTotal:            exactTotal,
+		CompactAssociations:   true,
+		AccountNameOnly:       true,
 	}
 
 	if adminInflightOnly(c) {

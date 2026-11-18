@@ -636,22 +636,27 @@ func (r *usageLogRepository) populateGroupNames(ctx context.Context, values []us
 		args = append(args, value.GroupID)
 		placeholders = append(placeholders, fmt.Sprintf("$%d", len(args)))
 	}
-	rows, err := r.sql.QueryContext(ctx, "SELECT id, COALESCE(name,'') FROM groups WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
+	rows, err := r.sql.QueryContext(ctx, "SELECT id, COALESCE(name,''), deleted_at IS NOT NULL FROM groups WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = rows.Close() }()
 	names := make(map[int64]string)
+	deleted := make(map[int64]bool)
 	for rows.Next() {
 		var id int64
 		var name string
-		if err := rows.Scan(&id, &name); err != nil {
+		var isDeleted bool
+		if err := rows.Scan(&id, &name, &isDeleted); err != nil {
 			return err
 		}
 		names[id] = name
+		deleted[id] = isDeleted
 	}
 	for i := range values {
 		values[i].GroupName = names[values[i].GroupID]
+		_, exists := names[values[i].GroupID]
+		values[i].Deleted = values[i].GroupID > 0 && (!exists || deleted[values[i].GroupID])
 	}
 	return rows.Err()
 }
@@ -699,7 +704,7 @@ func (r *usageLogRepository) GetStatsWithRollups(ctx context.Context, filters Us
 		return nil, false, err
 	}
 	for _, m := range endpointMetrics {
-		endpoint := usagestats.EndpointStat{Endpoint: m.DimensionKey, Requests: m.Requests, TotalTokens: m.InputTokens + m.OutputTokens + m.CacheCreation + m.CacheRead, Cost: m.Cost, ActualCost: m.ActualCost}
+		endpoint := usagestats.EndpointStat{Endpoint: m.DimensionKey, Requests: m.Requests, TotalTokens: m.InputTokens + m.OutputTokens + m.CacheCreation + m.CacheRead, Cost: m.Cost, ActualCost: m.ActualCost, AccountCost: m.AccountCost}
 		switch m.EndpointType {
 		case "inbound":
 			stats.Endpoints = append(stats.Endpoints, endpoint)
@@ -728,6 +733,9 @@ func (r *usageLogRepository) GetStatsWithRollups(ctx context.Context, filters Us
 	if durationCount > 0 {
 		stats.AverageDurationMs = totalDuration / float64(durationCount)
 	}
+	stats.Endpoints = consolidateEndpointStats(stats.Endpoints)
+	stats.UpstreamEndpoints = consolidateEndpointStats(stats.UpstreamEndpoints)
+	stats.EndpointPaths = consolidateEndpointStats(stats.EndpointPaths)
 	sortEndpointStatsForRollup(stats.Endpoints)
 	sortEndpointStatsForRollup(stats.UpstreamEndpoints)
 	sortEndpointStatsForRollup(stats.EndpointPaths)
@@ -815,6 +823,7 @@ func consolidateEndpointStats(values []usagestats.EndpointStat) []usagestats.End
 		row.TotalTokens += value.TotalTokens
 		row.Cost += value.Cost
 		row.ActualCost += value.ActualCost
+		row.AccountCost += value.AccountCost
 		byEndpoint[value.Endpoint] = row
 	}
 	result := make([]usagestats.EndpointStat, 0, len(byEndpoint))

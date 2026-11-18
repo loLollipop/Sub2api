@@ -20,6 +20,8 @@ func prepareDeepSeekChatReplay(account *Account, targetURL string, body []byte) 
 	if gjson.GetBytes(body, "thinking.type").String() == "disabled" {
 		return body
 	}
+	var edits []jsonObjectStringFieldEdit
+	var indexes []int
 	for i, message := range gjson.GetBytes(body, "messages").Array() {
 		if message.Get("role").String() != "assistant" {
 			continue
@@ -28,6 +30,13 @@ func prepareDeepSeekChatReplay(account *Account, targetURL string, body []byte) 
 		if reasoning.Exists() && reasoning.Type != gjson.Null && (reasoning.Type != gjson.String || reasoning.String() != "") {
 			continue
 		}
+		edits = append(edits, jsonObjectStringFieldEdit{object: message, value: deepSeekReasoningPlaceholderText})
+		indexes = append(indexes, i)
+	}
+	if updated, ok := setStringFieldInJSONObjects(body, "reasoning_content", edits); ok {
+		return updated
+	}
+	for _, i := range indexes {
 		if updated, err := sjson.SetBytes(body, "messages."+strconv.Itoa(i)+".reasoning_content", deepSeekReasoningPlaceholderText); err == nil {
 			body = updated
 		}

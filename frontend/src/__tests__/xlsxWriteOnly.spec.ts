@@ -22,6 +22,7 @@ const SRC_DIR = join(process.cwd(), 'src')
 const ALLOWED_CALLS = [
   'utils.aoa_to_sheet',
   'utils.sheet_add_aoa',
+  'utils.sheet_to_csv',
   'utils.book_new',
   'utils.book_append_sheet',
   'write'

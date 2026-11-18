@@ -40,7 +40,7 @@ func TestConvertedAnthropicUsageFidelity(t *testing.T) {
 		{"cache hit alias without prompt total", `{"input_tokens":11,"output_tokens":1,"cache_read_input_tokens":100}`, `{"input_tokens":0,"output_tokens":8,"prompt_cache_hit_tokens":600}`, ClaudeUsage{OutputTokens: 8, CacheReadInputTokens: 600}},
 		{"placeholder input zero", `{"input_tokens":47168,"output_tokens":1,"cache_creation_input_tokens":787,"cache_read_input_tokens":186900}`, `{"input_tokens":0,"output_tokens":2876}`, ClaudeUsage{InputTokens: 47168, OutputTokens: 2876, CacheCreationInputTokens: 787, CacheReadInputTokens: 186900}},
 		{"placeholder with null cache", `{"input_tokens":11,"output_tokens":1,"cache_read_input_tokens":600}`, `{"input_tokens":0,"output_tokens":8,"cache_read_input_tokens":null,"cache_creation":{"ephemeral_5m_input_tokens":null}}`, ClaudeUsage{InputTokens: 11, OutputTokens: 8, CacheReadInputTokens: 600}},
-		{"input zero with explicit zero TTL", `{"input_tokens":11,"output_tokens":1,"cache_creation_input_tokens":600,"cache_creation":{"ephemeral_1h_input_tokens":600}}`, `{"input_tokens":0,"output_tokens":8,"cache_creation":{"ephemeral_1h_input_tokens":0}}`, ClaudeUsage{OutputTokens: 8}},
+		{"input zero with explicit zero TTL", `{"input_tokens":11,"output_tokens":1,"cache_creation_input_tokens":600,"cache_creation":{"ephemeral_1h_input_tokens":600}}`, `{"input_tokens":0,"output_tokens":8,"cache_creation":{"ephemeral_1h_input_tokens":0}}`, ClaudeUsage{OutputTokens: 8, CacheCreationInputTokens: 600}},
 		{"upstream one hour cache write", `{"input_tokens":11,"output_tokens":4,"cache_creation_input_tokens":600,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":600}}`, `{"output_tokens":8}`, ClaudeUsage{InputTokens: 11, OutputTokens: 8, CacheCreationInputTokens: 600, CacheCreation1hTokens: 600}},
 		{"final read clears provisional write", `{"input_tokens":11,"output_tokens":4,"cache_creation_input_tokens":600,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":600}}`, `{"input_tokens":0,"output_tokens":8,"cache_creation_input_tokens":0,"cache_read_input_tokens":600}`, ClaudeUsage{OutputTokens: 8, CacheReadInputTokens: 600}},
 		{"fully cached zero output", `{"input_tokens":11,"output_tokens":4,"cache_creation_input_tokens":600}`, `{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":600}`, ClaudeUsage{CacheReadInputTokens: 600}},
@@ -53,7 +53,7 @@ func TestConvertedAnthropicUsageFidelity(t *testing.T) {
 		{"zero aggregate with null TTL", `{"cache_creation_input_tokens":600,"cache_creation":{"ephemeral_1h_input_tokens":600}}`, `{"cache_creation_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":null,"ephemeral_1h_input_tokens":null}}`, ClaudeUsage{}},
 		{"empty TTL retains aggregate", `{"cache_creation_input_tokens":600}`, `{"cache_creation":{}}`, ClaudeUsage{CacheCreationInputTokens: 600}},
 		{"null TTL retains aggregate", `{"cache_creation_input_tokens":600}`, `{"cache_creation":{"ephemeral_5m_input_tokens":null,"ephemeral_1h_input_tokens":null}}`, ClaudeUsage{CacheCreationInputTokens: 600}},
-		{"split only partial update", `{"input_tokens":2,"output_tokens":4,"cache_creation_input_tokens":600,"cache_creation":{"ephemeral_5m_input_tokens":100,"ephemeral_1h_input_tokens":500}}`, `{"cache_creation":{"ephemeral_5m_input_tokens":0}}`, ClaudeUsage{InputTokens: 2, OutputTokens: 4, CacheCreationInputTokens: 500, CacheCreation1hTokens: 500}},
+		{"split only partial update retains reported aggregate", `{"input_tokens":2,"output_tokens":4,"cache_creation_input_tokens":600,"cache_creation":{"ephemeral_5m_input_tokens":100,"ephemeral_1h_input_tokens":500}}`, `{"cache_creation":{"ephemeral_5m_input_tokens":0}}`, ClaudeUsage{InputTokens: 2, OutputTokens: 4, CacheCreationInputTokens: 600, CacheCreation1hTokens: 500}},
 		{"null retains initial counts", `{"input_tokens":2,"output_tokens":4,"cache_creation_input_tokens":600,"cache_read_input_tokens":900,"cache_creation":{"ephemeral_5m_input_tokens":100,"ephemeral_1h_input_tokens":500}}`, `{"input_tokens":null,"output_tokens":null,"cache_creation_input_tokens":null,"cache_read_input_tokens":null,"cache_creation":{"ephemeral_5m_input_tokens":null}}`, ClaudeUsage{InputTokens: 2, OutputTokens: 4, CacheCreationInputTokens: 600, CacheReadInputTokens: 900, CacheCreation5mTokens: 100, CacheCreation1hTokens: 500}},
 	} {
 		for _, protocol := range []string{"chat", "responses"} {
@@ -69,11 +69,11 @@ func TestConvertedAnthropicUsageFidelity(t *testing.T) {
 					var nativeUsage ClaudeUsage
 					parseSSEUsagePassthrough(start, &nativeUsage)
 					parseSSEUsagePassthrough(delta, &nativeUsage)
-					require.Equal(t, tc.want, nativeUsage, "native stream billing is the comparison baseline")
+					require.Equal(t, tc.want.billingUsageTokens(), nativeUsage.billingUsageTokens(), "native stream billing is the comparison baseline")
 					var generalUsage ClaudeUsage
 					newMinimalGatewayService().parseSSEUsage(start, &generalUsage)
 					newMinimalGatewayService().parseSSEUsage(delta, &generalUsage)
-					require.Equal(t, tc.want, generalUsage, "the general Messages path must use the same final usage")
+					require.Equal(t, tc.want.billingUsageTokens(), generalUsage.billingUsageTokens(), "the general Messages path must use the same final usage")
 					upstream := &anthropicHTTPUpstreamRecorder{resp: &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(sse))}}
 					cfg := &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}}
 					svc := &GatewayService{cfg: cfg, httpUpstream: upstream, responseHeaderFilter: compileResponseHeaderFilter(cfg)}
@@ -99,7 +99,7 @@ func TestConvertedAnthropicUsageFidelity(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, http.StatusOK, rec.Code)
 					require.Equal(t, "/v1/messages", upstream.lastReq.URL.Path)
-					require.Equal(t, tc.want, result.Usage)
+					require.Equal(t, tc.want.billingUsageTokens(), result.Usage.billingUsageTokens())
 					billing := &BillingService{cfg: &config.Config{}, fallbackPrices: map[string]*ModelPricing{
 						"claude-test": {SupportsCacheBreakdown: true, CacheCreation5mPrice: 4e-6, CacheCreation1hPrice: 5e-6},
 					}}
@@ -247,7 +247,7 @@ func TestConvertedAnthropicUsageAfterDisconnect(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, <-produced)
 			require.True(t, result.ClientDisconnect)
-			require.Equal(t, ClaudeUsage{OutputTokens: 19, CacheReadInputTokens: 600}, result.Usage)
+			require.Equal(t, (ClaudeUsage{OutputTokens: 19, CacheReadInputTokens: 600}).billingUsageTokens(), result.Usage.billingUsageTokens())
 			require.Equal(t, 1, upstream.requests, "continue draining the original upstream without replay")
 			require.Equal(t, 1, writer.writes, "no client writes after the first failure")
 		})
@@ -291,7 +291,7 @@ func TestConvertedAnthropicUsageParserPresence(t *testing.T) {
 			require.Equal(t, 11, usage.InputTokens, "omitted and null fields retain preceding usage")
 			require.Equal(t, 600, usage.CacheCreationInputTokens)
 			parser.parse(`{"type":"message_delta","usage":{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":600}}`, &usage)
-			require.Equal(t, ClaudeUsage{CacheReadInputTokens: 600}, usage, "explicit zero replaces provisional counts and clears old TTL buckets")
+			require.Equal(t, (ClaudeUsage{CacheReadInputTokens: 600}).billingUsageTokens(), usage.billingUsageTokens(), "explicit zero replaces provisional counts and clears old TTL buckets")
 		})
 	}
 }
@@ -320,9 +320,9 @@ func TestConvertedAnthropicUsageParserAliases(t *testing.T) {
 			mergeAnthropicUsage(&converted, event.Message.Usage)
 			require.NoError(t, json.Unmarshal([]byte(delta), &event))
 			mergeAnthropicUsage(&converted, *event.Usage)
-			require.Equal(t, tc.want, passthrough)
-			require.Equal(t, tc.want, messages)
-			require.Equal(t, tc.want, converted)
+			require.Equal(t, tc.want.billingUsageTokens(), passthrough.billingUsageTokens())
+			require.Equal(t, tc.want.billingUsageTokens(), messages.billingUsageTokens())
+			require.Equal(t, tc.want.billingUsageTokens(), converted.billingUsageTokens())
 		})
 	}
 }

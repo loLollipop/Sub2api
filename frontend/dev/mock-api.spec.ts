@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CustomUsageConfig, CustomUsageResult, CustomUsageBatch } from '../src/api/admin/customUsage'
 import { createUsageDraft, usageTemplate } from '../src/utils/customUsage'
 import { createMockApi, PreviewError } from './mock-api'
-import type { AccountListItem, AdminGroup, AdminUsageLog, AdminUser, ApiKey, DashboardStats, PaginatedResponse, UsageLog } from '../src/types'
+import type { AccountListItem, AdminGroup, AdminUsageLog, AdminUser, ApiKey, DashboardStats, PaginatedResponse, UsageLog, UserAnnouncement } from '../src/types'
 import type { UserDashboardStats } from '../src/api/usage'
 import type { MonitorMatrixResponse } from '../src/api/channelMonitorV2'
 import type { UserMonitorListResponse } from '../src/api/channelMonitor'
@@ -12,6 +12,23 @@ const date = new Date('2026-09-17T13:00:00Z')
 const query = (value = '') => new URLSearchParams(value)
 
 describe('local demo API contracts', () => {
+  it('splits announcement counts, timeline excerpts, popup bodies and read confirmations', () => {
+    const api = createMockApi(date)
+    expect(api.handle('GET', '/api/v1/announcements/summary', query())).toEqual({ total: 3, unread: 2 })
+    const timeline = api.handle('GET', '/api/v1/announcements', query()) as Array<Omit<UserAnnouncement, 'content'> & { excerpt: string }>
+    expect(timeline).toHaveLength(3)
+    expect(timeline.every(row => !('content' in row) && !!row.excerpt)).toBe(true)
+    const popups = api.handle('GET', '/api/v1/announcements/popups', query()) as UserAnnouncement[]
+    expect(popups).toHaveLength(1)
+    expect(popups[0].content).toContain('合成')
+    expect(api.handle('GET', `/api/v1/announcements/item/${popups[0].id}`, query())).toEqual(popups[0])
+    api.handle('POST', `/api/v1/announcements/${popups[0].id}/read`, query())
+    expect(api.handle('GET', '/api/v1/announcements/popups', query())).toEqual([])
+    expect(api.handle('GET', '/api/v1/announcements/summary', query())).toEqual({ total: 3, unread: 1 })
+    expect(api.handle('GET', '/api/v1/announcements', query('unread_only=1'))).toHaveLength(1)
+    expect(() => api.handle('GET', '/api/v1/announcements/item/999', query())).toThrow(PreviewError)
+    expect(() => api.handle('POST', '/api/v1/announcements/999/read', query())).toThrow(PreviewError)
+  })
   it('filters admin usage down to one exact second without including its neighbor', () => {
     const api = createMockApi(date)
     const all = api.handle('GET', '/api/v1/admin/usage', query('page_size=100&timezone=UTC')) as PaginatedResponse<AdminUsageLog>

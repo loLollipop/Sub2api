@@ -22,6 +22,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/gin-gonic/gin"
 )
 
@@ -1298,6 +1299,12 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 		applyOpsUpstreamFieldsFromContext(c, entry)
 		if parsed.StreamFailure {
 			if message := strings.TrimSpace(parsed.Message); message != "" {
+				// Keep the raw counterpart of this terminal message, not an earlier attempt.
+				if entry.UpstreamErrorMessage != nil && service.ClientUpstreamErrorMessage(*entry.UpstreamErrorMessage) == message {
+					message = *entry.UpstreamErrorMessage
+				} else if streamErr, ok := service.GetOpsStreamError(c); ok && service.ClientUpstreamErrorMessage(streamErr.Message) == message {
+					message = streamErr.Message
+				}
 				entry.UpstreamErrorMessage = &message
 			}
 			if status >= 400 {
@@ -2135,15 +2142,18 @@ func inferStreamFailureStatus(c *gin.Context, parsed parsedOpsError) int {
 	// infer the final result from a prior account attempt or WebSocket turn.
 	if marked, ok := service.GetOpsStreamError(c); ok && marked.Turn == 0 && !marked.NonStream &&
 		marked.IntendedStatus >= 400 && marked.IntendedStatus <= 599 &&
-		strings.TrimSpace(marked.Message) != "" && strings.TrimSpace(marked.Message) == strings.TrimSpace(parsed.Message) {
+		strings.TrimSpace(marked.Message) != "" && (strings.TrimSpace(marked.Message) == strings.TrimSpace(parsed.Message) ||
+		service.ClientUpstreamErrorMessage(strings.TrimSpace(marked.Message)) == strings.TrimSpace(parsed.Message)) {
 		code := strings.TrimSpace(parsed.Code)
 		expectedType := inferResponsesFailedOpsErrorType(code)
 		if expectedType == "" {
 			expectedType = "upstream_error"
 		}
-		matchingResponses := inboundIsResponses(c) && code == mapResponsesErrorCode(marked.ErrType, marked.Code) &&
+		matchingResponses := inboundIsResponses(c) && code == mapResponsesErrorCode(clientprivacy.ErrorType(0, marked.ErrType), marked.Code) &&
 			strings.TrimSpace(parsed.ErrorType) == expectedType
-		matchingSSE := strings.TrimSpace(parsed.ErrorType) == marked.ErrType && code == marked.Code
+		matchingSSE := (strings.TrimSpace(parsed.ErrorType) == marked.ErrType ||
+			strings.TrimSpace(parsed.ErrorType) == clientprivacy.ErrorType(marked.IntendedStatus, marked.ErrType) ||
+			strings.TrimSpace(parsed.ErrorType) == clientprivacy.ErrorType(0, marked.ErrType)) && code == marked.Code
 		if matchingResponses || matchingSSE {
 			return marked.IntendedStatus
 		}
@@ -2432,8 +2442,7 @@ func isOpsLocalBusinessLimitError(code string, msg string) bool {
 		(strings.Contains(msg, "beta feature ") && strings.Contains(msg, " is not allowed")) ||
 		(strings.Contains(msg, "openai service_tier=") && strings.Contains(msg, " is not allowed for model")) ||
 		strings.Contains(msg, "this account only allows codex official clients") ||
-		strings.Contains(msg, "openai wsv1 is temporarily unsupported") ||
-		strings.Contains(msg, "openai codex passthrough requires a non-empty instructions field")
+		strings.Contains(msg, "openai wsv1 is temporarily unsupported")
 }
 
 func hasOpsUpstreamErrorContext(c *gin.Context) bool {

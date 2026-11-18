@@ -279,6 +279,7 @@ export default {
         errorDescription: 'The catalog could not be fetched with this API key.',
       },
       opencode: {
+        mythosEligibilityHint: 'Mythos 5.2 requires an eligible Anthropic account; adding configuration does not grant model access.',
         title: 'OpenCode Example',
         subtitle: 'opencode.json',
         hint: 'Config path: ~/.config/opencode/opencode.json (or opencode.jsonc), create if not exists. Use default providers (openai/anthropic/google) or custom provider_id. API Key can be configured directly or via /connect command. This is an example, adjust models and options as needed.',
@@ -725,7 +726,9 @@ export default {
       outputPrice: 'Output',
       cacheWritePrice: 'Cache Write',
       cacheWrite5mPrice: 'Cache Write (5m)',
+      cacheWrite30mPrice: 'Cache Write (30m)',
       cacheWrite1hPrice: 'Cache Write (1h)',
+      cacheWrite12hPrice: 'Cache Write (12h)',
       cacheReadPrice: 'Cache Read',
       imageInputPrice: 'Image Input',
       imageOutputPrice: 'Image Output',

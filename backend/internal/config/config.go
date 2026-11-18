@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/sysutil"
 	"github.com/spf13/viper"
 	"golang.org/x/net/http/httpguts"
 )
@@ -509,6 +510,24 @@ func shouldApplyLegacyWeChatEnv(configKey, envKey string) bool {
 	}
 	_, hasNewEnv := os.LookupEnv(envKey)
 	return !hasNewEnv
+}
+
+// detectMemoryLimitBytes is replaced in tests so defaults do not depend on the host.
+var detectMemoryLimitBytes = sysutil.MemoryLimitBytes
+
+const (
+	defaultRequestBodyMemoryBudgetBytes = int64(1 << 30)
+	// requestBodyMemoryBudgetDivisor leaves the rest of memory for conversion
+	// state, SSE buffers, caches and GC headroom.
+	requestBodyMemoryBudgetDivisor = 4
+)
+
+// autoRequestBodyMemoryBudget sizes the unconfigured ingress budget to a
+// quarter of the process memory limit. It never goes below the historical
+// 1 GiB default, so small instances keep their previous behavior.
+func autoRequestBodyMemoryBudget(memoryLimitBytes uint64) int64 {
+	// uint64 / 4 always fits in int64.
+	return max(int64(memoryLimitBytes/requestBodyMemoryBudgetDivisor), defaultRequestBodyMemoryBudgetBytes)
 }
 
 func hasExplicitConfigOrEnv(configKey, envKey string) bool {
@@ -1015,6 +1034,9 @@ type GatewayConfig struct {
 	OpenAIHighEffortFirstOutputTimeoutSeconds int `mapstructure:"openai_high_effort_first_output_timeout_seconds"`
 	// 请求体最大字节数，用于网关请求体大小限制
 	MaxBodySize int64 `mapstructure:"max_body_size"`
+	// RequestBodyMemoryBudgetBytes bounds buffered ingress allocations per instance; 0 disables it.
+	// When unset in config and env it defaults to 1/4 of the memory limit (at least 1 GiB).
+	RequestBodyMemoryBudgetBytes int64 `mapstructure:"request_body_memory_budget_bytes"`
 	// TextMaxBodySize limits endpoints that cannot carry inline image/video payloads.
 	TextMaxBodySize int64 `mapstructure:"text_max_body_size"`
 	// 非流式上游响应体读取上限（字节），用于防止无界读取导致内存放大
@@ -1143,6 +1165,8 @@ type GatewayConfig struct {
 	MaxAccountSwitches int `mapstructure:"max_account_switches"`
 	// Gemini 账户切换最大次数（Gemini 平台单独配置，因 API 限制更严格）
 	MaxAccountSwitchesGemini int `mapstructure:"max_account_switches_gemini"`
+	// Gemini 同账号重试次数（不含首次请求，0 表示不重试，范围 0-10）
+	MaxSameAccountRetriesGemini int `mapstructure:"max_same_account_retries_gemini"`
 
 	// Antigravity 429 fallback 限流时间（分钟），解析重置时间失败时使用
 	AntigravityFallbackCooldownMinutes int `mapstructure:"antigravity_fallback_cooldown_minutes"`
@@ -1949,6 +1973,15 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 		cfg.Security.ForwardedClientIPHeaders = normalizeStringSlice(strings.Split(forwardedClientIPHeadersEnv, ","))
 	}
 	cfg.Server.TrustedProxiesConfigured = trustedProxiesConfigured
+	// Mirror viper's own precedence: an empty environment variable is ignored by
+	// viper, so it must not pin the static default either (e.g. Compose ${VAR:-}).
+	if !viper.InConfig("gateway.request_body_memory_budget_bytes") && os.Getenv("GATEWAY_REQUEST_BODY_MEMORY_BUDGET_BYTES") == "" {
+		memoryLimit := detectMemoryLimitBytes()
+		cfg.Gateway.RequestBodyMemoryBudgetBytes = autoRequestBodyMemoryBudget(memoryLimit)
+		slog.Info("gateway.request_body_memory_budget_bytes auto-sized from memory limit",
+			"budget_bytes", cfg.Gateway.RequestBodyMemoryBudgetBytes,
+			"memory_limit_bytes", memoryLimit)
+	}
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs == 0 {
 		cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs = 15000
 	}
@@ -2524,6 +2557,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.failover_on_400", false)
 	viper.SetDefault("gateway.max_account_switches", 10)
 	viper.SetDefault("gateway.max_account_switches_gemini", 3)
+	viper.SetDefault("gateway.max_same_account_retries_gemini", 4)
 	viper.SetDefault("gateway.force_codex_cli", false)
 	viper.SetDefault("gateway.codex_quota_overdraft_enabled", true)
 	viper.SetDefault("gateway.codex_quota_overdraft_business_injection_enabled", false)
@@ -2630,6 +2664,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.antigravity_fallback_cooldown_minutes", 1)
 	viper.SetDefault("gateway.antigravity_extra_retries", 10)
 	viper.SetDefault("gateway.max_body_size", int64(256*1024*1024))
+	// load() derives an unconfigured budget from the process memory limit.
+	viper.SetDefault("gateway.request_body_memory_budget_bytes", defaultRequestBodyMemoryBudgetBytes)
 	viper.SetDefault("gateway.text_max_body_size", int64(32*1024*1024))
 	viper.SetDefault("gateway.upstream_response_read_max_bytes", DefaultUpstreamResponseReadMaxBytes)
 	viper.SetDefault("gateway.models_list_read_max_bytes", DefaultModelsListReadMaxBytes)
@@ -3484,6 +3520,9 @@ func (c *Config) Validate() error {
 	if c.Gateway.MaxBodySize <= 0 {
 		return fmt.Errorf("gateway.max_body_size must be positive")
 	}
+	if c.Gateway.RequestBodyMemoryBudgetBytes < 0 {
+		return fmt.Errorf("gateway.request_body_memory_budget_bytes must be non-negative")
+	}
 	if c.Gateway.TextMaxBodySize <= 0 || c.Gateway.TextMaxBodySize > c.Gateway.MaxBodySize {
 		return fmt.Errorf("gateway.text_max_body_size must be positive and no greater than gateway.max_body_size")
 	}
@@ -3504,6 +3543,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Gateway.GrokResponseHeaderTimeout < 0 || c.Gateway.GrokResponseHeaderTimeout > 1800 {
 		return fmt.Errorf("gateway.grok_response_header_timeout must be between 0-1800 seconds")
+	}
+	if c.Gateway.MaxSameAccountRetriesGemini < 0 || c.Gateway.MaxSameAccountRetriesGemini > 10 {
+		return fmt.Errorf("gateway.max_same_account_retries_gemini must be between 0-10")
 	}
 	if c.Gateway.OpenAIFirstOutputTimeoutSeconds < 0 || c.Gateway.OpenAIFirstOutputTimeoutSeconds > 600 ||
 		(c.Gateway.OpenAIFirstOutputTimeoutSeconds > 0 && c.Gateway.OpenAIFirstOutputTimeoutSeconds < 30) {

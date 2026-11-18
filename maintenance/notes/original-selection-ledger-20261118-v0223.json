@@ -1,0 +1,777 @@
+{
+  "schema_version": 1,
+  "source_repository": "Wei-Shaw/sub2api",
+  "range": {
+    "from_inclusive_tag": "v0.2.22 (no local tag)",
+    "from_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+    "to_release_tag": "original/v0.2.23",
+    "to_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+    "observed_main_commit": "2af3f1e15c98c893a89255a037f551046883b8c0",
+    "main_imported": false,
+    "counting": "Git reachable commits in from..to range; merge commits included",
+    "commit_count": 32,
+    "non_merge_commit_count": 20,
+    "merge_commit_count": 12,
+    "changed_path_count": 90
+  },
+  "commits": [
+    {
+      "commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+      "parents": [
+        "2354c78288d05ec817b4f31a1cf5ebe231e36ba2",
+        "29809eef099843ccc35c1b01991f56362a3dc9b5"
+      ],
+      "subject": "Merge pull request #8920 from Wei-Shaw/fix/openai-stream-idle-failover-budget",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "2354c78288d05ec817b4f31a1cf5ebe231e36ba2",
+      "parents": [
+        "19d4cb222a24cecde72ba20045f7eb24cf2cf9a5",
+        "82395b0b5adf8dabd0c78d4009367f49ff161d0f"
+      ],
+      "subject": "Merge pull request #8174 from wucm667/fix/issue-8172-anthropic-cache-ttl",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "19d4cb222a24cecde72ba20045f7eb24cf2cf9a5",
+      "parents": [
+        "9e9ca6fe95d3d20ca9d099b0c681e336e8d812c4",
+        "189b336f47133dabe68ad0fa5d2c35a128210c73"
+      ],
+      "subject": "Merge pull request #8577 from WGeorgezzzz/fix/openai-stream-idle-timeout-failover",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "82395b0b5adf8dabd0c78d4009367f49ff161d0f",
+      "parents": [
+        "23c3eb7f8b569233023b3332424a7788da1e1fbb"
+      ],
+      "subject": "test(usage): distinguish EOF before and after client output",
+      "disposition": "supporting_regression",
+      "rationale": "Test/fixture commit supporting the selected behavior or boundary; implementation disposition follows its feature scope."
+    },
+    {
+      "commit": "29809eef099843ccc35c1b01991f56362a3dc9b5",
+      "parents": [
+        "189b336f47133dabe68ad0fa5d2c35a128210c73"
+      ],
+      "subject": "fix(openai): bound pre-output idle failover to the first-output switch budget",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "9e9ca6fe95d3d20ca9d099b0c681e336e8d812c4",
+      "parents": [
+        "4e10912b4eeb2754bd078217388838f9172cce04",
+        "b36cb244f32ddeb03f3fd11c52f70aea7f9776f5"
+      ],
+      "subject": "Merge pull request #8914 from r266-tech/codex/channel-ultrafast-pricing",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "4e10912b4eeb2754bd078217388838f9172cce04",
+      "parents": [
+        "69d2fae91318359e4e25c0171eaf70364dad3629",
+        "8a1315e8ccb60bf4389f6a436deb5447445ac560"
+      ],
+      "subject": "Merge pull request #8598 from lkon2112/fix/billing-heap-test",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "23c3eb7f8b569233023b3332424a7788da1e1fbb",
+      "parents": [
+        "202e23b2b8ae5984591bda227e4ccb3bf3c2951a"
+      ],
+      "subject": "fix(usage): align cache usage across Anthropic conversion boundaries",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "202e23b2b8ae5984591bda227e4ccb3bf3c2951a",
+      "parents": [
+        "661770bf34c1b8b5470a7ce7d67a192feb0c37f5"
+      ],
+      "subject": "chore(build): upgrade Go toolchain to 1.27.4",
+      "disposition": "already_covered",
+      "rationale": "Go 1.27.4 and follow-redirects >=1.16.2 are already present locally; no duplicate source delta."
+    },
+    {
+      "commit": "69d2fae91318359e4e25c0171eaf70364dad3629",
+      "parents": [
+        "45632495f593697393e6b52b3aabdab9eb1dd9ac",
+        "2c678449640ca67e0958b3e2a8e0c98acb4fd1e7"
+      ],
+      "subject": "Merge pull request #8903 from jianjianai/perf/openai-raw-chat-stream-flush",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "45632495f593697393e6b52b3aabdab9eb1dd9ac",
+      "parents": [
+        "a4d3103cd5a075505da604a3d2d5243cbc51f4ea",
+        "d867299264691b7158451ed547d94657d5da0237"
+      ],
+      "subject": "Merge pull request #8904 from jianjianai/perf/openai-chat-reasoning-single-pass",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "a4d3103cd5a075505da604a3d2d5243cbc51f4ea",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78",
+        "2d20707f16dcd5d2d692a9535370dbbdb9b8b6f0"
+      ],
+      "subject": "Merge pull request #8906 from lyy0709/codex/gpt62-astra-sol",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "b36cb244f32ddeb03f3fd11c52f70aea7f9776f5",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "fix(channels): support configurable Ultra Fast pricing",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "2d20707f16dcd5d2d692a9535370dbbdb9b8b6f0",
+      "parents": [
+        "6107cf17487fe5cb0bd179457ede6b1fe8f7271e"
+      ],
+      "subject": "fix(openai): honor GPT-6.2 Ultrafast entitlements by Pro plan",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "6107cf17487fe5cb0bd179457ede6b1fe8f7271e",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "feat(openai): support GPT-6.2 Sol and Astra",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "d867299264691b7158451ed547d94657d5da0237",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "perf(openai): DeepSeek reasoning 占位与 Ollama Cloud reasoning 回填改为单遍改写请求体",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "2c678449640ca67e0958b3e2a8e0c98acb4fd1e7",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "perf(openai): 原生 Chat Completions 流式透传在等待上游前才 flush",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "15871f904056f548dd874a1d069ffc6cdf777b78",
+      "parents": [
+        "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b"
+      ],
+      "subject": "chore: sync VERSION to 0.2.22 [skip ci]",
+      "disposition": "excluded",
+      "rationale": "Version/release metadata only; personal VERSION is unchanged."
+    },
+    {
+      "commit": "661770bf34c1b8b5470a7ce7d67a192feb0c37f5",
+      "parents": [
+        "4656364337fdadb4d4a8250f082fefe3445be041",
+        "ee58c0013c76ccd3f36439881bc848d342ec1c9d"
+      ],
+      "subject": "fix(usage): reconcile Anthropic and OpenAI cache TTL accounting",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "8a1315e8ccb60bf4389f6a436deb5447445ac560",
+      "parents": [
+        "6b4b37db43443b5e88e424fe3c69602cc3810dfb"
+      ],
+      "subject": "test(billing): reuse rate resolver and isolate heap checks",
+      "disposition": "supporting_regression",
+      "rationale": "Test/fixture commit supporting the selected behavior or boundary; implementation disposition follows its feature scope."
+    },
+    {
+      "commit": "189b336f47133dabe68ad0fa5d2c35a128210c73",
+      "parents": [
+        "6b4b37db43443b5e88e424fe3c69602cc3810dfb"
+      ],
+      "subject": "fix(openai): enforce stream idle deadlines and pre-output failover",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "4656364337fdadb4d4a8250f082fefe3445be041",
+      "parents": [
+        "b25dbe3e4b203ae955a94d06138946797dcf88e7"
+      ],
+      "subject": "test(usage): assert incomplete cache streams and isolate allocation guard",
+      "disposition": "supporting_regression",
+      "rationale": "Test/fixture commit supporting the selected behavior or boundary; implementation disposition follows its feature scope."
+    },
+    {
+      "commit": "b25dbe3e4b203ae955a94d06138946797dcf88e7",
+      "parents": [
+        "71532bf91cfe79f65f1943bdb32e896cd087238b",
+        "9432aa05fc21e3fe3bd042268d11158c7c1a2561"
+      ],
+      "subject": "chore: sync upstream main for cache usage validation",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "71532bf91cfe79f65f1943bdb32e896cd087238b",
+      "parents": [
+        "9e4c03d2fee29211d9026a5cbfbdfe0b4af92448"
+      ],
+      "subject": "fix(usage): preserve compatible cache snapshot semantics",
+      "disposition": "reviewed_not_imported_or_adapted",
+      "rationale": "Reviewed in the release range; source-specific behavior is retained/deferred according to the dated selection note, without importing its implementation wholesale."
+    },
+    {
+      "commit": "9e4c03d2fee29211d9026a5cbfbdfe0b4af92448",
+      "parents": [
+        "bcb0512132081c920da966e1e23c66389e948dcc"
+      ],
+      "subject": "fix(usage): reconcile prompt totals across cache-only updates",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "bcb0512132081c920da966e1e23c66389e948dcc",
+      "parents": [
+        "7b879c56a6002ae985fa535a33939d6f4602c97a"
+      ],
+      "subject": "fix(billing): account for unclassified cache creation tokens and TTL overrides",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    },
+    {
+      "commit": "7b879c56a6002ae985fa535a33939d6f4602c97a",
+      "parents": [
+        "9e8913876f566898e7dbd11a4efce37efe0e1017"
+      ],
+      "subject": "chore(deps): update follow-redirects security patch",
+      "disposition": "already_covered",
+      "rationale": "Go 1.27.4 and follow-redirects >=1.16.2 are already present locally; no duplicate source delta."
+    },
+    {
+      "commit": "9e8913876f566898e7dbd11a4efce37efe0e1017",
+      "parents": [
+        "e6bde6b3c642058a4f384bf7100d510ea385029b",
+        "d851a38477597157e78450d30af2d8504764d085"
+      ],
+      "subject": "Merge remote-tracking branch 'upstream/main' into HEAD",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "e6bde6b3c642058a4f384bf7100d510ea385029b",
+      "parents": [
+        "efc58486d88a5f43078dcd16bd0b05b33c75ed3e"
+      ],
+      "subject": "fix(billing): retain native cache creation accounting",
+      "disposition": "reviewed_not_imported_or_adapted",
+      "rationale": "Reviewed in the release range; source-specific behavior is retained/deferred according to the dated selection note, without importing its implementation wholesale."
+    },
+    {
+      "commit": "efc58486d88a5f43078dcd16bd0b05b33c75ed3e",
+      "parents": [
+        "c91c594cc8d080c46880da317942e3cb2fde9813"
+      ],
+      "subject": "fix(usage): preserve authoritative cache creation totals",
+      "disposition": "reviewed_not_imported_or_adapted",
+      "rationale": "Reviewed in the release range; source-specific behavior is retained/deferred according to the dated selection note, without importing its implementation wholesale."
+    },
+    {
+      "commit": "c91c594cc8d080c46880da317942e3cb2fde9813",
+      "parents": [
+        "7f6673ead54a1949a0db990eda789f72bbfd6dae",
+        "5c185c5c5d4f5e409e2139806e0964ae944e03e8"
+      ],
+      "subject": "chore: sync latest upstream changes",
+      "disposition": "merge_envelope",
+      "rationale": "Merge commit included to preserve the complete reviewed release-range graph; classify constituent changes by their non-merge commits."
+    },
+    {
+      "commit": "7f6673ead54a1949a0db990eda789f72bbfd6dae",
+      "parents": [
+        "b0a02a3304a0a78cdd003ddda1dd23ba02c03084"
+      ],
+      "subject": "fix(apicompat): preserve Anthropic cache creation TTL details",
+      "disposition": "selected_or_adapted",
+      "rationale": "Selected for local adaptation; local implementation preserves the named billing, protocol, permission or UI contract."
+    }
+  ],
+  "paths": [
+    {
+      "path": "backend/cmd/server/VERSION",
+      "disposition": "excluded",
+      "scope": "Release metadata: source VERSION is excluded; personal VERSION remains 2.1.67."
+    },
+    {
+      "path": "backend/internal/handler/admin/channel_handler.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/handler/admin/channel_handler_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/anthropic_cache_creation_usage_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/anthropic_cache_read_usage_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/anthropic_to_responses.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/anthropic_to_responses_response.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/chatcompletions_anthropic_bridge.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/chatcompletions_responses_bridge.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/responses_anthropic_cache_creation_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/responses_to_anthropic.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/pkg/apicompat/types.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/pkg/openai/codex_gpt62_astra.json",
+      "disposition": "selected_adapted",
+      "scope": "GPT-6.1 Terra/GPT-6.2 model and bridge behavior selected with local routing, entitlement and protocol rules."
+    },
+    {
+      "path": "backend/internal/pkg/openai/codex_gpt62_sol.json",
+      "disposition": "selected_adapted",
+      "scope": "GPT-6.1 Terra/GPT-6.2 model and bridge behavior selected with local routing, entitlement and protocol rules."
+    },
+    {
+      "path": "backend/internal/pkg/openai/constants.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/repository/channel_repo_pricing.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/repository/channel_repo_pricing_reasoning_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/repository/channel_repo_pricing_time_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/repository/channel_ultrafast_pricing_integration_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/account_stats_pricing.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/account_stats_pricing_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/anthropic_chat_stream_usage_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/anthropic_prompt_total_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/antigravity_gateway_service_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/antigravity_gateway_upstream.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/billing_inflight_reservation_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/billing_service.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/billing_service_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/channel.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/channel_pricing_multipliers_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/channel_service.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/channel_ultrafast_pricing_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/gateway_anthropic_apikey_passthrough_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/gateway_anthropic_passthrough.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/gateway_cache_compatibility_boundary_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/gateway_cache_creation_usage_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/gateway_cache_ttl_override_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/gateway_forward_as_chat_completions.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/gateway_forward_as_chat_completions_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/gateway_forward_as_responses.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/gateway_forward_as_responses_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/gateway_service.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/gateway_upstream_response.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/gateway_usage_billing.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/kimi_anthropic_usage_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/model_pricing_resolver.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/openai_cache_write_ttl_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/openai_codex_model_metadata.go",
+      "disposition": "selected_adapted",
+      "scope": "GPT-6.1 Terra/GPT-6.2 model and bridge behavior selected with local routing, entitlement and protocol rules."
+    },
+    {
+      "path": "backend/internal/service/openai_codex_models_service.go",
+      "disposition": "selected_adapted",
+      "scope": "GPT-6.1 Terra/GPT-6.2 model and bridge behavior selected with local routing, entitlement and protocol rules."
+    },
+    {
+      "path": "backend/internal/service/openai_codex_transform.go",
+      "disposition": "selected_adapted",
+      "scope": "GPT-6.1 Terra/GPT-6.2 model and bridge behavior selected with local routing, entitlement and protocol rules."
+    },
+    {
+      "path": "backend/internal/service/openai_compat_model.go",
+      "disposition": "selected_adapted",
+      "scope": "GPT-6.1 Terra/GPT-6.2 model and bridge behavior selected with local routing, entitlement and protocol rules."
+    },
+    {
+      "path": "backend/internal/service/openai_compat_prompt_cache_key.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_cc_pipeline.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions_anthropic_native.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions_raw.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions_raw_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_messages.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_messages_anthropic_native.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_messages_chat_fallback.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_native_cache_creation_test.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_ollama_cloud_cc_reasoning.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_request_body.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_response_handling.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_responses_anthropic_native.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_responses_chat_fallback.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_service.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_usage.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/internal/service/openai_gpt62_test.go",
+      "disposition": "selected_adapted",
+      "scope": "GPT-6.1 Terra/GPT-6.2 model and bridge behavior selected with local routing, entitlement and protocol rules."
+    },
+    {
+      "path": "backend/internal/service/openai_json_object_field_edit.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_json_object_field_edit_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_model_alias.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/openai_stream_idle_timeout_test.go",
+      "disposition": "selected_or_supporting",
+      "scope": "Backend source or regression fixture for selected model, usage, pricing, cache, stream-boundary or entitlement behavior; source-specific runtime policies are recorded as deferred where applicable."
+    },
+    {
+      "path": "backend/internal/service/pricing_service.go",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "backend/migrations/252_channel_pricing_ultrafast_multiplier.sql",
+      "disposition": "selected_adapted",
+      "scope": "Source migration semantics are represented by append-only local migrations 271-274; do not import source migration number or rewrite local history."
+    },
+    {
+      "path": "backend/resources/model-pricing/model_prices_and_context_window.json",
+      "disposition": "selected_adapted",
+      "scope": "Selected cache/TTL/usage/pricing behavior adapted with authoritative usage and local terminal-billing semantics."
+    },
+    {
+      "path": "frontend/src/api/admin/channels.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/components/admin/channel/PricingEntryCard.vue",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/components/admin/channel/__tests__/PricingEntryCard.modelDefaultPrice.spec.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/components/admin/channel/__tests__/PricingEntryCard.timePricing.spec.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/components/admin/channel/types.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/components/keys/UseKeyModal.vue",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/components/keys/__tests__/UseKeyModal.spec.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/composables/__tests__/useModelWhitelist.spec.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/composables/useModelWhitelist.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/admin/channels.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/admin/overview.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/admin/channels.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/admin/overview.ts",
+      "disposition": "selected_adapted",
+      "scope": "Selected frontend surface adapted to the local Vue theme, API shapes and active view lifecycle."
+    },
+    {
+      "path": "frontend/src/views/admin/ChannelsView.vue",
+      "disposition": "preserved_local_contract",
+      "scope": "Retain the local ChannelsView routing and permission surface; the group-based Ultra Fast editor is integrated in the active Groups UI."
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/ChannelsView.ultrafastPricing.spec.ts",
+      "disposition": "preserved_local_contract",
+      "scope": "Retain the local ChannelsView routing and permission surface; the group-based Ultra Fast editor is integrated in the active Groups UI."
+    }
+  ],
+  "selection_basis": "Selection note names implementation/adaptation boundaries; .artifacts/original-sync-20261118-v0223 is review evidence only, not the committed ledger.",
+  "evidence": {
+    "changed_paths": ".artifacts/original-sync-20261118-v0223/changed-paths.json",
+    "source_commit_inventory": ".artifacts/original-sync-20261118-v0223/commits.txt",
+    "validation_scope": "Use repo Git graph to reconcile release-range commit count; artifacts are not treated as committed records."
+  }
+}

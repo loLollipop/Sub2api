@@ -219,6 +219,18 @@ func RewriteGeminiCachedContentReference(body []byte, ref *GeminiCachedContentRe
 	return out, nil
 }
 
+// The resource region stays authoritative when an account's routing changes.
+func geminiCachedContentLocationInBody(body []byte) string {
+	ref, err := FindGeminiCachedContentReference(body)
+	if err != nil || ref == nil {
+		return ""
+	}
+	if parts := geminiCachedContentVertexName.FindStringSubmatch(ref.Name); parts != nil {
+		return parts[2]
+	}
+	return ""
+}
+
 type GeminiCachedContentCreateRequest struct {
 	Model       string
 	TTL         time.Duration
@@ -969,7 +981,7 @@ func geminiCachedContentAllowedVertexLocation(account *Account, location string)
 	if len(location) > 63 || !geminiCachedContentLocationPattern.MatchString(location) {
 		return false
 	}
-	if location == account.VertexLocation("") {
+	if location == account.vertexAccountLocation() || location == account.VertexLocation("") {
 		return true
 	}
 	if locations, ok := account.Credentials["vertex_model_locations"].(map[string]any); ok {
@@ -1034,10 +1046,7 @@ func geminiCachedContentResourceURL(account *Account, base, name string) (string
 }
 
 func geminiCachedContentVertexHost(location string) string {
-	if location == "global" {
-		return vertexGlobalHost
-	}
-	return location + "-aiplatform.googleapis.com"
+	return vertexAPIHost(location)
 }
 
 func (s *GeminiCachedContentService) parseUpstream(body []byte, account *Account, mappedModel, expectedModel, expectedName string, ttl time.Duration, absoluteExpiry time.Time, requireTokens bool) (*GeminiCachedContentUpstream, error) {

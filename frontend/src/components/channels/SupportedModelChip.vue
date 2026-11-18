@@ -79,7 +79,7 @@
                 :scale="perMillionScale"
               />
               <PricingRow
-                :label="t(prefixKey('cacheWrite5mPrice'))"
+                :label="t(prefixKey(effectivePlatform === 'openai' ? 'cacheWrite30mPrice' : 'cacheWrite5mPrice'))"
                 :value="model.pricing.cache_write_price"
                 :unit="t(prefixKey('unitPerMillion'))"
                 :scale="perMillionScale"
@@ -88,6 +88,13 @@
                 v-if="model.pricing.cache_write_1h_price != null"
                 :label="t(prefixKey('cacheWrite1hPrice'))"
                 :value="model.pricing.cache_write_1h_price"
+                :unit="t(prefixKey('unitPerMillion'))"
+                :scale="perMillionScale"
+              />
+              <PricingRow
+                v-if="model.pricing.cache_write_12h_price != null"
+                :label="t(prefixKey('cacheWrite12hPrice'))"
+                :value="model.pricing.cache_write_12h_price"
                 :unit="t(prefixKey('unitPerMillion'))"
                 :scale="perMillionScale"
               />

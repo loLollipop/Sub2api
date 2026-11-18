@@ -43,12 +43,12 @@ func sanitizeOpenAIResponsesToolSchemasForPlatform(body []byte, platform string)
 	// Stay below the body limit even when root-type repairs grow the document.
 	// Large/ambiguous cases retain the exact ordered-pass behavior below.
 	if platform == PlatformOpenAI && len(body) > 0 && len(body) < openAIResponsesToolSchemaMaxBodySize/2 &&
-		openAIResponsesBodyMayContainRegexLookaround(body) {
+		openAIResponsesBodyMayContainUnsupportedRegex(body) {
 		normalized, changed, err := trySanitizeOpenAIResponsesToolSchemas(body, openAIResponsesToolSchemaOptions{
 			replaceNullParameterTypes:       true,
 			injectObjectUnionRootObjectType: true,
 			dropNullRequired:                true,
-			removeLookaroundPatterns:        true,
+			removeUnsupportedRegexPatterns:  true,
 		})
 		if err == nil {
 			return normalized, changed, nil
@@ -81,15 +81,15 @@ func sanitizeOpenAIResponsesToolSchemasForPlatform(body []byte, platform string)
 	return normalized, changed, nil
 }
 
-// sanitizeOpenAIResponsesToolSchemaPatterns removes only schema constraints
-// containing regex lookaround, which OpenAI rejects. It deliberately does not
+// sanitizeOpenAIResponsesToolSchemaPatterns removes unsupported OpenAI regex
+// constraints and reopens objects only when a patternProperties key was removed. It deliberately does not
 // descend into instance-valued keywords such as default, examples, const, or
 // enum.
 func sanitizeOpenAIResponsesToolSchemaPatterns(body []byte) ([]byte, bool, error) {
-	if len(body) == 0 || !openAIResponsesBodyMayContainRegexLookaround(body) {
+	if len(body) == 0 || !openAIResponsesBodyMayContainUnsupportedRegex(body) {
 		return body, false, nil
 	}
-	return sanitizeOpenAIResponsesToolSchemas(body, openAIResponsesToolSchemaOptions{removeLookaroundPatterns: true})
+	return sanitizeOpenAIResponsesToolSchemas(body, openAIResponsesToolSchemaOptions{removeUnsupportedRegexPatterns: true})
 }
 
 // sanitizeOpenAIResponsesToolParameterTypes replaces an explicitly null type
@@ -108,20 +108,79 @@ func sanitizeOpenAIResponsesToolParameterTypes(body []byte) ([]byte, bool, error
 	})
 }
 
-func openAIResponsesBodyMayContainRegexLookaround(body []byte) bool {
+func openAIResponsesBodyMayContainUnsupportedRegex(body []byte) bool {
 	// An opening parenthesis may be literal or encoded as JSON's canonical
-	// Unicode escape. Other lookaround characters may themselves be escaped, so
-	// the full decoded pattern is checked only after scoped parsing.
-	return bytes.Contains(body, []byte("(")) || bytes.Contains(body, []byte(`\u0028`))
+	// Unicode escape. A backslash inside a JSON string is escaped as \\, so the
+	// sequence \\<letter> exposes the decoded regex escape without parsing.
+	if bytes.Contains(body, []byte("(")) || bytes.Contains(body, []byte(`\u0028`)) ||
+		bytes.Contains(body, []byte(`\u005c`)) || bytes.Contains(body, []byte(`\u005C`)) {
+		return true
+	}
+	for i := 0; i+2 < len(body); i++ {
+		if body[i] != '\\' || body[i+1] != '\\' {
+			continue
+		}
+		escaped := body[i+2]
+		if isASCIILetter(escaped) && !pythonRegexEscapeAllowed(escaped) {
+			return true
+		}
+	}
+	return false
 }
 
-func hasRegexLookaround(pattern string) bool {
-	return strings.Contains(pattern, "(?=") || strings.Contains(pattern, "(?!") ||
-		strings.Contains(pattern, "(?<=") || strings.Contains(pattern, "(?<!")
+// hasUnsupportedOpenAIRegexPattern reports whether Python re rejects pattern.
+// OpenAI validates tool-schema patterns with Python re, which supports neither
+// lookaround nor the .NET/Java (?<name>...) and (?'name'...) group forms, and
+// reserves unknown ASCII-letter escapes such as \p and \R.
+func hasUnsupportedOpenAIRegexPattern(pattern string) bool {
+	inCharacterClass := false
+	for i := 0; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '\\':
+			if i+1 >= len(pattern) {
+				return true
+			}
+			escaped := pattern[i+1]
+			if isASCIILetter(escaped) && !pythonRegexEscapeAllowed(escaped) {
+				return true
+			}
+			i++
+		case '[':
+			inCharacterClass = true
+		case ']':
+			inCharacterClass = false
+		case '(':
+			if inCharacterClass || i+1 >= len(pattern) || pattern[i+1] != '?' {
+				continue
+			}
+			if i+2 >= len(pattern) {
+				return true
+			}
+			switch pattern[i+2] {
+			case '=', '!', '<', '\'':
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isASCIILetter(ch byte) bool {
+	return ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z'
+}
+
+func pythonRegexEscapeAllowed(ch byte) bool {
+	switch ch {
+	case 'a', 'b', 'f', 'n', 'r', 't', 'v',
+		'd', 'D', 's', 'S', 'w', 'W',
+		'A', 'Z', 'B', 'N', 'u', 'U', 'x':
+		return true
+	}
+	return false
 }
 
 type openAIResponsesToolSchemaOptions struct {
-	removeLookaroundPatterns        bool
+	removeUnsupportedRegexPatterns  bool
 	replaceNullParameterTypes       bool
 	injectObjectUnionRootObjectType bool
 	dropNullRequired                bool
@@ -142,6 +201,7 @@ const (
 	openAIResponsesToolSchema
 	openAIResponsesToolSchemaArray
 	openAIResponsesToolSchemaMap
+	openAIResponsesToolSchemaPatternPropertiesMap
 	openAIResponsesToolSchemaOrArray
 )
 
@@ -152,11 +212,12 @@ type openAIResponsesToolSchemaEdit struct {
 }
 
 type openAIResponsesToolSchemaParser struct {
-	body      []byte
-	pos       int
-	options   openAIResponsesToolSchemaOptions
-	edits     []openAIResponsesToolSchemaEdit
-	probeType string
+	body                   []byte
+	pos                    int
+	options                openAIResponsesToolSchemaOptions
+	edits                  []openAIResponsesToolSchemaEdit
+	probeType              string
+	patternPropertiesDrops map[int]int
 }
 
 func sanitizeOpenAIResponsesToolSchemas(
@@ -252,6 +313,7 @@ func (p *openAIResponsesToolSchemaParser) parseValue(
 func (p *openAIResponsesToolSchemaParser) parseObject(
 	context openAIResponsesToolSchemaContext, schemaRoot bool, depth int,
 ) error {
+	objectStart := p.pos
 	p.pos++
 	p.skipWhitespace()
 	if p.consume('}') {
@@ -266,6 +328,9 @@ func (p *openAIResponsesToolSchemaParser) parseObject(
 	parameterCount := 0
 	parameterValueStart := -1
 	parameterValueEnd := -1
+	droppedPatternPropertyKeys := 0
+	lostPatternProperty := false
+	var additionalPropertiesEdits []openAIResponsesToolSchemaEdit
 	for {
 		p.skipWhitespace()
 		memberStart := p.pos
@@ -300,9 +365,33 @@ func (p *openAIResponsesToolSchemaParser) parseObject(
 			parameterValueStart = valueStart
 			parameterValueEnd = valueEnd
 		}
-		if context == openAIResponsesToolSchema && openAIResponsesJSONStringEquals(key, "pattern") && p.options.removeLookaroundPatterns {
-			if pattern, ok := decodeOpenAIResponsesJSONStringValue(p.body[valueStart:valueEnd]); ok && hasRegexLookaround(pattern) {
-				deleteMember = true
+		if p.options.removeUnsupportedRegexPatterns {
+			if context == openAIResponsesToolSchema && openAIResponsesJSONStringEquals(key, "patternProperties") {
+				// The child parser records how many keys it had to remove. A
+				// closed sibling object must be reopened in that case.
+				if p.patternPropertiesDrops[valueStart] > 0 {
+					lostPatternProperty = true
+				}
+			}
+			if context == openAIResponsesToolSchema && openAIResponsesJSONStringEquals(key, "additionalProperties") &&
+				!bytes.Equal(p.body[valueStart:valueEnd], []byte("true")) {
+				// Defer the edit: patternProperties may appear after this
+				// member, and only actual key removal requires reopening.
+				additionalPropertiesEdits = append(additionalPropertiesEdits, openAIResponsesToolSchemaEdit{
+					start:       valueStart,
+					end:         valueEnd,
+					replacement: "true",
+				})
+			}
+			if context == openAIResponsesToolSchema && openAIResponsesJSONStringEquals(key, "pattern") {
+				if pattern, ok := decodeOpenAIResponsesJSONStringValue(p.body[valueStart:valueEnd]); ok && hasUnsupportedOpenAIRegexPattern(pattern) {
+					deleteMember = true
+				}
+			}
+			if context == openAIResponsesToolSchemaPatternPropertiesMap {
+				if pattern, ok := decodeOpenAIResponsesJSONStringValue(key); ok && hasUnsupportedOpenAIRegexPattern(pattern) {
+					deleteMember = true
+				}
 			}
 		}
 		// JSON Schema requires "required" to be an array. Clients occasionally emit
@@ -327,6 +416,9 @@ func (p *openAIResponsesToolSchemaParser) parseObject(
 
 		if p.pos >= len(p.body) {
 			return p.syntaxError("unterminated object")
+		}
+		if deleteMember && context == openAIResponsesToolSchemaPatternPropertiesMap {
+			droppedPatternPropertyKeys++
 		}
 		if deleteMember && deleteRunStart < 0 {
 			deleteRunStart = memberStart
@@ -370,6 +462,24 @@ func (p *openAIResponsesToolSchemaParser) parseObject(
 			if edit, ok := openAIMissingRootObjectUnionTypeEdit(
 				p.body[parameterValueStart:parameterValueEnd], parameterValueStart,
 			); ok {
+				if err := p.addEdit(edit.start, edit.end, edit.replacement); err != nil {
+					return err
+				}
+			}
+		}
+		if droppedPatternPropertyKeys > 0 {
+			if p.patternPropertiesDrops == nil {
+				p.patternPropertiesDrops = make(map[int]int)
+			}
+			p.patternPropertiesDrops[objectStart] = droppedPatternPropertyKeys
+		}
+		if lostPatternProperty {
+			// Removing a patternProperties entry turns keys that only matched
+			// that pattern into additional properties. Keeping
+			// additionalProperties: false would reject argument keys the client
+			// declared as valid, so reopen the object. This only widens what the
+			// upstream accepts; it does not invent constraints.
+			for _, edit := range additionalPropertiesEdits {
 				if err := p.addEdit(edit.start, edit.end, edit.replacement); err != nil {
 					return err
 				}
@@ -522,11 +632,13 @@ func openAIResponsesToolSchemaChildContext(
 			return openAIResponsesToolSchemaOrArray, false
 		case openAIResponsesJSONStringMatchesAny(key, "anyOf", "oneOf", "allOf", "prefixItems"):
 			return openAIResponsesToolSchemaArray, false
+		case openAIResponsesJSONStringEquals(key, "patternProperties"):
+			return openAIResponsesToolSchemaPatternPropertiesMap, false
 		case openAIResponsesJSONStringMatchesAny(key,
-			"properties", "patternProperties", "$defs", "definitions", "dependentSchemas", "dependencies"):
+			"properties", "$defs", "definitions", "dependentSchemas", "dependencies"):
 			return openAIResponsesToolSchemaMap, false
 		}
-	case openAIResponsesToolSchemaMap:
+	case openAIResponsesToolSchemaMap, openAIResponsesToolSchemaPatternPropertiesMap:
 		return openAIResponsesToolSchema, false
 	}
 	return openAIResponsesToolSchemaSkip, false
@@ -715,7 +827,11 @@ func applyOpenAIResponsesToolSchemaEdits(
 		if edits[i].start != edits[j].start {
 			return edits[i].start < edits[j].start
 		}
-		return edits[i].end < edits[j].end
+		iEmpty, jEmpty := edits[i].start == edits[i].end, edits[j].start == edits[j].end
+		if iEmpty != jEmpty {
+			return iEmpty
+		}
+		return edits[i].end > edits[j].end
 	})
 
 	merged := edits[:0]
@@ -725,6 +841,10 @@ func applyOpenAIResponsesToolSchemaEdits(
 			continue
 		}
 		previous := &merged[len(merged)-1]
+		if edit.end <= previous.end {
+			// Replacing or deleting a whole span supersedes its nested edits.
+			continue
+		}
 		if previous.replacement != "" || edit.replacement != "" {
 			return nil, false, fmt.Errorf("sanitize OpenAI Responses tool schemas: overlapping patches")
 		}

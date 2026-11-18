@@ -75,6 +75,7 @@ type AnnouncementRepository interface {
 
 	List(ctx context.Context, params pagination.PaginationParams, filters AnnouncementListFilters) ([]Announcement, *pagination.PaginationResult, error)
 	ListActive(ctx context.Context, now time.Time) ([]Announcement, error)
+	ListActiveMetadata(ctx context.Context, now time.Time) ([]Announcement, error)
 }
 
 type AnnouncementReadRepository interface {

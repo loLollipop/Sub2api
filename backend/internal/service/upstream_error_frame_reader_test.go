@@ -55,3 +55,47 @@ func TestUpstreamErrorFrameReaderErrorLimitDoesNotLimitNormalContent(t *testing.
 	require.NoError(t, err)
 	require.Equal(t, errorEvent, string(body))
 }
+
+func TestUpstreamErrorFrameLineReaderCombinesOnlyErrorData(t *testing.T) {
+	const raw = `{"type":"error","error":{"type":"new_api_error","message":"bad input (request id: Synthetic123)"},"usage":{"input_tokens":13,"output_tokens":3}}`
+	for _, tc := range []struct{ name, frame string }{
+		{"named", "event: error\ndata: {\"type\":\"error\",\ndata: \"error\":{\"type\":\"new_api_error\",\"message\":\"bad input (request id: Synthetic123)\"},\ndata: \"usage\":{\"input_tokens\":13,\"output_tokens\":3}}\n\n"},
+		{"data only", "data: {\"type\":\"error\",\ndata: \"error\":{\"type\":\"new_api_error\",\"message\":\"bad input (request id: Synthetic123)\"},\ndata: \"usage\":{\"input_tokens\":13,\"output_tokens\":3}}\n\n"},
+		{"metadata and CRLF", "id: evt_safe\r\nevent:error\r\nretry: 1000\r\n: diagnostic\r\ndata: {\"type\":\"error\",\r\ndata: \"error\":{\"type\":\"new_api_error\",\"message\":\"bad input (request id: Synthetic123)\"},\r\ndata: \"usage\":{\"input_tokens\":13,\"output_tokens\":3}}\r\n\r\n"},
+		{"EOF", "event: error\ndata: {\"type\":\"error\",\ndata: \"error\":{\"type\":\"new_api_error\",\"message\":\"bad input (request id: Synthetic123)\"},\ndata: \"usage\":{\"input_tokens\":13,\"output_tokens\":3}}"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, err := io.ReadAll(newUpstreamErrorFrameReaderForLineProcessing(strings.NewReader(tc.frame), 1<<20))
+			require.NoError(t, err)
+			require.Equal(t, 1, strings.Count(string(body), "data:"))
+			require.Contains(t, string(body), "new_api_error", "internal parsing must retain the raw relay type")
+			require.Contains(t, string(body), "request id: Synthetic123", "internal parsing must retain the raw correlation ID")
+			var parser openAICompatSSEFrameParser
+			var data string
+			for _, line := range strings.Split(string(body), "\n") {
+				if frame, ok := parser.AddLine(strings.TrimSuffix(line, "\r")); ok {
+					data = frame.Data
+				}
+			}
+			if frame, ok := parser.Finish(); ok {
+				data = frame.Data
+			}
+			require.JSONEq(t, raw, data, "usage and diagnostic values must remain intact")
+			if tc.name == "metadata and CRLF" {
+				require.True(t, strings.HasPrefix(string(body), "id: evt_safe\r\nevent:error\r\nretry: 1000\r\n: diagnostic\r\n"))
+				require.True(t, strings.HasSuffix(string(body), "\r\n\r\n"))
+			}
+			unchanged, err := io.ReadAll(newUpstreamErrorFrameReader(strings.NewReader(tc.frame), 1<<20))
+			require.NoError(t, err)
+			require.Equal(t, tc.frame, string(unchanged), "raw-frame consumers must keep their existing evidence bytes")
+		})
+	}
+	for _, success := range []string{
+		"event: content_block_delta\ndata: {\ndata: \"type\":\"content_block_delta\",\ndata: \"delta\":{\"text\":\"new_api_error (request id: Synthetic123)\"}}\n\n",
+		"data: {\"candidates\":[\ndata: {\"content\":{\"parts\":[{\"text\":\"new_api_error (request id: Synthetic123)\"}]}}]}\r\n\r\n",
+	} {
+		body, err := io.ReadAll(newUpstreamErrorFrameReaderForLineProcessing(strings.NewReader(success), 1<<20))
+		require.NoError(t, err)
+		require.Equal(t, success, string(body), "successful multiline content must remain byte-for-byte unchanged")
+	}
+}

@@ -75,7 +75,7 @@
           </button>
         </div>
 
-        <UsageFilters v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="usage-filter-panel" :start-date="startDate" :end-date="endDate" :preset="datePreset" :exporting="exporting" :model-options="modelNameOptions" @date-range-change="onDateRangeChange" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
+        <UsageFilters v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="usage-filter-panel" :start-date="startDate" :end-date="endDate" :preset="datePreset" :exporting="exporting" :model-options="modelNameOptions" @date-range-change="onDateRangeChange" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel()" @export-csv="exportToExcel('csv')">
           <template #after-reset>
             <div v-if="activeTab !== 'ranking'" class="relative" ref="columnDropdownRef">
               <button
@@ -223,6 +223,7 @@ import type { OpsErrorLog } from '@/api/admin/ops'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'; import GroupDistributionChart from '@/components/charts/GroupDistributionChart.vue'; import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import EndpointDistributionChart from '@/components/charts/EndpointDistributionChart.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { escapeCsvText } from '@/utils/csv'
 import type { AdminUsageLog, TrendDataPoint, ModelStat, GroupStat, EndpointStat, AdminUser } from '@/types'; import type { AdminUsageStatsResponse, AdminUsageQueryParams } from '@/api/admin/usage'
 
 const { t } = useI18n()
@@ -719,7 +720,8 @@ const fetchExportPage = async (page: number, size: number, signal: AbortSignal) 
   }
 }
 
-const exportToExcel = async () => {
+const exportToExcel = async (format: 'xlsx' | 'csv' = 'xlsx') => {
+  const text = (value: string) => format === 'csv' ? escapeCsvText(value) : value
   if (exporting.value) return; exporting.value = true; exportProgress.show = true
   const c = new AbortController(); exportAbortController = c
   try {
@@ -745,16 +747,16 @@ const exportToExcel = async () => {
       if (p > 1 && res.page_size && res.page_size !== pageSize) throw new Error('Pagination size changed during export')
       pageSize = res.page_size || pageSize
       const rows = (res.items || []).map((log: AdminUsageLog) => [
-        log.created_at, log.user?.email || '', log.api_key?.name || '', log.account?.name || '', log.model,
-        log.upstream_model || log.model, log.upstream_response_model || '', log.upstream_model_mismatch == null ? '' : t(log.upstream_model_mismatch ? 'common.yes' : 'common.no'), formatReasoningEffort(log.reasoning_effort), formatReasoningEffort(log.upstream_reasoning_effort || log.reasoning_effort), log.group?.name || '',
-        log.inbound_endpoint || '', log.upstream_endpoint || '', getRequestTypeLabel(log),
+        text(log.created_at), text((log.user ?? log.user_summary)?.email || ''), text((log.api_key ?? log.api_key_summary)?.name || ''), text((log.account ?? log.account_summary)?.name || ''), text(log.model),
+        text(log.upstream_model || log.model), text(log.upstream_response_model || ''), log.upstream_model_mismatch == null ? '' : t(log.upstream_model_mismatch ? 'common.yes' : 'common.no'), formatReasoningEffort(log.reasoning_effort), formatReasoningEffort(log.upstream_reasoning_effort || log.reasoning_effort), text((log.group ?? log.group_summary)?.name || ''),
+        text(log.inbound_endpoint || ''), text(log.upstream_endpoint || ''), getRequestTypeLabel(log),
         log.input_tokens, log.output_tokens, log.cache_read_tokens, log.cache_creation_tokens,
         log.input_cost?.toFixed(6) || '0.000000', log.output_cost?.toFixed(6) || '0.000000',
         log.cache_read_cost?.toFixed(6) || '0.000000', log.cache_creation_cost?.toFixed(6) || '0.000000',
         log.rate_multiplier?.toPrecision(4) || '1.00', (log.account_rate_multiplier ?? 1).toPrecision(4),
         log.total_cost?.toFixed(6) || '0.000000', log.actual_cost?.toFixed(6) || '0.000000',
         ((log.account_stats_cost ?? log.total_cost) * (log.account_rate_multiplier ?? 1)).toFixed(6), log.first_token_ms ?? '', log.duration_ms,
-        log.request_id || '', log.upstream_request_id || '', log.user_agent || '', log.ip_address || ''
+        text(log.request_id || ''), text(log.upstream_request_id || ''), text(log.user_agent || ''), text(log.ip_address || '')
       ])
       if (rows.length) {
         XLSX.utils.sheet_add_aoa(ws, rows, { origin: -1 })
@@ -770,7 +772,12 @@ const exportToExcel = async () => {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Usage')
       const filename = `usage_${filters.value.start_date}_to_${filters.value.end_date}.xlsx`.replace(/:/g, '-')
-      saveAs(new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename)
+      if (format === 'csv') {
+        const csv = XLSX.utils.sheet_to_csv(ws)
+        saveAs(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }), filename.replace(/\.xlsx$/, '.csv'))
+      } else {
+        saveAs(new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename)
+      }
       appStore.showSuccess(t('usage.exportSuccess'))
     }
   } catch (error) { if (!c.signal.aborted) { console.error('Failed to export:', error); appStore.showError('Export Failed') } }

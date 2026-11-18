@@ -4,7 +4,7 @@ import { defineComponent, ref } from 'vue'
 
 import UsageView from '../UsageView.vue'
 
-const { list, exportList, getStats, getSnapshotV2, getById, getModelStats, listErrorLogs, routeQuery, aoaToSheet, sheetAddAoa, saveAs, xlsxWrite } = vi.hoisted(() => {
+const { list, exportList, getStats, getSnapshotV2, getById, getModelStats, listErrorLogs, routeQuery, aoaToSheet, sheetAddAoa, saveAs, xlsxWrite, sheetToCsv } = vi.hoisted(() => {
   vi.stubGlobal('localStorage', {
     getItem: vi.fn(() => null),
     setItem: vi.fn(),
@@ -24,6 +24,7 @@ const { list, exportList, getStats, getSnapshotV2, getById, getModelStats, listE
 		sheetAddAoa: vi.fn(),
 		saveAs: vi.fn(),
 		xlsxWrite: vi.fn(() => new Uint8Array([1, 2, 3])),
+    sheetToCsv: vi.fn(() => '"列,名","line1\nline2"\r\n'),
   }
 })
 
@@ -70,6 +71,7 @@ vi.mock('xlsx', () => ({
 	utils: {
 		aoa_to_sheet: aoaToSheet,
 		sheet_add_aoa: sheetAddAoa,
+    sheet_to_csv: sheetToCsv,
 		book_new: vi.fn(() => ({})),
 		book_append_sheet: vi.fn(),
 	},
@@ -992,11 +994,36 @@ describe('admin UsageView model audit export', () => {
 		sheetAddAoa.mockClear()
 		saveAs.mockClear()
 		xlsxWrite.mockClear()
+		sheetToCsv.mockClear()
 	})
 
 	afterEach(() => {
 		vi.useRealTimers()
 	})
+
+  it.each(['csv', 'xlsx'] as const)('keeps user formula text safe in %s', async format => {
+    exportList.mockResolvedValue({ items: [{ created_at: '2026-11-18T00:00:00Z', model: 'gpt-6.2-sol', request_type: 'sync', api_key_summary: { id: 2, name: '=1+1' }, actual_cost: -0.15 }], total: 1, pages: 1 })
+    const wrapper = mountRouteFilteredUsageView()
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+    await (wrapper.vm as any).exportToExcel(format)
+    const row = sheetAddAoa.mock.calls[0][1][0]
+    expect(row[2]).toBe(format === 'csv' ? "'=1+1" : '=1+1')
+    expect(row[25]).toBe('-0.150000')
+    wrapper.unmount()
+  })
+
+  it.each(['csv', 'xlsx'] as const)('exports compact association names to %s', async format => {
+    exportList.mockResolvedValue({ items: [{ created_at: '2026-11-18T00:00:00Z', model: 'gpt-6.2-sol', request_type: 'sync', user_summary: { id: 1, email: 'compact@example.test' }, api_key_summary: { id: 2, name: 'Compact key' }, account_summary: { id: 3, name: 'Compact account' }, group_summary: { id: 4, name: 'Compact group' } }], total: 1, pages: 1 })
+    const wrapper = mountRouteFilteredUsageView()
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+    await (wrapper.vm as any).exportToExcel(format)
+    const row = sheetAddAoa.mock.calls[0][1][0]
+    expect(row.slice(1, 4)).toEqual(['compact@example.test', 'Compact key', 'Compact account'])
+    expect(row[10]).toBe('Compact group')
+    wrapper.unmount()
+  })
 
 	it('exports requested, sent, response, and mismatch as separate admin columns', async () => {
 		const wrapper = mountRouteFilteredUsageView()
@@ -1023,6 +1050,23 @@ describe('admin UsageView model audit export', () => {
 		expect(row.slice(4, 8)).toEqual(['gpt-5.6-sol', 'gpt-5.5', 'gpt-5.4', 'Yes'])
 		expect(saveAs).toHaveBeenCalledTimes(1)
 	})
+
+  it('exports CSV through the same collector with UTF-8 BOM and serializer escaping', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+    await (wrapper.vm as any).exportToExcel('csv')
+    expect(sheetToCsv).toHaveBeenCalledTimes(1)
+    expect(xlsxWrite).not.toHaveBeenCalled()
+    expect(saveAs).toHaveBeenCalledWith(expect.any(Blob), expect.stringMatching(/\.csv$/))
+    const blob = saveAs.mock.calls[0][0] as Blob
+    expect(blob.type).toBe('text/csv;charset=utf-8')
+    vi.useRealTimers()
+    const text = await new Promise<string>(done => { const reader = new FileReader(); reader.onload = () => done(reader.result as string); reader.readAsText(blob) })
+    // FileReader decodes and removes the BOM; the remaining CSV is unmodified.
+    expect(text).toBe(sheetToCsv.mock.results.at(-1)?.value)
+    wrapper.unmount()
+  })
 
 	it('exports later pages when the backend caps each page at 50', async () => {
 		const wrapper = mountRouteFilteredUsageView()

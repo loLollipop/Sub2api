@@ -318,6 +318,56 @@ describe('AccountUsageCell', () => {
     expect(wrapper.text()).toContain('admin.accounts.usageWindow.gemini3Image|70|2026-03-01T09:00:00Z')
   })
 
+  it.each([
+    { id: 1006, state: { antigravity_quota: { 'gemini-3-pro-high': { utilization: 100, reset_time: '2099-11-14T21:22:49Z' } } } },
+    { id: 1007, state: { is_forbidden: true, forbidden_type: 'validation' } },
+    { id: 1008, state: { needs_reauth: true } },
+    { id: 1009, state: { error: 'upstream unavailable', error_code: 'network_error' } },
+    { id: 1010, state: {} }
+  ])('Antigravity active query bypasses cached state ($id)', async ({ id, state }) => {
+    getUsage.mockResolvedValueOnce(state).mockResolvedValueOnce({
+      antigravity_quota: { 'gemini-3-pro-high': { utilization: 0, reset_time: '2099-11-14T21:22:49Z' } }
+    })
+    const wrapper = mount(AccountUsageCell, {
+      props: { account: makeAccount({ id }) },
+      global: { stubs: { UsageProgressBar: {
+        props: ['label', 'utilization'], template: '<div class="usage-bar">{{ label }}|{{ utilization }}</div>'
+      }, AccountQuotaInfo: true } }
+    })
+    await flushPromises()
+    const button = wrapper.get('[data-testid="antigravity-active-query"]')
+    await button.trigger('click')
+    await flushPromises()
+    expect(getUsage).toHaveBeenLastCalledWith(id, 'active', true)
+    expect(wrapper.text()).toContain('gemini3Pro|0')
+    expect(wrapper.attributes('aria-busy')).toBe('false')
+    wrapper.unmount()
+  })
+
+  it('keeps Claude quota values visible and disables queries while a refresh is pending', async () => {
+    let finish!: (usage: object) => void
+    getUsage.mockResolvedValueOnce({ five_hour: { utilization: 25, resets_at: null, remaining_seconds: 0 } })
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const wrapper = mount(AccountUsageCell, {
+      props: { account: makeAccount({ id: 1011, platform: 'anthropic' }), manualRefreshToken: 0 },
+      global: { stubs: { UsageProgressBar: {
+        props: ['utilization'], template: '<div class="usage-bar">{{ utilization }}</div>'
+      }, AccountQuotaInfo: true, ClaudeResetCreditsCell: { template: '<div><slot name="pre-actions" /></div>' } } }
+    })
+    await flushPromises()
+    await wrapper.setProps({ manualRefreshToken: 1 })
+    await flushPromises()
+    expect(wrapper.get('.usage-bar').text()).toBe('25')
+    expect(wrapper.find('.animate-pulse').exists()).toBe(false)
+    expect(wrapper.attributes('aria-busy')).toBe('true')
+    expect(wrapper.get('button').attributes('disabled')).toBeDefined()
+    finish({ five_hour: { utilization: 40, resets_at: null, remaining_seconds: 0 } })
+    await flushPromises()
+    expect(wrapper.get('.usage-bar').text()).toBe('40')
+    expect(wrapper.attributes('aria-busy')).toBe('false')
+    wrapper.unmount()
+  })
+
   it('Antigravity 会显示 AI Credits 余额信息', async () => {
     getUsage.mockResolvedValue({
       ai_credits: [

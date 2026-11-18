@@ -53,15 +53,20 @@ func newOpenAIFirstOutputStage(limit int64) *openAIFirstOutputStage {
 	return &openAIFirstOutputStage{
 		limit: limit,
 		createTemp: func() (*os.File, error) {
-			const dir = "/var/tmp/sub2api"
-			if err := os.MkdirAll(dir, 0o1777); err != nil {
-				return nil, err
-			}
-			return os.CreateTemp(dir, "sub2api-openai-first-output-*")
+			return createOpenAIFirstOutputSpool("/var/tmp/sub2api")
 		},
 		removeFile: os.Remove,
 		memoryOnly: runtime.GOOS == "windows",
 	}
+}
+
+func createOpenAIFirstOutputSpool(preferredDir string) (*os.File, error) {
+	if err := os.MkdirAll(preferredDir, 0o1777); err == nil {
+		if file, err := os.CreateTemp(preferredDir, "sub2api-openai-first-output-*"); err == nil {
+			return file, nil
+		}
+	}
+	return os.CreateTemp("", "sub2api-openai-first-output-*")
 }
 
 func newDefaultOpenAIFirstOutputStage() *openAIFirstOutputStage {
@@ -152,7 +157,9 @@ func (s *openAIFirstOutputStage) prepareWrite(incoming int) error {
 	}
 	file, err := s.createTemp()
 	if err != nil {
-		return fmt.Errorf("create first-output spool: %w", err)
+		// Keep the same stage limit when neither temporary directory is writable.
+		s.memoryOnly = true
+		return nil
 	}
 	path := file.Name()
 	// Unlink before writing any request data. Unix keeps the file descriptor

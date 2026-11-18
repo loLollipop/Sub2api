@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -20,6 +22,22 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestOpenAIFirstOutputSpoolUsesSystemTempWhenPreferredDirectoryUnavailable(t *testing.T) {
+	root := t.TempDir()
+	blockedDir := filepath.Join(root, "regular-file")
+	require.NoError(t, os.WriteFile(blockedDir, []byte("occupied"), 0o600))
+	for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(key, root)
+	}
+	file, err := createOpenAIFirstOutputSpool(blockedDir)
+	require.NoError(t, err)
+	name := file.Name()
+	t.Cleanup(func() { _ = file.Close(); _ = os.Remove(name) })
+	require.Equal(t, root, filepath.Dir(name))
+	_, err = file.WriteString("staged bytes")
+	require.NoError(t, err)
+}
 
 type blockingOpenAIResponseHeaderUpstream struct {
 	canceled chan struct{}
@@ -674,5 +692,48 @@ func TestOpenAINativeFirstOutputFailoverKeepsAttemptHeadersPrivateAfterKeepalive
 	case <-firstWriterDone:
 	case <-time.After(time.Second):
 		t.Fatal("first account writer did not exit after timeout")
+	}
+}
+func TestOpenAIFirstOutputStageCreateFailurePreservesBoundedBuffer(t *testing.T) {
+	for _, useWriteString := range []bool{false, true} {
+		t.Run(fmt.Sprintf("write_string_%t", useWriteString), func(t *testing.T) {
+			stage := newOpenAIFirstOutputStage(70 * 1024)
+			stage.memoryOnly = false
+			t.Cleanup(func() { require.NoError(t, stage.Close()) })
+			createCalls := 0
+			stage.createTemp = func() (*os.File, error) {
+				createCalls++
+				return nil, &os.PathError{Op: "open", Path: "unwritable/spool", Err: os.ErrPermission}
+			}
+			stage.removeFile = func(string) error {
+				t.Fatal("failed creation must not leave a spool to remove")
+				return nil
+			}
+			write := func(value string) (int, error) {
+				if useWriteString {
+					return stage.WriteString(value)
+				}
+				return stage.Write([]byte(value))
+			}
+
+			payload := ""
+			for _, chunk := range []string{strings.Repeat("a", 32*1024), strings.Repeat("b", 36*1024), strings.Repeat("c", 2*1024)} {
+				n, err := write(chunk)
+				require.NoError(t, err)
+				require.Equal(t, len(chunk), n)
+				payload += chunk
+			}
+			require.Equal(t, 1, createCalls, "fallback must not retry CreateTemp on later writes")
+			require.EqualValues(t, len(payload), stage.Buffered())
+
+			n, err := write("overflow")
+			require.Zero(t, n)
+			require.ErrorIs(t, err, errOpenAIFirstOutputStageLimit)
+			require.EqualValues(t, len(payload), stage.Buffered())
+			var downstream bytes.Buffer
+			require.NoError(t, stage.CommitTo(&downstream))
+			require.Equal(t, payload, downstream.String())
+			require.Zero(t, stage.Buffered())
+		})
 	}
 }

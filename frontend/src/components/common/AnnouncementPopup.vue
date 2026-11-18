@@ -17,12 +17,19 @@
       </div>
     </template>
     <template v-if="displayedAnnouncement">
-      <div class="markdown-body prose prose-sm max-w-none break-words dark:prose-invert" v-html="renderedContent" />
+      <div v-if="detailFailed" class="py-10 text-center" role="alert">
+        <p>{{ t('announcements.loadFailed') }}</p>
+        <button type="button" class="btn btn-secondary mt-3" @click="loadDetail(true)">{{ t('common.refresh') }}</button>
+      </div>
+      <div v-else-if="detailPending" class="flex justify-center py-10" role="status" :aria-label="t('common.loading')">
+        <Icon name="refresh" size="lg" class="animate-spin text-gray-400" />
+      </div>
+      <div v-else class="markdown-body prose prose-sm max-w-none break-words dark:prose-invert" v-html="renderedContent" />
     </template>
     <template #footer>
       <div class="flex flex-wrap items-center justify-end gap-3">
         <p v-if="readFailed" role="alert" class="mr-auto text-sm text-red-600 dark:text-red-400">{{ t('announcements.readFailed') }}</p>
-        <button type="button" data-testid="announcement-popup-dismiss" class="btn btn-primary" :disabled="announcementStore.dismissingPopup" @click="handleDismiss">
+        <button type="button" data-testid="announcement-popup-dismiss" class="btn btn-primary" :disabled="announcementStore.dismissingPopup || detailPending || detailFailed" @click="handleDismiss">
           {{ preview ? t('common.close') : t('announcements.markRead') }}
         </button>
       </div>
@@ -62,7 +69,19 @@ const displayedAnnouncement = computed(() => (
   props.preview ? props.announcement : announcementStore.currentPopup
 ))
 const readFailed = ref(false)
-watch(displayedAnnouncement, () => { readFailed.value = false })
+const popupId = computed(() => props.preview ? null : announcementStore.currentPopup?.id)
+const detail = computed(() => announcementStore.detailFor(popupId.value))
+const content = computed(() => detail.value?.content ?? displayedAnnouncement.value?.content)
+const detailFailed = computed(() => !props.preview && announcementStore.detailErrorFor(popupId.value))
+const detailPending = computed(() => !props.preview && (typeof content.value !== 'string' ||
+  (!!popupId.value && announcementStore.isDetailLoading(popupId.value))) && !detailFailed.value)
+function loadDetail(force = false) {
+  if (popupId.value) void announcementStore.fetchDetail(popupId.value, force)
+}
+watch(displayedAnnouncement, () => {
+  readFailed.value = false
+  if (!props.preview && typeof content.value !== 'string') loadDetail()
+}, { immediate: true })
 
 marked.setOptions({
   breaks: true,
@@ -70,9 +89,8 @@ marked.setOptions({
 })
 
 const renderedContent = computed(() => {
-  const content = displayedAnnouncement.value?.content
-  if (!content) return ''
-  const html = marked.parse(content) as string
+  if (!content.value) return ''
+  const html = marked.parse(content.value) as string
   return DOMPurify.sanitize(html)
 })
 

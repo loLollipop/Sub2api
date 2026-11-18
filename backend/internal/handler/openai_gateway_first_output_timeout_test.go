@@ -39,3 +39,15 @@ func TestOpenAIRequestAllowsFailoverReplayStopsCanceledClient(t *testing.T) {
 	cancel()
 	require.False(t, openAIRequestAllowsFailoverReplay(c))
 }
+
+func TestOpenAIFirstOutputFailoverSharesOneSwitchBudget(t *testing.T) {
+	count := 0
+	require.False(t, openAIFirstOutputFailoverExhausted(nil, &count))
+	require.False(t, openAIFirstOutputFailoverExhausted(&service.UpstreamFailoverError{}, &count))
+	require.Zero(t, count)
+	failover := &service.UpstreamFailoverError{SafeToFailoverAfterWrite: true}
+	require.False(t, openAIFirstOutputFailoverExhausted(failover, &count))
+	require.Equal(t, 1, count)
+	require.True(t, openAIFirstOutputFailoverExhausted(failover, &count))
+	require.Equal(t, 1, count)
+}

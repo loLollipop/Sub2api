@@ -267,7 +267,10 @@
         "484d24eab",
         "4e53e58dc"
       ],
-      "reason": "Defer monitoring/channel/rate-history modules and source migrations 307-311. Plaintext credential reveal conflicts with local redacted account details and optional step-up; immediate account edit skeleton is separate. Removed crypto/payment/canvas, absent requestcapture/timers and Nuxt/SSR/CI/deployment changes remain excluded. Source router5 and theme-specific tooltip fixes do not apply. See v2310 note."
+      "reason": "Remove the completed Accounts shell from the deferral. Monitoring/channel/rate-history modules, migrations 307-311, plaintext credential reveal and absent requestcapture/timers remain excluded/deferred.",
+      "status": "partially_resolved_scope_split",
+      "resolution_20261118_v0223": "Remove the completed Accounts shell from the deferral. Monitoring/channel/rate-history modules, migrations 307-311, plaintext credential reveal and absent requestcapture/timers remain excluded/deferred.",
+      "reason_superseded_by_resolution": "Defer monitoring/channel/rate-history modules and source migrations 307-311. Plaintext credential reveal conflicts with local redacted account details and optional step-up; immediate account edit skeleton is separate. Removed crypto/payment/canvas, absent requestcapture/timers and Nuxt/SSR/CI/deployment changes remain excluded. Source router5 and theme-specific tooltip fixes do not apply. See v2310 note."
     },
     {
       "feature": "v2305-schedulable-timer-and-requestcapture-fixes",
@@ -276,7 +279,9 @@
         "c2d172150660e4416e8a49b80bbcff9ac2b09910",
         "51748099a2b82dbb16eb8f080cf92efe4a2722b2"
       ],
-      "reason": "No local schedulable-timer state/override API or requestcapture module. Existing immediate schedulable toggles do not cancel such timers; scheduled quality-test plans are separate and retained. Keep these fixes with their deferred modules: any later import must preserve confirmation for unknown timer state and include asynchronous startup/session-drain regressions."
+      "reason": "No local schedulable-timer state/override API or requestcapture module. Existing immediate schedulable toggles do not cancel such timers; scheduled quality-test plans are separate and retained. Keep these fixes with their deferred modules: any later import must preserve confirmation for unknown timer state and include asynchronous startup/session-drain regressions.",
+      "status": "not_applicable_missing_local_module",
+      "resolution_20261118_v0223": "Not applicable: source fixes only apply to the absent schedulable-timer and requestcapture modules; preserve the original reason and defer until those modules exist locally."
     },
     {
       "feature": "v2304-source-runtime-and-optional-admin-expansion",
@@ -287,14 +292,19 @@
         "85ec3769e",
         "20e04988a"
       ],
-      "reason": "Preserve the local SPA and virtual-table/edit lifecycle. Defer automatic whitelist runner, Ops import, activity/rate history, new key summary dialog, table DOM/preload and timer-state UI. Adapt standalone Intl cache and route-filter behavior independently. Nuxt SSR release/cookie/session/theme contracts and removed crypto payments do not apply. Exact classifications are recorded in the v2304 note."
+      "reason": "Remove completed Groups usage hydration and usage-cell performance items from the deferral; remaining automatic whitelist, Ops import, history/rate, timer and source SSR/theme scope stays deferred.",
+      "status": "partially_resolved_scope_split",
+      "resolution_20261118_v0223": "Remove completed Groups usage hydration and usage-cell performance items from the deferral; remaining automatic whitelist, Ops import, history/rate, timer and source SSR/theme scope stays deferred.",
+      "reason_superseded_by_resolution": "Preserve the local SPA and virtual-table/edit lifecycle. Defer automatic whitelist runner, Ops import, activity/rate history, new key summary dialog, table DOM/preload and timer-state UI. Adapt standalone Intl cache and route-filter behavior independently. Nuxt SSR release/cookie/session/theme contracts and removed crypto payments do not apply. Exact classifications are recorded in the v2304 note."
     },
     {
       "feature": "v2304-totp-consumption",
       "upstream_commits": [
         "5991959d6"
       ],
-      "reason": "Source delayed TOTP consumption depends on its removed crypto-security replay store; the local verifier has no corresponding early-consumption bug. Any general atomic replay protection needs a separate auth design. The separately reviewed x/crypto OpenPGP module split is adopted for the GO-2026-5932 release security gate, without an audit exception."
+      "reason": "Source delayed TOTP consumption depends on its removed crypto-security replay store; the local verifier has no corresponding early-consumption bug. Any general atomic replay protection needs a separate auth design. The separately reviewed x/crypto OpenPGP module split is adopted for the GO-2026-5932 release security gate, without an audit exception.",
+      "status": "not_applicable_preserve_local_contract",
+      "resolution_20261118_v0223": "The removed crypto replay store has no local early-consumption bug to fix; retain current verifier contract."
     },
     {
       "feature": "v2300-compact-usage-and-lazy-announcements",
@@ -302,7 +312,10 @@
         "ce7a129fe",
         "7d1249b10"
       ],
-      "reason": "Optional payload optimization. Compact usage replaces association response contracts; local SPA already batches usage hydration. Announcement summaries/popups/detail must preserve visibility, existing unread state and session isolation as a separate complete adaptation; source summary still loads full announcements and duplicates reads for popups. Retain compatible current APIs and full local functionality."
+      "reason": "Compact usage associations and lazy announcements are fully adapted with metadata SQL projection, authorization and session isolation; see resolution and current acceptance evidence.",
+      "status": "resolved",
+      "resolution_20261118_v0223": "ce7a129fe compact slice: admin lists project display metadata in Ent and skip subscriptions, excluding secrets/credentials/large pricing from SQL and DTO. Admin-only account_summary; legacy user/detail contracts preserved. Table navigation/deleted badges and XLSX/CSV display names accept summary and legacy shapes. CSV escapes formula-like user text while preserving numeric costs and XLSX string cells. 7d1249b10 announcement slice: login/navigation/focus fetch badge counts, bell loads a body-free timeline/excerpts and on-demand detail; popup bootstrap has at most five eligible unread bodies. Summary/popup selection uses body-free metadata SQL. Details and acknowledgements share active/target authorization; frontend requests, cache and acknowledgement states are isolated across sessions. Retired tickets/SSR/sidebar redesign excluded.",
+      "reason_superseded_by_resolution": "Optional payload optimization. Compact usage replaces association response contracts; local SPA already batches usage hydration. Announcement summaries/popups/detail must preserve visibility, existing unread state and session isolation as a separate complete adaptation; source summary still loads full announcements and duplicates reads for popups. Retain compatible current APIs and full local functionality."
     },
     {
       "feature": "v2300-nuxt-ssr-and-source-theme-settings",
@@ -379,7 +392,9 @@
       "upstream_commits": [
         "d7fa42325"
       ],
-      "reason": "Omitting thinking can select implicit adaptive behavior for Opus 5.5. Preserve the explicit disabled request and existing validation rather than claiming omission disables reasoning. Other selected thinking compatibility and final outbound boundaries are adapted separately."
+      "reason": "Omitting thinking can select implicit adaptive behavior for Opus 5.5. Preserve the explicit disabled request and existing validation rather than claiming omission disables reasoning. Other selected thinking compatibility and final outbound boundaries are adapted separately.",
+      "status": "not_applicable_preserve_local_contract",
+      "resolution_20261118_v0223": "Omitting thinking can enable implicit adaptive behavior for Opus 5.5; retain explicit disabled thinking."
     },
     {
       "feature": "deepseek-dsml-body-dedup-and-scope-expansion",
@@ -395,28 +410,36 @@
       "upstream_commits": [
         "c696d2cbd"
       ],
-      "reason": "Cancelled by user on 2026-10-15. Do not implement multi-code storage, APIs, UI, attribution or per-code statistics. Preserve the existing single-code and rebate behavior. LinuxDo OAuth referral propagation was also cancelled and its development changes removed."
+      "reason": "Cancelled by user on 2026-10-15. Do not implement multi-code storage, APIs, UI, attribution or per-code statistics. Preserve the existing single-code and rebate behavior. LinuxDo OAuth referral propagation was also cancelled and its development changes removed.",
+      "status": "cancelled_by_user",
+      "resolution_20261118_v0223": "User cancelled per-code affiliate statistics; preserve the existing single-code and rebate behavior."
     },
     {
       "feature": "typesafe-systemone-affiliate-multicode-and-moderation-engines",
       "upstream_commits": [
         "7435eebdd"
       ],
-      "reason": "Moderation remains default off with selected privacy/metadata regressions. Native System One forwarding/decoder now use the source implementation with only fork routing/scope adaptations; the bespoke journal/manual-resolution/worker/hold-marker redesign was withdrawn by user request. Affiliate multi-code and LinuxDo referral additions remain cancelled. No production mutation or complete-feature claim."
+      "reason": "Moderation remains default off with selected privacy/metadata regressions. Native System One forwarding/decoder now use the source implementation with only fork routing/scope adaptations; the bespoke journal/manual-resolution/worker/hold-marker redesign was withdrawn by user request. Affiliate multi-code and LinuxDo referral additions remain cancelled. No production mutation or complete-feature claim.",
+      "status": "partially_resolved_policy_split",
+      "resolution_20261118_v0223": "Native System One forwarding/decoding is restored with fork routing/scope adaptations; moderation stays default-off; affiliate multicode/referral remains cancelled and bespoke journal/recovery was withdrawn."
     },
     {
       "feature": "global-glass-modal-restyling",
       "upstream_commits": [
         "77696f2ea"
       ],
-      "reason": "Source modal appearance adapted and included in passing full frontend regression; customized Mixed/payment layouts, dialog layers and reduced-motion behavior preserved."
+      "reason": "Source modal appearance adapted and included in passing full frontend regression; customized Mixed/payment layouts, dialog layers and reduced-motion behavior preserved.",
+      "status": "resolved",
+      "resolution_20261118_v0223": "The adapted modal styling and frontend regressions are present; retained Mixed/payment layouts, dialog layers and reduced motion."
     },
     {
       "feature": "gemini-group-openai-account-catalog-expansion",
       "upstream_commits": [
         "7435eebdd"
       ],
-      "reason": "Implemented through the local authorized dynamic catalog rather than the source static platform list; local catalog/scope regressions pass. Live native-provider verification remains outstanding. See cumulative_sync rather than treating the old deferral as unimplemented."
+      "reason": "Implemented through the local authorized dynamic catalog rather than the source static platform list; local catalog/scope regressions pass. Live native-provider verification remains outstanding. See cumulative_sync rather than treating the old deferral as unimplemented.",
+      "status": "resolved",
+      "resolution_20261118_v0223": "Implemented through the local authorized dynamic catalog; source static platform-list shape is not copied."
     },
     {
       "feature": "unconditional-single-group-default-model-injection",
@@ -462,7 +485,10 @@
       "upstream_commits": [
         "14dc46aee"
       ],
-      "reason": "Implemented with provider profiles, mapped-model endpoint and credential-destination regressions; local append-only migration258 preserves Mixed. Source migration255 was not imported. Real PostgreSQL upgrade verification remains outstanding."
+      "reason": "Implemented with provider profiles, mapped-model endpoint and credential-destination regressions; local append-only migration258 preserves Mixed. Source migration255 was not imported. Real PostgreSQL upgrade verification remains outstanding.",
+      "status": "resolved",
+      "resolution_20261118_v0223": "Provider profiles, mapped endpoint and credential-destination regressions are implemented. Local PostgreSQL upgrade verification remains outstanding.",
+      "verification_backlog": "Real PostgreSQL upgrade verification remains outstanding."
     },
     {
       "feature": "honeypot-scanner-path-bans",
@@ -480,14 +506,19 @@
         "980c14531",
         "756f7efd3"
       ],
-      "reason": "Implemented via local append-only263/264, fail-closed extension/index validation, schema-aware invalid-index recovery and guarded literal search modes. SQL mock/unit/handler/UI regressions and static independent audit pass; opt-in local PostgreSQL fixtures exist but have not executed. Production retains validate mode, no schema migration performed."
+      "reason": "Implemented via local append-only263/264, fail-closed extension/index validation, schema-aware invalid-index recovery and guarded literal search modes. SQL mock/unit/handler/UI regressions and static independent audit pass; opt-in local PostgreSQL fixtures exist but have not executed. Production retains validate mode, no schema migration performed.",
+      "status": "resolved",
+      "resolution_20261118_v0223": "Append-only migrations 263/264 and guarded literal search are implemented. PostgreSQL fixtures exist but have not executed; no production migration is claimed.",
+      "verification_backlog": "Run the opt-in PostgreSQL fixture when an available PostgreSQL service is provided; local SQL/WASM evidence does not establish PostgreSQL concurrency/upgrade behavior."
     },
     {
       "feature": "opus55-public-model-only-strict-validation",
       "upstream_commits": [
         "66790d7ee"
       ],
-      "reason": "Adapted to validate the actual channel/account-resolved Anthropic model with original-body facts, not the source public-only gate. Local mapped/native/bridge regressions pass; no production verification performed."
+      "reason": "Adapted to validate the actual channel/account-resolved Anthropic model with original-body facts, not the source public-only gate. Local mapped/native/bridge regressions pass; no production verification performed.",
+      "status": "resolved",
+      "resolution_20261118_v0223": "Validation uses the actual channel/account-resolved Anthropic model and original request-body facts, stronger than the source public-only gate."
     },
     {
       "feature": "deepseek-automatic-web-search-execution",
@@ -522,7 +553,9 @@
       "upstream_commits": [
         "6eda39041"
       ],
-      "reason": "Import scanner and safe prefilters, but retain compaction/tool-schema no-op JSON validation and escaping semantics. Single-pass scanner retains hard JSON validation, first-match nested duplicate-key semantics, local thinking support, and range refresh after model rewrite."
+      "reason": "Import scanner and safe prefilters, but retain compaction/tool-schema no-op JSON validation and escaping semantics. Single-pass scanner retains hard JSON validation, first-match nested duplicate-key semantics, local thinking support, and range refresh after model rewrite.",
+      "status": "not_applicable_preserve_local_contract",
+      "resolution_20261118_v0223": "Retain no-op JSON validation and escaping semantics while using the selected scanner."
     },
     {
       "feature": "v2220-optional-admin-approval",
@@ -775,7 +808,12 @@
     "deferred": "Nuxt/SSR, source theme settings, compact usage and lazy announcement payload refactors. Source BSC scan changes are excluded because native payments were removed. Unreleased main commits remain outside the formal-release-only policy.",
     "preserved": "Local shadcn UI and grouped model plaza; native providers and scoped reasoning; existing billing, refusal and disconnect handling; removed tickets/canvas/native payments and previously deferred Ops/capture/Hosted.",
     "migration": "None. Existing migrations, Ent and both Go/frontend dependencies unchanged.",
-    "release_status": "User authorized GitHub submission and deployment on 2026-11-02. Prepare personal v2.1.46 via PR/CI, own GHCR and the controlled updater; exact source/artifact/runtime acceptance recorded separately. No migration or dependency changes."
+    "release_status": "User authorized GitHub submission and deployment on 2026-11-02. Prepare personal v2.1.46 via PR/CI, own GHCR and the controlled updater; exact source/artifact/runtime acceptance recorded separately. No migration or dependency changes.",
+    "resolution_20261118_v0223": {
+      "implemented": "Compact admin usage and lazy announcements adapted with local SQL, DTO, session and theme contracts.",
+      "still_excluded": "Nuxt/SSR, source theme settings and retired payment/ticket changes.",
+      "evidence": "maintenance/notes/upstream-sync-20261118-v0223.md"
+    }
   },
   "sync_20261103_v2305": {
     "evidence": "maintenance/notes/upstream-sync-20261103-v2305.md",
@@ -1212,6 +1250,176 @@
       "previous_deferrals": "Preserve all existing Hosted Search, catalogue/Plaza, auto-risk, raw request dump, connection trace and account blacklist deferrals. Retired native payments/crypto/Mixed/tickets are not restored."
     },
     "source_inventory": ".artifacts/dual-sync-20261118/fork-selection-ledger.json",
-    "preserved": "Local Vue theme, native provider routing, smart routing, real-terminal usage/billing, explicit zero and 0.15 multipliers, bounded disconnect drain, no-replay policy; no dependencies/migrations/runtime configuration changed."
+    "preserved": "Local Vue theme, native provider routing, smart routing, real-terminal usage/billing, explicit zero and 0.15 multipliers, bounded disconnect drain, no-replay policy; no dependencies/migrations/runtime configuration changed.",
+    "resolution_20261118_v0223": {
+      "pricing_and_quota": "Ultra Fast, Gemini Carbon/Hydrogen/Vertex default regional pricing, cache usage fidelity and account/user cost separation are implemented via the published original-source ancestors. DeepSeek OCR/TTS/ASR and provenance refactors without local consumers remain excluded.",
+      "usage_aggregation": "Retention trigger migration274, bounded archive/dedup, account-cost rollup merge and covering-index275 are adapted. Outbox/shared cache and source migration numbering are not imported.",
+      "relay_privacy": "All client exits and raw internal observations validated, including multiline errors; implemented.",
+      "protocol_and_runtime": "Published model/thinking/tool/schema, bounded stream/drain/spool, response instructions echo, configurable Gemini retries, HTTP body budget and quota refresh adapted. Transport policy and background billing redesign remain excluded.",
+      "ui_extensions": "CSV (including formula text protection), deleted-group reporting, account refresh/query and async key usage adapted in the local theme. Source theme/SSR redesign excluded.",
+      "evidence": "maintenance/notes/upstream-sync-20261118-v0223.md"
+    }
+  },
+  "sync_20261118_v0223": {
+    "evidence": "maintenance/notes/upstream-sync-20261118-v0223.md",
+    "source_inventory": "maintenance/notes/original-selection-ledger-20261118-v0223.json",
+    "reviewed_release_tag": "v0.2.23",
+    "reviewed_release_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+    "previous_release_tag": "v0.2.22",
+    "previous_release_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+    "observed_main_commit": "2af3f1e15c98c893a89255a037f551046883b8c0",
+    "main_imported": false,
+    "reviewed_delta": {
+      "commits": 32,
+      "non_merge_commits": 20,
+      "merge_commits": 12,
+      "paths": 90,
+      "range_count_basis": "Git reachable commits in previous_release_commit..reviewed_release_commit; discrepancy with prior summary count of 34 resolved against actual graph."
+    },
+    "personal_version": "2.1.67",
+    "release_status": "User subsequently authorized GitHub submission and deployment. Prepare personal v2.1.68 via PR/CI, own Release/GHCR, backup/isolated restore migration verification and controlled rollout; final artifact and production evidence stored separately.",
+    "fork_checkpoint_preserved": {
+      "version": "2.3.105",
+      "commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8"
+    },
+    "supersedes_deferred_scope": {
+      "resolved": [
+        "global-glass-modal-restyling",
+        "gemini-group-openai-account-catalog-expansion",
+        "cline-command-code-platforms",
+        "opus55-public-model-only-strict-validation",
+        "monitoring platform picker/details refresh and compact filters",
+        "SheetJS dependency replacement",
+        "Gemini 3.6 promotion",
+        "Gemini Carbon/Hydrogen and Vertex us/eu pricing chain",
+        "Gemini configurable same-account retries",
+        "adaptive HTTP request-body memory budget",
+        "Antigravity active query and refresh preservation",
+        "async key usage and covering index",
+        "compact admin usage associations",
+        "lazy announcements",
+        "mapping-as-existence union (baseline equivalent)",
+        "settings save dock (sticky-toolbar equivalent)"
+      ],
+      "cancelled": [
+        "affiliate-per-code-invite-and-rebate-statistics"
+      ],
+      "partially_resolved_policy_split": [
+        "typesafe-systemone-affiliate-multicode-and-moderation-engines"
+      ],
+      "preserve_local_contract": [
+        "v2304-totp-consumption",
+        "anthropic-disabled-thinking-omission",
+        "no-op-json-validation-removal"
+      ],
+      "verification_backlog": [
+        "usage-request-id-trigram-index-migrations",
+        "real PostgreSQL schema upgrade/rollback and race/concurrency verification",
+        "moderation group cleanup PostgreSQL concurrent delete/save/rollback validation"
+      ],
+      "not_applicable": [
+        "v2305-schedulable-timer-and-requestcapture-fixes: source fixes only apply to the absent schedulable-timer/requestcapture modules; retain the original deferral reason.",
+        "afbef7c8c duplicate DeepSeek image alias fix: required source alias predecessor is absent locally."
+      ],
+      "remaining_deferrals": [
+        "scheduler membership projection still lacks credentials, transient times and retirement fencing",
+        "explicit upstream-error no-charge policy changes real terminal billing",
+        "DeepSeek unsafe schema/ID collision/native scope and parser-dependent DSML",
+        "Hosted Search loses chargeable results and depends on DSML",
+        "auto whitelist clears manual mappings on failed fetch and retries stale fetchErr",
+        "mutable main catalogue provider/alias/ETag",
+        "public settings CDN auth/captcha cache semantics",
+        "automatic IP/key disablement",
+        "account blacklist lacks mcp_oauth_grants",
+        "DataTable large patch conflicts with local virtualization",
+        "outbox batching and 60-second statistics cache consistency",
+        "fixed 30% critical threshold overrides configured zero",
+        "DeepSeek 48K/20MB and 30-65 minute policy lack local evidence",
+        "Auth Quiet/SSR are product redesigns",
+        "Mihomo/upstream monitor/raw dump/trace modules are absent",
+        "Explicit Gemini cache CRUD/bound-cache pool runtime, management MCP/OAuth credentials, account-size routing, penalty configuration and image-size stickiness remain outside the adapted source contracts."
+      ]
+    },
+    "implemented_scope": {
+      "gemini_36_promotion": "Published pricing constants are present; no automatic expiry scheduler is added.",
+      "terra_and_gpt62": "GPT-6.1 Terra and GPT-6.2 Sol/Astra model reasoning/sampling/Codex/HTTP/WS bridge adapted; Terra none preserved and GPT-6.2 none/minimal rejected.",
+      "cache_usage": "30m/12h cache usage is recorded only when both upstream buckets are complete nonnegative integers whose sum equals aggregate usage; request TTL is not used to infer billing.",
+      "ultra_fast": "Force flags and channel override implement nil inheritance, valid positive multipliers, and reject zero/negative; Pro/chatgptpro and workspace/request-time entitlements retain local policy.",
+      "stream_and_schema": "First-output spool, tool-schema preservation, Gemini parallel tools/thoughts, response instructions echo and messages prelude/terminal/error boundaries adapted with bounded buffering and no false client-visible output.",
+      "retention_and_dedup": "Rollup retention boundary, bounded primary-key archive/delete, canonical transcript identity and 24-hour refusal UPSERT retain atomic billing/idempotency; local migration 274 addresses trigger boundaries.",
+      "privacy": "Client egress strips relay identifiers and maps relay error types while Ops/usage/financial observations retain raw semantics. Four line-oriented SSE exits join complete multiline error JSON, retain metadata/CRLF and leave successful bytes unchanged; default raw-frame reader behavior is preserved.",
+      "frontend": "CSV export, deleted groups, account edit shell, group Ultra Fast fields and account usage-cell rendering adapted while retaining local theme.",
+      "claude52": "Formal v0.2.21 eb2da3448/3e8c2ee3f/d216e4215: Fable/Mythos 5.2 protocol, thinking, catalog, native/bridge validation, standard/Fast pricing and UI adapted; CLI 2.1.321.",
+      "account_vs_user_cost": "d05e8ef03: raw and rollup endpoint/model statistics retain distinct customer actual cost and account cost; Gemini quota uses account cost. User API/UI omit account cost; admin UI shows a separate column. Hourly endpoint rows and raw tails are consolidated without losing account cost.",
+      "messages_disconnect_bound": "Client context cancellation and failed writes start one fixed drain deadline; continuous heartbeats cannot reset it. The existing wrapper supplies a 180-second default when idle timeout is disabled; real usage is retained without replay or estimates.",
+      "gemini_carbon_hydrogen_vertex": "Formal original/v0.2.23 ancestors d70a23f84,32e70f3d4,b32ad6dfe,68071ddde,2164ea487: Carbon protocol/catalog/thinking/whitelist and Carbon/Hydrogen static price cards. Vertex us/eu URL and 1.1 default model-price factor share the actual cached resource region, including escaped JSON paths. Group/channel final pricing and custom account rules take priority; no automatic Carbon date-based repricing is invented. These commits are not ancestors of fork v2.3.105.",
+      "gemini_same_account_retries": "4197fa620: config gateway.max_same_account_retries_gemini defaults to 4, accepts 0–10; zero means one initial attempt. Native/Messages/Chat use the same budget; signature downgrade does not consume transient retries. No retry after response output or chargeable usage; handler failover requires nil result. a20741237 bound-cache pool follow-up remains with absent explicit-cache runtime.",
+      "http_request_body_memory": "457602c8f/c004c962a/03bd718ab: shared HTTP body reservation includes chunks, contiguous copies, decompression/Zstd and normalization; released on handler completion/cancel/failure. Exhaustion yields protocol-specific 503 and Retry-After: 1. Auto budget uses one quarter of the smallest RAM/cgroup/GOMEMLIMIT limit with a 1 GiB floor; explicit 0 preserved. os.Root constrains cgroup paths. Upgraded WS frames keep their independent lifecycle.",
+      "account_query_refresh": "4ac1675b5/4a22a75b3: Antigravity active query bypasses both cache checks while retaining singleflight. Refresh keeps account rows and existing quota values; table is busy/inert until refreshed.",
+      "keys_async_usage": "b8de5e170: key list readiness is independent of deferred usage aggregates; cancel and request ownership prevent old responses/finalizers overwriting new data. Append-only migration275 adds the api_key_id/created_at covering index INCLUDE(actual_cost), with invalid-index recovery in the nontransactional runner.",
+      "compact_usage": "ce7a129fe compact slice: admin lists project display metadata in Ent and skip subscriptions, excluding secrets/credentials/large pricing from SQL and DTO. Admin-only account_summary; legacy user/detail contracts preserved. Table navigation/deleted badges and XLSX/CSV display names accept summary and legacy shapes. CSV escapes formula-like user text while preserving numeric costs and XLSX string cells.",
+      "lazy_announcements": "7d1249b10 announcement slice: login/navigation/focus fetch badge counts, bell loads a body-free timeline/excerpts and on-demand detail; popup bootstrap has at most five eligible unread bodies. Summary/popup selection uses body-free metadata SQL. Details and acknowledgements share active/target authorization; frontend requests, cache and acknowledgement states are isolated across sessions. Retired tickets/SSR/sidebar redesign excluded.",
+      "already_equivalent": "Mapping-as-existence union already exists in baseline Channel.SupportedModels plus authorized global pricing enrichment. Settings sticky save toolbar already meets save-dock access; do not replace it with the source floating UI."
+    },
+    "excluded_or_preserved": [
+      "Source VERSION; personal VERSION remains 2.1.67.",
+      "Go toolchain already at 1.27.4; follow-redirects local override already >=1.16.2.",
+      "Retired payment/crypto/Mixed/ticket/canvas/affiliate features and withdrawn journals remain absent.",
+      "DeepSeek extra output modalities/tool-call/family/authoritative schema has no current DTO consumer and would override primary-wins; keep excluded. Implemented max output 393216 and exact names only.",
+      "Kimi 4067236b neighbor-family 262144/65536 inference is not official evidence; do not import or call it authoritative."
+    ],
+    "verification": {
+      "evidence_directory": ".artifacts/original-sync-20261118-v0223",
+      "accepted_evidence": [
+        "cache-apicompat-verified.jsonl (895)",
+        "cache-service-accepted.jsonl (229)",
+        "models-complete-tests.jsonl (271)",
+        "models-service-final.jsonl (1288)",
+        "models-final-regression.jsonl (307)",
+        "models-terra-bridge-final.jsonl (47)",
+        "privacy-util-final.log",
+        "privacy-final-targeted.log",
+        "privacy-final-confirmed.log",
+        "instructions-echo-final.jsonl",
+        "messages-handler-fixed.jsonl",
+        "frontend-final-tests.log (229 tests / 11 files)",
+        "frontend-public-final.log (35 tests / 3 files)",
+        "frontend-lint.log",
+        "retention-sql-wasm.log (19 checks)",
+        "claude52-final-backend.jsonl (414)",
+        "claude52-frontend.log (66)",
+        "claude52-final-usekey.log (32)",
+        "messages-bound-and-account-cost.jsonl (123)",
+        "account-cost-frontend.log (28)",
+        "account-cost-rollup-final.jsonl (10)",
+        "privacy-multiline-final.log",
+        "ui-acceptance-results.json (26)",
+        "endpoint-cost-ui-results.json (8)",
+        "final-boundary-results.json",
+        "gemini-vertex-verification.json (754 backend / 27 frontend; includes 27 real ForwardNative-to-RecordUsage cases)",
+        "body-budget-test-summary.json (253 top-level / 639 pass events)",
+        "gemini-retry-verification.json (147 top-level / 604 pass events)",
+        "account-query-service.jsonl",
+        "account-query-and-refresh-ui.log (56 AccountUsageCell cases)",
+        "account-refresh-ui-final.log (17)",
+        "keys-async-usage.log (47)",
+        "keys-index-runner.jsonl",
+        "keys-index-sql-wasm.log (5)",
+        "compact-usage-backend.jsonl (30)",
+        "compact-usage-frontend.log (56 passing UsageTable cases; intermediate export failure superseded by compact-csv-final.log)",
+        "compact-csv-final.log (48)",
+        "account-keys-compact-ui-results.json (4 viewport/theme groups)",
+        "accepted-backend-tests-summary.json (20 packages / 1268 selected top-level / 3018 pass events)",
+        "announcements-lazy-frontend.log (58)",
+        "announcements-lazy-preview.log (24)",
+        "announcements-lazy-browser-results.json (4 viewport/theme groups)",
+        "final-acceptance-results.json"
+      ],
+      "limitations": [
+        "No Docker or local PostgreSQL was available; real PostgreSQL concurrency/integration, schema upgrade/rollback and Redis coverage remain pending. SQL/PGlite results do not substitute for PostgreSQL.",
+        "Windows symlink creation lacked permission for one cgroup escape subtest; the Windows junction escape test passed. Linux amd64 was cross-compiled, not executed natively.",
+        "Intermediate failing or stale logs are superseded only by the named final passing evidence. Per-feature counts overlap and must not be summed."
+      ]
+    }
   }
 }

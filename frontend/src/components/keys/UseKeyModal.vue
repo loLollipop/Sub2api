@@ -1352,7 +1352,14 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
       }
     }
   }
+  const solAstraOptions = {
+    limit: { context: 1050000, output: 128000 },
+    options: { store: false },
+    variants: { low: {}, medium: {}, high: {}, xhigh: {}, max: {} }
+  }
   const openaiModels = {
+    'gpt-6.2-sol': { name: 'GPT-6.2 Sol', ...solAstraOptions },
+    'gpt-6.2-astra': { name: 'GPT-6.2 Astra', ...solAstraOptions },
     'gpt-6': {
       name: 'GPT-6 (Astra)',
       limit: {
@@ -1430,6 +1437,24 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
         store: false
       },
       variants: {
+        low: {},
+        medium: {},
+        high: {},
+        xhigh: {},
+        max: {}
+      }
+    },
+    'gpt-6.1-terra': {
+      name: 'GPT-6.1 Terra',
+      limit: {
+        context: 1050000,
+        output: 128000
+      },
+      options: {
+        store: false
+      },
+      variants: {
+        none: {},
         low: {},
         medium: {},
         high: {},
@@ -1840,7 +1865,35 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
       }
     }
   }
+  // Mythos requires eligibility from Anthropic; configuration does not grant access.
   const anthropicModels = {
+    'claude-fable-5-2': {
+      name: 'Claude Fable 5.2',
+      limit: { context: 1000000, output: 128000 },
+      modalities: { input: ['text', 'image', 'pdf'], output: ['text'] },
+      options: { thinking: { type: 'adaptive' }, effort: 'high' },
+      variants: {
+        low: { effort: 'low' },
+        medium: { effort: 'medium' },
+        high: { effort: 'high' },
+        xhigh: { effort: 'xhigh' },
+        max: { effort: 'max' }
+      }
+    },
+    'claude-mythos-5-2': {
+      name: 'Claude Mythos 5.2',
+      limit: { context: 1000000, output: 128000 },
+      modalities: { input: ['text', 'image', 'pdf'], output: ['text'] },
+      options: { thinking: { type: 'adaptive' }, effort: 'high' },
+      variants: {
+        low: { effort: 'low' },
+        medium: { effort: 'medium' },
+        high: { effort: 'high' },
+        xhigh: { effort: 'xhigh' },
+        max: { effort: 'max' }
+      }
+    },
+
     'claude-opus-5-5': {
       name: 'Claude Opus 5.5',
       limit: {
@@ -2035,7 +2088,9 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   return {
     path: pathLabel ?? 'opencode.json',
     content,
-    hint: t('keys.useKeyModal.opencode.hint')
+    hint: platform === 'anthropic'
+      ? `${t('keys.useKeyModal.opencode.hint')} ${t('keys.useKeyModal.opencode.mythosEligibilityHint')}`
+      : t('keys.useKeyModal.opencode.hint')
   }
 }
 

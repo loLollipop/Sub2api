@@ -148,7 +148,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	// derive a stable seed from the final upstream model family.
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+	if err := validateGPT61CompatRequest(body, upstreamModel); err != nil {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
@@ -1184,8 +1184,8 @@ func writeChatCompletionsError(c *gin.Context, statusCode int, errType, message 
 	MarkResponseCommitted(c)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
-			"type":    clientprivacy.Text(errType),
-			"message": clientprivacy.Text(message),
+			"type":    clientprivacy.ErrorType(statusCode, clientprivacy.Text(errType)),
+			"message": ClientUpstreamErrorMessage(clientprivacy.Text(message)),
 		},
 	})
 }
@@ -1199,7 +1199,7 @@ func buildChatStreamErrorSSE(code, message string) string {
 		"error": gin.H{
 			"type":    "invalid_request_error",
 			"code":    clientprivacy.Text(code),
-			"message": clientprivacy.Text(message),
+			"message": ClientUpstreamErrorMessage(clientprivacy.Text(message)),
 		},
 	})
 	if err != nil {

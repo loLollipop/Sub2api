@@ -69,6 +69,8 @@ const usageLogsGroupRollupCoveringIndex = "idx_usage_logs_rollup_created_group_c
 const usageLogsUpstreamRequestIDIndexMigration = "233_add_usage_log_upstream_request_id_index_notx.sql"
 const usageLogsUpstreamRequestIDIndex = "idx_usage_logs_upstream_request_id"
 const requestIDSearchIndexesMigration = "264_add_request_id_search_indexes_notx.sql"
+const usageLogsAPIKeyCostIndexMigration = "275_add_usage_logs_api_key_cost_index_notx.sql"
+const usageLogsAPIKeyCostIndex = "idx_usage_logs_api_key_created_cost"
 
 var requestIDSearchIndexes = [...]struct{ name, table, column string }{
 	{"idx_usage_logs_request_id_trgm", "usage_logs", "request_id"},
@@ -394,6 +396,8 @@ func prepareNonTransactionalMigration(ctx context.Context, db migrationConnectio
 		return dropInvalidIndexIfPresent(ctx, db, usageLogsGroupRollupCoveringIndex)
 	case usageLogsUpstreamRequestIDIndexMigration:
 		return dropInvalidIndexIfPresent(ctx, db, usageLogsUpstreamRequestIDIndex)
+	case usageLogsAPIKeyCostIndexMigration:
+		return dropInvalidIndexIfPresent(ctx, db, usageLogsAPIKeyCostIndex)
 	case requestIDSearchIndexesMigration:
 		// Recheck even if the extension migration was applied in an earlier run:
 		// it may since have been removed or hidden by a changed search_path.

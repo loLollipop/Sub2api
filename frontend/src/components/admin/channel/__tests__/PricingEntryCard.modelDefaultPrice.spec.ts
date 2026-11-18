@@ -49,6 +49,20 @@ const emittedEntries = (wrapper: ReturnType<typeof shallowMount>) =>
   (wrapper.emitted('update') ?? []).map(e => e[0] as PricingFormEntry)
 
 describe('PricingEntryCard default price auto-fill', () => {
+  it('edits the OpenAI Ultra Fast override independently and clears to inheritance', async () => {
+    const wrapper = shallowMount(PricingEntryCard, {
+      props: { entry: { ...createEntry(['gpt-6.2-sol']), ultrafast_multiplier: 1.25 }, platform: 'openai', enableUltrafastMultiplier: true },
+    })
+    const field = wrapper.get('input[aria-label="admin.channels.form.ultrafastMultiplier"]')
+    expect((field.element as HTMLInputElement).value).toBe('1.25')
+    await field.setValue('1')
+    expect(emittedEntries(wrapper).at(-1)?.ultrafast_multiplier).toBe('1')
+    await field.setValue('')
+    expect(emittedEntries(wrapper).at(-1)?.ultrafast_multiplier).toBeNull()
+    await wrapper.setProps({ platform: 'anthropic' })
+    expect(wrapper.find('input[aria-label="admin.channels.form.ultrafastMultiplier"]').exists()).toBe(false)
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     getModelDefaultPricing.mockImplementation(async model => model === 'claude-opus-4-7'

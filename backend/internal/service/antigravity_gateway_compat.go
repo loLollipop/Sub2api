@@ -235,7 +235,7 @@ func (s *AntigravityGatewayService) prepareAntigravityCompatCall(
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", "Invalid request body")
 	}
 
-	mappedModel := s.getMappedModel(account, request.originalModel)
+	mappedModel := s.getMappedModelForThinkingLevel(account, request.originalModel, geminiThinkingLevelFromClaudeBody(request.claudeBody, claudeRequest.Thinking))
 	if mappedModel == "" {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
 		message := fmt.Sprintf("model %s not in whitelist", request.originalModel)
@@ -298,6 +298,7 @@ func (s *AntigravityGatewayService) buildAntigravityCompatGeminiBody(
 			return nil, err
 		}
 		body = ensureGeminiFunctionCallThoughtSignatures(body)
+		body = applyGeminiCompatThinkingConfig(body, claudeBody, mappedModel, claudeRequest != nil && claudeRequest.Stream)
 		body, err = injectIdentityPatchToGeminiRequest(body)
 		if err != nil {
 			return nil, err
@@ -542,8 +543,8 @@ func (s *AntigravityGatewayService) writeAntigravityCompatError(
 	MarkResponseCommitted(c)
 	c.JSON(status, gin.H{
 		"error": gin.H{
-			"message": clientprivacy.Text(message),
-			"type":    clientprivacy.Text(errType),
+			"message": ClientUpstreamErrorMessage(clientprivacy.Text(message)),
+			"type":    clientprivacy.ErrorType(status, clientprivacy.Text(errType)),
 			"param":   nil,
 			"code":    nil,
 		},

@@ -70,8 +70,8 @@ func WrapUpstreamErrorForClient(statusCode int, body []byte) (status int, errTyp
 	errCode = extractUpstreamErrorCode(body)
 	// All classification above uses the original evidence. Only this client
 	// presentation is sanitized; the caller still owns the raw upstream body.
-	errType = clientprivacy.Text(errType)
+	errType = clientprivacy.ErrorType(status, clientprivacy.Text(errType))
 	errCode = clientprivacy.Text(errCode)
-	message = clientprivacy.Text(message)
+	message = ClientUpstreamErrorMessage(clientprivacy.Text(message))
 	return
 }

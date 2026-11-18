@@ -185,7 +185,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		}
 		reqStream = gjson.GetBytes(body, "stream").Bool()
 
-		accountScopedBody, accountScoped, scopeErr := applyCodexAccountIdentityClientMetadataRaw(body, codexAccountIdentitySource(c, account), getAPIKeyIDFromContext(c))
+		accountScopedBody, accountScoped, scopeErr := applyCodexAccountIdentityClientMetadataRaw(body, codexAccountIdentitySource(c, account), getAPIKeyIDFromContext(c), codexClientSessionID(c))
 		if scopeErr != nil {
 			return nil, scopeErr
 		}

@@ -247,6 +247,19 @@ describe('API Client', () => {
   // --- 响应拦截器 ---
 
   describe('响应拦截器', () => {
+    it.each([400, 403, 408, 429, 502, 503])('保留用量导出重试判断所需的顶层 HTTP %s 状态码', async status => {
+      const usage = await import('@/api/admin/usage')
+      const adapter = vi.fn().mockRejectedValue({
+        response: { status, data: { code: 'EXPORT_FAILED', message: 'Export request failed' } },
+        config: { url: '/admin/usage', headers: {} },
+      })
+      apiClient.defaults.adapter = adapter
+
+      await expect(usage.adminUsageAPI.list({ page: 1, page_size: 1000 }))
+        .rejects.toMatchObject({ status, code: 'EXPORT_FAILED', message: 'Export request failed' })
+      expect(adapter).toHaveBeenCalledTimes(1)
+    })
+
     it('code=0 时解包 data 字段', async () => {
       const adapter = vi.fn().mockResolvedValue({
         status: 200,

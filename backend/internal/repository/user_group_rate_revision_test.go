@@ -33,6 +33,13 @@ func TestUserGroupRateRepositoryRevision_SuccessfulWrites(t *testing.T) {
 		{"group clear all", func(r service.UserGroupRateRepository) error {
 			return r.SyncGroupRateMultipliers(context.Background(), 10, nil)
 		}, []string{"UPDATE user_group_rate_multipliers", "DELETE FROM user_group_rate_multipliers"}, true},
+		{"rpm upsert zero", func(r service.UserGroupRateRepository) error {
+			zeroRPM := 0
+			return r.SyncGroupRPMOverrides(context.Background(), 10, []service.GroupRPMOverrideInput{{UserID: 42, RPMOverride: &zeroRPM}})
+		}, []string{"UPDATE user_group_rate_multipliers", "DELETE FROM user_group_rate_multipliers", "INSERT INTO user_group_rate_multipliers"}, true},
+		{"rpm clear all", func(r service.UserGroupRateRepository) error {
+			return r.SyncGroupRPMOverrides(context.Background(), 10, nil)
+		}, []string{"UPDATE user_group_rate_multipliers", "DELETE FROM user_group_rate_multipliers"}, true},
 		{"delete group", func(r service.UserGroupRateRepository) error { return r.DeleteByGroupID(context.Background(), 10) }, []string{"DELETE FROM user_group_rate_multipliers"}, false},
 		{"delete user", func(r service.UserGroupRateRepository) error { return r.DeleteByUserID(context.Background(), 42) }, []string{"DELETE FROM user_group_rate_multipliers"}, false},
 	} {
@@ -67,7 +74,7 @@ func TestUserGroupRateRepositoryRevision_SuccessfulWrites(t *testing.T) {
 
 func TestUserGroupRateRepositoryRevision_FailedWritesDoNotAdvance(t *testing.T) {
 	writeErr := errors.New("write failed")
-	for _, method := range []string{"user sync", "group sync"} {
+	for _, method := range []string{"user sync", "group sync", "rpm sync"} {
 		for _, stage := range []string{"begin", "first write", "later write", "commit"} {
 			t.Run(method+"/"+stage, func(t *testing.T) {
 				db, mock, err := sqlmock.New()
@@ -94,9 +101,12 @@ func TestUserGroupRateRepositoryRevision_FailedWritesDoNotAdvance(t *testing.T) 
 						}
 					}
 				}
-				if method == "user sync" {
+				switch method {
+				case "user sync":
 					err = repo.SyncUserGroupRates(context.Background(), 42, nil)
-				} else {
+				case "rpm sync":
+					err = repo.SyncGroupRPMOverrides(context.Background(), 10, nil)
+				default:
 					err = repo.SyncGroupRateMultipliers(context.Background(), 10, nil)
 				}
 				require.ErrorIs(t, err, writeErr)

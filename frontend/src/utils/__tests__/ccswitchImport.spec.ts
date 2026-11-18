@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CC_SWITCH_APPS,
   CLAUDE_CC_SWITCH_MODEL,
@@ -7,11 +7,31 @@ import {
   OPENAI_CC_SWITCH_CODEX_MODEL,
   buildCcSwitchImportDeeplink,
   ccSwitchProviderDeeplinkSupported,
+  fetchCcSwitchModels,
   parseCcSwitchModelsList,
   pickCcSwitchModel,
   resolveCcSwitchImportConfig
 } from '@/utils/ccswitchImport'
 import type { GroupPlatform } from '@/types'
+
+afterEach(() => vi.unstubAllGlobals())
+
+describe('CC Switch model discovery URLs', () => {
+  it.each([
+    ['https://api.example.com', 'https://api.example.com/v1/models'],
+    ['https://api.example.com/v1/', 'https://api.example.com/v1/models'],
+    ['https://api.example.com/proxy/v1?region=eu#fragment', 'https://api.example.com/proxy/v1/models?region=eu'],
+    ['https://api.example.com/proxy?region=eu', 'https://api.example.com/proxy/v1/models?region=eu'],
+  ])('composes %s without duplicate versions or misplaced query strings', async (base, expected) => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ id: 'model-a' }] }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+    expect(await fetchCcSwitchModels(base, 'synthetic-key', controller.signal)).toEqual(['model-a'])
+    expect(fetchMock).toHaveBeenCalledWith(expected, {
+      headers: { Authorization: 'Bearer synthetic-key' }, signal: controller.signal,
+    })
+  })
+})
 
 function paramsFromDeeplink(deeplink: string): URLSearchParams {
   const query = deeplink.split('?')[1] || ''

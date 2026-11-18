@@ -90,6 +90,9 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/admin/__tests__/SettingsView.spec.ts \
 	src/views/admin/__tests__/DashboardView.spec.ts \
 	src/views/admin/__tests__/UsageView.spec.ts \
+	src/utils/__tests__/ccswitchImport.spec.ts \
+	src/views/user/__tests__/ChannelStatusV3View.platformGroups.spec.ts \
+	src/components/user/monitor/__tests__/ChannelMonitorV3Card.statusBadge.spec.ts \
 	src/components/user/monitor/__tests__/ChannelMonitorV3Timeline.unknownBar.spec.ts \
 	src/features/channel-monitor-v2/__tests__/groupStatusDot.spec.ts \
 	src/features/channel-monitor-v2/__tests__/designSystem.structure.spec.ts \

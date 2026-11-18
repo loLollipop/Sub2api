@@ -9,18 +9,19 @@
     "v0.2.18": "ac1b8f1271be0d674fa6f074403c1410f30a3a81",
     "v0.2.19": "dece26153621959ccd7635814f4b2d08304e681a",
     "v0.2.20": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
-    "v0.2.21": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10"
+    "v0.2.21": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
+    "v0.2.22": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b"
   },
-  "latest_reviewed_main_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
+  "latest_reviewed_main_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v0.2.21",
-  "reviewed_release_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
+  "reviewed_release_tag": "v0.2.22",
+  "reviewed_release_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+    "source_head": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
     "implemented_with_local_regression": [
       "Toolchain, cooldown scopes and frontend lifecycle fixes",
       "2026-10-17 Responses created_at, Gemini compatibility thinking, subscription retirement/public catalogs and payment compatibility; dated sync note records local adaptations and verification",
@@ -36,7 +37,8 @@
       "Anthropic protocol base URL, Composite OpenAI OAuth ambiguity rejection and configurable minimum output tokens",
       "Argon and Antigravity catalogs, tool media/native parts, GLM credit windows and source pricing constants",
       "2026-10-29 formal v0.2.19 selective multipart, pagination, rate-limit, malformed response, image usage, role, fingerprint, cache, admin and Gemini catalog fixes; see maintenance/notes/upstream-sync-20261029.md",
-      "2026-11-07 formal v0.2.20 selective resource bounds, legacy-compatible cyber prefix matching, Gemini/Antigravity tool/schema/stream fixes, safe authentication/read errors and eight protocol/usage correctness fixes; see maintenance/notes/upstream-sync-20261107-v0220.md"
+      "2026-11-07 formal v0.2.20 selective resource bounds, legacy-compatible cyber prefix matching, Gemini/Antigravity tool/schema/stream fixes, safe authentication/read errors and eight protocol/usage correctness fixes; see maintenance/notes/upstream-sync-20261107-v0220.md",
+      "Formal v0.2.22: Login identity nil handling; schema strict=false; mid-conversation system->developer; sealed function content; raw Gemini response_format/OAuth schema bytes; Antigravity items/type consistency; raw-cased count_tokens headers; client metadata.user_id; additional_tools declaration IDs; parent Codex prompt-cache namespace; HTML no-store/nonce; atomic group multiplier/RPM sync with last-entry wins and post-commit revisions. See maintenance/notes/upstream-sync-20261118.md."
     ],
     "implemented_not_runtime_enabled": [
       "Gemini cache binding/endpoint identity260-261 and source-compatible quote/protocol helpers; runtime CRUD is not enabled"
@@ -45,8 +47,16 @@
       "Upstream Gemini cache runtime integration remains unfinished; do not replace it with a newly designed financial/recovery subsystem",
       "Gemini promotion automatic expiry is not implemented upstream; current source constants are imported without a new pricing scheduler"
     ],
-    "reverted_local_mechanisms_by_user_request": ["Custom Gemini operation journal/migration262 and v2 frozen-price schedule", "Custom System One journal/manual-resolution APIs/recovery worker/migration267 and native-only hold markers", "Experimental durable-image task store and this continuation's Redis CAS/billing-recovery extensions"],
-    "verification_limits": ["Full frontend387 files/3095 tests, typecheck/lint/pinned production build passed", "Mixed actual HTTP/SSE native-dispatch regression1004 tests/subtests passed", "Production-schema-only PostgreSQL16 migration rehearsal applies ten migrations twice; final backend/CI and production rollout gates are recorded separately"],
+    "reverted_local_mechanisms_by_user_request": [
+      "Custom Gemini operation journal/migration262 and v2 frozen-price schedule",
+      "Custom System One journal/manual-resolution APIs/recovery worker/migration267 and native-only hold markers",
+      "Experimental durable-image task store and this continuation's Redis CAS/billing-recovery extensions"
+    ],
+    "verification_limits": [
+      "Full frontend387 files/3095 tests, typecheck/lint/pinned production build passed",
+      "Mixed actual HTTP/SSE native-dispatch regression1004 tests/subtests passed",
+      "Production-schema-only PostgreSQL16 migration rehearsal applies ten migrations twice; final backend/CI and production rollout gates are recorded separately"
+    ],
     "evidence": ".artifacts/source-sync-resume-20261015/notes.md"
   },
   "selected_fixes": [
@@ -162,11 +172,13 @@
     "2026-11-07: image-size-tier stickiness6b565e45a depends on excluded size routing. Empty-instructions/response-echo a699c2bae changes existing Codex validation/default injection across protocols and remains deferred as a complete policy group."
   ],
   "observed_delta_review": {
-    "from_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
-    "to_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
-    "reviewed_release_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
-    "status": "formal_v0221_selective_backport",
-    "evidence": "maintenance/notes/upstream-sync-20261111.md"
+    "from_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
+    "to_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+    "status": "formal_v0222_selective_backport",
+    "scope": "Login identity nil handling; schema strict=false; mid-conversation system->developer; sealed function content; raw Gemini response_format/OAuth schema bytes; Antigravity items/type consistency; raw-cased count_tokens headers; client metadata.user_id; additional_tools declaration IDs; parent Codex prompt-cache namespace; HTML no-store/nonce; atomic group multiplier/RPM sync with last-entry wins and post-commit revisions.",
+    "review_depth": "Complete path/commit inventory and module-level selection; selected fixes and named incompatibilities received code-level review. Deferred runtime code was not all line-by-line audited.",
+    "observed_main_not_imported": "69d2fae91318359e4e25c0171eaf70364dad3629",
+    "evidence": "maintenance/notes/upstream-sync-20261118.md"
   },
   "sync_20261022": {
     "evidence": "maintenance/notes/upstream-sync-20261022.md",
@@ -270,5 +282,58 @@
       "Keys async30-day usage plus covering index, retained-refresh-row UI, Antigravity query button and settings save dock require separate local UI adaptation."
     ],
     "excluded_scope": "Retired payment changes, source release/deployment bookkeeping and original-catalog image documentation. Observed main after the official release is recorded only, not imported."
+  },
+  "sync_20261118_v0222": {
+    "evidence": "maintenance/notes/upstream-sync-20261118.md",
+    "personal_version": "2.1.66",
+    "release_status": "User subsequently authorized GitHub submission and deployment. Prepare personal v2.1.67; final PR/CI, artifact and controlled rollout evidence recorded separately.",
+    "reviewed_release_tag": "v0.2.22",
+    "reviewed_release_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+    "observed_main_commit": "69d2fae91318359e4e25c0171eaf70364dad3629",
+    "reviewed_delta": {
+      "from_version": "0.2.21",
+      "commits": 187,
+      "paths": 340,
+      "path_counts": {
+        "excluded": 6,
+        "deferred": 295,
+        "retained_local": 3,
+        "selected_partial": 36
+      }
+    },
+    "selected_source_commits": [
+      "197109ebce6ab4700052aad261b7200574b8932e",
+      "d085bb1a377bb42248da3bfa6d12cf205769fb56",
+      "6c79fdfc7ab55e2c067b475ee4a498efd12423c2",
+      "4584dcb39228ec606193f63d79b7a465e8751c1e",
+      "5846bfbbfaccb3bfad8f3bc006e2619306aaadb4",
+      "8480cb0cd95710de66052dabf364f6e62d267f0f",
+      "2b86d2f6a023bc7d1442bc2a350cb952d3616cb6",
+      "1f2242436293c1a64e5e17b17ca1033af902f232",
+      "fd648775810ed4348a44daaacaf38042d4927486",
+      "74ba91aa6b6d130d0b0029fabffed6ce3425dffe",
+      "f1394a1ab4ab22e2e221e0df20a6d898074567f0",
+      "98a44ba3f36f3acfd77cebc796fc10248c582018"
+    ],
+    "selected_scope": "Login identity nil handling; schema strict=false; mid-conversation system->developer; sealed function content; raw Gemini response_format/OAuth schema bytes; Antigravity items/type consistency; raw-cased count_tokens headers; client metadata.user_id; additional_tools declaration IDs; parent Codex prompt-cache namespace; HTML no-store/nonce; atomic group multiplier/RPM sync with last-entry wins and post-commit revisions.",
+    "already_covered": [
+      "Target-group RPM eligibility resets loaded override state before lookup.",
+      "Go 1.27.4 already adopted.",
+      "Retain local immutable snapshot clones and bounded singleflight fallback rather than replacing with upstream optimization."
+    ],
+    "deferred_scope": {
+      "explicit_error_no_charge": "Fork v2.3.104-105 changes the local real-terminal billing policy by waiving requests that end with an explicit upstream error after partial content/usage; subsequently completed delivered answers and empty error objects are excluded. Protocol coverage differs (WS/Bedrock/Antigravity/images excluded). Defer the entire family, including Hosted Search hooks.",
+      "scheduler_membership": "Original 39bac35a changes snapshot loading to ListModelAvailabilityCandidates. The local implementation is a short-lived model-diagnosis projection that deliberately omits credentials and transient timestamps, not a complete scheduler account. Copying it would lose authentication/cooldown information. Defer until a complete uncached scheduler-pool query, outbox freshness, retirement fencing and immutable/coalesced reads can be adapted together. Cooling membership expiry is not claimed fixed.",
+      "model_cooldown_fallback": "Fork a3bc6ff7/d1bd6fcc change advisory model cooldown, retries and reset boundaries. Retain local durable-fault exclusions and no-replay/failover policy; do not import the fallback family independently of scheduler membership.",
+      "pricing_and_quota": "Ultrafast, DeepSeek OCR/TTS/ASR, Gemini Carbon/Hydrogen/Vertex regional pricing, cache 5m/1h split, DeepSeek explicit override provenance and account-vs-user cost reporting require separate final-wire/explicit-zero/native-pricing review; no migrations or pricing data imported.",
+      "usage_aggregation": "Keep previously deferred rollup/shared statistics caching, covering indexes, live-balance outbox and archive/retention optimization deferred as complete modules; do not append source migrations 251/315-318 to the local migration history.",
+      "upstream_monitor": "Local upstream_monitor source/module is absent; alert SQL casts and pending-alert retry are dependencies of the already deferred balance/type monitor, not standalone local fixes.",
+      "relay_privacy": "Fork 39b93877 adds status-aware relay fingerprint/error-type normalization across handler/SSE/WS egress. Retain local privacy sanitization; defer new rules until every relevant client exit and raw Ops observation can be validated together.",
+      "codex_uuid_schema": "Keep declaration IDs for additional_tools; defer UUID compaction (8dcdfff22), new context rewriting and tool-schema regex removal. They expand body rewriting beyond the selected declaration-preservation fix; collision/reference behavior and native passthrough need a separate review.",
+      "protocol_and_runtime": "Other stream/effort/quota refresh, Bedrock error semantics, Gemini parallel tool calls, upstream keepalive/TCP timeout, first-output spool fallback, large DeepSeek request/wait policies and billing-lane/zero-copy optimizations remain unchanged. No claim that these unrelated source fixes are locally implemented.",
+      "ui_extensions": "Retain the local theme and UI. CSV export, deleted-group distribution, whitelist wildcard restrictions, quota/table refresh redesign and new media/pricing documentation are not part of the selected fixes.",
+      "previous_deferrals": "Preserve all existing Hosted Search, catalogue/Plaza, auto-risk, raw request dump, connection trace and account blacklist deferrals. Retired native payments/crypto/Mixed/tickets are not restored."
+    },
+    "source_inventory": ".artifacts/dual-sync-20261118/original-selection-ledger.json"
   }
 }

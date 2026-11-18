@@ -45,7 +45,7 @@ func TestRelayPrivacyMultilineErrorsAtLocalStreamBoundaries(t *testing.T) {
 					require.Equal(t, 3, result.usage.OutputTokens)
 				case "native":
 					svc := &OpenAIGatewayService{cfg: cfg}
-					result, err := svc.handleNativeAnthropicStreamingResponse(t.Context(), response, c, nativeAnthropicTestAccount(), "k3", "k3", "k3", nil, time.Now())
+					result, err := svc.handleNativeAnthropicStreamingResponse(t.Context(), response, c, &Account{ID: 702, Platform: PlatformKimi, Type: AccountTypeAPIKey, Concurrency: 1}, "k3", "k3", "k3", nil, time.Now())
 					require.NoError(t, err)
 					require.Equal(t, 18, result.Usage.InputTokens)
 					require.Equal(t, 7, result.Usage.CacheReadInputTokens)

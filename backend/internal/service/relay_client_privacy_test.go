@@ -49,7 +49,7 @@ func TestRelayPrivacyLocalStreamBoundariesKeepUsageAndEvidence(t *testing.T) {
 					require.Equal(t, 11, result.usage.InputTokens)
 					require.Equal(t, 3, result.usage.OutputTokens)
 				case "native":
-					result, err := svc.handleNativeAnthropicStreamingResponse(t.Context(), resp, c, nativeAnthropicTestAccount(), "k3", "k3", "k3", nil, time.Now())
+					result, err := svc.handleNativeAnthropicStreamingResponse(t.Context(), resp, c, &Account{ID: 702, Platform: PlatformKimi, Type: AccountTypeAPIKey, Concurrency: 1}, "k3", "k3", "k3", nil, time.Now())
 					require.NoError(t, err)
 					require.Equal(t, 18, result.Usage.InputTokens)
 					require.Equal(t, 7, result.Usage.CacheReadInputTokens)

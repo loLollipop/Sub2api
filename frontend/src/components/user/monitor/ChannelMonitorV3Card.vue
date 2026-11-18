@@ -38,6 +38,8 @@
       :buckets="row.buckets"
       :countdown-seconds="countdownSeconds"
       :length="timelineLength"
+      :anchor-bucket-start="anchorBucketStart"
+      :bucket-seconds="bucketSeconds"
     />
 
     <ChannelMonitorV3QualityHistory
@@ -61,6 +63,8 @@ const props = withDefaults(defineProps<{
   row: MonitorMatrixRow
   countdownSeconds: number
   timelineLength: number
+  anchorBucketStart?: string
+  bucketSeconds?: number
   userRateMultiplier?: number | null
   showPlatformBadge?: boolean
 }>(), {

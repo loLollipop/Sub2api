@@ -2,27 +2,28 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.89",
-  "imported_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
+  "imported_version": "2.3.105",
+  "imported_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.89",
-  "latest_observed_release_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
-  "latest_observed_main_commit": "cf769dbac37dfc8ddc2de57dd584e4968e065bc3",
+  "latest_observed_version": "2.3.105",
+  "latest_observed_release_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
+  "latest_observed_main_commit": "a58e3d2eefccb39e8679d6d03435ef29e519b3a1",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.89",
-  "reviewed_release_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
+  "reviewed_release_tag": "v2.3.105",
+  "reviewed_release_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
   "observed_delta_review": {
-    "from_commit": "f3956f1a7f31254e47eaf8cbb6cd9d83f2998b1d",
-    "to_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
-    "status": "formal_v2389_selective_backport",
-    "scope": "Review formal v2.3.76-v2.3.89: 66 commits including merges, 49 non-merge commits / 96 paths. Adapt editable registration fields before consent, opt-out transport cooldown (default false) and checked-fields-only key bulk edits to local components/API. Existing Antigravity /hub UA retained. Defer blacklist with missing MCP OAuth SQL, unsafe DeepSeek schema/reasoning changes, raw dumps and absent trace module. Exclude retired payments and global theme changes.",
-    "evidence": "maintenance/notes/upstream-sync-20261116-v2389.md"
+    "from_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
+    "to_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
+    "status": "formal_v23105_selective_backport",
+    "scope": "CC Switch model/usage URL normalization (no browser globals required by exported script), shared real-time monitor slots and chronological quality history, 1000-row Excel export with bounded transient retries and cancellation. Native billing/theme retained.",
+    "review_depth": "Complete path/commit inventory and module-level selection; selected fixes and named incompatibilities received code-level review. Deferred runtime code was not all line-by-line audited.",
+    "evidence": "maintenance/notes/upstream-sync-20261118.md"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
+    "source_head": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -30,6 +31,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.90-v2.3.105: CC Switch model/usage URL normalization (no browser globals required by exported script), shared real-time monitor slots and chronological quality history, 1000-row Excel export with bounded transient retries and cancellation. Native billing/theme retained. See maintenance/notes/upstream-sync-20261118.md.",
       "Formal v2.3.77-v2.3.89: separate editable registration fields from consent-gated actions; add default-false OpenAI transport cooldown opt-out preserving prior blocks/failover/custom-code policy; adapt checked-fields-only key bulk edits with explicit zero, expiry clearing and smart-route replacement. Keep local /hub UA, protocols, billing and theme. See maintenance/notes/upstream-sync-20261116-v2389.md.",
       "Formal v2.3.67-v2.3.76: whole-request average output rate without TTFT dependence; positive-balance user totals from one non-deleted population; lazy latest-monitor-bucket group dots with per-view cache, failure backoff and accessible descriptions; distinguish absent timeline slots from actual unknown buckets. See maintenance/notes/upstream-sync-20261114-v2376.md.",
       "Formal v2.3.59-v2.3.66: idempotent API path joins preserving Cloudflare beta exceptions, native version routing and escaped boundaries; placeholder-zero input handling preserving explicit-zero cache/TTL and terminal billing; failed public-settings 30s retry cooldown with force/coalescing/injected config intact. See maintenance/notes/upstream-sync-20261113-v2366.md for scope and validation.",
@@ -1170,5 +1172,46 @@
     "preserved": "Personal VERSION was 2.1.65 during selective sync and advances to 2.1.66 for this user-authorized release. Preserve original v0.2.21 checkpoint, native protocols, local billing/rates and theme. No migration, dependency or production/runtime configuration changes; all three pre-existing untracked usage tests remain untouched.",
     "release_status": "User authorized GitHub submission and deployment on 2026-11-16. Prepare v2.1.66 via reviewed PR/CI, own Release/GHCR and backup/restore-validated rollout; final acceptance stored separately.",
     "release_review": "Independent implementation review found no blocking issues. Advance runtime source baseline to v2.3.89 and add bulk-edit modal test to the critical frontend CI list; existing source-checkpoint regressions pass."
+  },
+  "sync_20261118_v23105": {
+    "evidence": "maintenance/notes/upstream-sync-20261118.md",
+    "personal_version": "2.1.66",
+    "personal_start_commit": "2a6233c9a6e4ccc5d26c7e1351423cd3f8938806",
+    "release_status": "User subsequently authorized GitHub submission and deployment. Prepare personal v2.1.67 through reviewed PR/CI, own Release/GHCR, backup/restore and controlled rollout; final evidence recorded separately.",
+    "reviewed_release_tag": "v2.3.105",
+    "reviewed_release_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
+    "observed_main_commit": "a58e3d2eefccb39e8679d6d03435ef29e519b3a1",
+    "reviewed_delta": {
+      "from_version": "2.3.89",
+      "commits": 156,
+      "paths": 303,
+      "path_counts": {
+        "excluded": 63,
+        "deferred": 221,
+        "selected_partial": 19
+      }
+    },
+    "selected_source_commits": [
+      "cc00ea4b465155e4e6164f6fa6d1f135ba906953",
+      "1055013d4b962a96ab6dcd3473200fc09a58bd10",
+      "d4b0308d441988a9bfca6b66e1528f5d77f8c051",
+      "eda7d7c08a31e36a2acd89b89b41807bc1cdf180"
+    ],
+    "selected_scope": "CC Switch model/usage URL normalization (no browser globals required by exported script), shared real-time monitor slots and chronological quality history, 1000-row Excel export with bounded transient retries and cancellation. Native billing/theme retained.",
+    "deferred_scope": {
+      "explicit_error_no_charge": "Fork v2.3.104-105 changes the local real-terminal billing policy by waiving requests that end with an explicit upstream error after partial content/usage; subsequently completed delivered answers and empty error objects are excluded. Protocol coverage differs (WS/Bedrock/Antigravity/images excluded). Defer the entire family, including Hosted Search hooks.",
+      "scheduler_membership": "Original 39bac35a changes snapshot loading to ListModelAvailabilityCandidates. The local implementation is a short-lived model-diagnosis projection that deliberately omits credentials and transient timestamps, not a complete scheduler account. Copying it would lose authentication/cooldown information. Defer until a complete uncached scheduler-pool query, outbox freshness, retirement fencing and immutable/coalesced reads can be adapted together. Cooling membership expiry is not claimed fixed.",
+      "model_cooldown_fallback": "Fork a3bc6ff7/d1bd6fcc change advisory model cooldown, retries and reset boundaries. Retain local durable-fault exclusions and no-replay/failover policy; do not import the fallback family independently of scheduler membership.",
+      "pricing_and_quota": "Ultrafast, DeepSeek OCR/TTS/ASR, Gemini Carbon/Hydrogen/Vertex regional pricing, cache 5m/1h split, DeepSeek explicit override provenance and account-vs-user cost reporting require separate final-wire/explicit-zero/native-pricing review; no migrations or pricing data imported.",
+      "usage_aggregation": "Keep previously deferred rollup/shared statistics caching, covering indexes, live-balance outbox and archive/retention optimization deferred as complete modules; do not append source migrations 251/315-318 to the local migration history.",
+      "upstream_monitor": "Local upstream_monitor source/module is absent; alert SQL casts and pending-alert retry are dependencies of the already deferred balance/type monitor, not standalone local fixes.",
+      "relay_privacy": "Fork 39b93877 adds status-aware relay fingerprint/error-type normalization across handler/SSE/WS egress. Retain local privacy sanitization; defer new rules until every relevant client exit and raw Ops observation can be validated together.",
+      "codex_uuid_schema": "Keep declaration IDs for additional_tools; defer UUID compaction (8dcdfff22), new context rewriting and tool-schema regex removal. They expand body rewriting beyond the selected declaration-preservation fix; collision/reference behavior and native passthrough need a separate review.",
+      "protocol_and_runtime": "Other stream/effort/quota refresh, Bedrock error semantics, Gemini parallel tool calls, upstream keepalive/TCP timeout, first-output spool fallback, large DeepSeek request/wait policies and billing-lane/zero-copy optimizations remain unchanged. No claim that these unrelated source fixes are locally implemented.",
+      "ui_extensions": "Retain the local theme and UI. CSV export, deleted-group distribution, whitelist wildcard restrictions, quota/table refresh redesign and new media/pricing documentation are not part of the selected fixes.",
+      "previous_deferrals": "Preserve all existing Hosted Search, catalogue/Plaza, auto-risk, raw request dump, connection trace and account blacklist deferrals. Retired native payments/crypto/Mixed/tickets are not restored."
+    },
+    "source_inventory": ".artifacts/dual-sync-20261118/fork-selection-ledger.json",
+    "preserved": "Local Vue theme, native provider routing, smart routing, real-terminal usage/billing, explicit zero and 0.15 multipliers, bounded disconnect drain, no-replay policy; no dependencies/migrations/runtime configuration changed."
   }
 }

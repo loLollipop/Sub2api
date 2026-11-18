@@ -765,6 +765,39 @@ describe('user KeysView column settings', () => {
     }
   })
 
+  it.each([
+    ['https://api.example.test', 'https://api.example.test/v1/usage'],
+    ['https://api.example.test/v1/', 'https://api.example.test/v1/usage'],
+    ['https://api.example.test/proxy/v1///', 'https://api.example.test/proxy/v1/usage'],
+    ['https://api.example.test/proxy/v1/?region=eu#ignored', 'https://api.example.test/proxy/v1/usage?region=eu'],
+  ])('generates an executable balance script for %s', async (baseUrl, expectedUrl) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [] }) }))
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    getPublicSettings.mockResolvedValue({ api_base_url: baseUrl })
+    const wrapper = await mountView()
+    try {
+      await getButtonByText(wrapper, 'keys.importToCcSwitch').trigger('click')
+      await flushPromises()
+      await getButtonByText(wrapper, 'common.import').trigger('click')
+      const params = new URL(String(open.mock.calls[0][0])).searchParams
+      const script = atob(params.get('usageScript')!)
+        .replaceAll('{{baseUrl}}', baseUrl).replaceAll('{{apiKey}}', 'sk-test-key')
+      // The external script runtime need not expose browser URL globals.
+      const config = new Function('URL', `return ${script}`)(undefined) as {
+        request: { url: string; headers: Record<string, string> }
+        extractor: (response: unknown) => { isValid: boolean; remaining: number; unit: string }
+      }
+      expect(config.request.url).toBe(expectedUrl)
+      expect(config.request.headers.Authorization).toBe('Bearer sk-test-key')
+      expect(config.extractor({ is_active: false, balance: 0, unit: 'USD' }))
+        .toEqual({ isValid: false, remaining: 0, unit: 'USD' })
+    } finally {
+      wrapper.unmount()
+      open.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('requires a Pi-family model while preserving discovered models and optional-model imports', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: async () => ({ data: [{ id: 'key-only-model' }, { id: 'gpt-5.6-sol' }] }),

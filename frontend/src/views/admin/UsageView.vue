@@ -705,11 +705,25 @@ const getRequestTypeLabel = (log: AdminUsageLog): string => {
   return t('usage.unknown')
 }
 
+const fetchExportPage = async (page: number, size: number, signal: AbortSignal) => {
+  const params = buildUsageListParams(page, size, true, false)
+  for (let attempt = 0; ; attempt++) {
+    signal.throwIfAborted()
+    try {
+      return await adminUsageAPI.list(params, { signal })
+    } catch (error) {
+      const status = (error as { status?: number } | null)?.status
+      if (signal.aborted || attempt === 2 || (status && status !== 408 && status !== 429 && status < 500)) throw error
+      await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)))
+    }
+  }
+}
+
 const exportToExcel = async () => {
   if (exporting.value) return; exporting.value = true; exportProgress.show = true
   const c = new AbortController(); exportAbortController = c
   try {
-    let p = 1; let total = pagination.total; let exportedCount = 0; let pageSize = 100
+    let p = 1; let total = pagination.total; let exportedCount = 0; let pageSize = 1000
     const XLSX = await import('xlsx')
     const headers = [
       t('usage.time'), t('admin.usage.user'), t('usage.apiKeyFilter'),
@@ -726,10 +740,7 @@ const exportToExcel = async () => {
     ]
     const ws = XLSX.utils.aoa_to_sheet([headers])
     while (true) {
-      const res = await adminUsageAPI.list(
-        buildUsageListParams(p, pageSize, true, false),
-        { signal: c.signal }
-      )
+      const res = await fetchExportPage(p, pageSize, c.signal)
       if (c.signal.aborted) break; if (p === 1) { total = res.total; exportProgress.total = total }
       if (p > 1 && res.page_size && res.page_size !== pageSize) throw new Error('Pagination size changed during export')
       pageSize = res.page_size || pageSize
@@ -762,7 +773,7 @@ const exportToExcel = async () => {
       saveAs(new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename)
       appStore.showSuccess(t('usage.exportSuccess'))
     }
-  } catch (error) { console.error('Failed to export:', error); appStore.showError('Export Failed') }
+  } catch (error) { if (!c.signal.aborted) { console.error('Failed to export:', error); appStore.showError('Export Failed') } }
   finally { if(exportAbortController === c) { exportAbortController = null; exporting.value = false; exportProgress.show = false } }
 }
 

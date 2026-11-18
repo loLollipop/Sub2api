@@ -701,6 +701,7 @@ type bufferedFuncCall struct {
 	Name                  string
 	Namespace             string
 	EncryptedFunctionArgs json.RawMessage
+	EncryptedContent      string
 	Args                  strings.Builder
 }
 
@@ -762,6 +763,9 @@ func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) 
 			}
 			if len(event.Item.EncryptedFunctionArgs) > 0 {
 				call.EncryptedFunctionArgs = event.Item.EncryptedFunctionArgs
+			}
+			if event.Item.EncryptedContent != "" {
+				call.EncryptedContent = event.Item.EncryptedContent
 			}
 			arguments := event.Item.Arguments
 			if event.Item.Type == "custom_tool_call" {
@@ -848,6 +852,7 @@ func (a *BufferedResponseAccumulator) BuildOutput() []ResponsesOutput {
 			Name:                  a.funcCalls[i].Name,
 			Namespace:             a.funcCalls[i].Namespace,
 			EncryptedFunctionArgs: a.funcCalls[i].EncryptedFunctionArgs,
+			EncryptedContent:      a.funcCalls[i].EncryptedContent,
 			Arguments:             a.funcCalls[i].Args.String(),
 		})
 	}

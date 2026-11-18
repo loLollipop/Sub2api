@@ -1036,12 +1036,63 @@ describe('admin UsageView model audit export', () => {
 		}))
 		await (wrapper.vm as any).exportToExcel()
 		expect(exportList.mock.calls.map(([params]) => [params.page, params.page_size])).toEqual([
-			[1, 100], [2, 50], [3, 50],
+			[1, 1000], [2, 50], [3, 50],
 		])
 		expect(sheetAddAoa.mock.calls.reduce((total, [, rows]) => total + rows.length, 0)).toBe(101)
 		expect(saveAs).toHaveBeenCalledTimes(1)
 		wrapper.unmount()
 	})
+
+  it('retries a transient export page without duplicating rows', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    exportList.mockRejectedValueOnce({ status: 502, message: 'Bad gateway' })
+    const done = (wrapper.vm as unknown as { exportToExcel: () => Promise<void> }).exportToExcel()
+    await flushPromises()
+    expect(exportList).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(400)
+    await done
+    expect(exportList).toHaveBeenCalledTimes(2)
+    expect(exportList.mock.calls[0][0]).toEqual(exportList.mock.calls[1][0])
+    expect(sheetAddAoa).toHaveBeenCalledTimes(1)
+    expect(saveAs).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it.each([400, 401, 403])('does not retry permanent HTTP %s export errors', async status => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    const warning = vi.spyOn(console, 'error').mockImplementation(() => {})
+    exportList.mockRejectedValue({ status, message: 'Request rejected' })
+    await (wrapper.vm as unknown as { exportToExcel: () => Promise<void> }).exportToExcel()
+    expect(exportList).toHaveBeenCalledTimes(1)
+    expect(saveAs).not.toHaveBeenCalled()
+    warning.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('bounds retries and skips a queued retry after cancellation', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    const warning = vi.spyOn(console, 'error').mockImplementation(() => {})
+    exportList.mockRejectedValue({ status: 503, message: 'Unavailable' })
+    const vm = wrapper.vm as unknown as { exportToExcel: () => Promise<void>; cancelExport: () => void }
+    const failed = vm.exportToExcel()
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(1200)
+    await failed
+    expect(exportList).toHaveBeenCalledTimes(3)
+    exportList.mockClear()
+    const canceled = vm.exportToExcel()
+    await flushPromises()
+    vm.cancelExport()
+    await vi.advanceTimersByTimeAsync(1200)
+    await canceled
+    expect(exportList).toHaveBeenCalledTimes(1)
+    expect(saveAs).not.toHaveBeenCalled()
+    warning.mockRestore()
+    wrapper.unmount()
+  })
 })
 
 const sliderDateRangeStub = (range: { startDate: string; endDate: string } | null) =>

@@ -268,6 +268,9 @@ func newOpenAIRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo U
 		nil,
 		nil, // userPlatformQuotaRepo
 	)
+	// Accounting tests replace dependencies after construction. Join the
+	// unrelated harvester before exposing the fixture to those writes.
+	svc.StopOpenAICodexTicketHarvester()
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		rateRepo,
 		nil,

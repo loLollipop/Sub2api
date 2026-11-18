@@ -33,7 +33,7 @@ func TestGrokRefusalCommitAtomicEffectsBlockAndJob(t *testing.T) {
 			}
 			mock.ExpectBegin()
 			mock.ExpectExec(`SELECT pg_advisory_xact_lock`).WithArgs(int64(42)).WillReturnResult(sqlmock.NewResult(0, 1))
-			mock.ExpectQuery(`SELECT job_id FROM grok_refusal_blocks`).WithArgs(int64(42), key).WillReturnError(sql.ErrNoRows)
+			mock.ExpectQuery(`(?s)SELECT job_id FROM grok_refusal_blocks.*created_at > NOW\(\) - INTERVAL '24 hours'`).WithArgs(int64(42), key).WillReturnError(sql.ErrNoRows)
 			mock.ExpectQuery(`(?s)SELECT.*FROM media_billing_jobs WHERE id`).WithArgs(job.ID).WillReturnError(sql.ErrNoRows)
 			mock.ExpectQuery(`(?s)INSERT INTO usage_billing_dedup`).WithArgs(job.Intent.Command.RequestID, int64(7), job.Intent.Command.RequestFingerprint).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 			mock.ExpectQuery(`(?s)SELECT request_fingerprint.*usage_billing_dedup_archive`).WillReturnError(sql.ErrNoRows)
@@ -63,7 +63,7 @@ func TestGrokRefusalCommitAtomicEffectsBlockAndJob(t *testing.T) {
 				mock.ExpectRollback()
 			} else {
 				insert.WillReturnResult(sqlmock.NewResult(0, 1))
-				block := mock.ExpectExec(`INSERT INTO grok_refusal_blocks`).WithArgs(int64(42), key, job.ID)
+				block := mock.ExpectExec(`(?s)INSERT INTO grok_refusal_blocks.*ON CONFLICT.*DO UPDATE SET job_id = EXCLUDED.job_id, created_at = EXCLUDED.created_at WHERE grok_refusal_blocks.created_at <= NOW\(\) - INTERVAL '24 hours'`).WithArgs(int64(42), key, job.ID)
 				if mode == "block_failure" {
 					block.WillReturnError(errors.New("block insert failed"))
 					mock.ExpectRollback()
@@ -102,9 +102,9 @@ func TestGrokRefusalConversationDuplicateDoesNotClaimRequestOrGuard(t *testing.T
 	key := strings.Repeat("b", 64)
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT pg_advisory_xact_lock`).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery(`SELECT job_id FROM grok_refusal_blocks`).WillReturnRows(sqlmock.NewRows([]string{"job_id"}).AddRow(existing.ID))
+	mock.ExpectQuery(`(?s)SELECT job_id FROM grok_refusal_blocks.*created_at > NOW\(\) - INTERVAL '24 hours'`).WillReturnRows(sqlmock.NewRows([]string{"job_id"}).AddRow(existing.ID))
 	mock.ExpectQuery(`(?s)SELECT.*FROM media_billing_jobs WHERE id`).WithArgs(existing.ID).WillReturnRows(mediaBillingTestRow(existing))
-	mock.ExpectExec(`INSERT INTO grok_refusal_blocks`).WithArgs(int64(42), key, existing.ID).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`(?s)INSERT INTO grok_refusal_blocks.*ON CONFLICT.*DO UPDATE SET job_id = EXCLUDED.job_id, created_at = EXCLUDED.created_at WHERE grok_refusal_blocks.created_at <= NOW\(\) - INTERVAL '24 hours'`).WithArgs(int64(42), key, existing.ID).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 	actual, created, err := repo.CommitGrokRefusal(context.Background(), job, []string{key}, []string{key})
 	require.NoError(t, err)
@@ -120,9 +120,9 @@ func TestGrokRefusalLookupSearchesEveryBoundedBatch(t *testing.T) {
 		keys[i] = strings.Repeat("c", 64)
 	}
 	for i := 0; i < 4; i++ {
-		mock.ExpectQuery(`SELECT job_id FROM grok_refusal_blocks`).WillReturnError(sql.ErrNoRows)
+		mock.ExpectQuery(`(?s)SELECT job_id FROM grok_refusal_blocks.*created_at > NOW\(\) - INTERVAL '24 hours'`).WillReturnError(sql.ErrNoRows)
 	}
-	mock.ExpectQuery(`SELECT job_id FROM grok_refusal_blocks`).WillReturnRows(sqlmock.NewRows([]string{"job_id"}).AddRow("persisted"))
+	mock.ExpectQuery(`(?s)SELECT job_id FROM grok_refusal_blocks.*created_at > NOW\(\) - INTERVAL '24 hours'`).WillReturnRows(sqlmock.NewRows([]string{"job_id"}).AddRow("persisted"))
 	found, err := repo.FindGrokRefusal(context.Background(), 42, keys)
 	require.NoError(t, err)
 	require.True(t, found)

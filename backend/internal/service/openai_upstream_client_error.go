@@ -135,7 +135,7 @@ func writeOpenAIUpstreamClientError(c *gin.Context, statusCode int, body []byte,
 	if errType == "api_error" && status == http.StatusBadRequest {
 		errType = openAIUpstreamClientErrorFallbackType
 	}
-	errorPayload := gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(message)}
+	errorPayload := gin.H{"type": clientprivacy.ErrorType(status, clientprivacy.Text(errType)), "message": ClientUpstreamErrorMessage(clientprivacy.Text(message))}
 	if errCode != "" {
 		errorPayload["code"] = clientprivacy.Text(errCode)
 	}

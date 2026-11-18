@@ -171,6 +171,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	// 读取请求体
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
 	if err != nil {
+		if handleRequestBodyReadError(c, err) {
+			return
+		}
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
@@ -668,7 +671,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					return
 				}
 				var failoverErr *service.UpstreamFailoverError
-				if errors.As(err, &failoverErr) {
+				if result == nil && errors.As(err, &failoverErr) {
 					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
 					if !service.ResetOpenAIStreamSSEKeepaliveForRetry(c) || service.OpenAICompactKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
 						submitGeminiUsage(result)
@@ -2266,7 +2269,7 @@ func (h *GatewayHandler) handleStreamingAwareErrorWithCode(c *gin.Context, statu
 			if code != "" {
 				errorCode = `,"code":` + strconv.Quote(code)
 			}
-			errorEvent := `data: {"type":"error","error":{"type":` + strconv.Quote(errType) + errorCode + `,"message":` + strconv.Quote(message) + `}}` + "\n\n"
+			errorEvent := `data: {"type":"error","error":{"type":` + strconv.Quote(clientprivacy.ErrorType(status, errType)) + errorCode + `,"message":` + strconv.Quote(service.ClientUpstreamErrorMessage(message)) + `}}` + "\n\n"
 			if _, err := fmt.Fprint(c.Writer, errorEvent); err != nil {
 				_ = c.Error(err)
 			}
@@ -2385,7 +2388,7 @@ func (h *GatewayHandler) errorResponseWithCode(c *gin.Context, status int, errTy
 		return
 	}
 
-	errorObject := gin.H{"type": errType, "message": message}
+	errorObject := gin.H{"type": clientprivacy.ErrorType(status, errType), "message": service.ClientUpstreamErrorMessage(message)}
 	if code != "" {
 		errorObject["code"] = code
 	}
@@ -2422,6 +2425,9 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	// 读取请求体
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
 	if err != nil {
+		if handleRequestBodyReadError(c, err) {
+			return
+		}
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return

@@ -10,19 +10,21 @@
     "v0.2.19": "dece26153621959ccd7635814f4b2d08304e681a",
     "v0.2.20": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
     "v0.2.21": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
-    "v0.2.22": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b"
+    "v0.2.22": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+    "v0.2.23": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6"
   },
-  "latest_reviewed_main_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+  "latest_reviewed_main_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v0.2.22",
-  "reviewed_release_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+  "reviewed_release_tag": "v0.2.23",
+  "reviewed_release_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
-    "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+    "status": "selective_sync_recorded_with_resolved_historical_deferrals_and_explicit_remaining_scope",
+    "source_head": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
     "implemented_with_local_regression": [
+      "Formal v0.2.23: GPT-6.1 Terra/GPT-6.2 Sol/Astra, Ultra Fast entitlements/pricing, OpenAI/Anthropic cache usage and TTL, bounded stream/schema/tool fixes, retention/dedup/privacy and UI adaptations; see maintenance/notes/upstream-sync-20261118-v0223.md and the complete path/commit ledger.",
       "Toolchain, cooldown scopes and frontend lifecycle fixes",
       "2026-10-17 Responses created_at, Gemini compatibility thinking, subscription retirement/public catalogs and payment compatibility; dated sync note records local adaptations and verification",
       "Provider registry with Mixed/Cline/Command Code and credential destination protection",
@@ -57,7 +59,24 @@
       "Mixed actual HTTP/SSE native-dispatch regression1004 tests/subtests passed",
       "Production-schema-only PostgreSQL16 migration rehearsal applies ten migrations twice; final backend/CI and production rollout gates are recorded separately"
     ],
-    "evidence": ".artifacts/source-sync-resume-20261015/notes.md"
+    "evidence": ".artifacts/source-sync-resume-20261015/notes.md",
+    "resolved_prior_deferrals": [
+      "Moderation cleanup, monitoring platform picker/details/compact filters, SheetJS pinned dependency, Gemini 3.6 published pricing, and listed fork deferrals are implemented; PostgreSQL-only checks remain a verification backlog.",
+      "Fable/Mythos 5.2 and its v0.2.21 pricing correction are implemented in this sync; backend 414 and frontend 66 targeted cases passed, with the final UseKey permission assertion rechecked (32).",
+      "Formal original/v0.2.23 ancestors d70a23f84,32e70f3d4,b32ad6dfe,68071ddde,2164ea487: Carbon protocol/catalog/thinking/whitelist and Carbon/Hydrogen static price cards. Vertex us/eu URL and 1.1 default model-price factor share the actual cached resource region, including escaped JSON paths. Group/channel final pricing and custom account rules take priority; no automatic Carbon date-based repricing is invented. These commits are not ancestors of fork v2.3.105.",
+      "4197fa620: config gateway.max_same_account_retries_gemini defaults to 4, accepts 0–10; zero means one initial attempt. Native/Messages/Chat use the same budget; signature downgrade does not consume transient retries. No retry after response output or chargeable usage; handler failover requires nil result. a20741237 bound-cache pool follow-up remains with absent explicit-cache runtime.",
+      "457602c8f/c004c962a/03bd718ab: shared HTTP body reservation includes chunks, contiguous copies, decompression/Zstd and normalization; released on handler completion/cancel/failure. Exhaustion yields protocol-specific 503 and Retry-After: 1. Auto budget uses one quarter of the smallest RAM/cgroup/GOMEMLIMIT limit with a 1 GiB floor; explicit 0 preserved. os.Root constrains cgroup paths. Upgraded WS frames keep their independent lifecycle.",
+      "4ac1675b5/4a22a75b3: Antigravity active query bypasses both cache checks while retaining singleflight. Refresh keeps account rows and existing quota values; table is busy/inert until refreshed.",
+      "b8de5e170: key list readiness is independent of deferred usage aggregates; cancel and request ownership prevent old responses/finalizers overwriting new data. Append-only migration275 adds the api_key_id/created_at covering index INCLUDE(actual_cost), with invalid-index recovery in the nontransactional runner.",
+      "ce7a129fe compact slice: admin lists project display metadata in Ent and skip subscriptions, excluding secrets/credentials/large pricing from SQL and DTO. Admin-only account_summary; legacy user/detail contracts preserved. Table navigation/deleted badges and XLSX/CSV display names accept summary and legacy shapes. CSV escapes formula-like user text while preserving numeric costs and XLSX string cells.",
+      "7d1249b10 announcement slice: login/navigation/focus fetch badge counts, bell loads a body-free timeline/excerpts and on-demand detail; popup bootstrap has at most five eligible unread bodies. Summary/popup selection uses body-free metadata SQL. Details and acknowledgements share active/target authorization; frontend requests, cache and acknowledgement states are isolated across sessions. Retired tickets/SSR/sidebar redesign excluded.",
+      "Mapping-as-existence union already exists in baseline Channel.SupportedModels plus authorized global pricing enrichment. Settings sticky save toolbar already meets save-dock access; do not replace it with the source floating UI."
+    ],
+    "preserved_local_contracts": [
+      "No scheduler membership projection without credentials/transient time/retirement fencing; real terminal-error billing remains.",
+      "DeepSeek caller schema and identifiers/native scope, Hosted Search, unsafe whitelist failure behavior, mutable main catalog, CDN/auth cache behavior, automatic IP/key disable, missing mcp_oauth_grants blacklist, large DataTable patch, outbox/statistics cache, fixed critical threshold, long timeout/size policy, Auth Quiet/SSR, absent Mihomo/upstream monitor/raw dump/trace modules remain deferred.",
+      "DeepSeek max output 393216 and exact names are implemented; extra OutputModalities/ToolCall/Family/authoritative catalog lacks consumers. Kimi 262144/65536 remains unverified neighbor-family inference."
+    ]
   },
   "selected_fixes": [
     { "commit": "f48866958", "scope": "openai-only-codex-image-bridge", "note": "Mixed and other non-OpenAI accounts cannot inject hosted OpenAI image tools." },
@@ -157,19 +176,10 @@
     "Controlled release, migration-validation and disabled self-update deployment policy"
   ],
   "deferred": [
-    "Moderation group cleanup (27de27ac6): transactional RawMessage-safe pruning and generation-aware caches are implemented and locally tested; real PostgreSQL concurrent delete/save/rollback validation is still required.",
     "Gemini explicit cache management: source-compatible binding260-261 and protocol helpers remain without runtime routes. Custom operation journal262 and frozen-price redesign were withdrawn by user request; continue only source-based integration, not a new financial subsystem.",
-    "Gemini 3.6 promotion (4426593e9): source constants imported as published; upstream supplies no automatic expiry. No bespoke frozen-price or scheduler mechanism added.",
-    "Monitoring platform picker/details refresh and compact filters are already present. Ops account-name/output-TPS UI is implemented with selected frontend regressions; final backend validation is tracked separately.",
-    "SheetJS CDN dependency replacement (daa791574) is now pinned0.20.3 with verified SHA512/clean-store frozen installation/export regression; obsolete xlsx audit exemptions removed.",
-    "Final real PostgreSQL schema upgrade/rollback, race/Redis/Docker and cross-batch integration verification remain outstanding; implemented source features are listed in cumulative_sync rather than the historical deferral list.",
     "53002f677 scheduler snapshot memo: requires shared-map mutator audit and Redis/race verification with local atomic account memo; not imported.",
-    "afbef7c8c duplicate DeepSeek image alias fix: source alias-generation predecessor absent locally; broader input compatibility intentionally not imported.",
     "2026-10-29: scoped admin keys, image_count_billing migrations/UI, managed Grok catalog observer/diagnostics, Gemini explicit-cache runtime remain outside this selective sync.",
-    "2026-10-29: GPT-6.1 Terra new capability, configurable Gemini same-account retries and mapping-as-existence union catalog require separate adaptation; existing behavior retained.",
-    "2026-11-07: management MCP/OAuth/migration249, full-access admin-key compatibility, account-size routing, managed catalog/Terra pricing and new account penalty configuration remain deferred.",
-    "2026-11-07: do not import disconnect usage truncation/estimation or 95% cache charging. General request memory budgets, transport timeouts, session caches and billing background-worker redesign from457602c8f remain separate; only bounded Gemini SSE dependencies are adapted.",
-    "2026-11-07: image-size-tier stickiness6b565e45a depends on excluded size routing. Empty-instructions/response-echo a699c2bae changes existing Codex validation/default injection across protocols and remains deferred as a complete policy group."
+    "2026-11-07: retain real terminal usage rather than disconnect truncation/estimation or 95% cache charging. HTTP request memory budgets are now fully adapted in this sync. Unrelated transport timeout/session-cache/background-worker redesign from457602c8f remains excluded."
   ],
   "observed_delta_review": {
     "from_commit": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
@@ -281,7 +291,11 @@
       "Fable/Mythos5.2 capability/catalog/pricing expansion.",
       "Keys async30-day usage plus covering index, retained-refresh-row UI, Antigravity query button and settings save dock require separate local UI adaptation."
     ],
-    "excluded_scope": "Retired payment changes, source release/deployment bookkeeping and original-catalog image documentation. Observed main after the official release is recorded only, not imported."
+    "excluded_scope": "Retired payment changes, source release/deployment bookkeeping and original-catalog image documentation. Observed main after the official release is recorded only, not imported.",
+    "resolution_20261118_v0223": {
+      "supersedes_deferred_scope": "All four formerly deferred lines have been addressed: cache TTL/Fast fix, adaptive HTTP body budget, Fable/Mythos 5.2, async key usage/index and account refresh/query are adapted; the sticky settings toolbar is already equivalent. Original dated scope retained as history.",
+      "evidence": "maintenance/notes/upstream-sync-20261118-v0223.md"
+    }
   },
   "sync_20261118_v0222": {
     "evidence": "maintenance/notes/upstream-sync-20261118.md",
@@ -335,5 +349,229 @@
       "previous_deferrals": "Preserve all existing Hosted Search, catalogue/Plaza, auto-risk, raw request dump, connection trace and account blacklist deferrals. Retired native payments/crypto/Mixed/tickets are not restored."
     },
     "source_inventory": ".artifacts/dual-sync-20261118/original-selection-ledger.json"
-  }
+  },
+  "latest_observed_main_commit": "2af3f1e15c98c893a89255a037f551046883b8c0",
+  "sync_20261118_v0223": {
+    "evidence": "maintenance/notes/upstream-sync-20261118-v0223.md",
+    "source_inventory": "maintenance/notes/original-selection-ledger-20261118-v0223.json",
+    "reviewed_release_tag": "v0.2.23",
+    "reviewed_release_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+    "previous_release_tag": "v0.2.22",
+    "previous_release_commit": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
+    "observed_main_commit": "2af3f1e15c98c893a89255a037f551046883b8c0",
+    "main_imported": false,
+    "reviewed_delta": {
+      "commits": 32,
+      "non_merge_commits": 20,
+      "merge_commits": 12,
+      "paths": 90,
+      "range_count_basis": "Git reachable commits in previous_release_commit..reviewed_release_commit; discrepancy with prior summary count of 34 resolved against actual graph."
+    },
+    "personal_version": "2.1.67",
+    "release_status": "User subsequently authorized GitHub submission and deployment. Prepare personal v2.1.68 via PR/CI, own Release/GHCR, backup/isolated restore migration verification and controlled rollout; final artifact and production evidence stored separately.",
+    "fork_checkpoint_preserved": {
+      "version": "2.3.105",
+      "commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8"
+    },
+    "supersedes_deferred_scope": {
+      "resolved": [
+        "global-glass-modal-restyling",
+        "gemini-group-openai-account-catalog-expansion",
+        "cline-command-code-platforms",
+        "opus55-public-model-only-strict-validation",
+        "monitoring platform picker/details refresh and compact filters",
+        "SheetJS dependency replacement",
+        "Gemini 3.6 promotion",
+        "Gemini Carbon/Hydrogen and Vertex us/eu pricing chain",
+        "Gemini configurable same-account retries",
+        "adaptive HTTP request-body memory budget",
+        "Antigravity active query and refresh preservation",
+        "async key usage and covering index",
+        "compact admin usage associations",
+        "lazy announcements",
+        "mapping-as-existence union (baseline equivalent)",
+        "settings save dock (sticky-toolbar equivalent)"
+      ],
+      "cancelled": [
+        "affiliate-per-code-invite-and-rebate-statistics"
+      ],
+      "partially_resolved_policy_split": [
+        "typesafe-systemone-affiliate-multicode-and-moderation-engines"
+      ],
+      "preserve_local_contract": [
+        "v2304-totp-consumption",
+        "anthropic-disabled-thinking-omission",
+        "no-op-json-validation-removal"
+      ],
+      "verification_backlog": [
+        "usage-request-id-trigram-index-migrations",
+        "real PostgreSQL schema upgrade/rollback and race/concurrency verification",
+        "moderation group cleanup PostgreSQL concurrent delete/save/rollback validation"
+      ],
+      "not_applicable": [
+        "v2305-schedulable-timer-and-requestcapture-fixes: source fixes only apply to the absent schedulable-timer/requestcapture modules; retain the original deferral reason.",
+        "afbef7c8c duplicate DeepSeek image alias fix: required source alias predecessor is absent locally."
+      ],
+      "remaining_deferrals": [
+        "scheduler membership projection still lacks credentials, transient times and retirement fencing",
+        "explicit upstream-error no-charge policy changes real terminal billing",
+        "DeepSeek unsafe schema/ID collision/native scope and parser-dependent DSML",
+        "Hosted Search loses chargeable results and depends on DSML",
+        "auto whitelist clears manual mappings on failed fetch and retries stale fetchErr",
+        "mutable main catalogue provider/alias/ETag",
+        "public settings CDN auth/captcha cache semantics",
+        "automatic IP/key disablement",
+        "account blacklist lacks mcp_oauth_grants",
+        "DataTable large patch conflicts with local virtualization",
+        "outbox batching and 60-second statistics cache consistency",
+        "fixed 30% critical threshold overrides configured zero",
+        "DeepSeek 48K/20MB and 30-65 minute policy lack local evidence",
+        "Auth Quiet/SSR are product redesigns",
+        "Mihomo/upstream monitor/raw dump/trace modules are absent",
+        "Explicit Gemini cache CRUD/bound-cache pool runtime, management MCP/OAuth credentials, account-size routing, penalty configuration and image-size stickiness remain outside the adapted source contracts."
+      ]
+    },
+    "implemented_scope": {
+      "gemini_36_promotion": "Published pricing constants are present; no automatic expiry scheduler is added.",
+      "terra_and_gpt62": "GPT-6.1 Terra and GPT-6.2 Sol/Astra model reasoning/sampling/Codex/HTTP/WS bridge adapted; Terra none preserved and GPT-6.2 none/minimal rejected.",
+      "cache_usage": "30m/12h cache usage is recorded only when both upstream buckets are complete nonnegative integers whose sum equals aggregate usage; request TTL is not used to infer billing.",
+      "ultra_fast": "Force flags and channel override implement nil inheritance, valid positive multipliers, and reject zero/negative; Pro/chatgptpro and workspace/request-time entitlements retain local policy.",
+      "stream_and_schema": "First-output spool, tool-schema preservation, Gemini parallel tools/thoughts, response instructions echo and messages prelude/terminal/error boundaries adapted with bounded buffering and no false client-visible output.",
+      "retention_and_dedup": "Rollup retention boundary, bounded primary-key archive/delete, canonical transcript identity and 24-hour refusal UPSERT retain atomic billing/idempotency; local migration 274 addresses trigger boundaries.",
+      "privacy": "Client egress strips relay identifiers and maps relay error types while Ops/usage/financial observations retain raw semantics. Four line-oriented SSE exits join complete multiline error JSON, retain metadata/CRLF and leave successful bytes unchanged; default raw-frame reader behavior is preserved.",
+      "frontend": "CSV export, deleted groups, account edit shell, group Ultra Fast fields and account usage-cell rendering adapted while retaining local theme.",
+      "claude52": "Formal v0.2.21 eb2da3448/3e8c2ee3f/d216e4215: Fable/Mythos 5.2 protocol, thinking, catalog, native/bridge validation, standard/Fast pricing and UI adapted; CLI 2.1.321.",
+      "account_vs_user_cost": "d05e8ef03: raw and rollup endpoint/model statistics retain distinct customer actual cost and account cost; Gemini quota uses account cost. User API/UI omit account cost; admin UI shows a separate column. Hourly endpoint rows and raw tails are consolidated without losing account cost.",
+      "messages_disconnect_bound": "Client context cancellation and failed writes start one fixed drain deadline; continuous heartbeats cannot reset it. The existing wrapper supplies a 180-second default when idle timeout is disabled; real usage is retained without replay or estimates.",
+      "gemini_carbon_hydrogen_vertex": "Formal original/v0.2.23 ancestors d70a23f84,32e70f3d4,b32ad6dfe,68071ddde,2164ea487: Carbon protocol/catalog/thinking/whitelist and Carbon/Hydrogen static price cards. Vertex us/eu URL and 1.1 default model-price factor share the actual cached resource region, including escaped JSON paths. Group/channel final pricing and custom account rules take priority; no automatic Carbon date-based repricing is invented. These commits are not ancestors of fork v2.3.105.",
+      "gemini_same_account_retries": "4197fa620: config gateway.max_same_account_retries_gemini defaults to 4, accepts 0–10; zero means one initial attempt. Native/Messages/Chat use the same budget; signature downgrade does not consume transient retries. No retry after response output or chargeable usage; handler failover requires nil result. a20741237 bound-cache pool follow-up remains with absent explicit-cache runtime.",
+      "http_request_body_memory": "457602c8f/c004c962a/03bd718ab: shared HTTP body reservation includes chunks, contiguous copies, decompression/Zstd and normalization; released on handler completion/cancel/failure. Exhaustion yields protocol-specific 503 and Retry-After: 1. Auto budget uses one quarter of the smallest RAM/cgroup/GOMEMLIMIT limit with a 1 GiB floor; explicit 0 preserved. os.Root constrains cgroup paths. Upgraded WS frames keep their independent lifecycle.",
+      "account_query_refresh": "4ac1675b5/4a22a75b3: Antigravity active query bypasses both cache checks while retaining singleflight. Refresh keeps account rows and existing quota values; table is busy/inert until refreshed.",
+      "keys_async_usage": "b8de5e170: key list readiness is independent of deferred usage aggregates; cancel and request ownership prevent old responses/finalizers overwriting new data. Append-only migration275 adds the api_key_id/created_at covering index INCLUDE(actual_cost), with invalid-index recovery in the nontransactional runner.",
+      "compact_usage": "ce7a129fe compact slice: admin lists project display metadata in Ent and skip subscriptions, excluding secrets/credentials/large pricing from SQL and DTO. Admin-only account_summary; legacy user/detail contracts preserved. Table navigation/deleted badges and XLSX/CSV display names accept summary and legacy shapes. CSV escapes formula-like user text while preserving numeric costs and XLSX string cells.",
+      "lazy_announcements": "7d1249b10 announcement slice: login/navigation/focus fetch badge counts, bell loads a body-free timeline/excerpts and on-demand detail; popup bootstrap has at most five eligible unread bodies. Summary/popup selection uses body-free metadata SQL. Details and acknowledgements share active/target authorization; frontend requests, cache and acknowledgement states are isolated across sessions. Retired tickets/SSR/sidebar redesign excluded.",
+      "already_equivalent": "Mapping-as-existence union already exists in baseline Channel.SupportedModels plus authorized global pricing enrichment. Settings sticky save toolbar already meets save-dock access; do not replace it with the source floating UI."
+    },
+    "excluded_or_preserved": [
+      "Source VERSION; personal VERSION remains 2.1.67.",
+      "Go toolchain already at 1.27.4; follow-redirects local override already >=1.16.2.",
+      "Retired payment/crypto/Mixed/ticket/canvas/affiliate features and withdrawn journals remain absent.",
+      "DeepSeek extra output modalities/tool-call/family/authoritative schema has no current DTO consumer and would override primary-wins; keep excluded. Implemented max output 393216 and exact names only.",
+      "Kimi 4067236b neighbor-family 262144/65536 inference is not official evidence; do not import or call it authoritative."
+    ],
+    "verification": {
+      "evidence_directory": ".artifacts/original-sync-20261118-v0223",
+      "accepted_evidence": [
+        "cache-apicompat-verified.jsonl (895)",
+        "cache-service-accepted.jsonl (229)",
+        "models-complete-tests.jsonl (271)",
+        "models-service-final.jsonl (1288)",
+        "models-final-regression.jsonl (307)",
+        "models-terra-bridge-final.jsonl (47)",
+        "privacy-util-final.log",
+        "privacy-final-targeted.log",
+        "privacy-final-confirmed.log",
+        "instructions-echo-final.jsonl",
+        "messages-handler-fixed.jsonl",
+        "frontend-final-tests.log (229 tests / 11 files)",
+        "frontend-public-final.log (35 tests / 3 files)",
+        "frontend-lint.log",
+        "retention-sql-wasm.log (19 checks)",
+        "claude52-final-backend.jsonl (414)",
+        "claude52-frontend.log (66)",
+        "claude52-final-usekey.log (32)",
+        "messages-bound-and-account-cost.jsonl (123)",
+        "account-cost-frontend.log (28)",
+        "account-cost-rollup-final.jsonl (10)",
+        "privacy-multiline-final.log",
+        "ui-acceptance-results.json (26)",
+        "endpoint-cost-ui-results.json (8)",
+        "final-boundary-results.json",
+        "gemini-vertex-verification.json (754 backend / 27 frontend; includes 27 real ForwardNative-to-RecordUsage cases)",
+        "body-budget-test-summary.json (253 top-level / 639 pass events)",
+        "gemini-retry-verification.json (147 top-level / 604 pass events)",
+        "account-query-service.jsonl",
+        "account-query-and-refresh-ui.log (56 AccountUsageCell cases)",
+        "account-refresh-ui-final.log (17)",
+        "keys-async-usage.log (47)",
+        "keys-index-runner.jsonl",
+        "keys-index-sql-wasm.log (5)",
+        "compact-usage-backend.jsonl (30)",
+        "compact-usage-frontend.log (56 passing UsageTable cases; intermediate export failure superseded by compact-csv-final.log)",
+        "compact-csv-final.log (48)",
+        "account-keys-compact-ui-results.json (4 viewport/theme groups)",
+        "accepted-backend-tests-summary.json (20 packages / 1268 selected top-level / 3018 pass events)",
+        "announcements-lazy-frontend.log (58)",
+        "announcements-lazy-preview.log (24)",
+        "announcements-lazy-browser-results.json (4 viewport/theme groups)",
+        "final-acceptance-results.json"
+      ],
+      "limitations": [
+        "No Docker or local PostgreSQL was available; real PostgreSQL concurrency/integration, schema upgrade/rollback and Redis coverage remain pending. SQL/PGlite results do not substitute for PostgreSQL.",
+        "Windows symlink creation lacked permission for one cgroup escape subtest; the Windows junction escape test passed. Linux amd64 was cross-compiled, not executed natively.",
+        "Intermediate failing or stale logs are superseded only by the named final passing evidence. Per-feature counts overlap and must not be summed."
+      ]
+    }
+  },
+  "historical_deferral_dispositions_20261118_v0223": [
+    {
+      "original_reason": "Moderation group cleanup (27de27ac6): transactional RawMessage-safe pruning and generation-aware caches are implemented and locally tested; real PostgreSQL concurrent delete/save/rollback validation is still required.",
+      "status": "implemented_pending_verification",
+      "resolution": "Transactional RawMessage-safe pruning and generation-aware caches are implemented; only real PostgreSQL concurrent delete/save/rollback verification remains."
+    },
+    {
+      "original_reason": "Gemini 3.6 promotion (4426593e9): source constants imported as published; upstream supplies no automatic expiry. No bespoke frozen-price or scheduler mechanism added.",
+      "status": "resolved",
+      "resolution": "Published constants are imported; no automatic expiry scheduler is added."
+    },
+    {
+      "original_reason": "Monitoring platform picker/details refresh and compact filters are already present. Ops account-name/output-TPS UI is implemented with selected frontend regressions; final backend validation is tracked separately.",
+      "status": "resolved",
+      "resolution": "Picker/details refresh, compact filters and Ops account-name/output-TPS UI are implemented; current final acceptance evidence is maintained separately."
+    },
+    {
+      "original_reason": "SheetJS CDN dependency replacement (daa791574) is now pinned0.20.3 with verified SHA512/clean-store frozen installation/export regression; obsolete xlsx audit exemptions removed.",
+      "status": "resolved",
+      "resolution": "Pinned 0.20.3, SHA512 and clean frozen install/export regression are recorded; prior audit exemption is obsolete."
+    },
+    {
+      "original_reason": "Final real PostgreSQL schema upgrade/rollback, race/Redis/Docker and cross-batch integration verification remain outstanding; implemented source features are listed in cumulative_sync rather than the historical deferral list.",
+      "status": "verification_backlog",
+      "resolution": "Schema upgrade/rollback, race/Redis/Docker and cross-batch integration verification are outstanding; SQL/PGlite does not substitute for PostgreSQL."
+    },
+    {
+      "original_reason": "afbef7c8c duplicate DeepSeek image alias fix: source alias-generation predecessor absent locally; broader input compatibility intentionally not imported.",
+      "status": "not_applicable",
+      "resolution": "Required source alias-generation predecessor is absent locally; do not claim the fix applies."
+    },
+    {
+      "original_reason": "2026-10-29: GPT-6.1 Terra new capability, configurable Gemini same-account retries and mapping-as-existence union catalog require separate adaptation; existing behavior retained.",
+      "status": "resolved",
+      "resolution": "Terra protocol/model/pricing and configurable Gemini retries are implemented. Mapping/pricing union already exists in the personal baseline; the former deferral was a mistaken classification."
+    },
+    {
+      "original_reason": "2026-11-07: management MCP/OAuth/migration249, full-access admin-key compatibility, account-size routing, managed catalog/Terra pricing and new account penalty configuration remain deferred.",
+      "status": "partially_resolved",
+      "resolution": "Completed Terra/model-pricing scope is removed; management MCP/OAuth/migration249, full-access admin-key compatibility, account-size routing, managed catalog and new penalty configuration remain deferred."
+    },
+    {
+      "original_reason": "2026-11-07: image-size-tier stickiness6b565e45a depends on excluded size routing. Empty-instructions/response-echo a699c2bae changes existing Codex validation/default injection across protocols and remains deferred as a complete policy group.",
+      "status": "partially_resolved",
+      "resolution": "Empty-instructions/response-echo policy is implemented; image-size-tier stickiness still depends on excluded size routing."
+    }
+  ],
+  "verification_backlog_20261118_v0223": [
+    {
+      "item": "Moderation cleanup real PostgreSQL concurrent delete/save/rollback",
+      "status": "pending"
+    },
+    {
+      "item": "PostgreSQL schema upgrade/rollback, race/Redis/Docker and cross-batch integration verification",
+      "status": "pending"
+    },
+    {
+      "item": "Cline/Command Code and request-ID trigram PostgreSQL fixtures",
+      "status": "pending"
+    }
+  ]
 }

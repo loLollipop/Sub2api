@@ -132,20 +132,22 @@ func TestGrokRefusalIdentityAcrossProtocolsAndLongHistory(t *testing.T) {
 	}
 }
 
-func TestGrokRefusalIdentityStrongIDsAndPreciseContent(t *testing.T) {
+func TestGrokRefusalIdentityIgnoresRelayIDsAndPreciseContent(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
 	c.Request.Header.Set("X-Session-Id", "same")
 	c.Request.Header.Set("X-Conversation-Id", "same")
 	body := []byte(`{"messages":[{"role":"user","content":" x "}],"prompt_cache_key":"shared","previous_response_id":"resp_shared"}`)
 	_, write := grokRefusalIdentity(c, body)
-	require.Len(t, write, 3)
-	require.NotEqual(t, write[0], write[1])
+	require.Len(t, write, 1)
+	other := []byte(`{"messages":[{"role":"user","content":"unrelated safe prompt"}],"metadata":{"session_id":"same","conversation_id":"same"}}`)
+	otherLookup, _ := grokRefusalIdentity(c, other)
+	require.NotContains(t, otherLookup, write[0], "reused IDs must not block unrelated content")
 	lookup, _ := grokRefusalIdentity(nil, body)
-	require.Contains(t, lookup, write[2])
+	require.Contains(t, lookup, write[0])
 	trimmed := []byte(strings.ReplaceAll(string(body), `" x "`, `"x"`))
 	lookup, _ = grokRefusalIdentity(nil, trimmed)
-	require.NotContains(t, lookup, write[2])
+	require.NotContains(t, lookup, write[0])
 	_, write = grokRefusalIdentity(nil, []byte(`{"input":"one","prompt_cache_key":"same"}`))
 	require.Len(t, write, 1)
 }

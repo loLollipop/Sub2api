@@ -268,6 +268,9 @@ func newOpenAIRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo U
 		nil,
 		nil, // userPlatformQuotaRepo
 	)
+	// Accounting tests replace dependencies after construction. Join the
+	// unrelated harvester before exposing the fixture to those writes.
+	svc.StopOpenAICodexTicketHarvester()
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		rateRepo,
 		nil,
@@ -3241,6 +3244,18 @@ func TestGroupBillsOpenAIFastAtStandardRequiresOpenAIAccount(t *testing.T) {
 		apiKey,
 		&Account{Platform: PlatformGrok, Type: AccountTypeAPIKey},
 		"priority",
+	))
+}
+
+// "免费 Fast" 只把 priority 降到 Standard 价；Ultrafast 是独立的更高档位，
+// 分组强制 Ultrafast 时仍按 Ultrafast 计费。
+func TestGroupBillsOpenAIFastAtStandardExcludesUltrafast(t *testing.T) {
+	apiKey := &APIKey{Group: &Group{Platform: PlatformOpenAI, FreeOpenAIFast: true, ForceOpenAIUltrafast: true}}
+
+	require.False(t, groupBillsOpenAIFastAtStandard(
+		apiKey,
+		&Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+		OpenAIFastTierUltrafast,
 	))
 }
 

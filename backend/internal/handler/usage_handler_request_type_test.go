@@ -266,6 +266,9 @@ func TestUserUsageStatsUsesScopedFilters(t *testing.T) {
 			TotalCost:        0.10,
 			TotalActualCost:  0.08,
 			TotalAccountCost: &accountCost,
+			Endpoints: []usagestats.EndpointStat{{
+				Endpoint: "/v1/responses", Cost: 0.10, ActualCost: 0.08, AccountCost: accountCost,
+			}},
 			UpstreamEndpoints: []usagestats.EndpointStat{{
 				Endpoint: "/v1/responses",
 			}},
@@ -289,6 +292,8 @@ func TestUserUsageStatsUsesScopedFilters(t *testing.T) {
 	require.Equal(t, "token", repo.statsFilters.BillingMode)
 	require.Contains(t, rec.Body.String(), `"total_cost":0.1`)
 	require.Contains(t, rec.Body.String(), `"total_actual_cost":0.08`)
+	require.Contains(t, rec.Body.String(), `"actual_cost":0.08`)
+	require.NotContains(t, rec.Body.String(), `"account_cost"`)
 	require.NotContains(t, rec.Body.String(), "total_account_cost")
 	require.NotContains(t, rec.Body.String(), "upstream_endpoints")
 	require.NotContains(t, rec.Body.String(), "endpoint_paths")

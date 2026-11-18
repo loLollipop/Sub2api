@@ -14,6 +14,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -31,6 +32,18 @@ import (
 // 所有 helper 都是对既有内联代码的等价提取，不改变任何行为；各路径的差异
 // （GLM effort 归一化、fast policy、Grok 分支、ClientDisconnect 语义等）仍留在
 // 调用方，属于有意保留的行为差异，不在此强行统一。
+
+// flushBeforeUpstreamRead coalesces buffered SSE lines, then flushes before
+// waiting for the next upstream read so available output is never held back.
+type flushBeforeUpstreamRead struct {
+	r     io.Reader
+	flush func()
+}
+
+func (f *flushBeforeUpstreamRead) Read(p []byte) (int, error) {
+	f.flush()
+	return f.r.Read(p)
+}
 
 // newUpstreamSSEScanner bounds line growth while allowing media SSE events.
 func (s *OpenAIGatewayService) newUpstreamSSEScanner(r io.Reader) *bufio.Scanner {
@@ -474,8 +487,8 @@ func (s *OpenAIGatewayService) readCCUpstreamJSONResponse(
 func writeOpenAIResponsesFallbackError(c *gin.Context, statusCode int, errType, message string) {
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clientprivacy.ErrorType(statusCode, errType),
+			"message": ClientUpstreamErrorMessage(message),
 		},
 	})
 }

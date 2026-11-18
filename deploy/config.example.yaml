@@ -235,6 +235,12 @@ gateway:
   # Max request body size in bytes (default: 256MB)
   # 请求体最大字节数（默认 256MB）
   max_body_size: 268435456
+  # Per-instance ingress buffer budget, shared by gateway routes and aliases.
+  # Unset: 1/4 of min(RAM, cgroup limits, GOMEMLIMIT), at least 1 GiB.
+  # Final bodies stay charged until the handler returns, including long streams.
+  # 实例级请求体内存预算；未配置时自动计算，超出返回 503 + Retry-After: 1；0 禁用。
+  # Environment: GATEWAY_REQUEST_BODY_MEMORY_BUDGET_BYTES; explicit values are used as-is.
+  # request_body_memory_budget_bytes: 1073741824
   # Pure-text endpoint body limit (embeddings and alpha/search), default 32 MiB.
   # 纯文本端点请求体上限（embeddings、alpha/search），默认 32 MiB。
   text_max_body_size: 33554432
@@ -250,6 +256,9 @@ gateway:
   # Enable Gemini upstream response header debug logs (default: false)
   # 是否开启 Gemini 上游响应头调试日志（默认 false）
   gemini_debug_response_headers: false
+  # Gemini same-account retries, excluding the initial request (0-10, default: 4).
+  # Gemini 同账号重试次数：0 表示只请求一次；签名降级重发不占此预算。
+  max_same_account_retries_gemini: 4
   # Connection pool isolation strategy:
   # 连接池隔离策略：
   # - proxy: Isolate by proxy, same proxy shares connection pool (suitable for few proxies, many accounts)

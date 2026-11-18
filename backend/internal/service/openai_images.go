@@ -23,6 +23,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmodel"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/imroc/req/v3"
@@ -1194,7 +1195,8 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 			firstTokenMs = &ms
 		}
 		if !clientDisconnected && direct == nil {
-			if _, writeErr := c.Writer.Write(forwardLine); writeErr != nil {
+			clientLine := []byte(clientprivacy.SSE(string(forwardLine)))
+			if _, writeErr := c.Writer.Write(clientLine); writeErr != nil {
 				clientDisconnected = true
 				logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Images stream client disconnected, continue draining upstream for billing")
 			} else {
@@ -1237,7 +1239,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 	streamInterval := s.openAIImageStreamDataInterval()
 	keepaliveInterval := s.openAIImageStreamKeepaliveInterval()
 	if streamInterval <= 0 && keepaliveInterval <= 0 {
-		reader := bufio.NewReader(newUpstreamErrorFrameReader(resp.Body, fallbackLimit))
+		reader := bufio.NewReader(newUpstreamErrorFrameReaderForLineProcessing(resp.Body, fallbackLimit))
 		for {
 			line, err := reader.ReadBytes('\n')
 			processLine(line)
@@ -1281,7 +1283,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 	go func() {
 		defer close(events)
-		reader := bufio.NewReader(newUpstreamErrorFrameReader(resp.Body, fallbackLimit))
+		reader := bufio.NewReader(newUpstreamErrorFrameReaderForLineProcessing(resp.Body, fallbackLimit))
 		for {
 			line, err := reader.ReadBytes('\n')
 			if len(line) > 0 {

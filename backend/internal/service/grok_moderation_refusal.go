@@ -178,45 +178,10 @@ func (s *OpenAIGatewayService) settleGrokRefusal(c *gin.Context, account *Accoun
 	return nil
 }
 
-func grokRefusalHash(namespace, value string) string {
-	sum := sha256.Sum256([]byte("grok-refusal-v1:" + namespace + ":" + value))
-	return hex.EncodeToString(sum[:])
-}
-
-// Strong IDs have separate namespaces. prompt_cache_key and previous_response_id
-// are routing hints, not stable conversation IDs. Always keep the full refused
-// transcript too, so removing an explicit ID cannot evade an unchanged history.
-func grokRefusalIdentity(c *gin.Context, body []byte) (lookup, write []string) {
-	seen := map[string]bool{}
-	addID := func(namespace, raw string) {
-		if id := sanitizeSessionID(raw); id != "" {
-			key := grokRefusalHash(namespace, id)
-			if !seen[key] {
-				seen[key] = true
-				lookup = append(lookup, key)
-				write = append(write, key)
-			}
-		}
-	}
-	if c != nil && c.Request != nil {
-		for _, header := range []string{"session-id", "session_id", "X-Session-Id", openCodeSessionAffinityHeader, openCodeNativeSessionHeader} {
-			addID("session", c.GetHeader(header))
-		}
-		for _, header := range []string{"conversation_id", "X-Conversation-Id", grokConversationIDHeader} {
-			addID("conversation", c.GetHeader(header))
-		}
-		addID("claude", ClaudeCodeSessionIDFromHeader(c))
-	}
+// Refusal locks are scoped to the full refused transcript. Relay session and
+// conversation IDs are reused across unrelated prompts and must not block them.
+func grokRefusalIdentity(_ *gin.Context, body []byte) (lookup, write []string) {
 	root := openAIRequestPayloadView(body)
-	for _, field := range []string{"session_id", "metadata.session_id"} {
-		addID("session", root.Get(field).String())
-	}
-	for _, field := range []string{"conversation_id", "metadata.conversation_id"} {
-		addID("conversation", root.Get(field).String())
-	}
-	if parsed := ParseMetadataUserID(root.Get("metadata.user_id").String()); parsed != nil {
-		addID("claude", parsed.SessionID)
-	}
 	// Canonical JSON gives unambiguous framing and preserves exact text. Unknown
 	// blocks/items retain their full structure, preventing unsafe aliasing.
 	h := sha256.New()

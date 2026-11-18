@@ -6,24 +6,79 @@ import BaseDialog from '../BaseDialog.vue'
 import AnnouncementPopup from '../AnnouncementPopup.vue'
 import { useAnnouncementStore } from '@/stores/announcements'
 
-const { markRead, showError, showSuccess } = vi.hoisted(() => ({ markRead: vi.fn(), showError: vi.fn(), showSuccess: vi.fn() }))
-vi.mock('@/api', () => ({ announcementsAPI: { markRead } }))
+const { list, getById, summary, markRead, showError, showSuccess } = vi.hoisted(() => ({ list: vi.fn(), getById: vi.fn(), summary: vi.fn(), markRead: vi.fn(), showError: vi.fn(), showSuccess: vi.fn() }))
+vi.mock('@/api', () => ({ announcementsAPI: { list, getById, summary, markRead } }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError, showSuccess }) }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('@/utils/format', () => ({ formatRelativeTime: () => 'now', formatRelativeWithDateTime: () => 'now' }))
 enableAutoUnmount(afterEach)
 beforeEach(() => {
   setActivePinia(createPinia())
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   vi.spyOn(console, 'error').mockImplementation(() => {})
-  useAnnouncementStore().announcements = [{ id: 1, title: 'Notice', content: 'Details', notify_mode: 'silent', created_at: '2026-09-30', updated_at: '2026-09-30' }]
+  const item = { id: 1, title: 'Notice', content: 'Details', notify_mode: 'silent' as const, created_at: '2026-09-30', updated_at: '2026-09-30' }
+  useAnnouncementStore().announcements = [item]
+  list.mockResolvedValue([item])
+  getById.mockResolvedValue(item)
 })
 afterEach(() => { vi.restoreAllMocks(); document.body.style.overflow = '' })
 
 describe('announcement read confirmation', () => {
+  it('loads the timeline on open and a body only after selecting its excerpt', async () => {
+    const store = useAnnouncementStore()
+    store.announcements = []
+    list.mockResolvedValue([{ id: 1, title: 'Lazy notice', excerpt: 'Short preview', notify_mode: 'silent', created_at: '2026-09-30', updated_at: '2026-09-30' }])
+    let finish!: (value: object) => void
+    getById.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    const wrapper = mount(AnnouncementBell, { global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
+    expect(list).not.toHaveBeenCalled()
+    expect(getById).not.toHaveBeenCalled()
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.announcement-row-excerpt').text()).toBe('Short preview')
+    expect(getById).not.toHaveBeenCalled()
+    await wrapper.get('.announcement-row').trigger('click')
+    expect(wrapper.find('.announcement-detail-panel [role="status"]').exists()).toBe(true)
+    expect(wrapper.find('.markdown-body').exists()).toBe(false)
+    expect(markRead).not.toHaveBeenCalled()
+    finish({ ...store.announcements[0], content: 'Loaded body' })
+    await flushPromises()
+    expect(wrapper.get('.markdown-body').text()).toBe('Loaded body')
+    expect(getById).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows body failures and retries rather than rendering an empty announcement', async () => {
+    getById.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ ...useAnnouncementStore().announcements[0], content: 'Retried body' })
+    const wrapper = mount(AnnouncementBell, { global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    await wrapper.get('.announcement-row').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.announcement-detail-panel [role="alert"]').text()).toContain('announcements.loadFailed')
+    expect(wrapper.find('.markdown-body').exists()).toBe(false)
+    expect(markRead).not.toHaveBeenCalled()
+    await wrapper.get('.announcement-detail-panel [role="alert"] button').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.markdown-body').text()).toBe('Retried body')
+  })
+
+  it('surfaces unavailable summary counts on the bell and keeps the previous unread count', async () => {
+    const store = useAnnouncementStore()
+    summary.mockResolvedValueOnce({ total: 24, unread: 22 }).mockRejectedValue(new Error('offline'))
+    await store.fetchSummary()
+    await store.fetchSummary(true)
+    const wrapper = mount(AnnouncementBell, { global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
+    expect(wrapper.get('button').attributes('title')).toBe('announcements.loadFailed')
+    expect(wrapper.get('button').text()).toContain('!')
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('announcements.loadFailed')
+    expect(store.unreadCount).toBe(22)
+  })
   it('blocks Escape behind a required announcement popup', async () => {
     const bell = mount(AnnouncementBell, { global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
     await bell.get('button').trigger('click')
+    await flushPromises()
     expect(bell.find('.modal-overlay--drawer').exists()).toBe(true)
     expect(bell.get('.modal-header .modal-description').text()).toBe('1 announcements.unread')
     expect(bell.get('.modal-header-actions button').text()).toBe('announcements.markAllRead')
@@ -50,6 +105,7 @@ describe('announcement read confirmation', () => {
     markRead.mockResolvedValue(undefined)
     const bell = mount(AnnouncementBell, { global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
     await bell.get('button').trigger('click')
+    await flushPromises()
     await bell.get('.group.relative').trigger('click')
     await flushPromises()
     // Mounted later, but visually below both announcement layers.
@@ -79,6 +135,7 @@ describe('announcement read confirmation', () => {
     const base = mount(BaseDialog, { props: { show: true, title: 'Base' } })
     const bell = mount(AnnouncementBell, { global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
     await bell.get('button').trigger('click')
+    await flushPromises()
     bell.unmount()
     expect(document.body.classList.contains('modal-open')).toBe(true)
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
@@ -91,6 +148,7 @@ describe('announcement read confirmation', () => {
     markRead.mockRejectedValue(new Error('offline'))
     const wrapper = mount(AnnouncementBell, { global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
     await wrapper.get('button').trigger('click')
+    await flushPromises()
     await wrapper.get('.group.relative').trigger('click')
     await flushPromises()
     expect(wrapper.get('.announcement-detail-panel .modal-header .announcement-meta').exists()).toBe(true)
@@ -115,10 +173,12 @@ describe('announcement read confirmation', () => {
     markRead.mockReturnValueOnce(new Promise<void>(done => { resolve = done }))
     const wrapper = mount(AnnouncementBell, { global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
     await wrapper.get('button').trigger('click')
+    await flushPromises()
     await wrapper.findAll('button').find(button => button.text() === 'announcements.markAllRead')!.trigger('click')
     const store = useAnnouncementStore()
     store.reset()
-    store.loading = true
+    list.mockReturnValue(new Promise(() => {}))
+    void store.fetchAnnouncements()
     resolve()
     await flushPromises()
     expect(store.loading).toBe(true)
@@ -130,6 +190,7 @@ describe('announcement read confirmation', () => {
     markRead.mockResolvedValue(undefined)
     const wrapper = mount(AnnouncementBell, { attachTo: document.body, global: { stubs: { Teleport: true, Transition: true, Icon: true } } })
     await wrapper.get('button').trigger('click')
+    await flushPromises()
     const drawer = wrapper.get('.announcement-overlay--drawer')
     const body = drawer.get('.modal-body').element
     body.scrollTop = 180

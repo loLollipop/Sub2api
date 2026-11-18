@@ -592,6 +592,8 @@ export default {
       cacheCreationTokens: '缓存创建 Token',
       cacheCreation5mTokens: '缓存创建',
       cacheCreation1hTokens: '缓存创建',
+      cacheCreation30mTokens: '缓存创建',
+      cacheCreation12hTokens: '缓存创建',
       cacheReadTokens: '缓存读取 Token',
       failedToLoad: '加载使用记录失败',
       billingType: '计费类型',

@@ -65,7 +65,7 @@ describe('announcement fetch ownership', () => {
     old.resolve([notice(1)])
     await oldRequest
     expect(store.announcements.map(a => a.id)).toEqual([2])
-    expect(store.currentPopup?.id).toBe(2)
+    expect(store.currentPopup).toBeNull()
   })
 
   it('does not clear the new session throttle when an old request rejects', async () => {
@@ -88,7 +88,7 @@ describe('announcement fetch ownership', () => {
     await store.fetchAnnouncements()
     await store.fetchAnnouncements()
     expect(list).toHaveBeenCalledTimes(2)
-    expect(store.currentPopup?.id).toBe(1)
+    expect(store.currentPopup).toBeNull()
   })
 
   it('still throttles ordinary concurrent fetches', async () => {

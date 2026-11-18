@@ -18,9 +18,9 @@ func sanitizeClientUpstreamErrorBody(status int, body []byte) []byte {
 		return body
 	}
 	if bodyHasSSEFraming(body) {
-		return []byte(clientprivacy.ErrorSSE(string(body)))
+		return []byte(clientprivacy.ErrorSSEWithStatus(string(body), status))
 	}
-	return clientprivacy.JSON(body)
+	return clientprivacy.JSONWithStatus(body, status)
 }
 
 // SanitizeClientUpstreamErrorBody protects handler-owned response writes.
@@ -31,4 +31,10 @@ func SanitizeClientUpstreamErrorBody(status int, body []byte) []byte {
 
 func clientUpstreamBodyIsError(body []byte) bool {
 	return clientprivacy.IsErrorJSON(body)
+}
+
+// ClientUpstreamErrorMessage removes relay correlation suffixes only at client
+// write boundaries. Internal diagnostics and rule matching keep their original.
+func ClientUpstreamErrorMessage(message string) string {
+	return clientprivacy.ErrorMessage(message)
 }

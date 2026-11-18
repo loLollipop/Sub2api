@@ -18,6 +18,7 @@ const subscriptionStore = useSubscriptionStore()
 const announcementStore = useAnnouncementStore()
 const adminComplianceStore = useAdminComplianceStore()
 const adminSettingsStore = useAdminSettingsStore()
+let announcementTimer: ReturnType<typeof setTimeout> | undefined
 
 function updateDocumentTitle() {
   const customMenuItems = [
@@ -55,7 +56,7 @@ watch(
 // Watch for authentication state and manage subscription data + announcements
 function onVisibilityChange() {
   if (document.visibilityState === 'visible' && authStore.isAuthenticated) {
-    announcementStore.fetchAnnouncements()
+    void announcementStore.fetchSummary()
   }
 }
 
@@ -67,6 +68,7 @@ function onAdminComplianceRequired(event: Event) {
 watch(
   () => authStore.isAuthenticated,
   (isAuthenticated, oldValue) => {
+    clearTimeout(announcementTimer)
     if (isAuthenticated) {
       if (authStore.isAdmin) {
         adminComplianceStore.fetchStatus().catch((error) => {
@@ -83,34 +85,43 @@ watch(
       // Announcements: new login vs page refresh restore
       if (oldValue === false) {
         // New login: delay 3s then force fetch
-        setTimeout(() => announcementStore.fetchAnnouncements(true), 3000)
+        announcementTimer = setTimeout(() => {
+          void announcementStore.fetchSummary(true)
+          void announcementStore.fetchPopups()
+        }, 3000)
       } else {
         // Page refresh restore (oldValue was undefined)
-        announcementStore.fetchAnnouncements()
+        void announcementStore.fetchSummary()
+        void announcementStore.fetchPopups()
       }
 
       // Register visibility change listener
       document.addEventListener('visibilitychange', onVisibilityChange)
+      window.addEventListener('focus', onVisibilityChange)
     } else {
       // User logged out: clear data and stop polling
       subscriptionStore.clear()
       announcementStore.reset()
       adminComplianceStore.reset()
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', onVisibilityChange)
     }
   },
   { immediate: true }
 )
 
 // Route change trigger (throttled by store)
-router.afterEach(() => {
+const removeAnnouncementRouteHook = router.afterEach(() => {
   if (authStore.isAuthenticated) {
-    announcementStore.fetchAnnouncements()
+    void announcementStore.fetchSummary()
   }
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(announcementTimer)
+  removeAnnouncementRouteHook()
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('focus', onVisibilityChange)
   window.removeEventListener('admin-compliance-required', onAdminComplianceRequired)
 })
 

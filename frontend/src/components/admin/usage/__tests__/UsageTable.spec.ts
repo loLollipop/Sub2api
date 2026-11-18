@@ -908,7 +908,7 @@ const DataTableStubWithUser = {
   template: `
     <div>
       <div v-for="row in data" :key="row.request_id">
-        <slot name="cell-user" :row="row" />
+        <slot name="cell-user" :row="row" /><slot name="cell-api_key" :row="row" /><slot name="cell-account" :row="row" /><slot name="cell-group" :row="row" />
         <slot name="cell-model" :row="row" :value="row.model" />
         <slot name="cell-reasoning_effort" :row="row" :value="row.reasoning_effort" />
         <slot name="cell-billing_mode" :row="row" />
@@ -1100,5 +1100,28 @@ describe('admin UsageTable responsive detail panels', () => {
     expect(wrapper.find('.usage-detail-tooltip').exists()).toBe(false)
     wrapper.unmount()
     vi.unstubAllGlobals()
+  })
+})
+
+
+describe('admin UsageTable compact associations', () => {
+  it('renders summaries, preserves deleted badge and user navigation, and accepts legacy rows', async () => {
+    const row = {
+      ...baseImageRow, user_id: 7,
+      user_summary: { id: 7, email: 'compact@example.test', deleted_at: '2026-11-18T00:00:00Z' },
+      api_key_summary: { id: 8, name: 'Compact key' },
+      account_summary: { id: 9, name: 'Compact account' },
+      group_summary: { id: 10, name: 'Compact group' },
+    }
+    const wrapper = mount(UsageTable, {
+      props: { data: [row], columns: [] },
+      global: { stubs: { DataTable: DataTableStubWithUser, EmptyState: true, Icon: true, Teleport: true } },
+    })
+    for (const text of ['compact@example.test', 'Deleted', 'Compact key', 'Compact account', 'Compact group']) expect(wrapper.text()).toContain(text)
+    await wrapper.get('button[title="admin.usage.clickToViewBalance"]').trigger('click')
+    expect(wrapper.emitted('userClick')?.[0]).toEqual([7, 'compact@example.test'])
+    await wrapper.setProps({ data: [{ ...row, user: { id: 7, email: 'legacy@example.test' }, api_key: { id: 8, name: 'Legacy key' }, account: { id: 9, name: 'Legacy account' }, group: { id: 10, name: 'Legacy group' } }] })
+    for (const text of ['legacy@example.test', 'Legacy key', 'Legacy account', 'Legacy group']) expect(wrapper.text()).toContain(text)
+    wrapper.unmount()
   })
 })

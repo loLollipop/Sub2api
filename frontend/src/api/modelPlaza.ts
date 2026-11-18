@@ -17,6 +17,7 @@ export interface PlazaOfficialPricing {
   cache_write_price: number | null
   /** 1h 缓存写入参考价（目录来源对应 LiteLLM cache_creation_above_1hr），多数模型缺失。 */
   cache_write_1h_price?: number | null
+  cache_write_12h_price?: number | null
   cache_read_price: number | null
   /** 参考价阶梯（多档模型才有）：配置参考价跟随实际计费阶梯，纯目录参考价保留目录阶梯。 */
   intervals?: UserPricingInterval[]

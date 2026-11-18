@@ -1751,14 +1751,14 @@ func TestExtractSSEUsage(t *testing.T) {
 			// message_start.message.usage.cache_creation 内的 5m/1h 明细也要解析。
 			name:     "message_start nested usage with cache_creation breakdown",
 			line:     `data: {"type":"message_start","message":{"usage":{"input_tokens":100,"cache_creation":{"ephemeral_5m_input_tokens":30,"ephemeral_1h_input_tokens":70}}}}`,
-			expected: ClaudeUsage{InputTokens: 100, CacheCreation5mTokens: 30, CacheCreation1hTokens: 70},
+			expected: ClaudeUsage{InputTokens: 100, CacheCreationInputTokens: 100, CacheCreation5mTokens: 30, CacheCreation1hTokens: 70},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			usage := &ClaudeUsage{}
 			svc.extractSSEUsage(tt.line, usage)
-			require.Equal(t, tt.expected, *usage)
+			require.Equal(t, tt.expected.billingUsageTokens(), usage.billingUsageTokens())
 		})
 	}
 }

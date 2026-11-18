@@ -19,7 +19,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
-const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, requested_model, upstream_model, upstream_response_model, upstream_model_mismatch, group_id, subscription_id, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, image_output_tokens, image_output_cost, image_input_tokens, image_input_cost, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, account_rate_multiplier, billing_type, request_type, stream, openai_ws_mode, duration_ms, first_token_ms, user_agent, ip_address, image_count, image_size, image_input_size, image_output_size, image_size_source, image_size_breakdown, video_count, video_resolution, video_duration_seconds, service_tier, reasoning_effort, requested_reasoning_effort, inbound_endpoint, upstream_endpoint, cache_ttl_overridden, long_context_billing_applied, channel_id, model_mapping_chain, billing_tier, billing_mode, account_stats_cost, upstream_request_id, session_id, native_compaction_v2, created_at"
+const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, requested_model, upstream_model, upstream_response_model, upstream_model_mismatch, group_id, subscription_id, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, image_output_tokens, image_output_cost, image_input_tokens, image_input_cost, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, account_rate_multiplier, billing_type, request_type, stream, openai_ws_mode, duration_ms, first_token_ms, user_agent, ip_address, image_count, image_size, image_input_size, image_output_size, image_size_source, image_size_breakdown, video_count, video_resolution, video_duration_seconds, service_tier, reasoning_effort, requested_reasoning_effort, inbound_endpoint, upstream_endpoint, cache_ttl_overridden, long_context_billing_applied, channel_id, model_mapping_chain, billing_tier, billing_mode, account_stats_cost, upstream_request_id, session_id, native_compaction_v2, cache_creation_30m_tokens, cache_creation_12h_tokens, created_at"
 
 func (r *usageLogRepository) GetByID(ctx context.Context, id int64) (log *service.UsageLog, err error) {
 	query := "SELECT " + usageLogSelectColumns + " FROM usage_logs WHERE id = $1"
@@ -154,8 +154,13 @@ func (r *usageLogRepository) ListWithFilters(ctx context.Context, params paginat
 	if err != nil {
 		return nil, nil, err
 	}
+	if filters.AccountNameOnly {
+		for i := range logs {
+			logs[i].AccountNameOnly = true
+		}
+	}
 
-	if err := r.hydrateUsageLogAssociations(ctx, logs); err != nil {
+	if err := r.hydrateUsageLogAssociations(ctx, logs, filters.CompactAssociations); err != nil {
 		return nil, nil, err
 	}
 	return logs, page, nil
@@ -300,32 +305,42 @@ func (r *usageLogRepository) queryUsageLogs(ctx context.Context, query string, a
 	return logs, nil
 }
 
-func (r *usageLogRepository) hydrateUsageLogAssociations(ctx context.Context, logs []service.UsageLog) error {
+func (r *usageLogRepository) hydrateUsageLogAssociations(ctx context.Context, logs []service.UsageLog, compact bool) error {
 	// 关联数据使用 Ent 批量加载，避免把复杂 SQL 继续膨胀。
 	if len(logs) == 0 {
 		return nil
 	}
 
 	ids := collectUsageLogIDs(logs)
-	users, err := r.loadUsers(ctx, ids.userIDs)
+	users, err := r.loadUsers(ctx, ids.userIDs, compact)
 	if err != nil {
 		return err
 	}
-	apiKeys, err := r.loadAPIKeys(ctx, ids.apiKeyIDs)
+	apiKeys, err := r.loadAPIKeys(ctx, ids.apiKeyIDs, compact)
 	if err != nil {
 		return err
 	}
-	accounts, err := r.loadAccounts(ctx, ids.accountIDs)
+	accountNameOnly := compact
+	for i := range logs {
+		if logs[i].AccountNameOnly {
+			accountNameOnly = true
+			break
+		}
+	}
+	accounts, err := r.loadAccounts(ctx, ids.accountIDs, accountNameOnly)
 	if err != nil {
 		return err
 	}
-	groups, err := r.loadGroups(ctx, ids.groupIDs)
+	groups, err := r.loadGroups(ctx, ids.groupIDs, compact)
 	if err != nil {
 		return err
 	}
-	subs, err := r.loadSubscriptions(ctx, ids.subscriptionIDs)
-	if err != nil {
-		return err
+	var subs map[int64]*service.UserSubscription
+	if !compact {
+		subs, err = r.loadSubscriptions(ctx, ids.subscriptionIDs)
+		if err != nil {
+			return err
+		}
 	}
 
 	for i := range logs {
@@ -343,11 +358,12 @@ func (r *usageLogRepository) hydrateUsageLogAssociations(ctx context.Context, lo
 				logs[i].Group = group
 			}
 		}
-		if logs[i].SubscriptionID != nil {
+		if !compact && logs[i].SubscriptionID != nil {
 			if sub, ok := subs[*logs[i].SubscriptionID]; ok {
 				logs[i].Subscription = sub
 			}
 		}
+		logs[i].AssociationsCompact = compact
 	}
 	return nil
 }
@@ -390,12 +406,25 @@ func collectUsageLogIDs(logs []service.UsageLog) usageLogIDs {
 	}
 }
 
-func (r *usageLogRepository) loadUsers(ctx context.Context, ids []int64) (map[int64]*service.User, error) {
+func (r *usageLogRepository) loadUsers(ctx context.Context, ids []int64, compact bool) (map[int64]*service.User, error) {
 	out := make(map[int64]*service.User)
 	if len(ids) == 0 {
 		return out, nil
 	}
 	// 无条件穿透软删除：ids 来自调用方已按 user_id 筛选的日志行；普通用户路径强制 UserID=本人（本人必为活跃用户），不会借此解析他人已删身份；仅 admin 路径可借此显示已删用户。
+	if compact {
+		models, err := r.client.User.Query().
+			Where(dbuser.IDIn(ids...)).
+			Select(dbuser.FieldID, dbuser.FieldEmail, dbuser.FieldUsername, dbuser.FieldDeletedAt).
+			All(mixins.SkipSoftDelete(ctx))
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range models {
+			out[m.ID] = userEntityToService(m)
+		}
+		return out, nil
+	}
 	models, err := r.client.User.Query().Where(dbuser.IDIn(ids...)).All(mixins.SkipSoftDelete(ctx))
 	if err != nil {
 		return nil, err
@@ -406,9 +435,22 @@ func (r *usageLogRepository) loadUsers(ctx context.Context, ids []int64) (map[in
 	return out, nil
 }
 
-func (r *usageLogRepository) loadAPIKeys(ctx context.Context, ids []int64) (map[int64]*service.APIKey, error) {
+func (r *usageLogRepository) loadAPIKeys(ctx context.Context, ids []int64, compact bool) (map[int64]*service.APIKey, error) {
 	out := make(map[int64]*service.APIKey)
 	if len(ids) == 0 {
+		return out, nil
+	}
+	if compact {
+		models, err := r.client.APIKey.Query().
+			Where(dbapikey.IDIn(ids...)).
+			Select(dbapikey.FieldID, dbapikey.FieldName).
+			All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range models {
+			out[m.ID] = apiKeyEntityToService(m)
+		}
 		return out, nil
 	}
 	models, err := r.client.APIKey.Query().Where(dbapikey.IDIn(ids...)).All(ctx)
@@ -421,9 +463,22 @@ func (r *usageLogRepository) loadAPIKeys(ctx context.Context, ids []int64) (map[
 	return out, nil
 }
 
-func (r *usageLogRepository) loadAccounts(ctx context.Context, ids []int64) (map[int64]*service.Account, error) {
+func (r *usageLogRepository) loadAccounts(ctx context.Context, ids []int64, compact bool) (map[int64]*service.Account, error) {
 	out := make(map[int64]*service.Account)
 	if len(ids) == 0 {
+		return out, nil
+	}
+	if compact {
+		models, err := r.client.Account.Query().
+			Where(dbaccount.IDIn(ids...)).
+			Select(dbaccount.FieldID, dbaccount.FieldName).
+			All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range models {
+			out[m.ID] = accountEntityToService(m)
+		}
 		return out, nil
 	}
 	models, err := r.client.Account.Query().Where(dbaccount.IDIn(ids...)).All(ctx)
@@ -436,9 +491,22 @@ func (r *usageLogRepository) loadAccounts(ctx context.Context, ids []int64) (map
 	return out, nil
 }
 
-func (r *usageLogRepository) loadGroups(ctx context.Context, ids []int64) (map[int64]*service.Group, error) {
+func (r *usageLogRepository) loadGroups(ctx context.Context, ids []int64, compact bool) (map[int64]*service.Group, error) {
 	out := make(map[int64]*service.Group)
 	if len(ids) == 0 {
+		return out, nil
+	}
+	if compact {
+		models, err := r.client.Group.Query().
+			Where(dbgroup.IDIn(ids...)).
+			Select(dbgroup.FieldID, dbgroup.FieldName).
+			All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range models {
+			out[m.ID] = groupEntityToService(m)
+		}
 		return out, nil
 	}
 	models, err := r.client.Group.Query().Where(dbgroup.IDIn(ids...)).All(ctx)
@@ -530,6 +598,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		upstreamRequestID         sql.NullString
 		sessionID                 sql.NullString
 		nativeCompactionV2        bool
+		cacheCreation30m          int
+		cacheCreation12h          int
 		createdAt                 time.Time
 	)
 
@@ -596,6 +666,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		&upstreamRequestID,
 		&sessionID,
 		&nativeCompactionV2,
+		&cacheCreation30m,
+		&cacheCreation12h,
 		&createdAt,
 	); err != nil {
 		return nil, err
@@ -629,6 +701,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		BillingType:               int8(billingType),
 		RequestType:               service.RequestTypeFromInt16(requestTypeRaw),
 		NativeCompactionV2:        nativeCompactionV2,
+		CacheCreation30mTokens:    cacheCreation30m,
+		CacheCreation12hTokens:    cacheCreation12h,
 		ImageCount:                imageCount,
 		VideoCount:                videoCount,
 		CacheTTLOverridden:        cacheTTLOverridden,

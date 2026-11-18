@@ -31,7 +31,7 @@ func findGrokRefusalJob(ctx context.Context, db grokRefusalQuerier, user int64, 
 			slots = append(slots, fmt.Sprintf("$%d", len(args)))
 		}
 		var id string
-		err := db.QueryRowContext(ctx, `SELECT job_id FROM grok_refusal_blocks WHERE user_id = $1 AND identity_hash IN (`+strings.Join(slots, ",")+`) LIMIT 1`, args...).Scan(&id)
+		err := db.QueryRowContext(ctx, `SELECT job_id FROM grok_refusal_blocks WHERE user_id = $1 AND identity_hash IN (`+strings.Join(slots, ",")+`) AND created_at > NOW() - INTERVAL '24 hours' LIMIT 1`, args...).Scan(&id)
 		if err == nil {
 			return id, nil
 		}
@@ -84,7 +84,7 @@ func (r *usageBillingRepository) CommitGrokRefusal(ctx context.Context, input *s
 		if err != nil {
 			return nil, false, err
 		}
-		// Learn additional strong IDs/full histories from an already in-flight
+		// Learn additional full histories from an already in-flight
 		// duplicate without ever creating another fee.
 		if err := insertGrokRefusalKeys(ctx, tx, job.UserID, existingID, write); err != nil {
 			return nil, false, err
@@ -152,7 +152,7 @@ func insertGrokRefusalKeys(ctx context.Context, tx *sql.Tx, user int64, job stri
 		if len(key) != 64 {
 			return errors.New("invalid Grok refusal hash")
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO grok_refusal_blocks (user_id, identity_hash, job_id) VALUES ($1,$2,$3) ON CONFLICT (user_id, identity_hash) DO NOTHING`, user, key, job); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO grok_refusal_blocks (user_id, identity_hash, job_id) VALUES ($1,$2,$3) ON CONFLICT (user_id, identity_hash) DO UPDATE SET job_id = EXCLUDED.job_id, created_at = EXCLUDED.created_at WHERE grok_refusal_blocks.created_at <= NOW() - INTERVAL '24 hours'`, user, key, job); err != nil {
 			return err
 		}
 	}

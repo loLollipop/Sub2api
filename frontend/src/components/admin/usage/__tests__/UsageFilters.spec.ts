@@ -341,7 +341,7 @@ describe('UsageFilters layout', () => {
     expect(filters.native_compaction_v2).toBe(false)
     await wrapper.setProps({ showActions: true })
     expect(wrapper.find('.usage-filter-grid .usage-filter-actions').exists()).toBe(false)
-    expect(wrapper.get('.usage-filter-actions').findAll('button')).toHaveLength(4)
+    expect(wrapper.get('.usage-filter-actions').findAll('button')).toHaveLength(5)
     wrapper.unmount()
   })
 })

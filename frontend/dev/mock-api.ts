@@ -9,6 +9,7 @@ import type {
   UserSpendingRankingResponse,
   UserUsageTrendPoint,
   ApiKey,
+  UserAnnouncement,
 } from '../src/types'
 import type { MonitorMatrixGroupBy, MonitorMatrixRow } from '../src/api/channelMonitorV2'
 import { readFileSync } from 'node:fs'
@@ -114,6 +115,15 @@ function buckets<T extends UsageLog>(rows: T[], key: (row: T) => string) {
 
 export function createMockApi(now = new Date()) {
   const data = createFixtures(now)
+  const announcements: UserAnnouncement[] = Array.from({ length: 3 }, (_, index) => ({
+    id: index + 1,
+    title: ['欢迎使用本地预览', '公告详情按需加载', '已读公告示例'][index],
+    content: ['## 本地演示公告\n\n这是合成的预览内容。确认已读后可继续浏览。', '## 按需加载\n\n时间线只返回摘要，打开详情时才加载正文。', '这条合成公告已读。'][index],
+    notify_mode: index === 0 ? 'popup' : 'silent',
+    created_at: new Date(now.getTime() - index * 86_400_000).toISOString(),
+    updated_at: now.toISOString(),
+    ...(index === 2 ? { read_at: now.toISOString() } : {}),
+  }))
   const customUsageConfigs = new Map<number, CustomUsageConfig>()
   const customUsageCache = new Map<number, CustomUsageResult>()
   const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
@@ -685,7 +695,18 @@ export function createMockApi(now = new Date()) {
         if (path === '/api/v1/groups/available') return data.groups
         if (path === '/api/v1/groups/rates') return {}
         if (path === '/api/v1/user/platform-quotas') return { platform_quotas: [] }
-        if (['/api/v1/announcements', '/api/v1/user/custom-endpoints'].includes(path)) return []
+        if (path === '/api/v1/announcements/summary') return { total: announcements.length, unread: announcements.filter(item => !item.read_at).length }
+        if (path === '/api/v1/announcements/popups') return copy(announcements.filter(item => item.notify_mode === 'popup' && !item.read_at).slice(0, 5))
+        if (path === '/api/v1/announcements') return announcements
+          .filter(item => !query.get('unread_only') || !item.read_at)
+          .map(({ content, ...item }) => ({ ...item, excerpt: content.replace(/[#\n]/g, ' ').trim().slice(0, 140) }))
+        const announcementDetail = path.match(/^\/api\/v1\/announcements\/item\/(\d+)$/)
+        if (announcementDetail) {
+          const item = announcements.find(item => item.id === Number(announcementDetail[1]))
+          if (!item) throw new PreviewError(404, '本地演示公告不存在')
+          return copy(item)
+        }
+        if (path === '/api/v1/user/custom-endpoints') return []
         if (path === '/api/v1/channel-monitors') return { items: data.monitorViews }
         const monitorDetail = path.match(/^\/api\/v1\/channel-monitors\/(\d+)\/status$/)
         if (monitorDetail) {
@@ -813,6 +834,13 @@ export function createMockApi(now = new Date()) {
           return { ...result, days, items: result.trend.map(row => ({ ...row, cache_write_tokens: row.cache_creation_tokens })) }
         }
         throw new PreviewError(404, '此接口未提供演示数据，不会连接真实后端')
+      }
+      const announcementRead = path.match(/^\/api\/v1\/announcements\/(\d+)\/read$/)
+      if (method === 'POST' && announcementRead) {
+        const item = announcements.find(item => item.id === Number(announcementRead[1]))
+        if (!item) throw new PreviewError(404, '本地演示公告不存在')
+        item.read_at = now.toISOString()
+        return { message: '已标记本地演示公告为已读' }
       }
       if (method === 'POST' && path === '/api/v1/__preview/role') {
         if (body.role !== 'admin' && body.role !== 'user') throw new PreviewError(422, '预览身份仅支持 admin 或 user')

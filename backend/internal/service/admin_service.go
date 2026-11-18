@@ -293,6 +293,7 @@ type CreateGroupInput struct {
 	CrossProtocolConversionEnabled bool
 	AllowLive                      bool
 	ForceOpenAIFast                bool
+	ForceOpenAIUltrafast           bool
 	FreeOpenAIFast                 bool
 	DefaultMappedModel             string
 	RequireOAuthOnly               bool
@@ -378,6 +379,7 @@ type UpdateGroupInput struct {
 	CrossProtocolConversionEnabled *bool
 	AllowLive                      *bool
 	ForceOpenAIFast                *bool
+	ForceOpenAIUltrafast           *bool
 	FreeOpenAIFast                 *bool
 	DefaultMappedModel             *string
 	RequireOAuthOnly               *bool

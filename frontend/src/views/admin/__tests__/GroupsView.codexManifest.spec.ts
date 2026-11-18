@@ -8,12 +8,16 @@ import GroupsView from "@/views/admin/GroupsView.vue";
 
 const {
   listGroups,
+  updateGroup,
+  getAccount,
   getModelAllowlistCandidates,
   getUsageSummary,
   getCapacitySummary,
   getLiveCapability,
 } = vi.hoisted(() => ({
   listGroups: vi.fn(),
+  updateGroup: vi.fn(),
+  getAccount: vi.fn(),
   getModelAllowlistCandidates: vi.fn(),
   getUsageSummary: vi.fn(),
   getCapacitySummary: vi.fn(),
@@ -30,14 +34,14 @@ vi.mock("@/api/admin", () => ({
       getCapacitySummary,
       getLiveCapability,
       create: vi.fn(),
-      update: vi.fn(),
+      update: updateGroup,
       delete: vi.fn(),
       duplicate: vi.fn(),
       updateSortOrder: vi.fn(),
     },
     accounts: {
       list: vi.fn(),
-      getById: vi.fn(),
+      getById: getAccount,
     },
   },
 }));
@@ -220,7 +224,10 @@ const mountView = () =>
         GroupCapacityBadge: true,
         GroupRateMultipliersModal: true,
         GroupRPMOverridesModal: true,
-        ReasoningEffortPolicyFields: true,
+        ReasoningEffortPolicyFields: defineComponent({
+          setup(_, { expose }) { expose({ validate: () => true, resetValidation: () => undefined }); },
+          template: '<div />',
+        }),
         CodexManifestAccountsField: CodexManifestAccountsFieldStub,
         PricingEntryCard: true,
         VueDraggable: true,
@@ -232,6 +239,8 @@ describe("GroupsView Codex manifest binding", () => {
   beforeEach(() => {
     localStorage.clear();
     listGroups.mockReset();
+    updateGroup.mockReset().mockResolvedValue(sourceGroup);
+    getAccount.mockReset().mockResolvedValue({ id: 17, name: "resolved" });
     getModelAllowlistCandidates.mockReset();
     getUsageSummary.mockReset();
     getCapacitySummary.mockReset();
@@ -248,6 +257,44 @@ describe("GroupsView Codex manifest binding", () => {
     getUsageSummary.mockResolvedValue([]);
     getCapacitySummary.mockResolvedValue([]);
     getLiveCapability.mockResolvedValue({ supported: false });
+  });
+
+  it("round-trips Ultra Fast pricing and permits both forced tiers", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    await vm.handleEdit({ ...sourceGroup, force_openai_fast: true, force_openai_ultrafast: true,
+      model_pricing: [{ models: ['gpt-6.2-sol'], billing_mode: 'token', input_price: 0, ultrafast_multiplier: 1.25 }] });
+    expect(wrapper.get('[data-testid="edit-force-openai-ultrafast"]').attributes('aria-checked')).toBe('true');
+    expect(vm.editForm.model_pricing[0].ultrafast_multiplier).toBe(1.25);
+    await vm.handleUpdateGroup();
+    expect(updateGroup).toHaveBeenLastCalledWith(42, expect.objectContaining({
+      force_openai_fast: true, force_openai_ultrafast: true,
+      model_pricing: [expect.objectContaining({ input_price: 0, ultrafast_multiplier: 1.25 })],
+    }));
+    await vm.handleEdit({ ...sourceGroup, force_openai_ultrafast: true });
+    await wrapper.get('[data-testid="edit-force-openai-ultrafast"]').trigger('click');
+    await vm.handleUpdateGroup();
+    expect(updateGroup).toHaveBeenLastCalledWith(42, expect.objectContaining({ force_openai_ultrafast: false }));
+    wrapper.unmount();
+  });
+
+  it("opens before routing names arrive and rejects stale dialog updates", async () => {
+    let resolve!: (value: { id: number; name: string }) => void;
+    getAccount.mockReturnValue(new Promise(done => { resolve = done; }));
+    const wrapper = mountView();
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    await vm.handleEdit({ ...sourceGroup, model_routing: { model: [17] } });
+    expect(vm.showEditModal).toBe(true);
+    expect(vm.editModelRoutingRules[0].accounts[0].name).toBe('#17');
+    vm.closeEditModal();
+    await vm.handleEdit({ ...sourceGroup, id: 43 });
+    resolve({ id: 17, name: 'old dialog' });
+    await flushPromises();
+    expect(vm.editModelRoutingRules).toEqual([]);
+    expect(vm.editCodexManifestAccountNames).toEqual({});
+    wrapper.unmount();
   });
 
   it("preserves consecutive child updates on the reactive edit config", async () => {

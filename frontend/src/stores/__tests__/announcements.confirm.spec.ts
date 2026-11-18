@@ -3,8 +3,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAnnouncementStore } from '../announcements'
 import type { UserAnnouncement } from '@/types'
 
-const { list, markRead } = vi.hoisted(() => ({ list: vi.fn(), markRead: vi.fn() }))
-vi.mock('@/api', () => ({ announcementsAPI: { list, markRead } }))
+const { list, popups, summary, markRead } = vi.hoisted(() => ({ list: vi.fn(), popups: vi.fn(), summary: vi.fn(), markRead: vi.fn() }))
+vi.mock('@/api', () => ({ announcementsAPI: { list, popups, summary, markRead } }))
 
 const notice = (id: number): UserAnnouncement => ({
   id, title: `Notice ${id}`, content: 'Content', notify_mode: 'popup',
@@ -14,6 +14,8 @@ const notice = (id: number): UserAnnouncement => ({
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.resetAllMocks()
+  popups.mockResolvedValue([])
+  summary.mockResolvedValue({ total: 2, unread: 2 })
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 afterEach(() => vi.restoreAllMocks())
@@ -21,8 +23,9 @@ afterEach(() => vi.restoreAllMocks())
 describe('required announcement confirmation', () => {
   it('keeps a failed confirmation open and advances the queue only after a successful retry', async () => {
     const store = useAnnouncementStore()
-    list.mockResolvedValue([notice(1), notice(2)])
-    await store.fetchAnnouncements()
+    popups.mockResolvedValue([notice(1), notice(2)])
+    await store.fetchSummary()
+    await store.fetchPopups()
     markRead.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined)
     expect(await store.dismissPopup()).toBe(false)
     expect(store.currentPopup?.id).toBe(1)
@@ -73,7 +76,8 @@ describe('required announcement confirmation', () => {
     const pending = store.markAllAsRead()
     store.reset()
     store.announcements = [notice(1)]
-    store.loading = true
+    list.mockReturnValue(new Promise(() => {}))
+    void store.fetchAnnouncements()
     if (outcome === 'resolve') resolve()
     else reject(new Error('old session failed'))
     expect(await pending).toBe(false)

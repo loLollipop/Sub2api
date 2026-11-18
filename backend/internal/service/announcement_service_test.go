@@ -42,6 +42,10 @@ func (*announcementRepoStub) ListActive(context.Context, time.Time) ([]Announcem
 	return nil, nil
 }
 
+func (*announcementRepoStub) ListActiveMetadata(context.Context, time.Time) ([]Announcement, error) {
+	return nil, nil
+}
+
 func TestAnnouncementServiceCreateRejectsEqualStartEndTimes(t *testing.T) {
 	repo := &announcementRepoStub{}
 	svc := NewAnnouncementService(repo, nil, nil, nil)

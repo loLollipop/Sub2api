@@ -54,7 +54,7 @@ func TestUpdateSourceOfficialReleaseCheckpointsAreSeparateFromReviewedMain(t *te
 	require.Len(t, sources, 2)
 	require.Equal(t, "v"+forkImportedVersion, sources[0].releaseTag)
 	require.Equal(t, forkImportedCommit, sources[0].releaseCommit)
-	require.Equal(t, "v0.2.22", sources[1].releaseTag)
-	require.Equal(t, "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b", sources[1].releaseCommit)
+	require.Equal(t, "v0.2.23", sources[1].releaseTag)
+	require.Equal(t, "5af9afb588c4b014b3df9db7d4073af1f8ae01b6", sources[1].releaseCommit)
 	require.Equal(t, originalReviewedCommit, sources[1].commit)
 }

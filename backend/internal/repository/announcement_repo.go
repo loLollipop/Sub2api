@@ -198,6 +198,15 @@ func announcementListOrders(params pagination.PaginationParams) []func(*entsql.S
 }
 
 func (r *announcementRepository) ListActive(ctx context.Context, now time.Time) ([]service.Announcement, error) {
+	return r.listActive(ctx, now, false)
+}
+
+// ListActiveMetadata omits the body for badge counts and popup selection.
+func (r *announcementRepository) ListActiveMetadata(ctx context.Context, now time.Time) ([]service.Announcement, error) {
+	return r.listActive(ctx, now, true)
+}
+
+func (r *announcementRepository) listActive(ctx context.Context, now time.Time, metadataOnly bool) ([]service.Announcement, error) {
 	q := r.client.Announcement.Query().
 		Where(
 			announcement.StatusEQ(service.AnnouncementStatusActive),
@@ -206,6 +215,11 @@ func (r *announcementRepository) ListActive(ctx context.Context, now time.Time) 
 		).
 		Order(dbent.Desc(announcement.FieldID)).
 		Limit(200)
+	if metadataOnly {
+		q.Select(announcement.FieldID, announcement.FieldTitle, announcement.FieldStatus,
+			announcement.FieldNotifyMode, announcement.FieldTargeting, announcement.FieldStartsAt,
+			announcement.FieldEndsAt, announcement.FieldCreatedAt, announcement.FieldUpdatedAt)
+	}
 
 	items, err := q.All(ctx)
 	if err != nil {

@@ -44,6 +44,7 @@ export default {
       model: 'Model',
       group: 'Group',
       noGroup: 'No Group',
+      deletedGroup: 'Deleted',
       requests: 'Requests',
       tokens: 'Tokens',
       cache: 'Cache',
@@ -1242,6 +1243,8 @@ export default {
         enableAnyway: 'Enable anyway'
       },
       openaiFast: {
+        forceUltrafast: 'Force Ultra Fast',
+        ultrafastHint: 'Forces Ultra Fast only when the model and account support it. With both switches enabled, other models use Fast. The global tier policy and configured pricing still apply.',
         title: 'OpenAI Fast mode',
         force: 'Force Fast (priority)',
         hint: 'Forces service_tier=priority on OpenAI requests in this group. The global Fast/Flex policy can still filter or block it. New requests update immediately after saving; existing WebSocket sessions must reconnect.',

@@ -130,11 +130,11 @@ export function useModelPlazaPricing(props: ModelPlazaPricingProps) {
   }
 
   function hasCachePricing(m: PlazaModel): boolean {
-    return m.pricing?.cache_write_price != null || m.pricing?.cache_write_1h_price != null || m.pricing?.cache_read_price != null
+    return m.pricing?.cache_write_price != null || m.pricing?.cache_write_1h_price != null || m.pricing?.cache_write_12h_price != null || m.pricing?.cache_read_price != null
   }
 
   function hasOfficialCache(o: NonNullable<PlazaModel['official_pricing']>): boolean {
-    return o.cache_write_price != null || o.cache_read_price != null || o.cache_write_1h_price != null
+    return o.cache_write_price != null || o.cache_read_price != null || o.cache_write_1h_price != null || o.cache_write_12h_price != null
   }
 
   /** 分时倍率时段(后端只给出倍率 ≠ 1 的时段,已升序)。 */
@@ -184,7 +184,7 @@ export function useModelPlazaPricing(props: ModelPlazaPricingProps) {
   /** 任一档带缓存价才按档渲染缓存列;否则沿用平价的写入/读取两行。 */
   function hasTierCachePricing(intervals: UserPricingInterval[]): boolean {
     return intervals.some((iv) =>
-      iv.cache_write_price != null || iv.cache_write_1h_price != null || iv.cache_read_price != null ||
+      iv.cache_write_price != null || iv.cache_write_1h_price != null || iv.cache_write_12h_price != null || iv.cache_read_price != null ||
       iv.cache_write_multiplier != null || iv.cache_read_multiplier != null
     )
   }

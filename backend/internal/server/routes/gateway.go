@@ -31,8 +31,9 @@ func RegisterGatewayRoutes(
 	compositeResolver *service.CompositeRouteResolver,
 	cfg *config.Config,
 ) {
-	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize)
-	textBodyLimit := middleware.RequestBodyLimit(cfg.Gateway.TextMaxBodySize)
+	bodyMemoryBudget := pkghttputil.NewBodyMemoryBudget(cfg.Gateway.RequestBodyMemoryBudgetBytes)
+	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize, bodyMemoryBudget)
+	textBodyLimit := middleware.RequestBodyLimit(cfg.Gateway.TextMaxBodySize, bodyMemoryBudget)
 	clientRequestID := middleware.ClientRequestID()
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 	endpointNorm := handler.InboundEndpointMiddleware()
@@ -110,6 +111,9 @@ func RegisterGatewayRoutes(
 			h.OpenAIGateway.GrokVideoGeneration(c)
 			return
 		}
+		if c.IsAborted() {
+			return
+		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": gin.H{
@@ -124,6 +128,9 @@ func RegisterGatewayRoutes(
 		// the Grok handler and let scheduler/account selection enforce capacity.
 		if grokVideosAPIAllowed(c) {
 			h.OpenAIGateway.GrokVideoStatus(c)
+			return
+		}
+		if c.IsAborted() {
 			return
 		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -142,6 +149,9 @@ func RegisterGatewayRoutes(
 			h.OpenAIGateway.GrokVideoContent(c)
 			return
 		}
+		if c.IsAborted() {
+			return
+		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": gin.H{
@@ -155,12 +165,18 @@ func RegisterGatewayRoutes(
 			h.OpenAIGateway.GrokVideoEdit(c)
 			return
 		}
+		if c.IsAborted() {
+			return
+		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"type": "not_found_error", "message": "Videos API is not supported for this platform"}})
 	}
 	videoExtensionHandler := func(c *gin.Context) {
 		if grokVideosAPIAllowed(c) {
 			h.OpenAIGateway.GrokVideoExtension(c)
+			return
+		}
+		if c.IsAborted() {
 			return
 		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -577,6 +593,9 @@ func grokVideosAPIAllowed(c *gin.Context) bool {
 	}
 	body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 	if err != nil {
+		if middleware.RejectRequestBodyReadError(c, err) {
+			return false
+		}
 		return false
 	}
 	requestmodel.ResetRequestBody(c.Request, body)
@@ -604,6 +623,9 @@ func compositeTargetPlatformMiddlewareResolved(resolver *service.CompositeRouteR
 		if c.Request != nil && c.Request.URL.Path == "/v1/systemone" {
 			body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 			if err != nil {
+				if middleware.RejectRequestBodyReadError(c, err) {
+					return
+				}
 				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": "Failed to read native request"}})
 				return
 			}
@@ -627,6 +649,9 @@ func compositeTargetPlatformMiddlewareResolved(resolver *service.CompositeRouteR
 
 		body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 		if err != nil {
+			if middleware.RejectRequestBodyReadError(c, err) {
+				return
+			}
 			status := http.StatusBadRequest
 			message := "Failed to read request body"
 			var maxErr *http.MaxBytesError

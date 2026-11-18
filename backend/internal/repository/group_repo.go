@@ -141,6 +141,7 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetCrossProtocolConversionEnabled(groupIn.CrossProtocolConversionEnabled).
 		SetAllowLive(groupIn.AllowLive).
 		SetForceOpenaiFast(groupIn.ForceOpenAIFast).
+		SetForceOpenaiUltrafast(groupIn.ForceOpenAIUltrafast).
 		SetFreeOpenaiFast(groupIn.FreeOpenAIFast).
 		SetRequireOauthOnly(groupIn.RequireOAuthOnly).
 		SetRequirePrivacySet(groupIn.RequirePrivacySet).
@@ -328,6 +329,7 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetCrossProtocolConversionEnabled(groupIn.CrossProtocolConversionEnabled).
 		SetAllowLive(groupIn.AllowLive).
 		SetForceOpenaiFast(groupIn.ForceOpenAIFast).
+		SetForceOpenaiUltrafast(groupIn.ForceOpenAIUltrafast).
 		SetFreeOpenaiFast(groupIn.FreeOpenAIFast).
 		SetRequireOauthOnly(groupIn.RequireOAuthOnly).
 		SetRequirePrivacySet(groupIn.RequirePrivacySet).

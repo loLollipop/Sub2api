@@ -84,6 +84,9 @@ func (s *OpenAIGatewayService) ForwardDeepSeekTools(ctx context.Context, c *gin.
 	if err != nil {
 		return nil, errors.New("failed to read DeepSeek tools upstream response")
 	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices || clientUpstreamBodyIsError(responseBody) {
+		setOpsUpstreamError(c, resp.StatusCode, sanitizeUpstreamErrorMessage(extractUpstreamErrorMessage(responseBody)), truncateString(string(responseBody), 2048))
+	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		// Never expose credential-bearing URLs, proxy errors, provider diagnostics,
 		// or redirect locations to clients or failover logs.

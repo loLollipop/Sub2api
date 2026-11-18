@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 )
 
 type antigravityStreamResult struct {
@@ -138,7 +139,7 @@ func (s *AntigravityGatewayService) handleGeminiStreamingResponse(c *gin.Context
 	}
 
 	// 使用 Scanner 并限制单行大小，避免 ReadString 无上限导致 OOM
-	scanner := bufio.NewScanner(newUpstreamErrorFrameReader(resp.Body, resolveUpstreamResponseReadLimit(s.settingService.cfg)))
+	scanner := bufio.NewScanner(newUpstreamErrorFrameReaderForLineProcessing(resp.Body, resolveUpstreamResponseReadLimit(s.settingService.cfg)))
 	maxLineSize := defaultMaxLineSize
 	if s.settingService.cfg != nil && s.settingService.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.settingService.cfg.Gateway.MaxLineSize
@@ -298,7 +299,15 @@ func (s *AntigravityGatewayService) handleGeminiStreamingResponse(c *gin.Context
 					firstTokenMs = &ms
 				}
 
-				cw.Fprintf("%sdata: %s\n\n", pendingErrorHeader, payload)
+				clientPayload := []byte(payload)
+				if pendingErrorHeader != "" || clientUpstreamBodyIsError(clientPayload) {
+					message := extractUpstreamErrorMessage(clientPayload)
+					status := openAIStreamFailureStatus(clientPayload, message)
+					setOpsUpstreamError(c, status, message, s.getUpstreamErrorDetail(clientPayload))
+					MarkOpsStreamFailure(c, gjson.GetBytes(clientPayload, "error.type").String(), extractUpstreamErrorCode(clientPayload), message, status)
+					clientPayload = clientprivacy.JSONWithStatus(clientPayload, 0)
+				}
+				cw.Fprintf("%sdata: %s\n\n", pendingErrorHeader, clientPayload)
 				pendingErrorHeader = ""
 				continue
 			}
@@ -629,7 +638,7 @@ func (s *AntigravityGatewayService) writeClaudeError(c *gin.Context, status int,
 	MarkResponseCommitted(c)
 	c.JSON(status, gin.H{
 		"type":  "error",
-		"error": gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(message)},
+		"error": gin.H{"type": clientprivacy.ErrorType(status, clientprivacy.Text(errType)), "message": ClientUpstreamErrorMessage(clientprivacy.Text(message))},
 	})
 	return fmt.Errorf("%s", message)
 }
@@ -673,7 +682,7 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 	); matched {
 		c.JSON(ptStatus, gin.H{
 			"type":  "error",
-			"error": gin.H{"type": clientprivacy.Text(ptErrType), "message": clientprivacy.Text(ptErrMsg)},
+			"error": gin.H{"type": clientprivacy.ErrorType(ptStatus, clientprivacy.Text(ptErrType)), "message": ClientUpstreamErrorMessage(clientprivacy.Text(ptErrMsg))},
 		})
 		if upstreamMsg == "" {
 			return fmt.Errorf("upstream error: %d", upstreamStatus)
@@ -713,7 +722,7 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 
 	c.JSON(statusCode, gin.H{
 		"type":  "error",
-		"error": gin.H{"type": clientprivacy.Text(errType), "message": clientprivacy.Text(errMsg)},
+		"error": gin.H{"type": clientprivacy.ErrorType(statusCode, clientprivacy.Text(errType)), "message": ClientUpstreamErrorMessage(clientprivacy.Text(errMsg))},
 	})
 	if upstreamMsg == "" {
 		return fmt.Errorf("upstream error: %d", upstreamStatus)
@@ -740,7 +749,7 @@ func (s *AntigravityGatewayService) writeGoogleError(c *gin.Context, status int,
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,
-			"message": clientprivacy.Text(message),
+			"message": ClientUpstreamErrorMessage(clientprivacy.Text(message)),
 			"status":  statusStr,
 		},
 	})

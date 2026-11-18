@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -189,6 +190,9 @@ func writeOpenAIEmbeddingsUpstreamResponse(c *gin.Context, resp *http.Response, 
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, filter)
 	}
 	c.Writer.Header().Set("Content-Type", responseheaders.ContentType(resp.Header.Get("Content-Type"), "application/json"))
+	if resp.StatusCode >= http.StatusBadRequest {
+		setOpsUpstreamError(c, resp.StatusCode, sanitizeUpstreamErrorMessage(extractUpstreamErrorMessage(body)), truncateString(string(body), 2048))
+	}
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, _ = c.Writer.Write(sanitizeClientUpstreamErrorBody(resp.StatusCode, body))
 }
@@ -196,8 +200,8 @@ func writeOpenAIEmbeddingsUpstreamResponse(c *gin.Context, resp *http.Response, 
 func writeOpenAIEmbeddingsError(c *gin.Context, statusCode int, errType, message string) {
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clientprivacy.ErrorType(statusCode, errType),
+			"message": ClientUpstreamErrorMessage(message),
 		},
 	})
 }

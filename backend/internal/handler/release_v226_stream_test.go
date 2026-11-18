@@ -78,7 +78,7 @@ func TestV226MessagesRetryRegatesKeepalive(t *testing.T) {
 	})
 }
 
-func TestV226FailoverAfterOrdinaryCommitAndCompactException(t *testing.T) {
+func TestV226FailoverDistinguishesHeartbeatAndSemanticOutput(t *testing.T) {
 	for _, compact := range []bool{false, true} {
 		c, _ := gin.CreateTestContext(httptest.NewRecorder())
 		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
@@ -97,8 +97,18 @@ func TestV226FailoverAfterOrdinaryCommitAndCompactException(t *testing.T) {
 		n, err, handled := service.WriteOpenAIStreamSSEHeartbeat(c, []byte(": ping\n\n"))
 		require.NoError(t, err)
 		require.True(t, handled)
+		require.Positive(t, n)
 		recordGatewayStreamHeartbeat(c, n)
-		require.Equal(t, compact, openAIForwardMayFailover(c, before, &service.UpstreamFailoverError{SafeToFailoverAfterWrite: true}))
+		// Heartbeats carry no semantic output for either stream mode.
+		require.True(t, openAIForwardMayFailover(c, before, &service.UpstreamFailoverError{}))
+		_, err = c.Writer.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello\"}\n\n"))
+		require.NoError(t, err)
+		require.False(t, openAIForwardMayFailover(c, before, &service.UpstreamFailoverError{}))
+		if !compact {
+			// Ordinary streams reject replay after real output even if a caller
+			// incorrectly retains the pre-output failover flag.
+			require.False(t, openAIForwardMayFailover(c, before, &service.UpstreamFailoverError{SafeToFailoverAfterWrite: true}))
+		}
 		stop()
 	}
 }

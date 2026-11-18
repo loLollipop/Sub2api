@@ -28,15 +28,33 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	if shouldPreemptivelyConvertInboundResponsesToChat(account) {
 		SetActualOpenAIUpstreamEndpoint(c, "/v1/chat/completions")
 	}
-	filteredBody, filterErr := filterOpenAIResponsesNoneReasoningEffortForAccount(account, body)
-	if filterErr != nil {
-		return nil, filterErr
+	requestedModel := gjson.GetBytes(body, "model").String()
+	_, mappedModel := resolveOpenAIForwardMappedModels(account, requestedModel, isOpenAIResponsesCompactPath(c))
+	if isOpenAIResponsesCompactPath(c) {
+		if compactModel := s.resolveOpenAICompactFallbackModel(account, requestedModel); compactModel != "" {
+			mappedModel = compactModel
+		}
 	}
-	body = filteredBody
+	modelBody, _, modelErr := normalizeOpenAIResponsesMappedModel(body, mappedModel)
+	if modelErr != nil {
+		writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", modelErr.Error())
+		return nil, modelErr
+	}
+	body = modelBody
+	// Terra accepts none as a real thinking switch, including compatible API
+	// endpoints where catalog-only none placeholders are otherwise omitted.
+	if !openai.IsGPT61TerraModelSpelling(mappedModel) {
+		filteredBody, filterErr := filterOpenAIResponsesNoneReasoningEffortForAccount(account, body)
+		if filterErr != nil {
+			return nil, filterErr
+		}
+		body = filteredBody
+	}
 	clearGrokResponsesClientToolMapping(c)
 	clearOpenAIResponsesClientToolMapping(c)
 	clearOpenAIResponsesNamespaceNames(c)
 	setCodexToolNameReverse(c, nil)
+	rememberOpenAIResponsesClientInstructions(c, body)
 	if _, err := s.prepareCodexAccountIdentitySource(ctx, c, account); err != nil {
 		return nil, err
 	}
@@ -399,7 +417,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 
 	requestRoot := parseRawJSONView(body)
 	isCompactRequest := compactPath
-	requestedModel := reqModel
+	requestedModel = reqModel
 	billingModel, upstreamModel := resolveOpenAIForwardMappedModels(account, requestedModel, isCompactRequest)
 	if isCompactRequest {
 		if compactModel := s.resolveOpenAICompactFallbackModel(account, requestedModel); compactModel != "" {
@@ -675,10 +693,10 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	}
 
 	rawTier := requestView.ServiceTier
-	if openAIGroupForcesFast(ctx, account) {
-		rawTier = OpenAIFastTierPriority
-		if requestView.ServiceTier != OpenAIFastTierPriority {
-			markPatchSet("service_tier", OpenAIFastTierPriority)
+	if forcedTier := openAIGroupForcedServiceTier(ctx, account, upstreamModel); forcedTier != "" {
+		rawTier = forcedTier
+		if requestView.ServiceTier != forcedTier {
+			markPatchSet("service_tier", forcedTier)
 		}
 	}
 	if rawTier != "" {
@@ -1097,6 +1115,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 				upstreamCtx, releaseUpstreamCtx, startTime.Add(firstOutputTimeout),
 			)
 		}
+		syncOpenAIResponsesInstructionsEcho(c, body)
 		upstreamReq, err := s.buildUpstreamRequest(upstreamCtx, c, account, body, token, reqStream, promptCacheKey, isCodexCLI)
 		if headerGuard == nil {
 			releaseUpstreamCtx()

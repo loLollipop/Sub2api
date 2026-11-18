@@ -37,7 +37,7 @@ func AnthropicToResponsesResponse(resp *AnthropicResponse, effectiveModel ...str
 	if len(effectiveModel) > 0 && strings.TrimSpace(effectiveModel[0]) != "" {
 		model = effectiveModel[0]
 	}
-	preserveThinking := claude.IsOpus55(model) || claude.IsSonnet55(model) || claude.IsHaiku55(model)
+	preserveThinking := claude.IsOpus55(model) || claude.IsSonnet55(model) || claude.IsHaiku55(model) || claude.IsFable52(model) || claude.IsMythos52(model)
 	id := resp.ID
 	if id == "" {
 		id = generateResponsesID()
@@ -136,27 +136,27 @@ func AnthropicToResponsesResponse(resp *AnthropicResponse, effectiveModel ...str
 	// Anthropic's input_tokens excludes cache_read/cache_creation, while OpenAI
 	// Responses' input_tokens is the total including cached tokens. Add them back
 	// when converting so downstream consumers see OpenAI semantics.
-	totalInputTokens := resp.Usage.InputTokens +
-		resp.Usage.CacheReadInputTokens +
-		resp.Usage.CacheCreationInputTokens
+	var usage AnthropicUsage
+	usage.Merge(resp.Usage)
+	totalInputTokens := usage.InputTokens + usage.CacheReadInputTokens + usage.CacheCreationInputTokens
 	out.Usage = &ResponsesUsage{
 		InputTokens:              totalInputTokens,
-		OutputTokens:             resp.Usage.OutputTokens,
-		TotalTokens:              totalInputTokens + resp.Usage.OutputTokens,
-		CacheCreationInputTokens: resp.Usage.CacheCreationInputTokens,
-		CacheCreation:            resp.Usage.CacheCreation,
+		OutputTokens:             usage.OutputTokens,
+		TotalTokens:              totalInputTokens + usage.OutputTokens,
+		CacheCreationInputTokens: usage.CacheCreationInputTokens,
+		CacheCreation:            usage.CacheCreation,
 	}
-	if resp.Usage.CacheCreation != nil {
-		if v := resp.Usage.CacheCreation.Ephemeral5mInputTokens; v != nil {
+	if usage.CacheCreation != nil {
+		if v := usage.CacheCreation.Ephemeral5mInputTokens; v != nil {
 			out.Usage.CacheCreation5mTokens = max(*v, 0)
 		}
-		if v := resp.Usage.CacheCreation.Ephemeral1hInputTokens; v != nil {
+		if v := usage.CacheCreation.Ephemeral1hInputTokens; v != nil {
 			out.Usage.CacheCreation1hTokens = max(*v, 0)
 		}
 	}
-	if resp.Usage.CacheReadInputTokens > 0 {
+	if usage.CacheReadInputTokens > 0 {
 		out.Usage.InputTokensDetails = &ResponsesInputTokensDetails{
-			CachedTokens: resp.Usage.CacheReadInputTokens,
+			CachedTokens: usage.CacheReadInputTokens,
 		}
 	}
 
@@ -301,7 +301,7 @@ func ResponsesEventToSSE(evt ResponsesStreamEvent) (string, error) {
 func anthToResHandleMessageStart(evt *AnthropicStreamEvent, state *AnthropicEventToResponsesState) []ResponsesStreamEvent {
 	if evt.Message != nil {
 		state.ResponseID = evt.Message.ID
-		state.PreserveThinkingSignatures = state.PreserveThinkingSignatures || claude.IsOpus55(evt.Message.Model) || claude.IsSonnet55(evt.Message.Model) || claude.IsHaiku55(evt.Message.Model)
+		state.PreserveThinkingSignatures = state.PreserveThinkingSignatures || claude.IsOpus55(evt.Message.Model) || claude.IsSonnet55(evt.Message.Model) || claude.IsHaiku55(evt.Message.Model) || claude.IsFable52(evt.Message.Model) || claude.IsMythos52(evt.Message.Model)
 		if state.Model == "" {
 			state.Model = evt.Message.Model
 		}

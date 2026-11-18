@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -69,6 +70,10 @@ func anthropicModelRequiresAdaptiveThinking(modelID string) bool {
 //
 // 只动 thinking 一个对象，其余字段字节级原样保留；无命中时返回原切片。
 func sanitizeAnthropicThinkingForModel(body []byte, modelID string) []byte {
+	// New 5.2 models validate the original thinking mode before compatibility edits.
+	if claude.IsFable52(modelID) || claude.IsMythos52(modelID) {
+		return body
+	}
 	if len(body) == 0 || !anthropicModelRequiresAdaptiveThinking(modelID) {
 		return body
 	}

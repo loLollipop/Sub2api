@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -351,7 +352,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 	sawTerminalEvent := false
 	pendingErrorHeader := ""
 
-	scanner := bufio.NewScanner(newUpstreamErrorFrameReader(resp.Body, resolveUpstreamResponseReadLimit(s.cfg)))
+	scanner := bufio.NewScanner(newUpstreamErrorFrameReaderForLineProcessing(resp.Body, resolveUpstreamResponseReadLimit(s.cfg)))
 	maxLineSize := defaultMaxLineSize
 	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.cfg.Gateway.MaxLineSize
@@ -488,6 +489,13 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 					firstTokenMs = &ms
 				}
 				parseSSEUsagePassthrough(data, usage)
+				if pendingErrorHeader != "" || clientUpstreamBodyIsError([]byte(data)) {
+					message := extractUpstreamErrorMessage([]byte(data))
+					status := openAIStreamFailureStatus([]byte(data), message)
+					s.recordOpenAIStreamUpstreamError(c, account, true, resp.Header.Get("x-request-id"), "http_error", []byte(data), message)
+					MarkOpsStreamFailure(c, gjson.Get(data, "error.type").String(), extractUpstreamErrorCode([]byte(data)), message, status)
+					sawTerminalEvent = true
+				}
 			} else {
 				trimmed := strings.TrimSpace(line)
 				if strings.HasPrefix(trimmed, "event:") && anthropicStreamEventIsTerminal(strings.TrimSpace(strings.TrimPrefix(trimmed, "event:")), "") {
@@ -501,6 +509,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 					restored = pendingErrorHeader + "\n" + restored
 					pendingErrorHeader = ""
 				}
+				restored = clientprivacy.SSE(restored)
 				if _, err := io.WriteString(w, restored); err != nil {
 					clientDisconnected = true
 					logger.LegacyPrintf("service.gateway", "[CN Anthropic 直通] Client disconnected during streaming, continue draining upstream for usage: account=%d", account.ID)

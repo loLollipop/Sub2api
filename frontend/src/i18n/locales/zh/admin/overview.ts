@@ -48,6 +48,7 @@ export default {
       model: '模型',
       group: '分组',
       noGroup: '无分组',
+      deletedGroup: '已删除',
       requests: '请求',
       tokens: 'Token',
       cache: '缓存',
@@ -1240,6 +1241,8 @@ export default {
         enableAnyway: '仍然开启'
       },
       openaiFast: {
+        forceUltrafast: '强制使用 Ultra Fast',
+        ultrafastHint: '仅在模型和账号支持时强制使用 Ultra Fast；同时开启 Fast 时，其他模型回落到 Fast。全局档位策略和配置的定价仍然生效。',
         title: 'OpenAI Fast 模式',
         force: '强制使用 Fast（priority）',
         hint: '开启后，此分组的 OpenAI 请求会强制写入 service_tier=priority；全局 Fast/Flex 策略仍可过滤或拦截。保存后新请求立即生效，已建立的 WebSocket 会话需重连。',

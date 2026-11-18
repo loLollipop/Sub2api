@@ -289,3 +289,34 @@ func TestGrokRefusalIntegration_AbsoluteRedisSnapshotAndAdminReset(t *testing.T)
 	}
 	assertGrokRefusalIntegrationState(t, f, quota, 9.75, 0, 1, 1, 1)
 }
+
+func TestGrokRefusalIntegration_ExpiredTranscriptRefreshesWithoutDuplicateFee(t *testing.T) {
+	ctx := context.Background()
+	f, quota := newGrokRefusalIntegrationFixture(t)
+	key := grokRefusalIntegrationHash("expired transcript")
+	first := grokRefusalIntegrationJob(f, fmt.Sprintf("expiry-first-%d", f.user.ID), 0.25)
+	_, created, err := f.repo.CommitGrokRefusal(ctx, first, []string{key}, []string{key})
+	require.NoError(t, err)
+	require.True(t, created)
+	_, err = integrationDB.ExecContext(ctx, `UPDATE grok_refusal_blocks SET created_at = NOW() - INTERVAL '25 hours' WHERE user_id = $1 AND identity_hash = $2`, f.user.ID, key)
+	require.NoError(t, err)
+	found, err := f.repo.FindGrokRefusal(ctx, f.user.ID, []string{key})
+	require.NoError(t, err)
+	require.False(t, found)
+	second := grokRefusalIntegrationJob(f, fmt.Sprintf("expiry-second-%d", f.user.ID), 0.25)
+	_, created, err = f.repo.CommitGrokRefusal(ctx, second, []string{key}, []string{key})
+	require.NoError(t, err)
+	require.True(t, created)
+	found, err = f.repo.FindGrokRefusal(ctx, f.user.ID, []string{key})
+	require.NoError(t, err)
+	require.True(t, found)
+	var owner string
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT job_id FROM grok_refusal_blocks WHERE user_id = $1 AND identity_hash = $2`, f.user.ID, key).Scan(&owner))
+	require.Equal(t, second.ID, owner)
+	// A second upstream refusal already in flight uses the fresh block.
+	third := grokRefusalIntegrationJob(f, fmt.Sprintf("expiry-third-%d", f.user.ID), 0.25)
+	_, created, err = f.repo.CommitGrokRefusal(ctx, third, []string{key}, []string{key})
+	require.NoError(t, err)
+	require.False(t, created)
+	assertGrokRefusalIntegrationState(t, f, quota, 9.5, 0.5, 2, 1, 2)
+}

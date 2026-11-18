@@ -8,6 +8,9 @@ import AnnouncementPopup from '../AnnouncementPopup.vue'
 import BaseDialog from '../BaseDialog.vue'
 import { useAnnouncementStore } from '@/stores/announcements'
 
+const api = vi.hoisted(() => ({ popups: vi.fn(), getById: vi.fn() }))
+vi.mock('@/api', () => ({ announcementsAPI: api }))
+
 const announcementMarkdownStyles = readFileSync(
   resolve(process.cwd(), 'src/styles/announcement-markdown.css'),
   'utf8',
@@ -37,11 +40,48 @@ const announcement = {
 describe('AnnouncementPopup', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    vi.resetAllMocks()
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     document.body.innerHTML = ''
     document.body.style.overflow = ''
+  })
+
+  it('reuses a bootstrap body without requesting a detail', async () => {
+    api.popups.mockResolvedValue([announcement])
+    await useAnnouncementStore().fetchPopups()
+    const wrapper = mount(AnnouncementPopup)
+    await flushPromises()
+    expect(document.body.querySelector('.markdown-body h2')?.textContent).toBe('Preview heading')
+    expect(api.getById).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('loads a missing body, displays failures and retries before allowing confirmation', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const store = useAnnouncementStore()
+    const { content: _content, ...withoutBody } = announcement
+    api.popups.mockResolvedValue([withoutBody])
+    let fail!: (reason: Error) => void
+    api.getById.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject }))
+      .mockResolvedValueOnce(announcement)
+    await store.fetchPopups()
+    const wrapper = mount(AnnouncementPopup)
+    expect(document.body.querySelector('[role="status"]')).not.toBeNull()
+    expect(document.body.querySelector<HTMLButtonElement>('[data-testid="announcement-popup-dismiss"]')?.disabled).toBe(true)
+    fail(new Error('offline'))
+    await flushPromises()
+    expect(document.body.querySelector('[role="alert"]')?.textContent).toContain('announcements.loadFailed')
+    expect(document.body.querySelector('.markdown-body')).toBeNull()
+    document.body.querySelector<HTMLButtonElement>('[role="alert"] button')!.click()
+    await flushPromises()
+    expect(document.body.querySelector('.markdown-body h2')?.textContent).toBe('Preview heading')
+    expect(document.body.querySelector<HTMLButtonElement>('[data-testid="announcement-popup-dismiss"]')?.disabled).toBe(false)
+    expect(api.getById).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+    error.mockRestore()
   })
 
   it('renders mixed Markdown and HTML inside the shared styled container', async () => {

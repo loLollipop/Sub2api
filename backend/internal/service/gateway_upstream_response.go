@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/clientprivacy"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
@@ -532,8 +533,8 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 		c.JSON(status, gin.H{
 			"type": "error",
 			"error": gin.H{
-				"type":    clientprivacy.Text(errType),
-				"message": clientprivacy.Text(errMsg),
+				"type":    clientprivacy.ErrorType(status, clientprivacy.Text(errType)),
+				"message": ClientUpstreamErrorMessage(clientprivacy.Text(errMsg)),
 			},
 		})
 
@@ -578,8 +579,8 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 	c.JSON(statusCode, gin.H{
 		"type": "error",
 		"error": gin.H{
-			"type":    clientprivacy.Text(errType),
-			"message": clientprivacy.Text(errMsg),
+			"type":    clientprivacy.ErrorType(statusCode, clientprivacy.Text(errType)),
+			"message": ClientUpstreamErrorMessage(clientprivacy.Text(errMsg)),
 		},
 	})
 
@@ -684,8 +685,8 @@ func (s *GatewayService) handleRetryExhaustedError(ctx context.Context, resp *ht
 		c.JSON(status, gin.H{
 			"type": "error",
 			"error": gin.H{
-				"type":    clientprivacy.Text(errType),
-				"message": clientprivacy.Text(errMsg),
+				"type":    clientprivacy.ErrorType(status, clientprivacy.Text(errType)),
+				"message": ClientUpstreamErrorMessage(clientprivacy.Text(errMsg)),
 			},
 		})
 
@@ -906,7 +907,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 			"type": "error",
 			"error": map[string]string{
 				"type":    reason,
-				"message": clientprivacy.Text(message),
+				"message": ClientUpstreamErrorMessage(clientprivacy.Text(message)),
 			},
 		})
 		if err != nil {
@@ -1348,9 +1349,9 @@ func mergeSSEUsagePatch(usage *ClaudeUsage, patch *sseUsagePatch) {
 
 	if patch.hasInputTokens {
 		usage.InputTokens = patch.inputTokens
-	}
-	if patch.hasCacheCreationInput {
-		usage.CacheCreationInputTokens = patch.cacheCreationInputTokens
+		if patch.providerUsage.Get("prompt_tokens").Int() <= 0 {
+			usage.promptTotalPresent = false
+		}
 	}
 	if patch.hasCacheReadInput {
 		usage.CacheReadInputTokens = patch.cacheReadInputTokens
@@ -1358,26 +1359,21 @@ func mergeSSEUsagePatch(usage *ClaudeUsage, patch *sseUsagePatch) {
 	if patch.hasOutputTokens {
 		usage.OutputTokens = patch.outputTokens
 	}
+	var details apicompat.AnthropicCacheCreation
 	if patch.hasCacheCreation5m {
-		usage.CacheCreation5mTokens = patch.cacheCreation5mTokens
+		details.Ephemeral5mInputTokens = &patch.cacheCreation5mTokens
 	}
 	if patch.hasCacheCreation1h {
-		usage.CacheCreation1hTokens = patch.cacheCreation1hTokens
+		details.Ephemeral1hInputTokens = &patch.cacheCreation1hTokens
 	}
-	if patch.hasCacheCreationInput && patch.cacheCreationInputTokens == 0 {
-		usage.CacheCreation5mTokens = 0
-		usage.CacheCreation1hTokens = 0
-	}
-	if !patch.hasCacheCreationInput && (patch.hasCacheCreation5m || patch.hasCacheCreation1h) {
-		usage.CacheCreationInputTokens = usage.CacheCreation5mTokens + usage.CacheCreation1hTokens
-	}
+	mergeAnthropicCacheCreationCounters(usage, patch.cacheCreationInputTokens, patch.hasCacheCreationInput, &details)
 	if patch.providerUsage.Exists() {
 		if cached, ok := anthropicCacheReadAlias(patch.providerUsage); (!patch.hasCacheReadInput || patch.cacheReadInputTokens == 0) && ok {
 			usage.CacheReadInputTokens = cached
 		}
-		if patch.providerUsage.Get("prompt_tokens").Int() > 0 || patch.providerUsage.Get("prompt_cache_miss_tokens").Exists() {
-			normalizeAnthropicCompatiblePromptUsage(patch.providerUsage, usage)
-		}
+	}
+	if !normalizeAnthropicCompatiblePromptUsage(patch.providerUsage, usage) {
+		normalizeAnthropicPromptTotal(usage, 0, nil)
 	}
 }
 
@@ -1411,24 +1407,19 @@ func parseSSEUsageInt(value any) (int, bool) {
 // applyCacheTTLOverride 将所有 cache creation tokens 归入指定的 TTL 类型。
 // target 为 "5m" 或 "1h"。返回 true 表示发生了变更。
 func applyCacheTTLOverride(usage *ClaudeUsage, target string) bool {
-	// Fallback: 如果只有聚合字段但无 5m/1h 明细，将聚合字段归入 5m 默认类别
-	if usage.CacheCreation5mTokens == 0 && usage.CacheCreation1hTokens == 0 && usage.CacheCreationInputTokens > 0 {
-		usage.CacheCreation5mTokens = usage.CacheCreationInputTokens
-	}
-
-	total := usage.CacheCreation5mTokens + usage.CacheCreation1hTokens
-	if total == 0 {
-		return false
+	total := max(usage.CacheCreationInputTokens, 0)
+	if total == 0 && !usage.cacheCreationInputTokensPresent {
+		total = max(usage.CacheCreation5mTokens, 0) + max(usage.CacheCreation1hTokens, 0)
 	}
 	switch target {
 	case "1h":
-		if usage.CacheCreation1hTokens == total {
+		if usage.CacheCreation1hTokens == total && usage.CacheCreation5mTokens == 0 {
 			return false // 已经全是 1h
 		}
 		usage.CacheCreation1hTokens = total
 		usage.CacheCreation5mTokens = 0
 	default: // "5m"
-		if usage.CacheCreation5mTokens == total {
+		if usage.CacheCreation5mTokens == total && usage.CacheCreation1hTokens == 0 {
 			return false // 已经全是 5m
 		}
 		usage.CacheCreation5mTokens = total
@@ -1446,24 +1437,16 @@ func rewriteCacheCreationJSON(usageObj map[string]any, target string) bool {
 	}
 	v5m, _ := parseSSEUsageInt(ccObj["ephemeral_5m_input_tokens"])
 	v1h, _ := parseSSEUsageInt(ccObj["ephemeral_1h_input_tokens"])
-	total := v5m + v1h
-	if total == 0 {
+	aggregate, present := parseSSEUsageInt(usageObj["cache_creation_input_tokens"])
+	usage := ClaudeUsage{
+		CacheCreationInputTokens: aggregate, cacheCreationInputTokensPresent: present,
+		CacheCreation5mTokens: v5m, CacheCreation1hTokens: v1h,
+	}
+	if !applyCacheTTLOverride(&usage, target) {
 		return false
 	}
-	switch target {
-	case "1h":
-		if v1h == total {
-			return false
-		}
-		ccObj["ephemeral_1h_input_tokens"] = float64(total)
-		ccObj["ephemeral_5m_input_tokens"] = float64(0)
-	default: // "5m"
-		if v5m == total {
-			return false
-		}
-		ccObj["ephemeral_5m_input_tokens"] = float64(total)
-		ccObj["ephemeral_1h_input_tokens"] = float64(0)
-	}
+	ccObj["ephemeral_5m_input_tokens"] = float64(usage.CacheCreation5mTokens)
+	ccObj["ephemeral_1h_input_tokens"] = float64(usage.CacheCreation1hTokens)
 	return true
 }
 
@@ -1508,16 +1491,10 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 
-	// 解析嵌套的 cache_creation 对象中的 5m/1h 明细
-	cc5m := gjson.GetBytes(body, "usage.cache_creation.ephemeral_5m_input_tokens")
-	cc1h := gjson.GetBytes(body, "usage.cache_creation.ephemeral_1h_input_tokens")
-	if cc5m.Exists() || cc1h.Exists() {
-		response.Usage.CacheCreation5mTokens = int(cc5m.Int())
-		response.Usage.CacheCreation1hTokens = int(cc1h.Int())
-	}
+	response.Usage = *parseClaudeUsageFromResponseBody(body)
 
 	// 兼容 Kimi cached_tokens → cache_read_input_tokens
-	if response.Usage.CacheReadInputTokens == 0 {
+	if gjson.GetBytes(body, "usage.cache_read_input_tokens").Int() == 0 {
 		cachedTokens := gjson.GetBytes(body, "usage.cached_tokens").Int()
 		if cachedTokens > 0 {
 			response.Usage.CacheReadInputTokens = int(cachedTokens)
@@ -1530,7 +1507,7 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 	// Cache TTL Override: 重写 non-streaming 响应中的 cache_creation 分类。
 	// 账号级设置优先；全局 1h 请求注入开启时，默认把 usage 计费归回 5m。
 	if overrideTarget, ok := s.resolveCacheTTLUsageOverrideTarget(ctx, account); ok {
-		if applyCacheTTLOverride(&response.Usage, overrideTarget) {
+		if changed := applyCacheTTLOverride(&response.Usage, overrideTarget); changed && gjson.GetBytes(body, "usage.cache_creation").IsObject() {
 			// 同步更新 body JSON 中的嵌套 cache_creation 对象
 			if newBody, err := sjson.SetBytes(body, "usage.cache_creation.ephemeral_5m_input_tokens", response.Usage.CacheCreation5mTokens); err == nil {
 				body = newBody

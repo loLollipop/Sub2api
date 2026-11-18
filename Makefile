@@ -97,7 +97,22 @@ FRONTEND_CRITICAL_VITEST := \
 	src/features/channel-monitor-v2/__tests__/groupStatusDot.spec.ts \
 	src/features/channel-monitor-v2/__tests__/designSystem.structure.spec.ts \
 	src/features/channel-monitor-v2/__tests__/monitorFormat.spec.ts \
-	src/features/channel-monitor-v2/__tests__/monitorZoom.spec.ts
+	src/features/channel-monitor-v2/__tests__/monitorZoom.spec.ts \
+	src/__tests__/App.announcements.spec.ts \
+	src/stores/__tests__/announcements.lazy.spec.ts \
+	src/stores/__tests__/announcements.fetch.spec.ts \
+	src/stores/__tests__/announcements.confirm.spec.ts \
+	src/components/common/__tests__/AnnouncementBell.spec.ts \
+	src/components/common/__tests__/AnnouncementPopup.spec.ts \
+	src/components/account/__tests__/AccountStatusIndicator.spec.ts \
+	src/components/admin/channel/__tests__/PricingEntryCard.modelDefaultPrice.spec.ts \
+	src/components/admin/channel/__tests__/types.spec.ts \
+	src/components/charts/__tests__/EndpointDistributionChart.spec.ts \
+	src/components/channels/__tests__/SupportedModelChip.spec.ts \
+	src/composables/__tests__/useModelWhitelist.spec.ts \
+	src/utils/__tests__/csv.spec.ts \
+	src/views/admin/__tests__/AccountsView.lite.spec.ts \
+	src/views/admin/__tests__/GroupsView.codexManifest.spec.ts
 
 # 一键编译前后端。前端必须先生成，后端 release build 才能把 dist
 # 嵌入二进制；否则服务会正常启动但根路径静默返回 404。

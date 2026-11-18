@@ -178,7 +178,8 @@ type Group struct {
 type AdminGroup struct {
 	Group
 	// ForceOpenAIFast 是管理端请求策略，用户侧分组 DTO 无需暴露。
-	ForceOpenAIFast bool `json:"force_openai_fast"`
+	ForceOpenAIFast      bool `json:"force_openai_fast"`
+	ForceOpenAIUltrafast bool `json:"force_openai_ultrafast"`
 	// FreeOpenAIFast 是管理端计费策略，用户侧分组 DTO 无需暴露。
 	FreeOpenAIFast bool `json:"free_openai_fast"`
 
@@ -623,8 +624,10 @@ type UsageLog struct {
 	CacheCreationTokens int `json:"cache_creation_tokens"`
 	CacheReadTokens     int `json:"cache_read_tokens"`
 
-	CacheCreation5mTokens int `json:"cache_creation_5m_tokens"`
-	CacheCreation1hTokens int `json:"cache_creation_1h_tokens"`
+	CacheCreation5mTokens  int `json:"cache_creation_5m_tokens"`
+	CacheCreation1hTokens  int `json:"cache_creation_1h_tokens"`
+	CacheCreation30mTokens int `json:"cache_creation_30m_tokens"`
+	CacheCreation12hTokens int `json:"cache_creation_12h_tokens"`
 
 	InputCost                 float64 `json:"input_cost"`
 	OutputCost                float64 `json:"output_cost"`
@@ -681,6 +684,43 @@ type UsageLog struct {
 	APIKey       *APIKey           `json:"api_key,omitempty"`
 	Group        *Group            `json:"group,omitempty"`
 	Subscription *UserSubscription `json:"subscription,omitempty"`
+
+	// Compact association summaries. Admin list endpoints use these instead of
+	// embedding full User/APIKey/Group/Subscription objects in every row; the
+	// list only needs display names and keeps large pricing/credential payloads
+	// out of the response.
+	UserSummary         *UsageUserSummary         `json:"user_summary,omitempty"`
+	APIKeySummary       *UsageAPIKeySummary       `json:"api_key_summary,omitempty"`
+	GroupSummary        *UsageGroupSummary        `json:"group_summary,omitempty"`
+	SubscriptionSummary *UsageSubscriptionSummary `json:"subscription_summary,omitempty"`
+}
+
+// UsageUserSummary is the minimum user identity needed by usage list rows.
+type UsageUserSummary struct {
+	ID        int64      `json:"id"`
+	Email     string     `json:"email"`
+	Username  string     `json:"username,omitempty"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+}
+
+// UsageAPIKeySummary is the minimum API key identity needed by usage list rows.
+type UsageAPIKeySummary struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// UsageGroupSummary is the minimum group identity needed by usage list rows.
+type UsageGroupSummary struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// UsageSubscriptionSummary is the minimum subscription identity needed by usage list rows.
+type UsageSubscriptionSummary struct {
+	ID      int64  `json:"id"`
+	UserID  int64  `json:"user_id"`
+	GroupID int64  `json:"group_id"`
+	Status  string `json:"status"`
 }
 
 // AdminUsageLog 是管理员接口使用的 usage log DTO（包含管理员字段）。
@@ -716,7 +756,8 @@ type AdminUsageLog struct {
 	IPAddress *string `json:"ip_address,omitempty"`
 
 	// Account 最小账号信息（避免泄露敏感字段）
-	Account *AccountSummary `json:"account,omitempty"`
+	Account        *AccountSummary `json:"account,omitempty"`
+	AccountSummary *AccountSummary `json:"account_summary,omitempty"`
 }
 
 type UsageCleanupFilters struct {

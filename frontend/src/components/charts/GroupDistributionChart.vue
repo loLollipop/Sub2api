@@ -60,12 +60,13 @@
                   <td
                     class="max-w-[100px] truncate py-1.5 font-medium"
                     :class="enableBreakdown && group.group_id > 0 ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300' : 'text-gray-900 dark:text-white'"
-                    :title="group.group_name || String(group.group_id)"
+                    :title="groupLabel(group)"
                   >
                     <span class="inline-flex items-center gap-1">
                       <Icon name="chevronDownSmall" size="none" v-if="enableBreakdown && group.group_id > 0 && expandedKey === `group-${group.group_id}`" class="h-3 w-3 shrink-0" :stroke-width="2" />
                       <Icon name="chevronRightSmall" size="none" v-else-if="enableBreakdown && group.group_id > 0" class="h-3 w-3 shrink-0" :stroke-width="2" />
-                      {{ group.group_name || t('admin.dashboard.noGroup') }}
+                      {{ groupLabel(group) }}
+                      <span v-if="group.deleted" class="shrink-0 rounded bg-gray-100 px-1 text-[10px] text-gray-500 dark:bg-dark-700">{{ t('admin.dashboard.deletedGroup') }}</span>
                     </span>
                   </td>
                   <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
@@ -190,11 +191,14 @@ const displayGroupStats = computed(() => {
   return [...props.groupStats].sort((a, b) => toFiniteNumber(b[metricKey]) - toFiniteNumber(a[metricKey]))
 })
 
+const groupLabel = (group: GroupStat) =>
+  group.group_name || (group.group_id > 0 ? `#${group.group_id}` : t('admin.dashboard.noGroup'))
+
 const chartData = computed(() => {
   if (!props.groupStats?.length) return null
 
   return {
-    labels: displayGroupStats.value.map((g) => g.group_name || String(g.group_id)),
+    labels: displayGroupStats.value.map(groupLabel),
     datasets: [
       {
         data: displayGroupStats.value.map((g) => toFiniteNumber(props.metric === 'actual_cost' ? g.actual_cost : g.total_tokens)),

@@ -4,12 +4,14 @@
       type="button"
       class="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-dark-800"
       :aria-label="t('announcements.title')"
+      :title="announcementStore.summaryError ? t('announcements.loadFailed') : t('announcements.title')"
       aria-haspopup="dialog"
       :aria-expanded="isModalOpen"
       @click="openModal"
     >
       <Icon name="bell" size="md" />
       <span v-if="unreadCount > 0" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary-500" />
+      <span v-if="announcementStore.summaryError" class="absolute -right-0.5 -top-0.5 text-xs font-bold text-red-600" aria-hidden="true">!</span>
     </button>
 
     <BaseDialog :show="isModalOpen" :title="t('announcements.title')" placement="right" width="narrow" overlay-class="announcement-overlay announcement-overlay--drawer" :z-index="100" close-on-click-outside @close="closeModal">
@@ -19,6 +21,10 @@
           {{ t('announcements.markAllRead') }}
         </button>
       </template>
+      <div v-if="announcementStore.summaryError" class="mb-3 text-sm text-red-600" role="alert">
+        {{ t('announcements.loadFailed') }}
+        <button type="button" class="underline" @click="announcementStore.fetchSummary(true)">{{ t('common.refresh') }}</button>
+      </div>
       <div v-if="loading" class="flex justify-center py-10" role="status" :aria-label="t('common.loading')">
         <Icon name="refresh" size="lg" class="animate-spin text-gray-400" />
       </div>
@@ -41,7 +47,7 @@
           </span>
           <span class="min-w-0 flex-1">
             <span class="announcement-row-heading"><span class="announcement-row-title">{{ item.title }}</span><time :datetime="item.created_at">{{ formatRelativeTime(item.created_at) }}</time></span>
-            <span class="announcement-row-excerpt">{{ excerpt(item.content) }}</span>
+            <span class="announcement-row-excerpt">{{ item.excerpt ?? excerpt(item.content || '') }}</span>
           </span>
         </button>
       </div>
@@ -60,14 +66,21 @@
         </div>
       </template>
       <template v-if="selectedAnnouncement">
-        <div class="markdown-body prose prose-sm max-w-none break-words dark:prose-invert" v-html="renderMarkdown(selectedAnnouncement.content)" />
+        <div v-if="announcementStore.detailErrorFor(selectedAnnouncement.id)" class="announcement-list-error" role="alert">
+          <p>{{ t('announcements.loadFailed') }}</p>
+          <button type="button" class="btn btn-secondary" @click="loadSelectedDetail(true)">{{ t('common.refresh') }}</button>
+        </div>
+        <div v-else-if="!selectedDetail || announcementStore.isDetailLoading(selectedAnnouncement.id)" class="flex justify-center py-10" role="status" :aria-label="t('common.loading')">
+          <Icon name="refresh" size="lg" class="animate-spin text-gray-400" />
+        </div>
+        <div v-else class="markdown-body prose prose-sm max-w-none break-words dark:prose-invert" v-html="renderMarkdown(selectedDetail.content)" />
       </template>
       <template #footer>
         <div v-if="selectedAnnouncement" class="flex w-full flex-wrap items-center justify-between gap-3">
           <span class="text-xs text-gray-500 dark:text-gray-400">{{ selectedRead ? t('announcements.readStatus') : t('announcements.markReadHint') }}</span>
           <div class="ml-auto flex flex-wrap justify-end gap-2">
             <button type="button" class="btn btn-secondary" @click="closeDetail">{{ t('common.close') }}</button>
-            <button v-if="!selectedRead" type="button" class="btn btn-primary" @click="markAsReadAndClose(selectedAnnouncement.id)">{{ t('announcements.markRead') }}</button>
+            <button v-if="!selectedRead" type="button" class="btn btn-primary" :disabled="!selectedDetail || announcementStore.isDetailLoading(selectedAnnouncement.id) || confirmingRead" @click="markAsReadAndClose(selectedAnnouncement.id)">{{ t('announcements.markRead') }}</button>
           </div>
         </div>
       </template>
@@ -76,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { marked } from 'marked'
@@ -84,7 +97,7 @@ import DOMPurify from 'dompurify'
 import { useAppStore } from '@/stores/app'
 import { useAnnouncementStore } from '@/stores/announcements'
 import { formatRelativeTime, formatRelativeWithDateTime } from '@/utils/format'
-import type { UserAnnouncement } from '@/types'
+import type { AnnouncementListItem } from '@/api/announcements'
 import Icon from '@/components/icons/Icon.vue'
 import BaseDialog from './BaseDialog.vue'
 import '@/styles/announcement-markdown.css'
@@ -106,7 +119,10 @@ const unreadCount = computed(() => announcementStore.unreadCount)
 // Local modal state
 const isModalOpen = ref(false)
 const detailModalOpen = ref(false)
-const selectedAnnouncement = ref<UserAnnouncement | null>(null)
+const selectedId = ref<number | null>(null)
+const selectedAnnouncement = computed(() => announcements.value.find(item => item.id === selectedId.value) ?? null)
+const selectedDetail = computed(() => announcementStore.detailFor(selectedId.value))
+const confirmingRead = ref(false)
 const selectedRead = computed(() => {
   const selected = selectedAnnouncement.value
   return !!(announcements.value.find(item => item.id === selected?.id) ?? selected)?.read_at
@@ -127,24 +143,35 @@ function renderMarkdown(content: string): string {
 
 function openModal() {
   isModalOpen.value = true
-  if (!announcements.value.length || announcementStore.fetchError) void announcementStore.fetchAnnouncements()
+  void announcementStore.ensureList()
+  if (announcementStore.summaryError) void announcementStore.fetchSummary()
 }
 
 function closeModal() {
   isModalOpen.value = false
 }
 
-function openDetail(announcement: UserAnnouncement) {
-  selectedAnnouncement.value = announcement
+function openDetail(announcement: AnnouncementListItem) {
+  selectedId.value = announcement.id
   detailModalOpen.value = true
-  if (!announcement.read_at) {
-    markAsRead(announcement.id)
+}
+
+async function loadSelectedDetail(force = false) {
+  const selected = selectedAnnouncement.value
+  if (!selected) return
+  const detail = await announcementStore.fetchDetail(selected.id, force)
+  if (detail && detailModalOpen.value && selectedAnnouncement.value?.id === selected.id && !selectedRead.value) {
+    void markAsRead(selected.id)
   }
 }
 
+watch(() => [selectedAnnouncement.value?.id, selectedAnnouncement.value?.updated_at], () => {
+  if (selectedAnnouncement.value) void loadSelectedDetail()
+})
+
 function closeDetail() {
   detailModalOpen.value = false
-  selectedAnnouncement.value = null
+  selectedId.value = null
 }
 
 async function markAsRead(id: number) {
@@ -159,9 +186,15 @@ async function markAsRead(id: number) {
 }
 
 async function markAsReadAndClose(id: number) {
-  if (!await markAsRead(id)) return
-  appStore.showSuccess(t('announcements.markedAsRead'))
-  closeDetail()
+  confirmingRead.value = true
+  try {
+    if (!await markAsRead(id)) return
+    if (selectedAnnouncement.value?.id !== id) return
+    appStore.showSuccess(t('announcements.markedAsRead'))
+    closeDetail()
+  } finally {
+    confirmingRead.value = false
+  }
 }
 
 async function markAllAsRead() {

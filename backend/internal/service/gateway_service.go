@@ -586,13 +586,17 @@ func (r *AccountSelectionResult) ProfitGateActive() bool {
 
 // ClaudeUsage 表示Claude API返回的usage信息
 type ClaudeUsage struct {
-	InputTokens              int `json:"input_tokens"`
-	OutputTokens             int `json:"output_tokens"`
-	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-	CacheCreation5mTokens    int // 5分钟缓存创建token（来自嵌套 cache_creation 对象）
-	CacheCreation1hTokens    int // 1小时缓存创建token（来自嵌套 cache_creation 对象）
-	ImageOutputTokens        int `json:"image_output_tokens,omitempty"`
+	InputTokens                         int `json:"input_tokens"`
+	OutputTokens                        int `json:"output_tokens"`
+	CacheCreationInputTokens            int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens                int `json:"cache_read_input_tokens"`
+	CacheCreation5mTokens               int // 5分钟缓存创建token（来自嵌套 cache_creation 对象）
+	CacheCreation1hTokens               int // 1小时缓存创建token（来自嵌套 cache_creation 对象）
+	ImageOutputTokens                   int `json:"image_output_tokens,omitempty"`
+	cacheCreationInputTokensPresent     bool
+	cacheCreationInputTokensFromDetails bool
+	promptTotalTokens                   int
+	promptTotalPresent                  bool
 }
 
 // ForwardResult 转发结果
@@ -643,6 +647,16 @@ type ForwardResult struct {
 	ImageSizeBreakdown map[string]int
 	SearchCount        int
 	AudioUsage         *AudioUsage
+	// UpstreamPriceMultiplier adjusts default token prices for the actual upstream
+	// endpoint. An unset value preserves the ordinary price.
+	UpstreamPriceMultiplier float64
+}
+
+func (r *ForwardResult) upstreamPriceFactor() float64 {
+	if r == nil || r.UpstreamPriceMultiplier <= 0 {
+		return 1
+	}
+	return r.UpstreamPriceMultiplier
 }
 
 // GatewayFailureStage identifies which request stage failed. The zero value is
@@ -701,6 +715,7 @@ type UpstreamFailoverError struct {
 	NextAccountAction        NextAccountAction
 	ClientStatusCode         int
 	ClientMessage            string
+	StreamFailedFrame        *OpenAIStreamFailedFrame // 触发本次 failover 的流内 failed/error 帧；耗尽时用于错误透传规则匹配
 }
 
 func (e *UpstreamFailoverError) Error() string {

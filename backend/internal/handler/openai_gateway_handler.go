@@ -457,6 +457,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// Read request body
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
 	if err != nil {
+		if handleRequestBodyReadError(c, err) {
+			return
+		}
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
@@ -700,6 +703,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 	maxAccountSwitches := h.maxAccountSwitches
 	switchCount := 0
+	firstOutputTimeoutSwitchCount := 0
 	profitVetoCount := 0
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
@@ -1030,6 +1034,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						streamStarted = true
 					}
 					shouldRetryNext := failoverErr.ShouldRetryNextAccount()
+					if shouldRetryNext && account.Platform == service.PlatformOpenAI && openAIFirstOutputFailoverExhausted(failoverErr, &firstOutputTimeoutSwitchCount) {
+						submitResponsesUsage(result)
+						h.handleFailoverExhausted(c, failoverErr, streamStarted)
+						return
+					}
 					// 池模式：同账号重试
 					if shouldRetryNext && failoverErr.RetryableOnSameAccount {
 						retryLimit := effectiveSameAccountRetryLimit(failoverErr, account)
@@ -1316,6 +1325,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
 	if err != nil {
+		if handleRequestBodyReadError(c, err) {
+			return
+		}
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.anthropicErrorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
@@ -1712,6 +1724,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 							continue
 						}
 					}
+					if c.Writer.Written() {
+						streamStarted = true
+					}
 					if failoverErr.ShouldReportAccountScheduleFailure() {
 						h.gatewayService.ReportOpenAIAccountScheduleResult(account, openAIAccountScheduleModel(c, account, currentRoutingModel, false, nil), false, nil, err)
 					}
@@ -1808,8 +1823,8 @@ func (h *OpenAIGatewayHandler) anthropicErrorResponse(c *gin.Context, status int
 	c.JSON(status, gin.H{
 		"type": "error",
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clientprivacy.ErrorType(status, errType),
+			"message": service.ClientUpstreamErrorMessage(message),
 		},
 	})
 }
@@ -1830,8 +1845,8 @@ func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, stat
 			errPayload, _ := json.Marshal(gin.H{
 				"type": "error",
 				"error": gin.H{
-					"type":    errType,
-					"message": message,
+					"type":    clientprivacy.ErrorType(status, errType),
+					"message": service.ClientUpstreamErrorMessage(message),
 				},
 			})
 			fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", errPayload) //nolint:errcheck
@@ -1888,6 +1903,10 @@ func (h *OpenAIGatewayHandler) handleAnthropicFailoverExhausted(c *gin.Context, 
 		h.anthropicStreamingAwareError(c, status, "api_error", message, streamStarted)
 		return
 	}
+	if status, errType, message, matched := service.ApplyOpenAIStreamFailedFrameRule(c, failoverErr); matched {
+		h.anthropicStreamingAwareError(c, status, errType, message, streamStarted)
+		return
+	}
 	status, errType, errMsg := wrapUpstreamClientError(failoverErr.StatusCode, failoverErr.ResponseBody)
 	status, errType, errMsg = exhaustedFailoverResponse(status, errType, errMsg)
 	h.anthropicStreamingAwareError(c, status, errType, errMsg, streamStarted)
@@ -1895,10 +1914,10 @@ func (h *OpenAIGatewayHandler) handleAnthropicFailoverExhausted(c *gin.Context, 
 
 // ensureAnthropicErrorResponse writes a fallback Anthropic error if no response was written.
 func (h *OpenAIGatewayHandler) ensureAnthropicErrorResponse(c *gin.Context, streamStarted bool) bool {
-	if c == nil || c.Writer == nil || c.Writer.Written() {
+	if c == nil || c.Writer == nil || service.OpenAICompactKeepaliveAdjustedWrittenSize(c) >= 0 {
 		return false
 	}
-	h.anthropicStreamingAwareError(c, http.StatusBadGateway, "api_error", "Upstream request failed", streamStarted)
+	h.anthropicStreamingAwareError(c, http.StatusBadGateway, "api_error", "Upstream request failed", streamStarted || c.Writer.Written())
 	return true
 }
 
@@ -3733,7 +3752,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithCode(
 		// Stream already started, send error as SSE event then close
 		flusher, ok := c.Writer.(http.Flusher)
 		if ok {
-			errorObject := gin.H{"type": errType, "message": message}
+			errorObject := gin.H{"type": clientprivacy.ErrorType(status, errType), "message": service.ClientUpstreamErrorMessage(message)}
 			if code != "" {
 				errorObject["code"] = code
 			}
@@ -3756,7 +3775,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithCode(
 		return
 	}
 	c.JSON(status, gin.H{"error": gin.H{
-		"type": errType, "code": code, "message": message,
+		"type": clientprivacy.ErrorType(status, errType), "code": code, "message": service.ClientUpstreamErrorMessage(message),
 	}})
 }
 
@@ -3873,6 +3892,17 @@ func openAIForwardMayFailover(c *gin.Context, writerSizeBeforeForward int, failo
 	return failoverErr != nil && failoverErr.SafeToFailoverAfterWrite
 }
 
+func openAIFirstOutputFailoverExhausted(failoverErr *service.UpstreamFailoverError, switchCount *int) bool {
+	if failoverErr == nil || !failoverErr.SafeToFailoverAfterWrite || switchCount == nil {
+		return false
+	}
+	if *switchCount >= 1 {
+		return true
+	}
+	*switchCount++
+	return false
+}
+
 func openAIFailoverSchedulePreviousResponseID(previousResponseID string, failedAccountIDs map[int64]struct{}) string {
 	if len(failedAccountIDs) == 0 {
 		return previousResponseID
@@ -3899,8 +3929,8 @@ func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType
 	}
 	c.JSON(status, gin.H{
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    clientprivacy.ErrorType(status, errType),
+			"message": service.ClientUpstreamErrorMessage(message),
 		},
 	})
 }

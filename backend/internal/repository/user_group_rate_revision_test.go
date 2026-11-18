@@ -101,11 +101,12 @@ func TestUserGroupRateRepositoryRevision_FailedWritesDoNotAdvance(t *testing.T) 
 						}
 					}
 				}
-				if method == "user sync" {
+				switch method {
+				case "user sync":
 					err = repo.SyncUserGroupRates(context.Background(), 42, nil)
-				} else if method == "rpm sync" {
+				case "rpm sync":
 					err = repo.SyncGroupRPMOverrides(context.Background(), 10, nil)
-				} else {
+				default:
 					err = repo.SyncGroupRateMultipliers(context.Background(), 10, nil)
 				}
 				require.ErrorIs(t, err, writeErr)

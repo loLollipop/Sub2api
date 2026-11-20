@@ -1107,6 +1107,12 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 		return nil
 	}
 	modelLower := normalizeAntigravityClaudeTierAlias(strings.ToLower(model))
+	modelID := lastSegment(modelLower)
+	if normalizeGeminiThinkingTierAlias(modelID) != modelID && modelID != modelLower && !isGeminiModelResourceName(modelLower) {
+		// A provider-qualified tier must not fall through to an unqualified
+		// static price after the dynamic catalog has rejected that namespace.
+		return nil
+	}
 
 	// Match 5.2 before the older Fable family fallback.
 	if claude.IsFable52(modelLower) {

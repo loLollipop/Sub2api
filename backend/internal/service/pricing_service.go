@@ -1410,7 +1410,19 @@ func (s *PricingService) buildModelLookupCandidates(modelLower string) []string 
 	// one later. Antigravity's Gemini thinking tiers share the base rate,
 	// so the normalized base remains the fallback after the exact aliases.
 	candidates := rawCandidates
-	if isAntigravityThinkingTierAlias(lastSegment(modelLower)) {
+	modelID := lastSegment(modelLower)
+	if base := normalizeGeminiThinkingTierAlias(modelID); base != modelID {
+		namespace := strings.TrimSuffix(modelLower, modelID)
+		switch {
+		case namespace == "":
+			candidates = append(candidates, base)
+		case isGeminiModelResourceName(modelLower):
+			candidates = []string{modelLower, modelID, base}
+		default:
+			// Provider-qualified quotes must stay in their own namespace.
+			candidates = []string{modelLower, namespace + base}
+		}
+	} else if isAntigravityThinkingTierAlias(modelID) {
 		candidates = append(candidates, normalized)
 	} else {
 		// Prefer canonical model names for all other aliases (including models/xxx).
@@ -1503,7 +1515,18 @@ func normalizeGeminiThinkingTierAlias(model string) string {
 			}
 		}
 	}
+	for _, tier := range []string{"-high", "-low", "-medium", "-xhigh", "-sonar"} {
+		if model == "gemini-4-hydrogen"+tier {
+			return "gemini-4-hydrogen"
+		}
+	}
 	return model
+}
+
+func isGeminiModelResourceName(model string) bool {
+	return strings.HasPrefix(model, "models/") ||
+		strings.HasPrefix(model, "publishers/google/models/") ||
+		(strings.HasPrefix(model, "projects/") && strings.Contains(model, "/publishers/google/models/"))
 }
 
 func lastSegment(model string) string {

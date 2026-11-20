@@ -1486,6 +1486,6 @@
         "browser-results.json"
       ]
     },
-    "publication": "Local selective sync only; no commit/push/deploy."
+    "publication": "User subsequently authorized GitHub submission and deployment as personal v2.1.69 via PR73; update_source_baselines.go checkpoints aligned with this formal release after the consistency regression exposed stale constants. Final CI, artifacts, backup/isolated restore and production acceptance recorded separately."
   }
 }

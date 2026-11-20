@@ -2,28 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.105",
-  "imported_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
+  "imported_version": "2.3.113",
+  "imported_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.105",
-  "latest_observed_release_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
-  "latest_observed_main_commit": "a58e3d2eefccb39e8679d6d03435ef29e519b3a1",
+  "latest_observed_version": "2.3.113",
+  "latest_observed_release_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+  "latest_observed_main_commit": "8850d92d6d090c3148d6563109cf8c3f095b27cc",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.105",
-  "reviewed_release_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
+  "reviewed_release_tag": "v2.3.113",
+  "reviewed_release_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
   "observed_delta_review": {
-    "from_commit": "9f7dc5e798e8054228e31feb6abaeae808d269cd",
-    "to_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
-    "status": "formal_v23105_selective_backport",
-    "scope": "CC Switch model/usage URL normalization (no browser globals required by exported script), shared real-time monitor slots and chronological quality history, 1000-row Excel export with bounded transient retries and cancellation. Native billing/theme retained.",
-    "review_depth": "Complete path/commit inventory and module-level selection; selected fixes and named incompatibilities received code-level review. Deferred runtime code was not all line-by-line audited.",
-    "evidence": "maintenance/notes/upstream-sync-20261118.md"
+    "from_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
+    "to_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+    "status": "formal_v23113_selective_backport",
+    "scope": "Retry-After export continuation and observable pagination drift for user/admin, session-owned auth query coalescing with forced mutation reads, left-aligned quality history, cross-gateway acknowledgement negative-cache fix, Gemini error-prelude recovery/named errors, safe decoder close, terminal protocol-response commitment and default Ops error retention. Native billing/routing/theme retained.",
+    "review_depth": "Complete 69-commit/256-path inventory and module decisions; selected slices and concrete conflicts reviewed at code level; deferred runtime is not all line-by-line audited.",
+    "evidence": "maintenance/notes/upstream-sync-20261120-v23113.md",
+    "selection_ledger": "maintenance/notes/upstream-selection-ledger-20261120-v23113.json"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
+    "source_head": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -31,6 +32,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.106-v2.3.113: bounded Retry-After export continuation and drift checks for both roles; session-owned auth coalescing/force/visibility, quality-history left alignment, cross-gateway acknowledgement visibility, Gemini prelude recovery/named-error priority, decoder-close synchronization and explicit terminal-response commitment. Default Ops error retention7d preserves explicit zero/settings. Native billing/routing/theme and VERSION2.1.68 retained. See maintenance/notes/upstream-sync-20261120-v23113.md.",
       "Formal v2.3.90-v2.3.105: CC Switch model/usage URL normalization (no browser globals required by exported script), shared real-time monitor slots and chronological quality history, 1000-row Excel export with bounded transient retries and cancellation. Native billing/theme retained. See maintenance/notes/upstream-sync-20261118.md.",
       "Formal v2.3.77-v2.3.89: separate editable registration fields from consent-gated actions; add default-false OpenAI transport cooldown opt-out preserving prior blocks/failover/custom-code policy; adapt checked-fields-only key bulk edits with explicit zero, expiry clearing and smart-route replacement. Keep local /hub UA, protocols, billing and theme. See maintenance/notes/upstream-sync-20261116-v2389.md.",
       "Formal v2.3.67-v2.3.76: whole-request average output rate without TTFT dependence; positive-balance user totals from one non-deleted population; lazy latest-monitor-bucket group dots with per-view cache, failure backoff and accessible descriptions; distinguish absent timeline slots from actual unknown buckets. See maintenance/notes/upstream-sync-20261114-v2376.md.",
@@ -1421,5 +1423,69 @@
         "Intermediate failing or stale logs are superseded only by the named final passing evidence. Per-feature counts overlap and must not be summed."
       ]
     }
+  },
+  "fork_sync_20261120_v23113": {
+    "baseline_head": "dfd4a724088004f7d2970401d7c188ed8057354d",
+    "source_release": "v2.3.113",
+    "source_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+    "observed_main_not_imported": "8850d92d6d090c3148d6563109cf8c3f095b27cc",
+    "source_commits": 69,
+    "source_nonmerge_commits": 46,
+    "source_paths": 256,
+    "personal_version": "2.1.68",
+    "note": "maintenance/notes/upstream-sync-20261120-v23113.md",
+    "ledger": "maintenance/notes/upstream-selection-ledger-20261120-v23113.json",
+    "implemented": [
+      "user/admin export Retry-After+bounded transient retries+abort+observable OFFSET drift restart",
+      "frontend auth coalescing/5s success reuse/90s visible polling/force/session ownership/disposal",
+      "quality history left alignment",
+      "admin acknowledgement missing-key cache bypass",
+      "Gemini Chat/Responses prelude recovery, nonempty finish and named SSE error priority/observation",
+      "gzip/zstd network-first synchronized idempotent close",
+      "nonstream protocol terminal MarkResponseCommitted",
+      "Ops error retention default/negative normalization7days, explicit settings and0 preserved"
+    ],
+    "equivalent_or_not_applicable": [
+      "fresh cache recheck already inside OpenAI model singleflight",
+      "native local dashboard links do not use upstream UPageCard anchor",
+      "no request_connection_traces/user_traffic_events writer/table locally"
+    ],
+    "excluded_or_preserved": [
+      "backend5s profile cache without mutation invalidation/force bypass",
+      "whole-request upstream-error free billing and inferred1h cache prices",
+      "DeepSeek20MB/30min/65min policies",
+      "raw/small body retention subsystem and migrations319/320",
+      "AccountOps wallet proofs/NewAPI balance/notification scans absent",
+      "retired payment/crypto delegated runtime",
+      "Nuxt UI and five-area operations/navigation replacement"
+    ],
+    "verification": {
+      "directory": ".artifacts/fork-sync-20261120-v23113",
+      "backend_final_top_level": 500,
+      "backend_final_pass_events": 1578,
+      "protocol_top_level": 31,
+      "protocol_pass_events": 53,
+      "frontend_core": 156,
+      "frontend_callers": 85,
+      "browser_checks": 36,
+      "counts_overlap": true,
+      "limits": [
+        "No live PostgreSQL cross-process/concurrency or race test; cache visibility uses SQL mock.",
+        "OFFSET export can detect only exposed count/page-size/short-page/duplicate-ID drift; API has no snapshot contract."
+      ],
+      "accepted_evidence": [
+        "final-acceptance-results.json",
+        "backend-final.jsonl",
+        "backend-protocol-final.jsonl",
+        "frontend-final.log",
+        "frontend-callers-final.log",
+        "frontend-production-accepted.log",
+        "frontend-lint-accepted.log",
+        "backend-build.log",
+        "backend-embed-accepted.log",
+        "browser-results.json"
+      ]
+    },
+    "publication": "Local selective sync only; no commit/push/deploy."
   }
 }

@@ -4,7 +4,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed, readonly } from 'vue'
+import { ref, computed, readonly, onScopeDispose } from 'vue'
 import { authAPI, isTotp2FARequired, passkeyAPI, type LoginResponse } from '@/api'
 import type {
   User,
@@ -19,7 +19,8 @@ const AUTH_USER_KEY = 'auth_user'
 const REFRESH_TOKEN_KEY = 'refresh_token'
 const TOKEN_EXPIRES_AT_KEY = 'token_expires_at' // 存储过期时间戳而非有效期
 const PENDING_AUTH_SESSION_KEY = 'pending_auth_session'
-const AUTO_REFRESH_INTERVAL = 60 * 1000 // 60 seconds for user data refresh
+const AUTO_REFRESH_INTERVAL = 90 * 1000
+const AUTH_REFRESH_MIN_INTERVAL = 5 * 1000
 const TOKEN_REFRESH_BUFFER = 120 * 1000 // 120 seconds before expiry to refresh token
 
 type PendingAuthTokenField = 'pending_auth_token' | 'pending_oauth_token'
@@ -84,6 +85,10 @@ export const useAuthStore = defineStore('auth', () => {
   const runMode = ref<'standard' | 'simple'>('standard')
   const pendingAuthSession = ref<PendingAuthSessionSummary | null>(null)
   let refreshIntervalId: ReturnType<typeof setInterval> | null = null
+  let lastRefreshAt = 0
+  let refreshGeneration = 0
+  let refreshRevision = 0
+  let inflightRefresh: Promise<User> | null = null
   let tokenRefreshTimeoutId: ReturnType<typeof setTimeout> | null = null
 
   // ==================== Computed ====================
@@ -115,6 +120,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (savedToken && savedUser) {
       try {
+        if (token.value !== savedToken) resetUserRefresh()
         token.value = savedToken
         user.value = JSON.parse(savedUser)
         refreshTokenValue.value = savedRefreshToken
@@ -142,13 +148,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Start auto-refresh interval for user data
-   * Refreshes user data every 60 seconds
+   * Refreshes visible tabs every 90 seconds and catches up when shown again.
    */
   function startAutoRefresh(): void {
     // Clear existing interval if any
     stopAutoRefresh()
+    document.addEventListener('visibilitychange', refreshWhenVisible)
 
     refreshIntervalId = setInterval(() => {
+      if (document.hidden) return
       if (token.value) {
         refreshUser().catch((error) => {
           console.error('Auto-refresh user failed:', error)
@@ -161,10 +169,23 @@ export const useAuthStore = defineStore('auth', () => {
    * Stop auto-refresh interval
    */
   function stopAutoRefresh(): void {
+    document.removeEventListener('visibilitychange', refreshWhenVisible)
     if (refreshIntervalId) {
       clearInterval(refreshIntervalId)
       refreshIntervalId = null
     }
+  }
+
+  function refreshWhenVisible(): void {
+    if (!document.hidden && token.value) {
+      refreshUser().catch((error) => console.error('Failed to refresh visible user:', error))
+    }
+  }
+
+  function resetUserRefresh(): void {
+    refreshGeneration++
+    lastRefreshAt = 0
+    inflightRefresh = null
   }
 
   /**
@@ -297,6 +318,7 @@ export const useAuthStore = defineStore('auth', () => {
    * Internal helper function
    */
   function setAuthFromResponse(response: AuthResponse): void {
+    resetUserRefresh()
     // Store token and user
     token.value = response.access_token
 
@@ -355,6 +377,7 @@ export const useAuthStore = defineStore('auth', () => {
    * @param newToken - 后端签发的 JWT access token
    */
   async function setToken(newToken: string): Promise<User> {
+    resetUserRefresh()
     // Clear any previous state first (avoid mixing sessions)
     // Note: Don't clear localStorage here as OAuth callback may have set refresh_token
     stopAutoRefresh()
@@ -432,30 +455,43 @@ export const useAuthStore = defineStore('auth', () => {
    * @returns Promise resolving to the updated user
    * @throws Error if not authenticated or request fails
    */
-  async function refreshUser(): Promise<User> {
+  async function refreshUser(options?: { force?: boolean }): Promise<User> {
     if (!token.value) {
       throw new Error('Not authenticated')
     }
 
-    try {
-      const response = await authAPI.getCurrentUser()
-      if (response.data.run_mode) {
-        runMode.value = response.data.run_mode
+    if (!options?.force) {
+      if (inflightRefresh) return inflightRefresh
+      if (lastRefreshAt > 0 && Date.now() - lastRefreshAt < AUTH_REFRESH_MIN_INTERVAL && user.value) {
+        return user.value
       }
-      const { run_mode: _run_mode, ...userData } = response.data
-      user.value = userData
-
-      // Update localStorage
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData))
-
-      return userData
-    } catch (error) {
-      // If refresh fails with 401, clear auth state
-      if ((error as { status?: number }).status === 401) {
-        clearAuth({ preservePendingAuthSession: pendingAuthSession.value !== null })
-      }
-      throw error
     }
+
+    const generation = refreshGeneration
+    const revision = ++refreshRevision
+    const isCurrent = () => generation === refreshGeneration && revision === refreshRevision
+    // A forced refresh follows a mutation; it must not reuse a request started before that mutation.
+    const request = Promise.resolve().then(async () => {
+      try {
+        const response = await authAPI.getCurrentUser()
+        if (!isCurrent()) throw new Error('Authentication refresh was superseded')
+        if (response.data.run_mode) runMode.value = response.data.run_mode
+        const { run_mode: _run_mode, ...userData } = response.data
+        user.value = userData
+        lastRefreshAt = Date.now()
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData))
+        return userData
+      } catch (error) {
+        if (isCurrent() && (error as { status?: number }).status === 401) {
+          clearAuth({ preservePendingAuthSession: pendingAuthSession.value !== null })
+        }
+        throw error
+      } finally {
+        if (isCurrent()) inflightRefresh = null
+      }
+    })
+    inflightRefresh = request
+    return request
   }
 
   /**
@@ -463,6 +499,7 @@ export const useAuthStore = defineStore('auth', () => {
    * Internal helper function
    */
   function clearAuth(options?: { preservePendingAuthSession?: boolean }): void {
+    resetUserRefresh()
     // Stop auto-refresh
     stopAutoRefresh()
     // Stop token refresh
@@ -485,6 +522,12 @@ export const useAuthStore = defineStore('auth', () => {
     pendingAuthSession.value = null
     clearPendingAuthSessionStorage()
   }
+
+  onScopeDispose(() => {
+    resetUserRefresh()
+    stopAutoRefresh()
+    stopTokenRefresh()
+  })
 
   // ==================== Return Store API ====================
 

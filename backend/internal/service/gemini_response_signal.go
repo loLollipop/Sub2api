@@ -63,16 +63,21 @@ func geminiPayloadMayCarrySignal(payload []byte) bool {
 // {"response":{...}} 包装体先解包。判定顺序：错误信封 > promptFeedback.blockReason > 首候选 finishReason。
 // finishReason 只有内容过滤类枚举登记为信号；STOP、MAX_TOKENS、OTHER、MALFORMED_FUNCTION_CALL、
 // UNEXPECTED_TOOL_CALL、TOO_MANY_TOOL_CALLS 等其余枚举都是模型侧的生成结果，不做上游归因，一律不登记。
-func detectGeminiResponseSignal(payload []byte) (geminiResponseSignal, bool) {
+func detectGeminiResponseSignal(payload []byte, eventType ...string) (geminiResponseSignal, bool) {
 	payload = bytes.TrimSpace(payload)
-	if len(payload) == 0 || !geminiPayloadMayCarrySignal(payload) || !gjson.ValidBytes(payload) {
+	namedError := len(eventType) > 0 && eventType[0] == "error"
+	if len(payload) == 0 || (!namedError && !geminiPayloadMayCarrySignal(payload)) || !gjson.ValidBytes(payload) {
 		return geminiResponseSignal{}, false
 	}
 	if inner := gjson.GetBytes(payload, "response"); inner.Exists() && inner.IsObject() {
 		payload = []byte(inner.Raw)
 	}
 
-	if errObj := gjson.GetBytes(payload, "error"); errObj.Exists() && errObj.IsObject() {
+	errObj := gjson.GetBytes(payload, "error")
+	if namedError && !errObj.IsObject() {
+		errObj = gjson.ParseBytes(payload)
+	}
+	if errObj.IsObject() {
 		googleStatus := strings.ToUpper(strings.TrimSpace(errObj.Get("status").String()))
 		status := int(errObj.Get("code").Int())
 		if status < 400 || status > 599 {

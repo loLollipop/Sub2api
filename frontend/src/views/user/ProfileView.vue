@@ -146,7 +146,7 @@ const totpEnabled = ref(false)
 const passkeyEnabled = ref(false)
 
 onMounted(async () => {
-  const profileRefresh = authStore.refreshUser().catch((error) => {
+  const profileRefresh = authStore.refreshUser({ force: true }).catch((error) => {
     console.error('Failed to refresh profile:', error)
   })
 

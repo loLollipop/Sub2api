@@ -198,6 +198,7 @@
 </template>
 
 <script setup lang="ts">
+import { forEachUsageExportPage, isUsageExportRateLimited, UsageExportChangedError } from '@/utils/usageExport'
 import { buildErrorLogColumns } from '@/utils/errorLogColumns'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -706,26 +707,12 @@ const getRequestTypeLabel = (log: AdminUsageLog): string => {
   return t('usage.unknown')
 }
 
-const fetchExportPage = async (page: number, size: number, signal: AbortSignal) => {
-  const params = buildUsageListParams(page, size, true, false)
-  for (let attempt = 0; ; attempt++) {
-    signal.throwIfAborted()
-    try {
-      return await adminUsageAPI.list(params, { signal })
-    } catch (error) {
-      const status = (error as { status?: number } | null)?.status
-      if (signal.aborted || attempt === 2 || (status && status !== 408 && status !== 429 && status < 500)) throw error
-      await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)))
-    }
-  }
-}
-
 const exportToExcel = async (format: 'xlsx' | 'csv' = 'xlsx') => {
   const text = (value: string) => format === 'csv' ? escapeCsvText(value) : value
   if (exporting.value) return; exporting.value = true; exportProgress.show = true
   const c = new AbortController(); exportAbortController = c
   try {
-    let p = 1; let total = pagination.total; let exportedCount = 0; let pageSize = 1000
+    const params = buildUsageListParams(1, 1000, true, false)
     const XLSX = await import('xlsx')
     const headers = [
       t('usage.time'), t('admin.usage.user'), t('usage.apiKeyFilter'),
@@ -740,38 +727,44 @@ const exportToExcel = async (format: 'xlsx' | 'csv' = 'xlsx') => {
       t('usage.firstToken'), t('usage.duration'),
       t('admin.usage.requestId'), t('admin.usage.upstreamRequestId'), t('usage.userAgent'), t('admin.usage.ipAddress')
     ]
-    const ws = XLSX.utils.aoa_to_sheet([headers])
-    while (true) {
-      const res = await fetchExportPage(p, pageSize, c.signal)
-      if (c.signal.aborted) break; if (p === 1) { total = res.total; exportProgress.total = total }
-      if (p > 1 && res.page_size && res.page_size !== pageSize) throw new Error('Pagination size changed during export')
-      pageSize = res.page_size || pageSize
-      const rows = (res.items || []).map((log: AdminUsageLog) => [
-        text(log.created_at), text((log.user ?? log.user_summary)?.email || ''), text((log.api_key ?? log.api_key_summary)?.name || ''), text((log.account ?? log.account_summary)?.name || ''), text(log.model),
-        text(log.upstream_model || log.model), text(log.upstream_response_model || ''), log.upstream_model_mismatch == null ? '' : t(log.upstream_model_mismatch ? 'common.yes' : 'common.no'), formatReasoningEffort(log.reasoning_effort), formatReasoningEffort(log.upstream_reasoning_effort || log.reasoning_effort), text((log.group ?? log.group_summary)?.name || ''),
-        text(log.inbound_endpoint || ''), text(log.upstream_endpoint || ''), getRequestTypeLabel(log),
-        log.input_tokens, log.output_tokens, log.cache_read_tokens, log.cache_creation_tokens,
-        log.input_cost?.toFixed(6) || '0.000000', log.output_cost?.toFixed(6) || '0.000000',
-        log.cache_read_cost?.toFixed(6) || '0.000000', log.cache_creation_cost?.toFixed(6) || '0.000000',
-        log.rate_multiplier?.toPrecision(4) || '1.00', (log.account_rate_multiplier ?? 1).toPrecision(4),
-        log.total_cost?.toFixed(6) || '0.000000', log.actual_cost?.toFixed(6) || '0.000000',
-        ((log.account_stats_cost ?? log.total_cost) * (log.account_rate_multiplier ?? 1)).toFixed(6), log.first_token_ms ?? '', log.duration_ms,
-        text(log.request_id || ''), text(log.upstream_request_id || ''), text(log.user_agent || ''), text(log.ip_address || '')
-      ])
-      if (rows.length) {
-        XLSX.utils.sheet_add_aoa(ws, rows, { origin: -1 })
-      }
-      exportedCount += rows.length
-      exportProgress.current = exportedCount
-      exportProgress.progress = total > 0 ? Math.min(100, Math.round(exportedCount / total * 100)) : 0
-      if (exportedCount >= total) break
-      if (rows.length === 0) throw new Error('Incomplete usage export')
-      p++
-    }
+    let ws = XLSX.utils.aoa_to_sheet([headers])
+    await forEachUsageExportPage(
+      (page, pageSize) => adminUsageAPI.list({ ...params, page, page_size: pageSize }, { signal: c.signal }),
+      c.signal,
+      {
+        pageSize: 1000,
+        onWaiting: waiting => { exportProgress.estimatedTime = waiting ? t('usage.exportWaiting') : '' },
+        onRestart: () => {
+          ws = XLSX.utils.aoa_to_sheet([headers])
+          exportProgress.current = 0
+          exportProgress.progress = 0
+        },
+        onPage: (items, total, current) => {
+          const rows = items.map((log: AdminUsageLog) => [
+            text(log.created_at), text((log.user ?? log.user_summary)?.email || ''), text((log.api_key ?? log.api_key_summary)?.name || ''), text((log.account ?? log.account_summary)?.name || ''), text(log.model),
+            text(log.upstream_model || log.model), text(log.upstream_response_model || ''), log.upstream_model_mismatch == null ? '' : t(log.upstream_model_mismatch ? 'common.yes' : 'common.no'), formatReasoningEffort(log.reasoning_effort), formatReasoningEffort(log.upstream_reasoning_effort || log.reasoning_effort), text((log.group ?? log.group_summary)?.name || ''),
+            text(log.inbound_endpoint || ''), text(log.upstream_endpoint || ''), getRequestTypeLabel(log),
+            log.input_tokens, log.output_tokens, log.cache_read_tokens, log.cache_creation_tokens,
+            log.input_cost?.toFixed(6) || '0.000000', log.output_cost?.toFixed(6) || '0.000000',
+            log.cache_read_cost?.toFixed(6) || '0.000000', log.cache_creation_cost?.toFixed(6) || '0.000000',
+            log.rate_multiplier?.toPrecision(4) || '1.00', (log.account_rate_multiplier ?? 1).toPrecision(4),
+            log.total_cost?.toFixed(6) || '0.000000', log.actual_cost?.toFixed(6) || '0.000000',
+            ((log.account_stats_cost ?? log.total_cost) * (log.account_rate_multiplier ?? 1)).toFixed(6), log.first_token_ms ?? '', log.duration_ms,
+            text(log.request_id || ''), text(log.upstream_request_id || ''), text(log.user_agent || ''), text(log.ip_address || '')
+          ])
+          if (rows.length) {
+            XLSX.utils.sheet_add_aoa(ws, rows, { origin: -1 })
+          }
+          exportProgress.total = total
+          exportProgress.current = current
+          exportProgress.progress = total > 0 ? Math.min(100, Math.round(current / total * 100)) : 0
+        },
+      },
+    )
     if(!c.signal.aborted) {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Usage')
-      const filename = `usage_${filters.value.start_date}_to_${filters.value.end_date}.xlsx`.replace(/:/g, '-')
+      const filename = `usage_${params.start_date}_to_${params.end_date}.xlsx`.replace(/:/g, '-')
       if (format === 'csv') {
         const csv = XLSX.utils.sheet_to_csv(ws)
         saveAs(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }), filename.replace(/\.xlsx$/, '.csv'))
@@ -780,8 +773,14 @@ const exportToExcel = async (format: 'xlsx' | 'csv' = 'xlsx') => {
       }
       appStore.showSuccess(t('usage.exportSuccess'))
     }
-  } catch (error) { if (!c.signal.aborted) { console.error('Failed to export:', error); appStore.showError('Export Failed') } }
-  finally { if(exportAbortController === c) { exportAbortController = null; exporting.value = false; exportProgress.show = false } }
+  } catch (error) {
+    if (!c.signal.aborted) {
+      if (isUsageExportRateLimited(error)) appStore.showError(t('usage.exportRateLimited'))
+      else if (error instanceof UsageExportChangedError) appStore.showError(t('usage.exportRecordsChanged'))
+      else { console.error('Failed to export:', error); appStore.showError(t('usage.exportFailed')) }
+    }
+  }
+  finally { if(exportAbortController === c) { exportAbortController = null; exporting.value = false; exportProgress.show = false; exportProgress.estimatedTime = '' } }
 }
 
 // Column visibility

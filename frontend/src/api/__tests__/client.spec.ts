@@ -247,6 +247,20 @@ describe('API Client', () => {
   // --- 响应拦截器 ---
 
   describe('响应拦截器', () => {
+    it.each([
+      { 'retry-after': '2' },
+      { 'Retry-After': 60 },
+      new axios.AxiosHeaders({ 'Retry-After': 'Fri, 20 Nov 2026 12:00:00 GMT' }),
+    ])('preserves Retry-After in the real export API error contract', async headers => {
+      const usage = await import('@/api/admin/usage')
+      apiClient.defaults.adapter = vi.fn().mockRejectedValue({
+        response: { status: 429, headers, data: { message: 'Slow down' } },
+        config: { url: '/admin/usage', headers: {} },
+      })
+      await expect(usage.adminUsageAPI.list({ page: 1, page_size: 1000 }))
+        .rejects.toMatchObject({ status: 429, retryAfter: expect.any(String) })
+    })
+
     it.each([400, 403, 408, 429, 502, 503])('保留用量导出重试判断所需的顶层 HTTP %s 状态码', async status => {
       const usage = await import('@/api/admin/usage')
       const adapter = vi.fn().mockRejectedValue({

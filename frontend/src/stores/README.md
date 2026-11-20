@@ -23,7 +23,7 @@ Manages user authentication state, login/logout, and token persistence.
 - `register(userData)` - Register new user account
 - `logout()` - Clear authentication and logout
 - `checkAuth()` - Restore session from localStorage
-- `refreshUser()` - Fetch latest user data from server
+- `refreshUser({ force?: boolean })` - Coalesce profile reads and reuse successful results for five seconds. Use `force: true` after profile/balance mutations. Visible tabs poll every 90 seconds; session changes discard stale responses.
 
 ### 2. App Store (`app.ts`)
 

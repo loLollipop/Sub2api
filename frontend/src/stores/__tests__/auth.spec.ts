@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
+import { setActivePinia, createPinia, disposePinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 
 // Mock authAPI
@@ -52,14 +52,17 @@ const fakeAuthResponse = {
 }
 
 describe('useAuthStore', () => {
+  let pinia: ReturnType<typeof createPinia>
   beforeEach(() => {
-    setActivePinia(createPinia())
+    pinia = createPinia()
+    setActivePinia(pinia)
     localStorage.clear()
     vi.useFakeTimers()
     vi.clearAllMocks()
   })
 
   afterEach(() => {
+    disposePinia(pinia)
     vi.useRealTimers()
   })
 
@@ -345,6 +348,69 @@ describe('useAuthStore', () => {
   // --- refreshUser ---
 
   describe('refreshUser', () => {
+    it('coalesces concurrent reads and expires the five-second reuse window', async () => {
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      mockGetCurrentUser.mockResolvedValue({ data: fakeUser })
+      await Promise.all([store.refreshUser(), store.refreshUser()])
+      await store.refreshUser()
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(5000)
+      await store.refreshUser()
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(2)
+    })
+
+    it('forces a new post-mutation read and rejects the superseded result', async () => {
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      let resolveOld!: (value: unknown) => void
+      mockGetCurrentUser.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+      const old = store.refreshUser()
+      const superseded = expect(old).rejects.toThrow('superseded')
+      await Promise.resolve()
+      mockGetCurrentUser.mockResolvedValue({ data: { ...fakeUser, balance: 210 } })
+      await store.refreshUser({ force: true })
+      resolveOld({ data: { ...fakeUser, balance: 100 } })
+      await superseded
+      expect(store.user?.balance).toBe(210)
+    })
+
+    it.each([false, true])('ignores stale session responses (401=%s)', async failed => {
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      let settle!: (value: unknown) => void
+      mockGetCurrentUser.mockImplementationOnce(() => new Promise((resolve, reject) => { settle = failed ? reject : resolve }))
+      const old = store.refreshUser()
+      const rejected = expect(old).rejects.toBeDefined()
+      await Promise.resolve()
+      await store.logout()
+      mockLogin.mockResolvedValue({ ...fakeAuthResponse, access_token: 'new-session', user: fakeAdminUser })
+      await store.login({ email: 'admin@example.com', password: '123456' })
+      settle(failed ? { status: 401 } : { data: fakeUser })
+      await rejected
+      expect(store.user?.id).toBe(fakeAdminUser.id)
+      expect(store.token).toBe('new-session')
+    })
+
+    it('pauses hidden-tab polls and refreshes on visibility recovery', async () => {
+      const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      mockGetCurrentUser.mockResolvedValue({ data: fakeUser })
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      await vi.advanceTimersByTimeAsync(90_000)
+      expect(mockGetCurrentUser).not.toHaveBeenCalled()
+      hidden.mockReturnValue(false)
+      document.dispatchEvent(new Event('visibilitychange'))
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+      await store.logout()
+      hidden.mockRestore()
+    })
+
     it('刷新用户数据并更新 localStorage', async () => {
       mockLogin.mockResolvedValue(fakeAuthResponse)
       const store = useAuthStore()

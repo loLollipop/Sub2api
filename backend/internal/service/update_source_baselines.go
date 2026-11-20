@@ -4,8 +4,8 @@ package service
 // this project's release version. A reviewed checkpoint does not imply every
 // feature was merged. Update only after the corresponding review/sync completes.
 const (
-	forkImportedVersion    = "2.3.105"
-	forkImportedCommit     = "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8"
+	forkImportedVersion    = "2.3.113"
+	forkImportedCommit     = "04acc3827c761e0915e41859cabbf3d6da3aeb0c"
 	originalReviewedCommit = "5af9afb588c4b014b3df9db7d4073af1f8ae01b6"
 )
 

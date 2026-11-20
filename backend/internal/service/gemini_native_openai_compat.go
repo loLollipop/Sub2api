@@ -345,22 +345,23 @@ func (s *GeminiMessagesCompatService) pipeOpenAIStreamAsGemini(ctx context.Conte
 		if sawOutput {
 			result.NonBillableUpstreamError = false
 		}
-		if status := geminiBridgeFailureStatus(parsed.data, parsed.eventType); status != 0 {
+		failureEventType := parsed.eventType
+		if frame.EventType == "error" || frame.EventType == "response.failed" {
+			failureEventType = frame.EventType
+		}
+		if status := geminiBridgeFailureStatus(parsed.data, failureEventType); status != 0 {
 			if !sawOutput && geminiBridgeNonBillableFailure(status, parsed.data) {
 				result.NonBillableUpstreamError = true
 			}
 			streamStatus = status
 			financialFailure = financialFailure || IsUpstreamFinancialError(status, parsed.data)
-			streamErr = fmt.Errorf("gemini upstream stream failed: %s", parsed.eventType)
-			// A Responses error prelude can be followed by a terminal usage snapshot.
-			terminal = protocol != APIProtocolResponses || (parsed.eventType != "error" && parsed.eventType != "")
-			return
-		}
-		if streamErr != nil {
-			terminal = isOpenAICompatResponsesTerminalEvent(parsed.eventType)
+			streamErr = fmt.Errorf("gemini upstream stream failed: %s", failureEventType)
+			// Both protocols may recover from an error prelude with a later successful finish.
+			terminal = failureEventType != "error" && failureEventType != ""
 			return
 		}
 		var chunks []apicompat.ChatCompletionsChunk
+		successfulChatFinish := false
 		if protocol == APIProtocolResponses {
 			var event apicompat.ResponsesStreamEvent
 			if err := json.Unmarshal(parsed.data, &event); err != nil {
@@ -412,10 +413,17 @@ func (s *GeminiMessagesCompatService) pipeOpenAIStreamAsGemini(ctx context.Conte
 						return
 					}
 				}
-				if choice.FinishReason != nil {
+				if choice.FinishReason != nil && *choice.FinishReason != "" {
 					finish = geminiBridgeFinishReason(*choice.FinishReason)
+					successfulChatFinish = true
 				}
 			}
+		}
+		if streamErr != nil && (parsed.eventType == "response.completed" || parsed.eventType == "response.done" ||
+			(protocol == APIProtocolChatCompletions && successfulChatFinish)) {
+			streamErr = nil
+			financialFailure = false
+			result.NonBillableUpstreamError = false
 		}
 	}
 	for !terminal && !result.ClientDisconnect && ctx.Err() == nil && scanner.Scan() {
@@ -459,6 +467,13 @@ func extractGeminiBridgeErrorMessage(raw []byte) string {
 }
 
 func geminiBridgeFailureStatus(raw []byte, eventType string) int {
+	root := gjson.ParseBytes(raw)
+	for _, choice := range root.Get("choices").Array() {
+		if choice.Get("finish_reason").String() == "error" {
+			eventType = "error"
+			break
+		}
+	}
 	status := gjson.GetBytes(raw, "response.status").String()
 	if status == "" {
 		status = gjson.GetBytes(raw, "status").String()

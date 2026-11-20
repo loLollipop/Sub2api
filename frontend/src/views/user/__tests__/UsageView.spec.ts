@@ -636,7 +636,7 @@ describe('user UsageView', () => {
       sort_by: 'created_at',
       sort_order: 'desc',
       native_compaction_v2: true,
-    }))
+    }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(clickSpy).toHaveBeenCalled()
     expect(showSuccess).toHaveBeenCalled()
     expect(csvContent.startsWith('\uFEFF')).toBe(true)
@@ -674,9 +674,10 @@ describe('user UsageView', () => {
     let resolveFirstPage!: (value: typeof pageResponse) => void
     const firstPage = new Promise<typeof pageResponse>((resolve) => { resolveFirstPage = resolve })
     query.mockClear()
-    query.mockImplementation((params, options) => {
-      if (!options && params.page === 1) return firstPage
-      if (!options && params.page === 3) return Promise.resolve({ ...pageResponse, items: [{ ...usageLog, id: 101 }] })
+    query.mockImplementation((params) => {
+      if (params.include_inflight === false && params.page === 1 && params.start_date === '2026-03-01') return firstPage
+      if (params.include_inflight === false && params.page === 2) return Promise.resolve({ ...pageResponse, items: Array.from({ length: 50 }, (_, index) => ({ ...usageLog, id: index + 51 })) })
+      if (params.include_inflight === false && params.page === 3) return Promise.resolve({ ...pageResponse, items: [{ ...usageLog, id: 101 }] })
       return Promise.resolve(pageResponse)
     })
     const originalCreateObjectURL = window.URL.createObjectURL
@@ -712,7 +713,7 @@ describe('user UsageView', () => {
       resolveFirstPage(pageResponse)
       await flushPromises()
 
-      const exportCalls = query.mock.calls.filter((call) => call.length === 1)
+      const exportCalls = query.mock.calls.filter(([params]) => params.include_inflight === false && params.start_date === '2026-03-01' && params.page_size !== 20).map(([params]) => [params])
       expect.soft(exportCalls).toEqual([
         [initialParams],
         [{ ...initialParams, page: 2, page_size: 50 }],

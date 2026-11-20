@@ -219,7 +219,7 @@ func TestComputeEffective_PartialAdvancedSettingsUseSafeDefaults(t *testing.T) {
 	svc.computeEffectiveLocked(context.Background())
 
 	if svc.effective.Schedule != opsCleanupDefaultSchedule ||
-		svc.effective.ErrorLogRetentionDays != 30 ||
+		svc.effective.ErrorLogRetentionDays != 7 ||
 		svc.effective.MinuteMetricsRetentionDays != 30 ||
 		svc.effective.HourlyMetricsRetentionDays != 30 {
 		t.Fatalf("partial settings did not use safe defaults: %#v", svc.effective)

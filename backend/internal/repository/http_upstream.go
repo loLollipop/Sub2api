@@ -1675,18 +1675,33 @@ func (r *zstdResponseReader) Read(p []byte) (int, error) {
 
 // decompressedBody 组合解压 reader 和原始 body 的 close。
 type decompressedBody struct {
-	reader io.Reader
-	closer io.Closer
+	reader   io.Reader
+	closer   io.Closer
+	readMu   sync.Mutex
+	once     sync.Once
+	closed   bool
+	closeErr error
 }
 
 func (d *decompressedBody) Read(p []byte) (int, error) {
+	d.readMu.Lock()
+	defer d.readMu.Unlock()
+	if d.closed {
+		return 0, io.ErrClosedPipe
+	}
 	return d.reader.Read(p)
 }
 
 func (d *decompressedBody) Close() error {
-	// 如果 reader 本身也是 Closer（如 gzip.Reader），先关闭它
-	if rc, ok := d.reader.(io.Closer); ok {
-		_ = rc.Close()
-	}
-	return d.closer.Close()
+	d.once.Do(func() {
+		// Interrupt blocked network reads before touching a non-concurrent decoder.
+		d.closeErr = d.closer.Close()
+		d.readMu.Lock()
+		defer d.readMu.Unlock()
+		d.closed = true
+		if rc, ok := d.reader.(io.Closer); ok {
+			_ = rc.Close()
+		}
+	})
+	return d.closeErr
 }

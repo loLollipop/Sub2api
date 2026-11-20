@@ -2291,7 +2291,8 @@ func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string
 }
 
 func (s *OpenAIGatewayService) writeOpenAINonStreamingProtocolError(resp *http.Response, c *gin.Context, message string) error {
-
+	// This helper owns the terminal body; handler fallback must not append another error.
+	MarkResponseCommitted(c)
 	defer GuardUpstreamFinancialError(c, http.StatusBadGateway, []byte(message))()
 	message = sanitizeUpstreamErrorMessage(strings.TrimSpace(message))
 	if message == "" {

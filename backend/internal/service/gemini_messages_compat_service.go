@@ -3040,6 +3040,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 	sawDataEvent := false
 	fallback := &geminiSSEFallbackBody{}
 	pendingErrorHeader := ""
+	currentEventType := ""
 	clientDisconnect := false
 	finished := false
 	streamResult := func() *geminiNativeStreamResult {
@@ -3050,7 +3051,12 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 		line, err := reader.ReadLineString()
 		if len(line) > 0 && (err == nil || errors.Is(err, io.EOF)) {
 			trimmed := strings.TrimRight(line, "\r\n")
-			if strings.TrimSpace(trimmed) == "event: error" {
+			if strings.HasPrefix(trimmed, "event:") {
+				currentEventType = strings.TrimSpace(strings.TrimPrefix(trimmed, "event:"))
+			} else if trimmed == "" {
+				currentEventType = ""
+			}
+			if strings.HasPrefix(trimmed, "event:") && currentEventType == "error" {
 				pendingErrorHeader = line
 				continue
 			}
@@ -3077,7 +3083,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 					}
 
 					sawDataEvent = true
-					if sig, ok := detectGeminiResponseSignal(rawBytes); ok && sig.Kind > best.Kind {
+					if sig, ok := detectGeminiResponseSignal(rawBytes, currentEventType); ok && sig.Kind > best.Kind {
 						best = sig
 					}
 					if u := extractGeminiUsage(rawBytes); u != nil {

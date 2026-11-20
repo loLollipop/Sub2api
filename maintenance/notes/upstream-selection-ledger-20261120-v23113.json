@@ -1,0 +1,2081 @@
+{
+  "source_repository": "kiss-kedaya/sub2api",
+  "from_version": "2.3.105",
+  "to_version": "2.3.113",
+  "from_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
+  "to_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+  "observed_main": "8850d92d6d090c3148d6563109cf8c3f095b27cc",
+  "review_depth": "Complete commit/path inventory with module-level decisions. Selected slices and concrete dependency conflicts received code-level review; deferred runtime is not all line-by-line audited.",
+  "decisions": {
+    "compliance": "适配跨进程合规确认负缓存；普通 missing key 和 positive cache 保留。",
+    "export": "适配 Retry-After、同页有限重试、取消、OFFSET 可观察漂移重取一次；扩展到本地管理员 XLSX/CSV，保留1000行和安全文本。",
+    "auth_frontend": "适配 SPA 五秒复用、并发合并、90秒可见轮询；补 force、请求归属和销毁清理。",
+    "auth_backend": "不复制服务端五秒 profile cache：源实现无 mutation invalidation/force bypass，前端兑换后强制刷新仍会读到旧余额。保留服务器即时读取。",
+    "quality_history": "适配左对齐，保留时间排序、sandbox和本地主题。",
+    "gemini_protocol": "适配错误前奏恢复、空finish不作成功、SSE event:error优先和观察；不复制整单error免收和终态用量改变。",
+    "decoder_close": "抽取独立 gzip/zstd Read/Close 同步、先关闭网络及幂等关闭修复；不需要30分钟silence策略。",
+    "ops_defaults": "只把缺省/非法负数的错误日志保留改7天；显式DB设置和0保留。",
+    "equivalent_models": "本地 singleflight 内已有 fresh-cache 二次检查，保持现实现。",
+    "dashboard_native": "本地使用原生Vue/RouterLink，不使用源UPageCard stretched anchor；无对应点击区域缺陷。",
+    "payment_absent": "支付/加密支付服务和路由已移除；不重新引入 delegated runtime 来隔离不存在的服务。",
+    "capture_excluded": "新小请求留存是客户端/上游正文持久化子系统，依赖capture/filter/store、billing观察、middleware/admin settings/API和迁移319/320；本地无requestcapture运行链，沿用已确定的不引入raw capture范围。不是以新功能名义无条件延期。",
+    "account_ops_absent": "钱包归属证明、NewAPI余额和owner email/Bark引用依赖本地不存在的AccountOps扫描/通知/余额probe链；只导入显示字段不能满足已验证shared-wallet契约。",
+    "diagnostic_tables_absent": "本地没有request_connection_traces/user_traffic_events表和writer；对应清理无调用方。Ops日志默认值单独适配。",
+    "cache_ttl_contract": "保留真实上游cache分桶及本地30m/12h/显式零价；源1h请求TTL推断漏报分桶单价会改变账单，不导入。",
+    "silence_policy": "未启用>20MB DeepSeek请求body静默30min/总等待65min策略及其no-charge/retry分支，保留本地timeout/drain/replay；解压关闭独立修复已抽取。",
+    "billing_contract": "不导入error标记使全单免收/丢弃部分真实用量及相关failover改动。单独适配Gemini协议和完成响应标记。",
+    "protocol_commit_mixed": "仅抽取writeOpenAINonStreamingProtocolError的MarkResponseCommitted，保留现有error前缀、privacy及真实用量。其余源hunk混合silence和error免收策略，未复制。",
+    "local_ui": "保留本地Vue主题/导航/监控设置和virtualization。源改为Nuxt UI和运营五工作区，并依赖缺失的operations/credential/Mihomo运行模块；没有覆盖本地产品入口。",
+    "excluded_wiring": "此处config/types/wire/CI/router切片接入缺失capture、wallet operations或delegated payment；不添加无调用方字段、路由或迁移。",
+    "source_metadata": "来源发布说明/VERSION/build envelope仅作溯源；个人VERSION保持2.1.68。"
+  },
+  "commits": [
+    {
+      "sha": "6928645cba3bd72442223f7cf3fe6548e8215177",
+      "subject": "feat(deepseek): end a large request whose stream goes silent for 30 minutes",
+      "categories": [
+        "billing_contract",
+        "protocol_commit_mixed",
+        "silence_policy"
+      ],
+      "paths": [
+        "backend/internal/handler/deepseek_stream_silence.go",
+        "backend/internal/handler/deepseek_stream_silence_test.go",
+        "backend/internal/handler/openai_gateway_handler.go",
+        "backend/internal/service/deepseek_hosted_search.go",
+        "backend/internal/service/openai_alpha_search.go",
+        "backend/internal/service/openai_embeddings.go",
+        "backend/internal/service/openai_gateway_cc_pipeline.go",
+        "backend/internal/service/openai_gateway_chat_completions.go",
+        "backend/internal/service/openai_gateway_chat_completions_raw.go",
+        "backend/internal/service/openai_gateway_forward.go",
+        "backend/internal/service/openai_gateway_messages.go",
+        "backend/internal/service/openai_gateway_messages_chat_fallback.go",
+        "backend/internal/service/openai_gateway_partial_usage.go",
+        "backend/internal/service/openai_gateway_passthrough.go",
+        "backend/internal/service/openai_gateway_response_handling.go",
+        "backend/internal/service/openai_gateway_responses_chat_fallback.go",
+        "backend/internal/service/openai_plugin_transport.go",
+        "backend/internal/service/openai_upstream_stream_silence.go",
+        "backend/internal/service/openai_upstream_stream_silence_test.go",
+        "backend/internal/service/openai_upstream_wait_limit.go",
+        "backend/internal/service/openai_ws_http_bridge.go",
+        "backend/internal/service/upstream_response_limit.go"
+      ]
+    },
+    {
+      "sha": "445f54162277b68611a87a4e339b5a1dbd05b772",
+      "subject": "Merge branch 'fix/no-charge-upstream-error-openai-20261118' into feat/deepseek-stream-silence-limit-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "08087523bb362f73c7acceb30229d72d69766409",
+      "subject": "Merge branch 'fix/no-charge-upstream-error-openai-20261118' into feat/deepseek-stream-silence-limit-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "a58e3d2eefccb39e8679d6d03435ef29e519b3a1",
+      "subject": "chore: sync VERSION to 2.3.105 [skip ci]",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "sha": "9b0669e6292c9b0372120ff6c40569d70d58efc0",
+      "subject": "fix(billing): untyped stream errors, empty terminals and fake successes on the OpenAI-compatible streams",
+      "categories": [
+        "billing_contract",
+        "protocol_commit_mixed"
+      ],
+      "paths": [
+        "backend/internal/handler/openai_gaps3_stream_billing_test.go",
+        "backend/internal/service/openai_gateway_cc_pipeline.go",
+        "backend/internal/service/openai_gateway_chat_completions.go",
+        "backend/internal/service/openai_gateway_chat_completions_anthropic_native.go",
+        "backend/internal/service/openai_gateway_chat_completions_raw.go",
+        "backend/internal/service/openai_gateway_gaps3_stream_test.go",
+        "backend/internal/service/openai_gateway_messages.go",
+        "backend/internal/service/openai_gateway_messages_anthropic_native.go",
+        "backend/internal/service/openai_gateway_messages_chat_fallback.go",
+        "backend/internal/service/openai_gateway_passthrough.go",
+        "backend/internal/service/openai_gateway_response_flush_test.go",
+        "backend/internal/service/openai_gateway_response_handling.go",
+        "backend/internal/service/openai_gateway_responses_anthropic_native.go",
+        "backend/internal/service/openai_gateway_responses_chat_fallback.go",
+        "backend/internal/service/openai_gateway_upstream_error_billing_test.go",
+        "backend/internal/service/openai_stream_timeout_test.go"
+      ]
+    },
+    {
+      "sha": "1703d2cd4cb9f916666101af4cc5a4dc016080f0",
+      "subject": "fix(billing): keep the error source through the buffered parsers and later hosted-search rounds",
+      "categories": [
+        "billing_contract",
+        "protocol_commit_mixed"
+      ],
+      "paths": [
+        "backend/internal/handler/openai_dshosted_buffered_gaps_test.go",
+        "backend/internal/service/deepseek_hosted_buffered_sse_billing_test.go",
+        "backend/internal/service/openai_dshosted_buffered_gaps_test.go",
+        "backend/internal/service/openai_gateway_forward.go",
+        "backend/internal/service/openai_gateway_passthrough.go",
+        "backend/internal/service/openai_gateway_response_handling.go",
+        "backend/internal/service/openai_gateway_responses_anthropic_native.go"
+      ]
+    },
+    {
+      "sha": "182a865b6884b36919800ef907e3ed8d3ec75474",
+      "subject": "fix(billing): Gemini named error events, empty stops and aggregate exits",
+      "categories": [
+        "billing_contract",
+        "gemini_protocol"
+      ],
+      "paths": [
+        "backend/internal/handler/gemini_gaps3_billing_test.go",
+        "backend/internal/service/gemini_gaps3_billing_test.go",
+        "backend/internal/service/gemini_messages_compat_service.go",
+        "backend/internal/service/gemini_native_billing_test.go",
+        "backend/internal/service/gemini_native_openai_compat.go",
+        "backend/internal/service/gemini_response_signal.go"
+      ]
+    },
+    {
+      "sha": "afcd3b6001bd11eadcbb6d362d02f2b4aa659195",
+      "subject": "fix(deepseek): stream silence limit review follow-ups",
+      "categories": [
+        "billing_contract",
+        "decoder_close",
+        "protocol_commit_mixed",
+        "silence_policy"
+      ],
+      "paths": [
+        "backend/internal/handler/deepseek_stream_silence_review_test.go",
+        "backend/internal/handler/openai_alpha_search.go",
+        "backend/internal/handler/openai_embeddings.go",
+        "backend/internal/repository/deepseek_stream_silence_review_test.go",
+        "backend/internal/repository/http_upstream.go",
+        "backend/internal/service/deepseek_hosted_search.go",
+        "backend/internal/service/deepseek_stream_silence_concurrency_review_test.go",
+        "backend/internal/service/deepseek_stream_silence_review_test.go",
+        "backend/internal/service/deepseek_stream_silence_review_unit.go",
+        "backend/internal/service/openai_embeddings.go",
+        "backend/internal/service/openai_gateway_cc_pipeline.go",
+        "backend/internal/service/openai_gateway_chat_completions.go",
+        "backend/internal/service/openai_gateway_chat_completions_raw.go",
+        "backend/internal/service/openai_gateway_forward.go",
+        "backend/internal/service/openai_gateway_messages.go",
+        "backend/internal/service/openai_gateway_messages_chat_fallback.go",
+        "backend/internal/service/openai_gateway_passthrough.go",
+        "backend/internal/service/openai_gateway_response_handling.go",
+        "backend/internal/service/openai_gateway_responses_chat_fallback.go",
+        "backend/internal/service/openai_gateway_upstream_errors.go",
+        "backend/internal/service/openai_upstream_stream_silence.go",
+        "backend/internal/service/openai_ws_http_bridge.go"
+      ]
+    },
+    {
+      "sha": "34b6f29b0e776b012ef5ece230df51bc79a7c1d4",
+      "subject": "feat(account-ops): balance rules read the balance the account page shows; New API quota per the upstream contract",
+      "categories": [
+        "account_ops_absent",
+        "local_ui"
+      ],
+      "paths": [
+        "backend/internal/service/account_ops.go",
+        "backend/internal/service/account_ops_balance.go",
+        "backend/internal/service/account_ops_balance_refresh.go",
+        "backend/internal/service/account_ops_balance_test.go",
+        "backend/internal/service/account_ops_dependencies.go",
+        "backend/internal/service/upstream_balance_newapi.go",
+        "backend/internal/service/upstream_balance_newapi_test.go",
+        "backend/internal/service/upstream_balance_probe.go",
+        "backend/internal/service/upstream_balance_probe_test.go",
+        "backend/internal/service/upstream_billing_probe.go",
+        "backend/internal/service/upstream_kind_probe.go",
+        "backend/internal/service/upstream_kind_probe_test.go",
+        "frontend/src/api/admin/accountOps.ts",
+        "frontend/src/components/account/UpstreamBalanceCell.vue",
+        "frontend/src/components/account/__tests__/UpstreamBalanceCell.spec.ts",
+        "frontend/src/components/account/__tests__/UpstreamBalanceCell.upstream-balance.spec.ts",
+        "frontend/src/components/account/upstreamBalance.ts",
+        "frontend/src/components/admin/operations/AccountOpsRuleList.vue",
+        "frontend/src/components/admin/operations/__tests__/AccountOpsRuleList.upstream-balance.spec.ts",
+        "frontend/src/components/admin/operations/accountOps.en.ts",
+        "frontend/src/components/admin/operations/accountOps.zh.ts",
+        "frontend/src/i18n/locales/en/admin/accounts.ts",
+        "frontend/src/i18n/locales/zh/admin/accounts.ts",
+        "frontend/src/types/index.ts"
+      ]
+    },
+    {
+      "sha": "b6120a7ac79b98daee6150e1d864ceb4ef6e78ba",
+      "subject": "Merge branch 'fix/no-charge-gaps3-openai-20261118' into fix/no-charge-gaps3-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "c83b5513a2ee167b72b5632d442af4706e1b593e",
+      "subject": "Merge branch 'fix/no-charge-gaps3-dshosted-20261118' into fix/no-charge-gaps3-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "ba31833ec7ac8ee41cea87203149dd165280ddb1",
+      "subject": "Merge branch 'fix/no-charge-gaps3-gemini-20261118' into fix/no-charge-gaps3-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "b473e272efe19ac4afd7bfc05d1a054c26af2373",
+      "subject": "Merge branch 'fix/no-charge-gaps3-20261118' into feat/deepseek-stream-silence-limit-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "9c68222b59825891ba94a9ebf27c747ae66f9f3d",
+      "subject": "fix(deepseek): one error when the silence limit ends a Chat fallback stream",
+      "categories": [
+        "billing_contract"
+      ],
+      "paths": [
+        "backend/internal/service/openai_gateway_messages_chat_fallback.go",
+        "backend/internal/service/openai_gateway_responses_chat_fallback.go"
+      ]
+    },
+    {
+      "sha": "aa61f22e94da26bbcca773e650717a4a4a60b26a",
+      "subject": "feat(account-ops): notification channels use the owner's email and Bark by reference",
+      "categories": [
+        "account_ops_absent",
+        "excluded_wiring"
+      ],
+      "paths": [
+        "backend/cmd/server/wire.go",
+        "backend/cmd/server/wire_gen.go",
+        "backend/internal/handler/admin/account_ops_handler.go",
+        "backend/internal/handler/admin/account_ops_permissions_test.go",
+        "backend/internal/notify/account_ops_channels.go",
+        "backend/internal/notify/account_ops_channels_test.go",
+        "backend/internal/server/routes/account_ops_defaults_test.go",
+        "backend/internal/server/routes/operator_capabilities.go",
+        "backend/internal/service/account_ops.go",
+        "backend/internal/service/account_ops_admin_channels.go",
+        "backend/internal/service/account_ops_admin_channels_test.go",
+        "backend/internal/service/account_ops_config.go",
+        "backend/internal/service/account_ops_dependencies.go",
+        "backend/internal/service/account_ops_notification.go",
+        "backend/internal/service/account_ops_robot.go",
+        "backend/internal/service/account_ops_scoped.go",
+        "backend/internal/service/account_ops_test.go",
+        "backend/internal/service/account_ops_wire.go",
+        "frontend/src/api/admin/accountOps.ts",
+        "frontend/src/components/admin/operations/AccountOpsAdminChannels.vue",
+        "frontend/src/components/admin/operations/accountOps.en.ts",
+        "frontend/src/components/admin/operations/accountOps.zh.ts",
+        "frontend/src/views/admin/AccountOpsView.vue",
+        "frontend/src/views/admin/__tests__/AccountOpsView.spec.ts"
+      ]
+    },
+    {
+      "sha": "ab8aabd13ed9ac5f17c8b3fb350dcaff45aeb33c",
+      "subject": "Merge branch 'feat/newapi-balance-probe-20261118' into feat/ops-features-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "fc36bc65e298c274b920293a9b55caa30c904ae4",
+      "subject": "Merge branch 'feat/account-ops-admin-default-channels-20261118' into feat/ops-features-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "f641762ba10ed8ddab5042570b8942d3f1270ad1",
+      "subject": "fix(billing): drop the delivered-answer heuristics; explicit failure markers always win",
+      "categories": [
+        "billing_contract",
+        "protocol_commit_mixed"
+      ],
+      "paths": [
+        "backend/internal/handler/openai_dshosted_buffered_gaps_test.go",
+        "backend/internal/handler/openai_gaps3_r4_billing_test.go",
+        "backend/internal/handler/openai_gaps3_stream_billing_test.go",
+        "backend/internal/service/openai_dshosted_buffered_gaps_test.go",
+        "backend/internal/service/openai_gaps3_r4_envelope_test.go",
+        "backend/internal/service/openai_gaps3_r4_failure_priority_test.go",
+        "backend/internal/service/openai_gaps3_r4_test.go",
+        "backend/internal/service/openai_gateway_cc_pipeline.go",
+        "backend/internal/service/openai_gateway_chat_completions.go",
+        "backend/internal/service/openai_gateway_chat_completions_anthropic_native.go",
+        "backend/internal/service/openai_gateway_chat_completions_raw.go",
+        "backend/internal/service/openai_gateway_gaps3_stream_test.go",
+        "backend/internal/service/openai_gateway_messages.go",
+        "backend/internal/service/openai_gateway_messages_anthropic_native.go",
+        "backend/internal/service/openai_gateway_passthrough.go",
+        "backend/internal/service/openai_gateway_response_handling.go",
+        "backend/internal/service/openai_gateway_responses_anthropic_native.go",
+        "backend/internal/service/openai_gateway_upstream_error_billing_test.go",
+        "backend/internal/service/openai_gateway_upstream_errors.go"
+      ]
+    },
+    {
+      "sha": "117a45efe2386152eeb82d797c99fae1a6523645",
+      "subject": "fix(gemini): restore main's rule for withdrawing an upstream error; explicit errors win over choices",
+      "categories": [
+        "billing_contract",
+        "gemini_protocol"
+      ],
+      "paths": [
+        "backend/internal/handler/gemini_r4_billing_test.go",
+        "backend/internal/service/gemini_b2_billing_test.go",
+        "backend/internal/service/gemini_gaps3_billing_test.go",
+        "backend/internal/service/gemini_messages_compat_service.go",
+        "backend/internal/service/gemini_native_openai_compat.go",
+        "backend/internal/service/gemini_r4_billing_test.go"
+      ]
+    },
+    {
+      "sha": "4c9504458db56857ea1349e371c30223909ffcfa",
+      "subject": "Merge branch 'fix/no-charge-gaps3-r4-gemini-20261118' into fix/no-charge-gaps3-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "41c3fd99322e7b641c4b4f8da760497126f9149a",
+      "subject": "fix(deepseek): the silence limit respects a terminal that already arrived",
+      "categories": [
+        "billing_contract",
+        "protocol_commit_mixed",
+        "silence_policy"
+      ],
+      "paths": [
+        "backend/internal/service/deepseek_stream_silence_r4_test.go",
+        "backend/internal/service/openai_gateway_cc_pipeline.go",
+        "backend/internal/service/openai_gateway_chat_completions_raw.go",
+        "backend/internal/service/openai_gateway_passthrough.go",
+        "backend/internal/service/openai_gateway_response_handling.go",
+        "backend/internal/service/openai_upstream_stream_silence.go",
+        "backend/internal/service/openai_upstream_stream_silence_test.go"
+      ]
+    },
+    {
+      "sha": "68bb930d31f90a1375e8e7dbb7c1f9a43de2b821",
+      "subject": "Merge branch 'fix/no-charge-gaps3-20261118' into feat/deepseek-stream-silence-limit-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "91be65dacbcb71b72f79e036396d679845beb3fc",
+      "subject": "fix(account-ops): balance refresh reaches active accounts; a shared balance needs a proven shared wallet",
+      "categories": [
+        "account_ops_absent"
+      ],
+      "paths": [
+        "backend/internal/repository/account_ops_accounts.go",
+        "backend/internal/repository/account_ops_accounts_r4_test.go",
+        "backend/internal/repository/account_ops_notifications_r4_test.go",
+        "backend/internal/repository/account_ops_scan_r4_test.go",
+        "backend/internal/service/account_ops_balance.go",
+        "backend/internal/service/account_ops_balance_refresh.go",
+        "backend/internal/service/upstream_balance_baseline_r4_test.go",
+        "backend/internal/service/upstream_balance_newapi.go",
+        "backend/internal/service/upstream_balance_newapi_test.go",
+        "backend/internal/service/upstream_balance_r4_test.go",
+        "frontend/src/api/admin/accountOps.ts",
+        "frontend/src/components/admin/operations/AccountOpsRuleList.vue",
+        "frontend/src/components/admin/operations/__tests__/AccountOpsRuleList.r4.spec.ts",
+        "frontend/src/components/admin/operations/__tests__/AccountOpsRuleList.upstream-balance.spec.ts"
+      ]
+    },
+    {
+      "sha": "b27321a792231d2cbf2f5390fe93469371bb5260",
+      "subject": "Merge branch 'feat/newapi-balance-probe-20261118' into feat/ops-features-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "ea18dad0d23ba49958f00690f31ca1c7ef23212b",
+      "subject": "style(openai): spell the silence condition without a negated disjunction",
+      "categories": [
+        "billing_contract"
+      ],
+      "paths": [
+        "backend/internal/service/openai_gateway_passthrough.go"
+      ]
+    },
+    {
+      "sha": "5b104c4fd884878cd6dd6f365e27f0140b261f30",
+      "subject": "fix(models): reuse fresh catalog inside singleflight refresh",
+      "categories": [
+        "equivalent_models"
+      ],
+      "paths": [
+        "backend/internal/service/openai_codex_models_service.go",
+        "backend/internal/service/openai_models_list_test.go"
+      ]
+    },
+    {
+      "sha": "7d12e12cbd765a51a1e245ccdabd27708825014e",
+      "subject": "refactor(ops-center): five work areas, one shared navigation list, slimmer overview",
+      "categories": [
+        "account_ops_absent",
+        "local_ui"
+      ],
+      "paths": [
+        "frontend/dev/mock-api.spec.ts",
+        "frontend/dev/mock-api.ts",
+        "frontend/dev/operations-fixtures.ts",
+        "frontend/src/components/admin/monitor/MonitorFiltersBar.vue",
+        "frontend/src/components/admin/operations/accountOps.en.ts",
+        "frontend/src/components/admin/operations/accountOps.zh.ts",
+        "frontend/src/components/admin/operations/channelOps.en.ts",
+        "frontend/src/components/admin/operations/channelOps.zh.ts",
+        "frontend/src/components/admin/operations/opsNavigation.ts",
+        "frontend/src/components/admin/operations/serverlessMessages.ts",
+        "frontend/src/components/layout/AppHeader.vue",
+        "frontend/src/components/layout/AppSidebar.vue",
+        "frontend/src/components/layout/ConsoleNavigationSearch.vue",
+        "frontend/src/components/layout/OperationsAreaNav.vue",
+        "frontend/src/components/layout/__tests__/AppSidebar.spec.ts",
+        "frontend/src/components/layout/__tests__/ConsoleNavigationSearch.spec.ts",
+        "frontend/src/components/layout/__tests__/ConsoleSignal.spec.ts",
+        "frontend/src/components/layout/__tests__/OperationsAreaNav.spec.ts",
+        "frontend/src/features/channel-monitor-v2/MonitorSettingsPanel.vue",
+        "frontend/src/features/channel-monitor-v2/__tests__/MonitorSettingsPanel.spec.ts",
+        "frontend/src/features/channel-monitor-v2/__tests__/designSystem.structure.spec.ts",
+        "frontend/src/i18n/locales/en/admin/channels.ts",
+        "frontend/src/i18n/locales/en/admin/ops.ts",
+        "frontend/src/i18n/locales/en/common.ts",
+        "frontend/src/i18n/locales/en/index.ts",
+        "frontend/src/i18n/locales/en/opsCenter.ts",
+        "frontend/src/i18n/locales/zh/admin/channels.ts",
+        "frontend/src/i18n/locales/zh/admin/ops.ts",
+        "frontend/src/i18n/locales/zh/common.ts",
+        "frontend/src/i18n/locales/zh/index.ts",
+        "frontend/src/i18n/locales/zh/opsCenter.ts",
+        "frontend/src/router/records.ts",
+        "frontend/src/utils/__tests__/opsCenter.spec.ts",
+        "frontend/src/utils/opsCenter.ts",
+        "frontend/src/views/admin/ChannelMonitorView.vue",
+        "frontend/src/views/admin/ChannelOperationsView.vue",
+        "frontend/src/views/admin/ChannelsView.vue",
+        "frontend/src/views/admin/CredentialGuardView.vue",
+        "frontend/src/views/admin/ExcelGrantsView.vue",
+        "frontend/src/views/admin/MihomoView.vue",
+        "frontend/src/views/admin/ModelComparisonView.vue",
+        "frontend/src/views/admin/OpsAutomationView.vue",
+        "frontend/src/views/admin/OpsCenterView.vue",
+        "frontend/src/views/admin/UpstreamMonitorView.vue",
+        "frontend/src/views/admin/__tests__/ChannelOperationsView.spec.ts",
+        "frontend/src/views/admin/__tests__/OpsAutomationView.spec.ts",
+        "frontend/src/views/admin/__tests__/OpsCenterView.spec.ts",
+        "frontend/src/views/admin/__tests__/UpstreamMonitorView.spec.ts"
+      ]
+    },
+    {
+      "sha": "75e9d1c00c181f3d5d8533ef9326658a6e5ba903",
+      "subject": "refactor(ops): unify channel operations controls and preview fixtures",
+      "categories": [
+        "local_ui"
+      ],
+      "paths": [
+        "frontend/dev/channel-operations-fixtures.ts",
+        "frontend/dev/mock-api.spec.ts",
+        "frontend/dev/operations-fixtures.ts",
+        "frontend/src/components/admin/operations/channelOps.en.ts",
+        "frontend/src/components/admin/operations/channelOps.zh.ts",
+        "frontend/src/views/admin/ChannelOperationsView.vue",
+        "frontend/src/views/admin/__tests__/ChannelOperationsView.spec.ts"
+      ]
+    },
+    {
+      "sha": "2dcff83e55dd4172216d4c11684842db9d78d968",
+      "subject": "fix(ops): preserve notification audiences and retry email source changes",
+      "categories": [
+        "account_ops_absent"
+      ],
+      "paths": [
+        "backend/internal/service/account_ops.go",
+        "backend/internal/service/account_ops_admin_channels.go",
+        "backend/internal/service/account_ops_admin_channels_r5_test.go",
+        "backend/internal/service/account_ops_admin_channels_test.go",
+        "backend/internal/service/account_ops_balance_test.go",
+        "backend/internal/service/account_ops_config.go",
+        "backend/internal/service/account_ops_notification.go",
+        "backend/internal/service/account_ops_notification_test.go",
+        "backend/internal/service/account_ops_test.go",
+        "frontend/src/components/admin/operations/AccountOpsAdminChannels.vue",
+        "frontend/src/components/admin/operations/__tests__/AccountOpsAdminChannels.r5.spec.ts",
+        "frontend/src/components/admin/operations/accountOps.en.ts",
+        "frontend/src/components/admin/operations/accountOps.zh.ts"
+      ]
+    },
+    {
+      "sha": "8d1e67a0770b90038eb6e934d49af34c7b16080f",
+      "subject": "fix(gemini): recover Chat preludes and preserve SSE event order",
+      "categories": [
+        "billing_contract",
+        "gemini_protocol"
+      ],
+      "paths": [
+        "backend/internal/handler/gemini_r4_billing_test.go",
+        "backend/internal/service/gemini_messages_compat_service.go",
+        "backend/internal/service/gemini_native_openai_compat.go",
+        "backend/internal/service/gemini_r6_billing_test.go"
+      ]
+    },
+    {
+      "sha": "944b567e938f210abf74f34ac9b22007be0d585c",
+      "subject": "feat: retain small billed requests with bounded asynchronous capture",
+      "categories": [
+        "billing_contract",
+        "capture_excluded",
+        "excluded_wiring"
+      ],
+      "paths": [
+        ".github/workflows/backend-ci.yml",
+        "backend/internal/handler/admin/request_capture_handler.go",
+        "backend/internal/handler/admin/small_request_retention_handler.go",
+        "backend/internal/handler/admin/small_request_retention_handler_test.go",
+        "backend/internal/handler/openai_gateway_handler.go",
+        "backend/internal/handler/small_request_retention_test.go",
+        "backend/internal/pkg/httputil/body.go",
+        "backend/internal/requestcapture/small.go",
+        "backend/internal/requestcapture/small_content.go",
+        "backend/internal/requestcapture/small_store.go",
+        "backend/internal/requestcapture/small_store_integration_test.go",
+        "backend/internal/requestcapture/small_test.go",
+        "backend/internal/server/middleware/audit_log.go",
+        "backend/internal/server/middleware/request_capture.go",
+        "backend/internal/server/middleware/small_request_capture.go",
+        "backend/internal/server/middleware/small_request_capture_test.go",
+        "backend/internal/server/routes/admin.go",
+        "backend/internal/server/routes/gateway.go",
+        "backend/internal/service/gateway_usage_billing.go",
+        "backend/internal/service/openai_gateway_usage.go",
+        "backend/internal/service/request_capture.go",
+        "backend/internal/service/setting_service.go",
+        "backend/internal/service/small_request_retention.go",
+        "backend/internal/service/small_request_retention_test.go",
+        "backend/migrations/319_small_request_retention.sql"
+      ]
+    },
+    {
+      "sha": "573194c1578d79ad45bbfd75eac7a0b9c440b24b",
+      "subject": "feat: integrate small retention admin UI with v2 quota contract",
+      "categories": [
+        "capture_excluded",
+        "local_ui"
+      ],
+      "paths": [
+        "frontend/dev/mock-api.ts",
+        "frontend/dev/small-retention.spec.ts",
+        "frontend/dev/small-retention.ts",
+        "frontend/src/api/admin/requestCaptures.ts",
+        "frontend/src/api/admin/smallRequestRetention.ts",
+        "frontend/src/i18n/locales/en/admin/requestCapture.ts",
+        "frontend/src/i18n/locales/zh/admin/requestCapture.ts",
+        "frontend/src/router/records.ts",
+        "frontend/src/views/admin/RequestCaptureView.vue",
+        "frontend/src/views/admin/SmallRequestRetentionPanel.vue",
+        "frontend/src/views/admin/__tests__/RequestCaptureDiagnostics.spec.ts",
+        "frontend/src/views/admin/__tests__/SmallRequestRetention.spec.ts",
+        "frontend/src/views/admin/__tests__/smallRequestRetentionFormat.spec.ts",
+        "frontend/src/views/admin/smallRequestRetentionFormat.ts"
+      ]
+    },
+    {
+      "sha": "189d0250fedf52b92a066b5df8ce04ac4c7bce05",
+      "subject": "fix(ops): release failed balance probes and bind wallet proofs to routes",
+      "categories": [
+        "account_ops_absent"
+      ],
+      "paths": [
+        "backend/internal/service/account_ops_balance.go",
+        "backend/internal/service/upstream_balance_newapi.go",
+        "backend/internal/service/upstream_balance_newapi_test.go",
+        "backend/internal/service/upstream_balance_r4_test.go",
+        "backend/internal/service/upstream_balance_r5_test.go"
+      ]
+    },
+    {
+      "sha": "5eb81b7bd7bba20856aae7508bfe77f6a36fb79f",
+      "subject": "fix(frontend): make dashboard quick actions clickable again",
+      "categories": [
+        "dashboard_native",
+        "source_metadata"
+      ],
+      "paths": [
+        "Makefile",
+        "frontend/src/components/dashboard/DashboardQuickLinks.vue",
+        "frontend/src/components/dashboard/__tests__/DashboardQuickLinks.spec.ts"
+      ]
+    },
+    {
+      "sha": "90edb054d821eab39fafdbb66dddf9e07bd2d097",
+      "subject": "fix(capture): filter retained bodies and require PostgreSQL CI",
+      "categories": [
+        "capture_excluded",
+        "excluded_wiring"
+      ],
+      "paths": [
+        ".github/workflows/backend-ci.yml",
+        "backend/internal/requestcapture/filter.go",
+        "backend/internal/requestcapture/small_content.go",
+        "backend/internal/requestcapture/small_test.go",
+        "frontend/src/i18n/locales/en/admin/requestCapture.ts",
+        "frontend/src/i18n/locales/zh/admin/requestCapture.ts",
+        "frontend/src/views/admin/SmallRequestRetentionPanel.vue",
+        "frontend/src/views/admin/smallRequestRetentionFormat.ts"
+      ]
+    },
+    {
+      "sha": "531dfa0d4dec0c99deb0030a840406530c338979",
+      "subject": "fix(capture): preserve ordinary URLs and standard event framing",
+      "categories": [
+        "capture_excluded"
+      ],
+      "paths": [
+        "backend/internal/requestcapture/filter.go",
+        "backend/internal/requestcapture/small_content.go",
+        "backend/internal/requestcapture/small_test.go"
+      ]
+    },
+    {
+      "sha": "9eb7f37ae467a896d5633261862b996886972379",
+      "subject": "fix(gateway): observe parsed stream progress without read limits",
+      "categories": [
+        "billing_contract",
+        "protocol_commit_mixed",
+        "silence_policy"
+      ],
+      "paths": [
+        "backend/internal/service/deepseek_stream_silence_concurrency_review_test.go",
+        "backend/internal/service/deepseek_stream_silence_parser_test.go",
+        "backend/internal/service/openai_gateway_cc_pipeline.go",
+        "backend/internal/service/openai_gateway_chat_completions_anthropic_native.go",
+        "backend/internal/service/openai_gateway_chat_completions_raw.go",
+        "backend/internal/service/openai_gateway_grok_tool_protocol.go",
+        "backend/internal/service/openai_gateway_passthrough.go",
+        "backend/internal/service/openai_gateway_response_handling.go",
+        "backend/internal/service/openai_gateway_responses_anthropic_native.go",
+        "backend/internal/service/openai_gateway_upstream_errors.go",
+        "backend/internal/service/openai_release_regressions_test.go",
+        "backend/internal/service/openai_upstream_stream_silence.go",
+        "backend/internal/service/openai_upstream_stream_silence_test.go",
+        "backend/internal/service/openai_upstream_wait_limit.go",
+        "backend/internal/service/openai_ws_http_bridge.go"
+      ]
+    },
+    {
+      "sha": "54e3df2441a8c051b9095ce626b2adced5a4eec9",
+      "subject": "Merge pull request #399 from kiss-kedaya/feat/deepseek-stream-silence-limit-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "f8d80044e862080631aa4987815f08e2d1dc600f",
+      "subject": "Merge pull request #403 from kiss-kedaya/feat/ops-features-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "663b4c05ae9b370bb60d848b72fff541ebbecfba",
+      "subject": "Merge pull request #402 from kiss-kedaya/feat/small-request-retention-v2-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "8ba358f8c36bdf9f90e4cb0a5dec5dd0449df1dc",
+      "subject": "perf(auth): /auth/me 复用窗口 + 前端去重，砍掉四分之一 API 请求",
+      "categories": [
+        "auth_backend",
+        "auth_frontend",
+        "payment_absent"
+      ],
+      "paths": [
+        "backend/internal/handler/auth_current_user_cache.go",
+        "backend/internal/handler/auth_current_user_cache_test.go",
+        "backend/internal/handler/auth_handler.go",
+        "backend/internal/handler/user_handler_test.go",
+        "frontend/src/stores/__tests__/auth.spec.ts",
+        "frontend/src/stores/auth.ts",
+        "frontend/src/views/user/AffiliateView.vue",
+        "frontend/src/views/user/DepositView.vue",
+        "frontend/src/views/user/PaymentResultView.vue",
+        "frontend/src/views/user/PaymentView.vue",
+        "frontend/src/views/user/ProfileView.vue",
+        "frontend/src/views/user/RedeemView.vue"
+      ]
+    },
+    {
+      "sha": "de4968d0d4adc47da65ddd3f428d4baafa203f2e",
+      "subject": "Merge pull request #404 from kiss-kedaya/perf/auth-me-dedupe",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "8dc332277648613b5741053f6e4ea7cfc878a8a6",
+      "subject": "fix(capture): enforce the rolling 24-hour request window",
+      "categories": [
+        "capture_excluded"
+      ],
+      "paths": [
+        "backend/internal/requestcapture/small.go",
+        "backend/internal/requestcapture/small_store.go",
+        "backend/internal/requestcapture/small_store_integration_test.go",
+        "backend/internal/requestcapture/small_store_window.go",
+        "backend/internal/requestcapture/small_test.go",
+        "backend/internal/server/middleware/small_request_capture_test.go",
+        "backend/internal/service/small_request_retention_test.go",
+        "backend/migrations/320_small_request_retention_occurrences.sql",
+        "frontend/dev/small-retention.ts",
+        "frontend/src/api/admin/smallRequestRetention.ts",
+        "frontend/src/i18n/locales/en/admin/requestCapture.ts",
+        "frontend/src/i18n/locales/zh/admin/requestCapture.ts",
+        "frontend/src/views/admin/SmallRequestRetentionPanel.vue",
+        "frontend/src/views/admin/__tests__/SmallRequestRetention.spec.ts"
+      ]
+    },
+    {
+      "sha": "406ff109f61278e673fddb1f899c3aad99a21784",
+      "subject": "fix(billing): 密钥强制 1h 缓存时，上游漏报 ephemeral 明细按 1h 单价计费",
+      "categories": [
+        "billing_contract",
+        "cache_ttl_contract"
+      ],
+      "paths": [
+        "backend/internal/service/billing_cache_ttl_hint_test.go",
+        "backend/internal/service/billing_service.go",
+        "backend/internal/service/billing_token_cost_request.go",
+        "backend/internal/service/gateway_usage_billing.go"
+      ]
+    },
+    {
+      "sha": "03c274c6a4541e0536e8f183893919825af44c9a",
+      "subject": "Merge pull request #405 from kiss-kedaya/fix-small-retention-window-20261118",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "049a3982f60f998dd54b5a8b2cad23242660695d",
+      "subject": "fix(billing): 去掉未使用的旧入口，测试改用带 TTL 提示的实现",
+      "categories": [
+        "cache_ttl_contract"
+      ],
+      "paths": [
+        "backend/internal/service/billing_service.go",
+        "backend/internal/service/billing_service_test.go"
+      ]
+    },
+    {
+      "sha": "1cc753c08e1da26caeb269915b4871566ae10a07",
+      "subject": "chore: sync VERSION to 2.3.106 [skip ci]",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "sha": "41b17af9e91e920b193a5c240ab328ceb98688de",
+      "subject": "Merge pull request #406 from kiss-kedaya/fix/cache-1h-billing",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "ac9bc92452b7b701e0f455f67885f8730ce69042",
+      "subject": "docs: release notes for 2.3.106",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "docs/release-notes/v2.3.106.md"
+      ]
+    },
+    {
+      "sha": "44897f8811e905b2619742c9c66415fa375eb71f",
+      "subject": "docs: release notes for 2.3.107",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "docs/release-notes/v2.3.107.md"
+      ]
+    },
+    {
+      "sha": "0ffdfa76b70dbfddbc90fe9f72e7cc60d8014ec1",
+      "subject": "chore: sync VERSION to 2.3.107 [skip ci]",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "sha": "98488a08fd7ce2ef8860952e25cba04c0609a4af",
+      "subject": "perf(retention): 诊断类表统一 7 天保留（traces 14→7、user_traffic_events 新增 7 天、ops 默认 30→7）",
+      "categories": [
+        "diagnostic_tables_absent",
+        "ops_defaults"
+      ],
+      "paths": [
+        "backend/internal/repository/usage_connections.go",
+        "backend/internal/repository/usage_retention_test.go",
+        "backend/internal/service/ops_settings.go"
+      ]
+    },
+    {
+      "sha": "5f5d44718490e37386010aef3fd4f0f78d941134",
+      "subject": "test(ops): 默认保留 7 天，更新安全默认值断言",
+      "categories": [
+        "ops_defaults"
+      ],
+      "paths": [
+        "backend/internal/service/ops_cleanup_overlay_test.go"
+      ]
+    },
+    {
+      "sha": "d05e5fe2d0eb47a02c2d10a2a43ce839552f3262",
+      "subject": "Merge pull request #407 from kiss-kedaya/perf/retention-7d",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "4f1a14cd1946a7f54ef4f0058811498decf9d82c",
+      "subject": "docs: release notes for 2.3.108",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "docs/release-notes/v2.3.108.md"
+      ]
+    },
+    {
+      "sha": "2abe7ab6e7dbe04bc3cefb416827f44e44455821",
+      "subject": "chore: sync VERSION to 2.3.108 [skip ci]",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "sha": "eeb49499adeb6f9e2b389add042fc3f36a30353a",
+      "subject": "Merge pull request #401 from kiss-kedaya/agent/fix-dashboard-nav-buttons-b4b89cce62b0",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "0f0529d7d10ffdf8e22ab0080d5d6c90f69dd225",
+      "subject": "fix(monitor): align quality history chips left",
+      "categories": [
+        "quality_history"
+      ],
+      "paths": [
+        "frontend/src/components/user/monitor/ChannelMonitorV3QualityHistory.vue",
+        "frontend/src/components/user/monitor/__tests__/ChannelMonitorV3QualityHistory.spec.ts"
+      ]
+    },
+    {
+      "sha": "b59cb4dde8b478b62d656f0a24ed439f9c356bfa",
+      "subject": "Merge pull request #408 from kiss-kedaya/fix-quality-history-alignment-20261119",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "5f10c3dd0ff79772df22cc45424e36d6f565a6dd",
+      "subject": "chore: sync VERSION to 2.3.109 [skip ci]",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "sha": "3c98f51fb2b5ef8d1c907f5ea205ba47e0dd66f7",
+      "subject": "fix(usage): resume paginated exports after rate limits",
+      "categories": [
+        "export",
+        "source_metadata"
+      ],
+      "paths": [
+        "docs/release-notes/v2.3.110.md",
+        "frontend/src/api/__tests__/client.spec.ts",
+        "frontend/src/api/client.ts",
+        "frontend/src/i18n/locales/en/dashboard.ts",
+        "frontend/src/i18n/locales/zh/dashboard.ts",
+        "frontend/src/utils/__tests__/usageExport.spec.ts",
+        "frontend/src/utils/usageExport.ts",
+        "frontend/src/views/user/UsageView.vue",
+        "frontend/src/views/user/__tests__/UsageView.spec.ts"
+      ]
+    },
+    {
+      "sha": "4e993cb0b688eda5a6d17756512b8c0eb0ccd5aa",
+      "subject": "fix(usage): preserve retry timing for cookie sessions",
+      "categories": [
+        "export"
+      ],
+      "paths": [
+        "frontend/src/api/__tests__/client.spec.ts",
+        "frontend/src/api/client.ts"
+      ]
+    },
+    {
+      "sha": "c74ce2688c8e5e82e8bf0d5a8d5ecc37a832a177",
+      "subject": "Merge pull request #409 from kiss-kedaya/fix-usage-export-retry-20261119",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "1686101120e3c26f43f5811a806c40236a334ade",
+      "subject": "chore: sync VERSION to 2.3.110 [skip ci]",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "sha": "61a759675f53c3678a2616cde91c2d676bb29809",
+      "subject": "fix(gateway): isolate delegated payment runtime",
+      "categories": [
+        "excluded_wiring",
+        "payment_absent"
+      ],
+      "paths": [
+        "backend/cmd/server/payment_runtime.go",
+        "backend/cmd/server/payment_runtime_test.go",
+        "backend/cmd/server/wire.go",
+        "backend/cmd/server/wire_gen.go",
+        "backend/internal/config/config.go",
+        "backend/internal/config/delegate_payments_test.go",
+        "backend/internal/handler/wire.go",
+        "backend/internal/server/middleware/delegated_payment_routes.go",
+        "backend/internal/server/middleware/delegated_payment_routes_test.go",
+        "backend/internal/server/router.go",
+        "backend/internal/service/crypto_instance.go",
+        "backend/internal/service/setting_public.go",
+        "backend/internal/service/setting_service_public_test.go",
+        "backend/internal/service/wire.go",
+        "deploy/config.example.yaml"
+      ]
+    },
+    {
+      "sha": "d2f546faeaba8ce5462aae89168a838f8f923383",
+      "subject": "Merge pull request #410 from kiss-kedaya/standalone-gateway-runtime-b32a",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    },
+    {
+      "sha": "d1772fded9ff76eadf7cb641956b939c025e1aae",
+      "subject": "chore: sync VERSION to 2.3.112 [skip ci]",
+      "categories": [
+        "source_metadata"
+      ],
+      "paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "sha": "e814dfd9fcf37ccd5732f68d67cb8e65c152b420",
+      "subject": "fix(settings): refresh admin acknowledgement across gateways",
+      "categories": [
+        "compliance"
+      ],
+      "paths": [
+        "backend/internal/repository/setting_repo.go",
+        "backend/internal/repository/setting_repo_cache_test.go",
+        "backend/internal/service/admin_compliance.go"
+      ]
+    },
+    {
+      "sha": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+      "subject": "Merge pull request #411 from kiss-kedaya/fix-admin-compliance-replica-r7",
+      "categories": [
+        "merge_envelope"
+      ],
+      "paths": []
+    }
+  ],
+  "paths": [
+    {
+      "path": ".github/workflows/backend-ci.yml",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "Makefile",
+      "category": "source_metadata"
+    },
+    {
+      "path": "backend/cmd/server/VERSION",
+      "category": "source_metadata"
+    },
+    {
+      "path": "backend/cmd/server/payment_runtime.go",
+      "category": "payment_absent"
+    },
+    {
+      "path": "backend/cmd/server/payment_runtime_test.go",
+      "category": "payment_absent"
+    },
+    {
+      "path": "backend/cmd/server/wire.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/cmd/server/wire_gen.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/config/config.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/config/delegate_payments_test.go",
+      "category": "payment_absent"
+    },
+    {
+      "path": "backend/internal/handler/admin/account_ops_handler.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/handler/admin/account_ops_permissions_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/handler/admin/request_capture_handler.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/handler/admin/small_request_retention_handler.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/handler/admin/small_request_retention_handler_test.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/handler/auth_current_user_cache.go",
+      "category": "auth_backend"
+    },
+    {
+      "path": "backend/internal/handler/auth_current_user_cache_test.go",
+      "category": "auth_backend"
+    },
+    {
+      "path": "backend/internal/handler/auth_handler.go",
+      "category": "auth_backend"
+    },
+    {
+      "path": "backend/internal/handler/deepseek_stream_silence.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/handler/deepseek_stream_silence_review_test.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/handler/deepseek_stream_silence_test.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/handler/gemini_gaps3_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/handler/gemini_r4_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/handler/openai_alpha_search.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/handler/openai_dshosted_buffered_gaps_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/handler/openai_embeddings.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/handler/openai_gaps3_r4_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/handler/openai_gaps3_stream_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/handler/openai_gateway_handler.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/handler/small_request_retention_test.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/handler/user_handler_test.go",
+      "category": "auth_backend"
+    },
+    {
+      "path": "backend/internal/handler/wire.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/notify/account_ops_channels.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/notify/account_ops_channels_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/pkg/httputil/body.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/repository/account_ops_accounts.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/repository/account_ops_accounts_r4_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/repository/account_ops_notifications_r4_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/repository/account_ops_scan_r4_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/repository/deepseek_stream_silence_review_test.go",
+      "category": "decoder_close"
+    },
+    {
+      "path": "backend/internal/repository/http_upstream.go",
+      "category": "decoder_close"
+    },
+    {
+      "path": "backend/internal/repository/setting_repo.go",
+      "category": "compliance"
+    },
+    {
+      "path": "backend/internal/repository/setting_repo_cache_test.go",
+      "category": "compliance"
+    },
+    {
+      "path": "backend/internal/repository/usage_connections.go",
+      "category": "diagnostic_tables_absent"
+    },
+    {
+      "path": "backend/internal/repository/usage_retention_test.go",
+      "category": "diagnostic_tables_absent"
+    },
+    {
+      "path": "backend/internal/requestcapture/filter.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/requestcapture/small.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/requestcapture/small_content.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/requestcapture/small_store.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/requestcapture/small_store_integration_test.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/requestcapture/small_store_window.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/requestcapture/small_test.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/server/middleware/audit_log.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/server/middleware/delegated_payment_routes.go",
+      "category": "payment_absent"
+    },
+    {
+      "path": "backend/internal/server/middleware/delegated_payment_routes_test.go",
+      "category": "payment_absent"
+    },
+    {
+      "path": "backend/internal/server/middleware/request_capture.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/server/middleware/small_request_capture.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/server/middleware/small_request_capture_test.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/server/router.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/server/routes/account_ops_defaults_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/server/routes/admin.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/server/routes/gateway.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/server/routes/operator_capabilities.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/service/account_ops.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_admin_channels.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_admin_channels_r5_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_admin_channels_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_balance.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_balance_refresh.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_balance_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_config.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_dependencies.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_notification.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_notification_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_robot.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_scoped.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/account_ops_wire.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/admin_compliance.go",
+      "category": "compliance"
+    },
+    {
+      "path": "backend/internal/service/billing_cache_ttl_hint_test.go",
+      "category": "cache_ttl_contract"
+    },
+    {
+      "path": "backend/internal/service/billing_service.go",
+      "category": "cache_ttl_contract"
+    },
+    {
+      "path": "backend/internal/service/billing_service_test.go",
+      "category": "cache_ttl_contract"
+    },
+    {
+      "path": "backend/internal/service/billing_token_cost_request.go",
+      "category": "cache_ttl_contract"
+    },
+    {
+      "path": "backend/internal/service/crypto_instance.go",
+      "category": "payment_absent"
+    },
+    {
+      "path": "backend/internal/service/deepseek_hosted_buffered_sse_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/deepseek_hosted_search.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/deepseek_stream_silence_concurrency_review_test.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/deepseek_stream_silence_parser_test.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/deepseek_stream_silence_r4_test.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/deepseek_stream_silence_review_test.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/deepseek_stream_silence_review_unit.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/gateway_usage_billing.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/gemini_b2_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/gemini_gaps3_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/gemini_messages_compat_service.go",
+      "category": "gemini_protocol"
+    },
+    {
+      "path": "backend/internal/service/gemini_native_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/gemini_native_openai_compat.go",
+      "category": "gemini_protocol"
+    },
+    {
+      "path": "backend/internal/service/gemini_r4_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/gemini_r6_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/gemini_response_signal.go",
+      "category": "gemini_protocol"
+    },
+    {
+      "path": "backend/internal/service/openai_alpha_search.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_codex_models_service.go",
+      "category": "equivalent_models"
+    },
+    {
+      "path": "backend/internal/service/openai_dshosted_buffered_gaps_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_embeddings.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gaps3_r4_envelope_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gaps3_r4_failure_priority_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gaps3_r4_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_cc_pipeline.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions_anthropic_native.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions_raw.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_forward.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_gaps3_stream_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_grok_tool_protocol.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_messages.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_messages_anthropic_native.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_messages_chat_fallback.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_partial_usage.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_passthrough.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_response_flush_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_response_handling.go",
+      "category": "protocol_commit_mixed"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_responses_anthropic_native.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_responses_chat_fallback.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_upstream_error_billing_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_upstream_errors.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_usage.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_models_list_test.go",
+      "category": "equivalent_models"
+    },
+    {
+      "path": "backend/internal/service/openai_plugin_transport.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_release_regressions_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_stream_timeout_test.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/openai_upstream_stream_silence.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/openai_upstream_stream_silence_test.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/openai_upstream_wait_limit.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/openai_ws_http_bridge.go",
+      "category": "billing_contract"
+    },
+    {
+      "path": "backend/internal/service/ops_cleanup_overlay_test.go",
+      "category": "ops_defaults"
+    },
+    {
+      "path": "backend/internal/service/ops_settings.go",
+      "category": "ops_defaults"
+    },
+    {
+      "path": "backend/internal/service/request_capture.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/service/setting_public.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/service/setting_service.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/service/setting_service_public_test.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/internal/service/small_request_retention.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/service/small_request_retention_test.go",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/internal/service/upstream_balance_baseline_r4_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_balance_newapi.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_balance_newapi_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_balance_probe.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_balance_probe_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_balance_r4_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_balance_r5_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_billing_probe.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_kind_probe.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_kind_probe_test.go",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "backend/internal/service/upstream_response_limit.go",
+      "category": "silence_policy"
+    },
+    {
+      "path": "backend/internal/service/wire.go",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "backend/migrations/319_small_request_retention.sql",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "backend/migrations/320_small_request_retention_occurrences.sql",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "deploy/config.example.yaml",
+      "category": "excluded_wiring"
+    },
+    {
+      "path": "docs/release-notes/v2.3.106.md",
+      "category": "source_metadata"
+    },
+    {
+      "path": "docs/release-notes/v2.3.107.md",
+      "category": "source_metadata"
+    },
+    {
+      "path": "docs/release-notes/v2.3.108.md",
+      "category": "source_metadata"
+    },
+    {
+      "path": "docs/release-notes/v2.3.110.md",
+      "category": "source_metadata"
+    },
+    {
+      "path": "frontend/dev/channel-operations-fixtures.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/dev/mock-api.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/dev/mock-api.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/dev/operations-fixtures.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/dev/small-retention.spec.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/dev/small-retention.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/api/__tests__/client.spec.ts",
+      "category": "export"
+    },
+    {
+      "path": "frontend/src/api/admin/accountOps.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/api/admin/requestCaptures.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/api/admin/smallRequestRetention.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/api/client.ts",
+      "category": "export"
+    },
+    {
+      "path": "frontend/src/components/account/UpstreamBalanceCell.vue",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/account/__tests__/UpstreamBalanceCell.spec.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/account/__tests__/UpstreamBalanceCell.upstream-balance.spec.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/account/upstreamBalance.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/admin/monitor/MonitorFiltersBar.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/AccountOpsAdminChannels.vue",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/AccountOpsRuleList.vue",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/__tests__/AccountOpsAdminChannels.r5.spec.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/__tests__/AccountOpsRuleList.r4.spec.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/__tests__/AccountOpsRuleList.upstream-balance.spec.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/accountOps.en.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/accountOps.zh.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/channelOps.en.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/channelOps.zh.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/opsNavigation.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/admin/operations/serverlessMessages.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/dashboard/DashboardQuickLinks.vue",
+      "category": "dashboard_native"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/DashboardQuickLinks.spec.ts",
+      "category": "dashboard_native"
+    },
+    {
+      "path": "frontend/src/components/layout/AppHeader.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/layout/AppSidebar.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/layout/ConsoleNavigationSearch.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/layout/OperationsAreaNav.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/layout/__tests__/AppSidebar.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/layout/__tests__/ConsoleNavigationSearch.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/layout/__tests__/ConsoleSignal.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/layout/__tests__/OperationsAreaNav.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/components/user/monitor/ChannelMonitorV3QualityHistory.vue",
+      "category": "quality_history"
+    },
+    {
+      "path": "frontend/src/components/user/monitor/__tests__/ChannelMonitorV3QualityHistory.spec.ts",
+      "category": "quality_history"
+    },
+    {
+      "path": "frontend/src/features/channel-monitor-v2/MonitorSettingsPanel.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/features/channel-monitor-v2/__tests__/MonitorSettingsPanel.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/features/channel-monitor-v2/__tests__/designSystem.structure.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/admin/accounts.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/admin/channels.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/admin/ops.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/admin/requestCapture.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/common.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/dashboard.ts",
+      "category": "export"
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/index.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/en/opsCenter.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/admin/accounts.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/admin/channels.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/admin/ops.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/admin/requestCapture.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/common.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/dashboard.ts",
+      "category": "export"
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/index.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/i18n/locales/zh/opsCenter.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/router/records.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/stores/__tests__/auth.spec.ts",
+      "category": "auth_frontend"
+    },
+    {
+      "path": "frontend/src/stores/auth.ts",
+      "category": "auth_frontend"
+    },
+    {
+      "path": "frontend/src/types/index.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/utils/__tests__/opsCenter.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/utils/__tests__/usageExport.spec.ts",
+      "category": "export"
+    },
+    {
+      "path": "frontend/src/utils/opsCenter.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/utils/usageExport.ts",
+      "category": "export"
+    },
+    {
+      "path": "frontend/src/views/admin/AccountOpsView.vue",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/views/admin/ChannelMonitorView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/ChannelOperationsView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/ChannelsView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/CredentialGuardView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/ExcelGrantsView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/MihomoView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/ModelComparisonView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/OpsAutomationView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/OpsCenterView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/RequestCaptureView.vue",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/views/admin/SmallRequestRetentionPanel.vue",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/views/admin/UpstreamMonitorView.vue",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/AccountOpsView.spec.ts",
+      "category": "account_ops_absent"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/ChannelOperationsView.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/OpsAutomationView.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/OpsCenterView.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/RequestCaptureDiagnostics.spec.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/SmallRequestRetention.spec.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/UpstreamMonitorView.spec.ts",
+      "category": "local_ui"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/smallRequestRetentionFormat.spec.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/views/admin/smallRequestRetentionFormat.ts",
+      "category": "capture_excluded"
+    },
+    {
+      "path": "frontend/src/views/user/AffiliateView.vue",
+      "category": "auth_frontend"
+    },
+    {
+      "path": "frontend/src/views/user/DepositView.vue",
+      "category": "payment_absent"
+    },
+    {
+      "path": "frontend/src/views/user/PaymentResultView.vue",
+      "category": "payment_absent"
+    },
+    {
+      "path": "frontend/src/views/user/PaymentView.vue",
+      "category": "payment_absent"
+    },
+    {
+      "path": "frontend/src/views/user/ProfileView.vue",
+      "category": "auth_frontend"
+    },
+    {
+      "path": "frontend/src/views/user/RedeemView.vue",
+      "category": "auth_frontend"
+    },
+    {
+      "path": "frontend/src/views/user/UsageView.vue",
+      "category": "export"
+    },
+    {
+      "path": "frontend/src/views/user/__tests__/UsageView.spec.ts",
+      "category": "export"
+    }
+  ]
+}

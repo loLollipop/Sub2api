@@ -146,6 +146,13 @@ apiClient.interceptors.response.use(
     // Handle common errors
     if (error.response) {
       const { status, data } = error.response
+      const headers = error.response.headers
+      const rawRetryAfter = status === 429
+        ? (headers instanceof axios.AxiosHeaders
+          ? headers.get('Retry-After')
+          : Object.entries(headers ?? {}).find(([name]) => name.toLowerCase() === 'retry-after')?.[1])
+        : undefined
+      const retryAfter = typeof rawRetryAfter === 'string' || typeof rawRetryAfter === 'number' ? String(rawRetryAfter) : undefined
       const url = String(error.config?.url || '')
 
       // Validate `data` shape to avoid HTML error pages breaking our error handling.
@@ -291,6 +298,7 @@ apiClient.interceptors.response.use(
       // Return structured error
       return Promise.reject({
         status,
+        ...(retryAfter ? { retryAfter } : {}),
         code: apiData.code,
         reason: apiData.reason,
         error: apiData.error,

@@ -1002,7 +1002,7 @@ describe('admin UsageView model audit export', () => {
 	})
 
   it.each(['csv', 'xlsx'] as const)('keeps user formula text safe in %s', async format => {
-    exportList.mockResolvedValue({ items: [{ created_at: '2026-11-18T00:00:00Z', model: 'gpt-6.2-sol', request_type: 'sync', api_key_summary: { id: 2, name: '=1+1' }, actual_cost: -0.15 }], total: 1, pages: 1 })
+    exportList.mockResolvedValue({ items: [{ id: 1, created_at: '2026-11-18T00:00:00Z', model: 'gpt-6.2-sol', request_type: 'sync', api_key_summary: { id: 2, name: '=1+1' }, actual_cost: -0.15 }], total: 1, pages: 1 })
     const wrapper = mountRouteFilteredUsageView()
     vi.advanceTimersByTime(120)
     await flushPromises()
@@ -1014,7 +1014,7 @@ describe('admin UsageView model audit export', () => {
   })
 
   it.each(['csv', 'xlsx'] as const)('exports compact association names to %s', async format => {
-    exportList.mockResolvedValue({ items: [{ created_at: '2026-11-18T00:00:00Z', model: 'gpt-6.2-sol', request_type: 'sync', user_summary: { id: 1, email: 'compact@example.test' }, api_key_summary: { id: 2, name: 'Compact key' }, account_summary: { id: 3, name: 'Compact account' }, group_summary: { id: 4, name: 'Compact group' } }], total: 1, pages: 1 })
+    exportList.mockResolvedValue({ items: [{ id: 1, created_at: '2026-11-18T00:00:00Z', model: 'gpt-6.2-sol', request_type: 'sync', user_summary: { id: 1, email: 'compact@example.test' }, api_key_summary: { id: 2, name: 'Compact key' }, account_summary: { id: 3, name: 'Compact account' }, group_summary: { id: 4, name: 'Compact group' } }], total: 1, pages: 1 })
     const wrapper = mountRouteFilteredUsageView()
     vi.advanceTimersByTime(120)
     await flushPromises()

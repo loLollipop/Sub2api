@@ -193,7 +193,7 @@
           </div>
           <button v-if="activeTab !== 'errors'" type="button" @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
             <Icon name="download" size="sm" class="mr-2" />
-            {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
+            {{ t(exportWaiting ? 'usage.exportWaiting' : exporting ? 'usage.exporting' : 'usage.exportCsv') }}
           </button>
         </div>
       </div>
@@ -288,7 +288,7 @@ import Icon from '@/components/icons/Icon.vue'
 import UserErrorRequestsTable from '@/components/user/UserErrorRequestsTable.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
-import { fetchPaginatedItems } from '@/utils/paginatedItems'
+import { collectUsageForExport, isUsageExportRateLimited, UsageExportChangedError } from '@/utils/usageExport'
 import { getBillingModeLabel, getDisplayBillingMode as resolveDisplayBillingMode } from '@/utils/billingMode'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import type {
@@ -328,6 +328,8 @@ const chartsLoading = ref(false)
 const modelStatsLoading = ref(false)
 const endpointStatsLoading = ref(false)
 const exporting = ref(false)
+const exportWaiting = ref(false)
+let exportController: AbortController | undefined
 const errorRows = ref<UserErrorRequest[]>([])
 const errorLoading = ref(false)
 const errorPage = ref(1)
@@ -791,17 +793,23 @@ const escapeCSVValue = (value: unknown): string => {
 }
 
 const exportToCSV = async () => {
+  if (exporting.value) return
   if (pagination.total === 0) {
     appStore.showWarning(t('usage.noDataToExport'))
     return
   }
+  const controller = new AbortController()
+  exportController = controller
   exporting.value = true
   appStore.showInfo(t('usage.preparingExport'))
   try {
     const exportParams = { ...buildUsageListParams(1, 100), include_inflight: false }
-    const allLogs = await fetchPaginatedItems(
-      (page, pageSize) => usageAPI.query({ ...exportParams, page, page_size: pageSize }), 100
+    const allLogs = await collectUsageForExport(
+      (page, pageSize) => usageAPI.query({ ...exportParams, page, page_size: pageSize }, { signal: controller.signal }),
+      controller.signal,
+      waiting => { exportWaiting.value = waiting },
     )
+    controller.signal.throwIfAborted()
     if (allLogs.length === 0) {
       appStore.showWarning(t('usage.noDataToExport'))
       return
@@ -857,9 +865,18 @@ const exportToCSV = async () => {
     window.URL.revokeObjectURL(url)
     appStore.showSuccess(t('usage.exportSuccess'))
   } catch (error) {
-    console.error('CSV Export failed:', error)
-    appStore.showError(t('usage.exportFailed'))
+    if (controller.signal.aborted) return
+    if (isUsageExportRateLimited(error)) {
+      appStore.showError(t('usage.exportRateLimited'))
+    } else if (error instanceof UsageExportChangedError) {
+      appStore.showError(t('usage.exportRecordsChanged'))
+    } else {
+      console.error('CSV Export failed:', error)
+      appStore.showError(t('usage.exportFailed'))
+    }
   } finally {
+    exportController = undefined
+    exportWaiting.value = false
     exporting.value = false
   }
 }
@@ -1073,6 +1090,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  exportController?.abort()
   ++errorGeneration
   errorController?.abort()
   ++logsGeneration

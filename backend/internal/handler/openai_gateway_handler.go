@@ -2424,8 +2424,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "invalid JSON payload")
 		return
 	}
-	if openAIConflictingModels("application/json", firstMessage) {
-		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, service.ErrDuplicateModelField.Error())
+	if field, conflict := requestmodel.ConflictingField("application/json", firstMessage); conflict {
+		middleware2.MarkIngressRejected(c, middleware2.IngressRejectInvalidRequestFields)
+		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, fmt.Sprintf("websocket request payload declares field %.64q more than once", field))
 		return
 	}
 	reqModel := strings.TrimSpace(gjson.GetBytes(firstMessage, "model").String())
@@ -2945,8 +2946,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				if !gjson.ValidBytes(payload) {
 					return nil, service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", errors.New("invalid json"))
 				}
-				if openAIConflictingModels("application/json", payload) {
-					return nil, service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, service.ErrDuplicateModelField.Error(), service.ErrDuplicateModelField)
+				if field, conflict := requestmodel.ConflictingField("application/json", payload); conflict {
+					middleware2.MarkIngressRejected(c, middleware2.IngressRejectInvalidRequestFields)
+					return nil, service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, fmt.Sprintf("websocket request payload declares field %.64q more than once", field), nil)
 				}
 				// 分组级模型白名单：后续 turn 同样校验客户端模型（省略 model 时
 				// 沿用会话实际生效模型，含 session.update 轮换后的模型），不通过

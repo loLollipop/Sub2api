@@ -1961,6 +1961,7 @@ type openAIResponsesWSUsageLogCase struct {
 	// secondTurnCloseExpected：第二个 turn 被拒（连接被 1008 关闭）。
 	secondTurnCloseExpected bool
 	expectedCloseReason     string
+	midFrameCloseExpected   bool
 }
 
 type openAIResponsesWSUsageLogResult struct {
@@ -3194,7 +3195,8 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		require.Equal(t, coderws.StatusPolicyViolation, closeErr.Code)
 		require.True(t,
 			strings.Contains(closeErr.Reason, "not available for this group") ||
-				strings.Contains(closeErr.Reason, service.ErrDuplicateModelField.Error()),
+				strings.Contains(closeErr.Reason, service.ErrDuplicateModelField.Error()) ||
+				strings.Contains(closeErr.Reason, "more than once"),
 			closeErr.Reason)
 		if tc.expectedCloseReason != "" {
 			require.Equal(t, tc.expectedCloseReason, closeErr.Reason)
@@ -3218,6 +3220,17 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		err = clientConn.Write(writeCtx, coderws.MessageText, []byte(tc.midPayload))
 		cancelWrite()
 		require.NoError(t, err)
+		if tc.midFrameCloseExpected {
+			readCtx, cancelRead := context.WithTimeout(context.Background(), 3*time.Second)
+			_, _, readErr := clientConn.Read(readCtx)
+			cancelRead()
+			var closeErr coderws.CloseError
+			require.ErrorAs(t, readErr, &closeErr)
+			require.Equal(t, coderws.StatusPolicyViolation, closeErr.Code)
+			require.Equal(t, tc.expectedCloseReason, closeErr.Reason)
+			_ = clientConn.CloseNow()
+			return openAIResponsesWSUsageLogResult{}
+		}
 		readCompleted()
 	}
 	if strings.TrimSpace(tc.secondPayload) != "" && (turnCount >= 2) {
@@ -3235,7 +3248,8 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 			require.Equal(t, coderws.StatusPolicyViolation, closeErr.Code)
 			require.True(t,
 				strings.Contains(closeErr.Reason, "not available for this group") ||
-					strings.Contains(closeErr.Reason, service.ErrDuplicateModelField.Error()),
+					strings.Contains(closeErr.Reason, service.ErrDuplicateModelField.Error()) ||
+					strings.Contains(closeErr.Reason, "more than once"),
 				closeErr.Reason)
 			if tc.expectedCloseReason != "" {
 				require.Equal(t, tc.expectedCloseReason, closeErr.Reason)

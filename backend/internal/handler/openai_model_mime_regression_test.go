@@ -94,7 +94,7 @@ func TestOpenAIResponsesWebSocket_ConflictingModelsRejectedWithAllowlistDisabled
 						firstPayload:        `{"type":"response.create","model":"gpt-5.4","stream":false}`,
 						group:               wsAllowlistGroup(false, "gpt-5.4"),
 						ingressMode:         mode,
-						expectedCloseReason: service.ErrDuplicateModelField.Error(),
+						expectedCloseReason: `websocket request payload declares field "model" more than once`,
 					}
 					conflict := `{"type":"response.create","model":"gpt-5.4","model":"gpt-4.1","stream":false}`
 					if stage == "first frame" {
@@ -119,7 +119,7 @@ func TestOpenAIResponsesWebSocket_DeepSeekDedupeDoesNotHideConflictingModels(t *
 				secondPayload:           `{"type":"response.create","model":"deepseek-v4","model":"deepseek-v3","stream":false,"input":[{"type":"function_call","call_id":"call_a","name":"do","arguments":"{}"},{"type":"function_call","call_id":"call_a","name":"do","arguments":"{}"}]}`,
 				group:                   wsAllowlistGroup(false, "gpt-5.4"),
 				ingressMode:             mode,
-				expectedCloseReason:     service.ErrDuplicateModelField.Error(),
+				expectedCloseReason:     `websocket request payload declares field "model" more than once`,
 				secondTurnCloseExpected: true,
 			})
 		})

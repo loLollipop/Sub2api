@@ -2,29 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.113",
-  "imported_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+  "imported_version": "2.3.117",
+  "imported_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.113",
-  "latest_observed_release_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
-  "latest_observed_main_commit": "8850d92d6d090c3148d6563109cf8c3f095b27cc",
+  "latest_observed_version": "2.3.117",
+  "latest_observed_release_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+  "latest_observed_main_commit": "c0b98f46bc90f89be896aa3909d7b3cac095ecae",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.113",
-  "reviewed_release_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+  "reviewed_release_tag": "v2.3.117",
+  "reviewed_release_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
   "observed_delta_review": {
-    "from_commit": "3b3f324c3a8f4032aca7fa86ecafdd32747cffc8",
-    "to_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
-    "status": "formal_v23113_selective_backport",
-    "scope": "Retry-After export continuation and observable pagination drift for user/admin, session-owned auth query coalescing with forced mutation reads, left-aligned quality history, cross-gateway acknowledgement negative-cache fix, Gemini error-prelude recovery/named errors, safe decoder close, terminal protocol-response commitment and default Ops error retention. Native billing/routing/theme retained.",
-    "review_depth": "Complete 69-commit/256-path inventory and module decisions; selected slices and concrete conflicts reviewed at code level; deferred runtime is not all line-by-line audited.",
-    "evidence": "maintenance/notes/upstream-sync-20261120-v23113.md",
-    "selection_ledger": "maintenance/notes/upstream-selection-ledger-20261120-v23113.json"
+    "from_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+    "to_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+    "status": "formal_v23117_selective_backport",
+    "scope": "GPT-6.2 Codex cacheable developer prefix, Gemini tier provider-scoped price matching and HTTP/WebSocket duplicate-field guards; retain local billing/routing/theme.",
+    "review_depth": "Complete 15-commit/16-path inventory; selected source slices, local contracts and companion original security changes reviewed.",
+    "evidence": "maintenance/notes/upstream-sync-20261120-v23117.md",
+    "selection_ledger": "maintenance/notes/upstream-selection-ledger-20261120-v23117.json"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+    "source_head": "13674d757916d41ef6bac6f9269ff61afe430f8e",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -32,6 +32,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.114-v2.3.117: GPT-6.2 cacheable stable guidance, provider-scoped Gemini tier prices and duplicate-field ingress protection with original v0.2.24 WebSocket companion guards. Preserve local static pricing, Carbon tiered aliases, body budgets, privacy and VERSION2.1.69. Regression and Linux backend build passed; see maintenance/notes/upstream-sync-20261120-v23117.md.",
       "Formal v2.3.106-v2.3.113: bounded Retry-After export continuation and drift checks for both roles; session-owned auth coalescing/force/visibility, quality-history left alignment, cross-gateway acknowledgement visibility, Gemini prelude recovery/named-error priority, decoder-close synchronization and explicit terminal-response commitment. Default Ops error retention7d preserves explicit zero/settings. Native billing/routing/theme and VERSION2.1.68 retained. See maintenance/notes/upstream-sync-20261120-v23113.md.",
       "Formal v2.3.90-v2.3.105: CC Switch model/usage URL normalization (no browser globals required by exported script), shared real-time monitor slots and chronological quality history, 1000-row Excel export with bounded transient retries and cancellation. Native billing/theme retained. See maintenance/notes/upstream-sync-20261118.md.",
       "Formal v2.3.77-v2.3.89: separate editable registration fields from consent-gated actions; add default-false OpenAI transport cooldown opt-out preserving prior blocks/failover/custom-code policy; adapt checked-fields-only key bulk edits with explicit zero, expiry clearing and smart-route replacement. Keep local /hub UA, protocols, billing and theme. See maintenance/notes/upstream-sync-20261116-v2389.md.",
@@ -1487,5 +1488,88 @@
       ]
     },
     "publication": "User subsequently authorized GitHub submission and deployment as personal v2.1.69 via PR73; update_source_baselines.go checkpoints aligned with this formal release after the consistency regression exposed stale constants. Final CI, artifacts, backup/isolated restore and production acceptance recorded separately."
+  },
+  "fork_sync_20261120_v23117": {
+    "baseline_head": "0ae7e03753d40ca867610bff468bcf5a3787151d",
+    "source_release": "v2.3.117",
+    "source_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+    "observed_main_not_imported": "c0b98f46bc90f89be896aa3909d7b3cac095ecae",
+    "source_commits": 15,
+    "source_nonmerge_commits": 11,
+    "source_paths": 16,
+    "personal_version": "2.1.69",
+    "note": "maintenance/notes/upstream-sync-20261120-v23117.md",
+    "ledger": "maintenance/notes/upstream-selection-ledger-20261120-v23117.json",
+    "implemented": [
+      "GPT-6.2 cacheable stable developer-prefix guidance and turn-scoped instructions",
+      "Gemini exact-tier/same-provider base pricing",
+      "Duplicate fields rejected across local HTTP gateway chains and WebSocket ingress/continuation/passthrough frames"
+    ],
+    "local_adaptations": [
+      "Keep stronger local requestmodel JSON/multipart candidate parsing rather than replacing it with upstream.",
+      "Honor shared body-memory budget 503/Retry-After and cancellation 499 before field-scanner error classification.",
+      "Apply text route limit before the newly introduced early body read.",
+      "Protect WebSocket common ingress and every passthrough client frame, including session.update, before rewrite/transport.",
+      "Retain Carbon/Argon tiered aliases, static local pricing and real usage/cache billing policies.",
+      "Prevent local static billing fallback from crossing explicit provider-qualified Gemini thinking-tier namespaces; retain bare-model and Google-resource fallback cards."
+    ],
+    "not_applicable": [
+      "Explicit auto-whitelist toggle fix belongs to an absent runtime/caller; no automatic-whitelist subsystem imported."
+    ],
+    "companion_original_security": {
+      "repository": "Wei-Shaw/sub2api",
+      "release": "v0.2.24",
+      "commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+      "scope": "WebSocket first/subsequent/all-frame duplicate guards and security regression tests; not a complete v0.2.24 sync.",
+      "reviewed_release_checkpoint_retained": "v0.2.23",
+      "source_commits": [
+        "2b67d1ede",
+        "d270d6434",
+        "ce86c1b30",
+        "263a13f16",
+        "a436766de"
+      ]
+    },
+    "verification": {
+      "status": "passed_with_existing_unrelated_skip",
+      "directory": ".artifacts/sync-20261120-latest",
+      "passed_top_level": 1782,
+      "passed_test_and_subtest_events": 4375,
+      "full_packages": [
+        "internal/pkg/requestmodel",
+        "internal/server/middleware",
+        "internal/server/routes"
+      ],
+      "targeted_packages": [
+        "internal/handler",
+        "internal/service"
+      ],
+      "existing_skipped_test": {
+        "name": "TestGatewayModels_CodexGeminiGroupListsAntigravityGeminiMappings",
+        "reason": "Existing skip for original/fork model-listing policy conflict; unrelated to the imported cache, pricing and duplicate-field changes."
+      },
+      "backend_build": "PASS: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/server (without embedded frontend assets)",
+      "diff_check": "PASS",
+      "preservation": {
+        "head": "0ae7e03753d40ca867610bff468bcf5a3787151d",
+        "index_unchanged": true,
+        "personal_version": "2.1.69",
+        "protected_untracked_files": 3,
+        "unchanged_sql_migrations": 331
+      },
+      "limits": [
+        "No frontend checks: no frontend source or dependency changes.",
+        "No live PostgreSQL/Redis integration, upstream-provider traffic or race instrumentation in this run."
+      ],
+      "accepted_evidence": [
+        "backend-gateway-final.jsonl",
+        "backend-handler-final.jsonl",
+        "backend-service-final.jsonl",
+        "backend-build.log",
+        "test-and-preservation-results.json",
+        "final-acceptance-results.json"
+      ]
+    },
+    "publication": "User subsequently authorized GitHub submission and deployment as personal v2.1.70. Final PR/CI, artifact identity, backup/isolated restore and production acceptance are recorded separately in development/diagnostics/sub2api-release-v2170-20261120/; synchronization-time evidence remains unchanged."
   }
 }

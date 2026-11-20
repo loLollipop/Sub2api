@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-20",
+  "source_repository": "kiss-kedaya/sub2api",
+  "from_release": "v2.3.113",
+  "from_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
+  "to_release": "v2.3.117",
+  "to_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+  "observed_main_not_imported": "c0b98f46bc90f89be896aa3909d7b3cac095ecae",
+  "source_commit_count": 15,
+  "source_path_count": 16,
+  "personal_version": "2.1.69",
+  "baseline_head": "0ae7e03753d40ca867610bff468bcf5a3787151d",
+  "commits": [
+    {
+      "commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+      "subject": "fix(admin): honor explicit model auto-sync toggle (#421)",
+      "decision": "not_applicable_runtime_absent"
+    },
+    {
+      "commit": "bc3c9b77aa1e334afee8945cf2890c4d4a5d8bb6",
+      "subject": "chore: sync VERSION to 2.3.116 [skip ci]",
+      "decision": "source_release_metadata"
+    },
+    {
+      "commit": "14c0a67c7a289da4cab17ce81d676fb44ce6ae6a",
+      "subject": "docs: release notes for 2.3.116 (security only)",
+      "decision": "source_release_metadata"
+    },
+    {
+      "commit": "430ae00d6042e34175329f9f9a389a765f91a592",
+      "subject": "Merge pull request #419 from kiss-kedaya/fix/duplicate-field-rce",
+      "decision": "merge_ancestry_reviewed"
+    },
+    {
+      "commit": "65d42da96c74a1485a733f18c925c2380e12e3f3",
+      "subject": "fix(gateway): reject duplicate request fields (GHSA-p3r4-jcm3-2hph)",
+      "decision": "selected_behavior_or_test"
+    },
+    {
+      "commit": "920b9a2519e5086374bdf4fcee8fc048f98b1be3",
+      "subject": "chore: sync VERSION to 2.3.115 [skip ci]",
+      "decision": "source_release_metadata"
+    },
+    {
+      "commit": "e999e2eef7df20df12640fb2b0819825528a7c19",
+      "subject": "chore: sync VERSION to 2.3.114 [skip ci]",
+      "decision": "source_release_metadata"
+    },
+    {
+      "commit": "8850d92d6d090c3148d6563109cf8c3f095b27cc",
+      "subject": "Merge pull request #413 from kiss-kedaya/fix-gemini-thinking-tier-pricing-r12",
+      "decision": "merge_ancestry_reviewed"
+    },
+    {
+      "commit": "fff516ed362baa8957d3bcd77f4b28e7ea067b03",
+      "subject": "Merge branch 'main' into fix-gemini-thinking-tier-pricing-r12",
+      "decision": "merge_ancestry_reviewed"
+    },
+    {
+      "commit": "86b3f8edbec0fb88ee5245713f8a986b04086c2e",
+      "subject": "Merge pull request #412 from kiss-kedaya/fix-gpt62-cache-prefix-8930",
+      "decision": "merge_ancestry_reviewed"
+    },
+    {
+      "commit": "0fd1ca9de3bc6ba635ebebf1fc3e31abe3f85a27",
+      "subject": "fix(pricing): keep thinking tier fallback provider-scoped",
+      "decision": "selected_behavior_or_test"
+    },
+    {
+      "commit": "e9a4509438634159d1d7dab8efbed0c4c967dc1b",
+      "subject": "test: format Gemini pricing fixture",
+      "decision": "selected_behavior_or_test"
+    },
+    {
+      "commit": "86c60ba900e3f3885786d5e86e912d1f1b5134af",
+      "subject": "fix(pricing): match Gemini thinking tiers to base quotes",
+      "decision": "selected_behavior_or_test"
+    },
+    {
+      "commit": "1b13f0a0b79144bf4500419d583f3d2a8508180e",
+      "subject": "fix(openai): keep GPT-6.2 Codex guidance cacheable",
+      "decision": "selected_behavior_or_test"
+    },
+    {
+      "commit": "50ab316b3353771e0610f69e5123091e9a0595bd",
+      "subject": "chore: sync VERSION to 2.3.113 [skip ci]",
+      "decision": "source_release_metadata"
+    }
+  ],
+  "paths": [
+    {
+      "path": "backend/cmd/server/VERSION",
+      "decision": "source_release_metadata",
+      "reason": "Keep personal VERSION 2.1.69; source checkpoint is tracked separately."
+    },
+    {
+      "path": "backend/internal/pkg/requestmodel/conflict.go",
+      "decision": "adapted",
+      "reason": "Duplicate-field guard before rewrites on every local gateway chain; preserve request-body memory/read errors, native protocols and early text limits."
+    },
+    {
+      "path": "backend/internal/pkg/requestmodel/conflict_test.go",
+      "decision": "adapted",
+      "reason": "Duplicate-field guard before rewrites on every local gateway chain; preserve request-body memory/read errors, native protocols and early text limits."
+    },
+    {
+      "path": "backend/internal/server/middleware/ingress_reject.go",
+      "decision": "adapted",
+      "reason": "Duplicate-field guard before rewrites on every local gateway chain; preserve request-body memory/read errors, native protocols and early text limits."
+    },
+    {
+      "path": "backend/internal/server/middleware/request_field_conflict.go",
+      "decision": "adapted",
+      "reason": "Duplicate-field guard before rewrites on every local gateway chain; preserve request-body memory/read errors, native protocols and early text limits."
+    },
+    {
+      "path": "backend/internal/server/middleware/request_field_conflict_test.go",
+      "decision": "adapted",
+      "reason": "Duplicate-field guard before rewrites on every local gateway chain; preserve request-body memory/read errors, native protocols and early text limits."
+    },
+    {
+      "path": "backend/internal/server/routes/gateway.go",
+      "decision": "adapted",
+      "reason": "Duplicate-field guard before rewrites on every local gateway chain; preserve request-body memory/read errors, native protocols and early text limits."
+    },
+    {
+      "path": "backend/internal/service/account_model_whitelist_auto_sync.go",
+      "decision": "not_applicable",
+      "reason": "This runtime and its preserveManagedAccountExtra caller are absent locally under the recorded automatic-whitelist exclusion; importing the whole subsystem is not required for its toggle fix."
+    },
+    {
+      "path": "backend/internal/service/account_model_whitelist_auto_sync_test.go",
+      "decision": "not_applicable",
+      "reason": "This runtime and its preserveManagedAccountExtra caller are absent locally under the recorded automatic-whitelist exclusion; importing the whole subsystem is not required for its toggle fix."
+    },
+    {
+      "path": "backend/internal/service/gemini_thinking_tier_pricing_test.go",
+      "decision": "adapted",
+      "reason": "Exact tier quote then same-provider base quote; preserve local Carbon tiered aliases and explicit local fallback cards."
+    },
+    {
+      "path": "backend/internal/service/openai_codex_cache_prefix_8930_test.go",
+      "decision": "adopted",
+      "reason": "GPT-6.2 stable developer guidance prefix and turn-scoped instructions; preserve continuation, passthrough and legacy-model behavior."
+    },
+    {
+      "path": "backend/internal/service/openai_codex_instructions_template.go",
+      "decision": "adopted",
+      "reason": "GPT-6.2 stable developer guidance prefix and turn-scoped instructions; preserve continuation, passthrough and legacy-model behavior."
+    },
+    {
+      "path": "backend/internal/service/openai_codex_transform.go",
+      "decision": "adopted",
+      "reason": "GPT-6.2 stable developer guidance prefix and turn-scoped instructions; preserve continuation, passthrough and legacy-model behavior."
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_forward.go",
+      "decision": "adopted",
+      "reason": "GPT-6.2 stable developer guidance prefix and turn-scoped instructions; preserve continuation, passthrough and legacy-model behavior."
+    },
+    {
+      "path": "backend/internal/service/pricing_service.go",
+      "decision": "adapted",
+      "reason": "Exact tier quote then same-provider base quote; preserve local Carbon tiered aliases and explicit local fallback cards."
+    },
+    {
+      "path": "docs/release-notes/v2.3.116.md",
+      "decision": "documented_locally",
+      "reason": "Source release note content represented in this dated synchronization note; do not copy a foreign personal release note."
+    }
+  ],
+  "companion_original_security": {
+    "repository": "Wei-Shaw/sub2api",
+    "release": "v0.2.24",
+    "commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+    "scope": "WebSocket first/subsequent/all-frame duplicate guards and security regression tests; not a complete v0.2.24 sync.",
+    "reviewed_release_checkpoint_retained": "v0.2.23",
+    "source_commits": [
+      "2b67d1ede",
+      "d270d6434",
+      "ce86c1b30",
+      "263a13f16",
+      "a436766de"
+    ]
+  },
+  "local_adaptations": [
+    "Keep stronger local requestmodel JSON/multipart candidate parsing rather than replacing it with upstream.",
+    "Honor shared body-memory budget 503/Retry-After and cancellation 499 before field-scanner error classification.",
+    "Apply text route limit before the newly introduced early body read.",
+    "Protect WebSocket common ingress and every passthrough client frame, including session.update, before rewrite/transport.",
+    "Retain Carbon/Argon tiered aliases, static local pricing and real usage/cache billing policies.",
+    "Prevent local static billing fallback from crossing explicit provider-qualified Gemini thinking-tier namespaces; retain bare-model and Google-resource fallback cards."
+  ],
+  "preserved": [
+    "Personal VERSION 2.1.69",
+    "Existing SQL migrations byte-for-byte",
+    "Three preexisting untracked regression files",
+    "Local UI/theme and routing",
+    "Real usage/cache buckets, upstream multipliers and privacy policy"
+  ],
+  "verification": {
+    "status": "passed_with_existing_unrelated_skip",
+    "directory": ".artifacts/sync-20261120-latest",
+    "passed_top_level": 1782,
+    "passed_test_and_subtest_events": 4375,
+    "full_packages": [
+      "internal/pkg/requestmodel",
+      "internal/server/middleware",
+      "internal/server/routes"
+    ],
+    "targeted_packages": [
+      "internal/handler",
+      "internal/service"
+    ],
+    "existing_skipped_test": {
+      "name": "TestGatewayModels_CodexGeminiGroupListsAntigravityGeminiMappings",
+      "reason": "Existing skip for original/fork model-listing policy conflict; unrelated to the imported cache, pricing and duplicate-field changes."
+    },
+    "backend_build": "PASS: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/server (without embedded frontend assets)",
+    "diff_check": "PASS",
+    "preservation": {
+      "head": "0ae7e03753d40ca867610bff468bcf5a3787151d",
+      "index_unchanged": true,
+      "personal_version": "2.1.69",
+      "protected_untracked_files": 3,
+      "unchanged_sql_migrations": 331
+    },
+    "limits": [
+      "No frontend checks: no frontend source or dependency changes.",
+      "No live PostgreSQL/Redis integration, upstream-provider traffic or race instrumentation in this run."
+    ],
+    "accepted_evidence": [
+      "backend-gateway-final.jsonl",
+      "backend-handler-final.jsonl",
+      "backend-service-final.jsonl",
+      "backend-build.log",
+      "test-and-preservation-results.json",
+      "final-acceptance-results.json"
+    ]
+  },
+  "publication": "User subsequently authorized GitHub submission and deployment as personal v2.1.70. Final PR/CI, artifact identity, backup/isolated restore and production acceptance are recorded separately in development/diagnostics/sub2api-release-v2170-20261120/; synchronization-time evidence remains unchanged."
+}

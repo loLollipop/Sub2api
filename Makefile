@@ -38,6 +38,10 @@ FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/redeem.spec.ts \
 	src/views/auth/__tests__/LinuxDoCallbackView.spec.ts \
 	src/views/auth/__tests__/WechatCallbackView.spec.ts \
+	src/views/auth/__tests__/OAuthCallbackView.spec.ts \
+	src/views/auth/__tests__/OidcCallbackView.spec.ts \
+	src/utils/__tests__/accountUsageRefresh.spec.ts \
+	src/utils/__tests__/upstreamFailure.spec.ts \
 	src/views/user/__tests__/PaymentView.spec.ts \
 	src/components/payment/__tests__/ExternalShopRecharge.spec.ts \
 	src/router/__tests__/feature-access.spec.ts \

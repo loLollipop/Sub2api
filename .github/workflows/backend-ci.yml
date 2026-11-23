@@ -132,6 +132,10 @@ jobs:
         working-directory: backend
         run: go test -race -p 1 -parallel 1 -tags=unit ./internal/pkg/requestmodel ./internal/server/middleware ./internal/server/routes ./internal/handler ./internal/service -run 'Test.*(Conflicting|Duplicate|GPT62CachePrefix|Gemini4ThinkingTier|GatewayRoutesMultipart|GatewayRoutesBOM|GatewayRoutesTextBodyLimit)' -count=1
 
+      - name: Dual-source login, rotation and buffered protocol regression
+        working-directory: backend
+        run: go test -race -p 1 -parallel 1 -tags=unit ./internal/pkg/ip ./internal/pkg/apicompat ./internal/repository ./internal/service ./internal/handler ./internal/server/middleware -run 'Test(.*Login.*TOTP|.*TotpLogin|.*OAuth.*TOTP|.*OpenAI.*(Persist|Credentials|Rotat)|RefreshIfNeeded.*OpenAI|TokenRefreshService.*OpenAI|CustomForwardedFor|GetClientIP|GetSecurityClientIP|EnforceStepUp|NormalizeCodex|OpenAIResponses_CodexUntrustedContext|ApplyNativeToolSearch|ForwardAsAnthropic_.*ToolSearch|BufferedCompat|ReadOpenAICompatBufferedTerminal|.*BodyBudget|AntigravityRetryLoop_Bare429)' -count=1
+
   frontend:
     runs-on: ubuntu-latest
     steps:

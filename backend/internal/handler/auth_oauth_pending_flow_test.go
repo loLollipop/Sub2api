@@ -3542,9 +3542,12 @@ func (s *oauthPendingFlowDefaultSubAssignerStub) AssignOrExtendSubscription(
 }
 
 type oauthPendingFlowTotpCacheStub struct {
-	setupSessions  map[int64]*service.TotpSetupSession
-	loginSessions  map[string]*service.TotpLoginSession
-	verifyAttempts map[int64]int
+	loginMarkerErr  error
+	consumeLoginErr error
+	usedLoginCodes  map[string]bool
+	setupSessions   map[int64]*service.TotpSetupSession
+	loginSessions   map[string]*service.TotpLoginSession
+	verifyAttempts  map[int64]int
 }
 
 func (s *oauthPendingFlowTotpCacheStub) GetSetupSession(_ context.Context, userID int64) (*service.TotpSetupSession, error) {
@@ -3623,4 +3626,114 @@ func (oauthPendingFlowTotpEncryptorStub) Encrypt(plaintext string) (string, erro
 
 func (oauthPendingFlowTotpEncryptorStub) Decrypt(ciphertext string) (string, error) {
 	return ciphertext, nil
+}
+
+func (s *oauthPendingFlowTotpCacheStub) MarkLoginCodeUsed(_ context.Context, _ int64, digest string, _ time.Duration) (bool, error) {
+	if s.loginMarkerErr != nil {
+		return false, s.loginMarkerErr
+	}
+	if s.usedLoginCodes == nil {
+		s.usedLoginCodes = map[string]bool{}
+	}
+	if s.usedLoginCodes[digest] {
+		return false, nil
+	}
+	s.usedLoginCodes[digest] = true
+	return true, nil
+}
+func (s *oauthPendingFlowTotpCacheStub) ConsumeLoginSession(_ context.Context, token string) (*service.TotpLoginSession, error) {
+	if s.consumeLoginErr != nil {
+		return nil, s.consumeLoginErr
+	}
+	session := s.loginSessions[token]
+	delete(s.loginSessions, token)
+	return session, nil
+}
+
+func TestBindOIDCOAuthLoginFailsClosedOnTotpSettingReadError(t *testing.T) {
+	totpCache := &oauthPendingFlowTotpCacheStub{}
+	handler, client := newOAuthPendingFlowTestHandlerWithDependencies(t, oauthPendingFlowTestHandlerOptions{
+		settingValues: map[string]string{
+			service.SettingKeyTotpEnabled: "true",
+		},
+		totpCache:     totpCache,
+		totpEncryptor: oauthPendingFlowTotpEncryptorStub{},
+	})
+	handler.settingSvc = service.NewSettingService(&loginTOTPSettingRepo{errKey: service.SettingKeyTotpEnabled}, nil)
+	ctx := context.Background()
+
+	passwordHash, err := handler.authService.HashPassword("secret-123")
+	require.NoError(t, err)
+	totpEnabledAt := time.Now().UTC().Add(-time.Hour)
+	secret := "JBSWY3DPEHPK3PXP"
+
+	existingUser, err := client.User.Create().
+		SetEmail("owner@example.com").
+		SetUsername("owner-user").
+		SetPasswordHash(passwordHash).
+		SetRole(service.RoleUser).
+		SetStatus(service.StatusActive).
+		SetTotpEnabled(true).
+		SetTotpSecretEncrypted(secret).
+		SetTotpEnabledAt(totpEnabledAt).
+		Save(ctx)
+	require.NoError(t, err)
+
+	session, err := client.PendingAuthSession.Create().
+		SetSessionToken("bind-login-2fa-session-token").
+		SetIntent("adopt_existing_user_by_email").
+		SetProviderType("oidc").
+		SetProviderKey("https://issuer.example").
+		SetProviderSubject("oidc-bind-2fa-123").
+		SetTargetUserID(existingUser.ID).
+		SetResolvedEmail(existingUser.Email).
+		SetBrowserSessionKey("bind-login-2fa-browser-session-key").
+		SetUpstreamIdentityClaims(map[string]any{
+			"suggested_display_name": "Bound OIDC User",
+			"suggested_avatar_url":   "https://cdn.example/bound.png",
+		}).
+		SetRedirectTo("/profile").
+		SetExpiresAt(time.Now().UTC().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	body := bytes.NewBufferString(`{"email":"owner@example.com","password":"secret-123","adopt_display_name":false,"adopt_avatar":false}`)
+	recorder := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/oauth/oidc/bind-login", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: oauthPendingSessionCookieName, Value: encodeCookieValue(session.SessionToken)})
+	req.AddCookie(&http.Cookie{Name: oauthPendingBrowserCookieName, Value: encodeCookieValue("bind-login-2fa-browser-session-key")})
+	ginCtx.Request = req
+
+	handler.BindOIDCOAuthLogin(ginCtx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	data := decodeJSONResponseData(t, recorder)
+	require.Equal(t, true, data["requires_2fa"])
+	require.Equal(t, "o***r@example.com", data["user_email_masked"])
+	tempToken, ok := data["temp_token"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, tempToken)
+
+	loginSession, err := totpCache.GetLoginSession(ctx, tempToken)
+	require.NoError(t, err)
+	require.NotNil(t, loginSession)
+	require.NotNil(t, loginSession.PendingOAuthBind)
+	require.Equal(t, session.SessionToken, loginSession.PendingOAuthBind.PendingSessionToken)
+	require.Equal(t, session.BrowserSessionKey, loginSession.PendingOAuthBind.BrowserSessionKey)
+
+	identityCount, err := client.AuthIdentity.Query().
+		Where(
+			authidentity.ProviderTypeEQ("oidc"),
+			authidentity.ProviderKeyEQ("https://issuer.example"),
+			authidentity.ProviderSubjectEQ("oidc-bind-2fa-123"),
+		).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, identityCount)
+
+	storedSession, err := client.PendingAuthSession.Get(ctx, session.ID)
+	require.NoError(t, err)
+	require.Nil(t, storedSession.ConsumedAt)
 }

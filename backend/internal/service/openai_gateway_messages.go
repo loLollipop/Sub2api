@@ -181,6 +181,13 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		responsesReq.ServiceTier = "priority"
 	}
 
+	if account.UsesOpenAICodexProtocol() && account.Platform != PlatformGrok &&
+		string(accountCodexToolCapabilities(account, upstreamModel)["supports_search_tool"]) == "true" {
+		if err := apicompat.ApplyNativeToolSearch(&anthropicReq, responsesReq); err != nil {
+			return nil, fmt.Errorf("apply native tool_search: %w", err)
+		}
+	}
+
 	responsesReq.Model = upstreamModel
 	if responsesReq.Reasoning != nil && account.Platform != PlatformDeepseek {
 		if account.Platform != PlatformOpenAI || anthropicReq.Thinking == nil || anthropicReq.Thinking.Type != "disabled" {
@@ -834,10 +841,11 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 
 	// When the terminal event has an empty output array, reconstruct from
 	// accumulated delta events so the client receives the full content.
-	if acc != nil {
+	if acc != nil && !finalResponse.BufferedOutputRebuilt {
 		acc.SupplementResponseOutput(finalResponse)
 	}
 
+	finalResponse.XAIServerSideSearch = account.IsGrok()
 	anthropicResp := apicompat.ResponsesToAnthropicWithOptions(finalResponse, originalModel, account.Platform == PlatformDeepseek)
 
 	if s.responseHeaderFilter != nil {
@@ -932,6 +940,7 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 	requestID string,
 ) (*apicompat.ResponsesResponse, OpenAIUsage, *apicompat.BufferedResponseAccumulator, error) {
 	acc := apicompat.NewBufferedResponseAccumulator()
+	outputSlots := &openAICompatOutputSlots{}
 	var usage OpenAIUsage
 	if resp == nil || resp.Body == nil {
 		return nil, usage, acc, errors.New("upstream response body is nil")
@@ -1008,6 +1017,7 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 				if frame, ok := parser.Finish(); ok {
 					payload := openAICompatPayloadWithEventType(frame.Data, frame.EventType)
 					payload = string(restoreCodexToolNamesFromContext(c, []byte(payload)))
+					outputSlots.Observe([]byte(payload))
 					var event apicompat.ResponsesStreamEvent
 					if err := json.Unmarshal([]byte(payload), &event); err == nil {
 						s.parseSSEUsageBytesWithType([]byte(payload), event.Type, &usage)
@@ -1022,6 +1032,7 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 							if response.Usage != nil {
 								usage = copyOpenAIUsageFromResponsesUsage(response.Usage)
 							}
+							outputSlots.fillTerminalOutput(event.Type, response)
 							return response, usage, acc, nil
 						}
 					}
@@ -1048,6 +1059,7 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 			}
 			payload := openAICompatPayloadWithEventType(frame.Data, frame.EventType)
 			payload = string(restoreCodexToolNamesFromContext(c, []byte(payload)))
+			outputSlots.Observe([]byte(payload))
 
 			var event apicompat.ResponsesStreamEvent
 			if err := json.Unmarshal([]byte(payload), &event); err != nil {
@@ -1071,6 +1083,7 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 				if response.Usage != nil {
 					usage = copyOpenAIUsageFromResponsesUsage(response.Usage)
 				}
+				outputSlots.fillTerminalOutput(event.Type, response)
 				return response, usage, acc, nil
 			}
 

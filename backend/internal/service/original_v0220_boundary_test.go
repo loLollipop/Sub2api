@@ -228,7 +228,7 @@ func TestGeminiToolMediaUsesMappedModelOnActualUpstreamRequest(t *testing.T) {
 					require.Equal(t, "AQID", gjson.GetBytes(wire, "contents.1.parts.0.functionResponse.parts.0.inlineData.data").String())
 					require.False(t, gjson.GetBytes(wire, "contents.1.parts.1.inlineData").Exists())
 				} else {
-					require.Equal(t, "AQID", gjson.GetBytes(wire, "contents.1.parts.1.inlineData.data").String())
+					require.Equal(t, "AQID", gjson.GetBytes(wire, "contents.2.parts.0.inlineData.data").String())
 					require.False(t, gjson.GetBytes(wire, "contents.1.parts.0.functionResponse.parts").Exists())
 				}
 			})

@@ -13,10 +13,11 @@ import (
 
 var codexSelectedPageName = regexp.MustCompile(`^codex_apps_selected_page_part_([1-9][0-9]*)_of_([1-9][0-9]*)$`)
 
-// Desktop injects page snapshots as standalone outputs, without a model tool call.
-// Keep them as untrusted user text, including on history replay and mixed bootstrap turns.
-func normalizeCodexPageContext(body []byte) ([]byte, bool) {
-	if !codexPageInputLooksRelevant(body) || !hasUniqueJSONMembers(body) {
+// Desktop and IDE inject external context as standalone outputs, without a model
+// tool call. Keep it as untrusted user text, including on history replay and
+// mixed bootstrap turns; real tools and unknown outputs retain normal validation.
+func normalizeCodexUntrustedContext(body []byte) ([]byte, bool) {
+	if !codexUntrustedInputLooksRelevant(body) || !hasUniqueJSONMembers(body) {
 		return body, false
 	}
 	var request map[string]json.RawMessage
@@ -47,16 +48,21 @@ func normalizeCodexPageContext(body []byte) ([]byte, bool) {
 				continue
 			}
 		}
-		name, output := readString("name"), readString("output")
-		if !validCodexPageContext(name, output) {
+		name := readString("name")
+		var output *string
+		if json.Unmarshal(item["output"], &output) != nil || output == nil || !validCodexUntrustedContext(name, *output) {
 			continue
+		}
+		text := "<external_" + name + ">" + *output + "</external_" + name + ">"
+		if name == "codex_apps_open_page" || strings.HasPrefix(name, "codex_apps_selected_page_part_") {
+			text = "<external_" + name + ">\n" + *output + "\n</external_" + name + ">"
 		}
 		message := map[string]any{
 			"type": "message",
 			"role": "user",
 			"content": []map[string]string{{
 				"type": "input_text",
-				"text": "<external_" + name + ">\n" + output + "\n</external_" + name + ">",
+				"text": text,
 			}},
 		}
 		encoded, err := json.Marshal(message)
@@ -81,7 +87,7 @@ func normalizeCodexPageContext(body []byte) ([]byte, bool) {
 	return encoded, true
 }
 
-func codexPageInputLooksRelevant(body []byte) bool {
+func codexUntrustedInputLooksRelevant(body []byte) bool {
 	input := gjson.GetBytes(body, "input")
 	if !input.IsArray() {
 		return false
@@ -93,9 +99,27 @@ func codexPageInputLooksRelevant(body []byte) bool {
 		}
 		name := item.Get("name").String()
 		found = name == "codex_apps_open_page" || strings.HasPrefix(name, "codex_apps_selected_page_part_")
+		switch name {
+		case "browser_info", "goal_objective", "untrusted_context", "untrusted_content", "ide_context", "proposed_plan":
+			found = true
+		}
 		return !found
 	})
 	return found
+}
+
+func validCodexUntrustedContext(name, output string) bool {
+	switch name {
+	case "browser_info", "goal_objective", "untrusted_context", "ide_context":
+		return strings.TrimSpace(output) != ""
+	case "untrusted_content":
+		return true
+	case "proposed_plan":
+		// Codex splits approved plans by byte length, so chunks can be whitespace.
+		return output != ""
+	default:
+		return validCodexPageContext(name, output)
+	}
 }
 
 func validCodexPageContext(name, output string) bool {

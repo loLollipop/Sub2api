@@ -9,6 +9,7 @@ const {
   showErrorMock,
   showSuccessMock,
   setTokenMock,
+  login2FAMock,
   copyToClipboardMock,
   exchangePendingOAuthCompletionMock,
   apiPostMock,
@@ -27,6 +28,7 @@ const {
   showErrorMock: vi.fn(),
   showSuccessMock: vi.fn(),
   setTokenMock: vi.fn(),
+  login2FAMock: vi.fn(),
   copyToClipboardMock: vi.fn(),
   exchangePendingOAuthCompletionMock: vi.fn(),
   apiPostMock: vi.fn(),
@@ -48,6 +50,7 @@ vi.mock('vue-i18n', () => ({
 vi.mock('@/stores', () => ({
   useAuthStore: () => ({
     setToken: (...args: any[]) => setTokenMock(...args),
+    login2FA: (...args: unknown[]) => login2FAMock(...args),
   }),
   useAppStore: () => ({
     showError: (...args: any[]) => showErrorMock(...args),
@@ -92,6 +95,7 @@ describe('OAuthCallbackView', () => {
     showErrorMock.mockReset()
     showSuccessMock.mockReset()
     setTokenMock.mockReset()
+    login2FAMock.mockReset()
     copyToClipboardMock.mockReset()
     exchangePendingOAuthCompletionMock.mockReset()
     apiPostMock.mockReset()
@@ -222,5 +226,49 @@ describe('OAuthCallbackView', () => {
     })
     expect(apiPostMock.mock.calls[0][1]).not.toHaveProperty('email')
     expect(setTokenMock).toHaveBeenCalledWith('token-2')
+  })
+  it('requires a TOTP code before issuing a session for 2FA-enabled accounts', async () => {
+    const hash =
+      '#requires_2fa=1&temp_token=temp-abc&user_email_masked=u***%40example.com&provider=github&redirect=%2Fdashboard'
+    locationState.current = {
+      href: `http://localhost/auth/oauth/callback${hash}`,
+      hash,
+    }
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: locationState.current,
+    })
+    routeState.path = '/auth/oauth/callback'
+    login2FAMock.mockResolvedValue({ id: 1 })
+
+    const wrapper = mount(OAuthCallbackView)
+    await vi.dynamicImportSettled()
+
+    const input = wrapper.find('[data-testid="oauth-callback-totp"]')
+    expect(input.exists()).toBe(true)
+    // 挑战阶段绝不能先把 token 落库/放行
+    expect(setTokenMock).not.toHaveBeenCalled()
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+
+    await input.setValue('123456')
+    await wrapper.find('[data-testid="oauth-callback-totp-submit"]').trigger('click')
+    await vi.dynamicImportSettled()
+
+    expect(login2FAMock).toHaveBeenCalledWith('temp-abc', '123456')
+    expect(routerReplaceMock).toHaveBeenCalledWith('/dashboard')
+  })
+  it('handles a pending TOTP challenge and keeps failed verification on the form', async () => {
+    routeState.path = '/auth/oauth/callback'
+    exchangePendingOAuthCompletionMock.mockResolvedValue({ requires_2fa: true, temp_token: 'pending-temp', provider: 'google' })
+    login2FAMock.mockRejectedValue({ response: { data: { message: 'Invalid code' } } })
+    const wrapper = mount(OAuthCallbackView)
+    await vi.dynamicImportSettled()
+    await wrapper.get('[data-testid="oauth-callback-totp"]').setValue('123456')
+    await wrapper.get('[data-testid="oauth-callback-totp-submit"]').trigger('click')
+    await vi.dynamicImportSettled()
+    expect(login2FAMock).toHaveBeenCalledWith('pending-temp', '123456')
+    expect(wrapper.text()).toContain('Invalid code')
+    expect(setTokenMock).not.toHaveBeenCalled()
+    expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 })

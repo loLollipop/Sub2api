@@ -323,7 +323,7 @@ func createTestPayload(modelID string, prompts ...string) (map[string]any, error
 		maxTokens = 8192
 	}
 
-	return map[string]any{
+	payload := map[string]any{
 		"model": modelID,
 		"messages": []map[string]any{
 			{
@@ -351,10 +351,13 @@ func createTestPayload(modelID string, prompts ...string) (map[string]any, error
 		"metadata": map[string]string{
 			"user_id": sessionID,
 		},
-		"max_tokens":  maxTokens,
-		"temperature": 1,
-		"stream":      true,
-	}, nil
+		"max_tokens": maxTokens,
+		"stream":     true,
+	}
+	if !claude.RejectsTemperature(modelID) {
+		payload["temperature"] = 1
+	}
+	return payload, nil
 }
 
 // TestAccountConnection tests an account's connection by sending a test request
@@ -686,8 +689,10 @@ func (s *AccountTestService) testBedrockAccountConnection(c *gin.Context, ctx co
 				},
 			},
 		},
-		"max_tokens":  maxTokens,
-		"temperature": 1,
+		"max_tokens": maxTokens,
+	}
+	if !claude.RejectsTemperature(testModelID) {
+		bedrockPayload["temperature"] = 1
 	}
 	bedrockBody, _ := json.Marshal(bedrockPayload)
 

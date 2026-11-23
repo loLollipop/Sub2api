@@ -511,7 +511,7 @@ export default {
         cacheTTL5m: '5 分钟',
         cacheTTL1h: '1 小时',
         anthropicCacheTTL1hInjection: 'Anthropic 缓存 TTL 注入',
-        anthropicCacheTTL1hInjectionHint: '开启后，对 Anthropic OAuth/Setup Token 请求体中已有的 ephemeral 缓存块强制写入 1h；响应 usage 默认按 5m 回写计费，账号级 TTL 计费设置优先。API 密钥页面可按密钥覆盖（跟随全局 / 关闭 / 强制 1h / 强制 5m），密钥级设置优先于本开关。',
+        anthropicCacheTTL1hInjectionHint: '开启后，对 Anthropic OAuth/Setup Token 请求体中已有的 ephemeral 缓存块强制写入 1h，Claude Code 上下文压缩请求使用 5m；响应 usage 默认按 5m 回写计费，账号级 TTL 计费设置优先。API 密钥页面可按密钥覆盖（跟随全局 / 关闭 / 强制 1h / 强制 5m），密钥级设置优先于本开关。',
         balancePreauthorizationEnabled: '余额预扣（hold）',
         balancePreauthorizationEnabledHint: '默认关闭。开启后请求入口按预测花费冻结一份余额，请求结束按实际用量多退少补。与下方「在途预留」是两套独立机制，同时打开会把同一份可用余额算两遍，建议二选一。',
         inflightReservationEnabled: '在途余额预留',

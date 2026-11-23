@@ -757,8 +757,8 @@ type SecurityConfig struct {
 	CSP                    CSPConfig            `mapstructure:"csp"`
 	ProxyFallback          ProxyFallbackConfig  `mapstructure:"proxy_fallback"`
 	ProxyProbe             ProxyProbeConfig     `mapstructure:"proxy_probe"`
-	// TrustForwardedIPForAPIKeyACL enables legacy raw forwarded-header takeover.
-	// When disabled, server.trusted_proxies is authoritative for all client-IP consumers.
+	// TrustForwardedIPForAPIKeyACL enables custom forwarding-header resolution
+	// only for TCP peers in server.trusted_proxies. Otherwise Gin resolves the IP.
 	TrustForwardedIPForAPIKeyACL  bool                                       `mapstructure:"trust_forwarded_ip_for_api_key_acl"`
 	ForwardedClientIPHeaders      []string                                   `mapstructure:"forwarded_client_ip_headers" json:"forwarded_client_ip_headers" yaml:"forwarded_client_ip_headers"`
 	forwardedClientIPSettingsLive *atomic.Pointer[ForwardedClientIPSettings] `mapstructure:"-" json:"-" yaml:"-"`
@@ -816,8 +816,8 @@ func (c *Config) TrustForwardedIPForAPIKeyACL() bool {
 	return c.ForwardedClientIPSettings().TrustForwardedIP
 }
 
-// ForwardedClientIPTrustEnabled reports whether the legacy forwarded-header
-// compatibility mode currently overrides server.trusted_proxies.
+// ForwardedClientIPTrustEnabled reports whether custom forwarding headers may
+// be read from configured trusted proxies.
 func (c *Config) ForwardedClientIPTrustEnabled() bool {
 	return c != nil && c.TrustForwardedIPForAPIKeyACL()
 }

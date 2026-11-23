@@ -2,29 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.117",
-  "imported_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+  "imported_version": "2.3.153",
+  "imported_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.117",
-  "latest_observed_release_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
-  "latest_observed_main_commit": "c0b98f46bc90f89be896aa3909d7b3cac095ecae",
+  "latest_observed_version": "2.3.153",
+  "latest_observed_release_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
+  "latest_observed_main_commit": "020862cea3431c4b48ed14f7168e6acf1c0d7a70",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.117",
-  "reviewed_release_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+  "reviewed_release_tag": "v2.3.153",
+  "reviewed_release_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
   "observed_delta_review": {
-    "from_commit": "04acc3827c761e0915e41859cabbf3d6da3aeb0c",
-    "to_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
-    "status": "formal_v23117_selective_backport",
-    "scope": "GPT-6.2 Codex cacheable developer prefix, Gemini tier provider-scoped price matching and HTTP/WebSocket duplicate-field guards; retain local billing/routing/theme.",
-    "review_depth": "Complete 15-commit/16-path inventory; selected source slices, local contracts and companion original security changes reviewed.",
-    "evidence": "maintenance/notes/upstream-sync-20261120-v23117.md",
-    "selection_ledger": "maintenance/notes/upstream-selection-ledger-20261120-v23117.json"
+    "from_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+    "to_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
+    "status": "formal_v23153_selective_backport",
+    "scope": "Login TOTP fail-closed/replay, trusted proxy chain, Codex contexts, cached usage/body-budget503 and Turnstile partial saves; retain local routing/billing/theme.",
+    "review_depth": "Complete333-commit/1185-path inventory; selected source slices/local callers and explicitly named gaps deeply checked. Deferred entries are not code-audited.",
+    "evidence": "maintenance/notes/upstream-sync-20261123-dual.md",
+    "selection_ledger": "maintenance/notes/upstream-selection-ledger-20261123-v23153.json"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "13674d757916d41ef6bac6f9269ff61afe430f8e",
+    "source_head": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -32,6 +32,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.118-v2.3.153 selective login/TOTP, trusted proxy, Codex context, Gemini cache usage, request-body-budget503 and Turnstile fixes; original v0.2.24 protocol/rotation companion. Keep personal2.1.70; see maintenance/notes/upstream-sync-20261123-dual.md",
       "Formal v2.3.114-v2.3.117: GPT-6.2 cacheable stable guidance, provider-scoped Gemini tier prices and duplicate-field ingress protection with original v0.2.24 WebSocket companion guards. Preserve local static pricing, Carbon tiered aliases, body budgets, privacy and VERSION2.1.69. Regression and Linux backend build passed; see maintenance/notes/upstream-sync-20261120-v23117.md.",
       "Formal v2.3.106-v2.3.113: bounded Retry-After export continuation and drift checks for both roles; session-owned auth coalescing/force/visibility, quality-history left alignment, cross-gateway acknowledgement visibility, Gemini prelude recovery/named-error priority, decoder-close synchronization and explicit terminal-response commitment. Default Ops error retention7d preserves explicit zero/settings. Native billing/routing/theme and VERSION2.1.68 retained. See maintenance/notes/upstream-sync-20261120-v23113.md.",
       "Formal v2.3.90-v2.3.105: CC Switch model/usage URL normalization (no browser globals required by exported script), shared real-time monitor slots and chronological quality history, 1000-row Excel export with bounded transient retries and cancellation. Native billing/theme retained. See maintenance/notes/upstream-sync-20261118.md.",
@@ -1571,5 +1572,30 @@
       ]
     },
     "publication": "User subsequently authorized GitHub submission and deployment as personal v2.1.70. Final PR/CI, artifact identity, backup/isolated restore and production acceptance are recorded separately in development/diagnostics/sub2api-release-v2170-20261120/; synchronization-time evidence remains unchanged."
+  },
+  "dual_sync_20261123": {
+    "baseline_head": "df3d4234caa23d02fb555246b5310470c9d1beb5",
+    "fork_release": "v2.3.153",
+    "fork_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
+    "original_release": "v0.2.24",
+    "original_commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+    "personal_version": "2.1.70",
+    "note": "maintenance/notes/upstream-sync-20261123-dual.md",
+    "ledgers": [
+      "maintenance/notes/upstream-selection-ledger-20261123-v23153.json",
+      "maintenance/notes/original-selection-ledger-20261123-v0224.json"
+    ],
+    "evidence_directory": ".artifacts/dual-sync-20261123",
+    "verification": {
+      "status": "passed_with_explicit_integration_and_scope_limits",
+      "evidence": ".artifacts/dual-sync-20261123/final-acceptance-results.json",
+      "unique_backend_top_level": 4019,
+      "unique_backend_test_and_subtest_events": 8201,
+      "frontend_tests": 176,
+      "browser_checks": 32,
+      "linux_embed_build": "passed",
+      "live_database_redis_integration": false
+    },
+    "publication": "User subsequently authorized GitHub submission and deployment as personal v2.1.71. PR/CI, immutable artifacts, backup/restore and production acceptance are recorded separately in development/diagnostics/sub2api-release-v2171-20261123/; synchronization-time evidence remains unchanged."
   }
 }

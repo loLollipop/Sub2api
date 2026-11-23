@@ -334,6 +334,42 @@ func (h *AuthHandler) LinuxDoOAuthCallback(c *gin.Context) {
 			redirectOAuthError(c, frontendCallback, "session_error", infraerrors.Reason(err), infraerrors.Message(err))
 			return
 		}
+
+		// Legacy synthetic-email accounts may predate auth_identities. They still
+		// require the same TOTP challenge before a session is issued.
+		legacyUser, lookupErr := h.entClient().User.Query().Where(dbuser.EmailEQ(email)).Only(c.Request.Context())
+		if lookupErr != nil && !dbent.IsNotFound(lookupErr) {
+			redirectOAuthError(c, frontendCallback, "session_error", "failed to look up oauth user", "")
+			return
+		}
+		if legacyUser != nil {
+			user, err := h.userService.GetByID(c.Request.Context(), legacyUser.ID)
+			if err != nil {
+				redirectOAuthError(c, frontendCallback, "session_error", infraerrors.Reason(err), infraerrors.Message(err))
+				return
+			}
+			if h.settingSvc.LoginRequiresTOTP(c.Request.Context(), user) {
+				if err := ensureLoginUserActive(user); err != nil {
+					redirectOAuthError(c, frontendCallback, "login_blocked", infraerrors.Reason(err), infraerrors.Message(err))
+					return
+				}
+				if err := applyPendingOAuthBinding(c.Request.Context(), h.entClient(), h.authService, h.userService,
+					&dbent.PendingAuthSession{Intent: oauthIntentLogin, ProviderType: identityKey.ProviderType, ProviderKey: identityKey.ProviderKey, ProviderSubject: identityKey.ProviderSubject, ResolvedEmail: email, UpstreamIdentityClaims: upstreamClaims},
+					nil, &user.ID, true, false); err != nil {
+					redirectOAuthError(c, frontendCallback, "session_error", "failed to bind oauth identity", "")
+					return
+				}
+				if err := h.createOAuthPendingSession(c, oauthPendingSessionPayload{
+					Intent: oauthIntentLogin, Identity: identityKey, TargetUserID: &user.ID, ResolvedEmail: user.Email, RedirectTo: redirectTo,
+					BrowserSessionKey: browserSessionKey, UpstreamIdentityClaims: upstreamClaims, CompletionResponse: map[string]any{"redirect": redirectTo},
+				}); err != nil {
+					redirectOAuthError(c, frontendCallback, "session_error", "failed to continue oauth login", "")
+					return
+				}
+				redirectToFrontendCallback(c, frontendCallback)
+				return
+			}
+		}
 		tokenPair, user, err := h.authService.LoginOrRegisterOAuthWithTokenPairAndPromoCode(
 			c.Request.Context(),
 			email,

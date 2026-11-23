@@ -12,11 +12,12 @@ import (
 )
 
 const (
-	totpSetupKeyPrefix    = "totp:setup:"
-	totpLoginKeyPrefix    = "totp:login:"
-	totpAttemptsKeyPrefix = "totp:attempts:"
-	totpStepUpKeyPrefix   = "totp:stepup:"
-	totpAttemptsTTL       = 15 * time.Minute
+	totpSetupKeyPrefix       = "totp:setup:"
+	totpLoginKeyPrefix       = "totp:login:"
+	totpAttemptsKeyPrefix    = "totp:attempts:"
+	totpStepUpKeyPrefix      = "totp:stepup:"
+	totpLoginReplayKeyPrefix = "totp:login-replay:"
+	totpAttemptsTTL          = 15 * time.Minute
 )
 
 // TotpCache implements service.TotpCache using Redis
@@ -168,4 +169,25 @@ func (c *TotpCache) HasStepUpGrant(ctx context.Context, userID int64, sessionKey
 		return false, fmt.Errorf("get step-up grant: %w", err)
 	}
 	return true, nil
+}
+
+// MarkLoginCodeUsed reserves a login code atomically across all application instances.
+func (c *TotpCache) MarkLoginCodeUsed(ctx context.Context, userID int64, codeDigest string, ttl time.Duration) (bool, error) {
+	key := fmt.Sprintf("%s{%d}:%s", totpLoginReplayKeyPrefix, userID, codeDigest)
+	return c.rdb.SetNX(ctx, key, "1", ttl).Result()
+}
+
+func (c *TotpCache) ConsumeLoginSession(ctx context.Context, tempToken string) (*service.TotpLoginSession, error) {
+	data, err := c.rdb.GetDel(ctx, totpLoginKeyPrefix+tempToken).Bytes()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("consume login session: %w", err)
+	}
+	var session service.TotpLoginSession
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, fmt.Errorf("unmarshal login session: %w", err)
+	}
+	return &session, nil
 }

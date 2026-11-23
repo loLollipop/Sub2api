@@ -598,7 +598,7 @@ const ErrorPassthroughRulesModal = defineAsyncComponent(() => import('@/componen
 const TLSFingerprintProfilesModal = defineAsyncComponent(() => import('@/components/admin/TLSFingerprintProfilesModal.vue'))
 const BalanceAlertConfigModal = defineAsyncComponent(() => import('@/components/account/BalanceAlertConfigModal.vue'))
 import { resolveBatchTestAccounts } from '@/utils/accountModelTest'
-import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
+import { buildGrokUsageRefreshKey, buildAccountUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -817,7 +817,7 @@ const usageBatchByAccountId = ref<Record<string, AccountUsageInfo | null>>({})
 const usageBatchErrorByAccountId = ref<Record<string, string | null>>({})
 const usageBatchLoadingByAccountId = ref<Record<string, boolean>>({})
 const usageBatchRequestTokenByAccountId = ref<Record<string, number>>({})
-const usageBatchCache = new Map<number, { data: AccountUsageInfo; ts: number }>()
+const usageBatchCache = new Map<number, { data: AccountUsageInfo; ts: number; refreshKey: string }>()
 const USAGE_BATCH_CACHE_TTL = 5 * 60 * 1000
 const pendingUsageBatchIds = new Set<number>()
 let usageBatchFlushTimer: ReturnType<typeof setTimeout> | null = null
@@ -871,6 +871,7 @@ const flushQueuedUsageBatch = async () => {
   usageBatchFlushTimer = null
   const accountIDs = Array.from(pendingUsageBatchIds)
   const force = queuedUsageBatchForce
+  const refreshKeys = new Map(accounts.value.map(account => [account.id, buildAccountUsageRefreshKey(account)]))
   pendingUsageBatchIds.clear()
   queuedUsageBatchForce = false
 
@@ -901,7 +902,7 @@ const flushQueuedUsageBatch = async () => {
       nextErrors[key] = errorMap[key] ?? null
       nextLoading[key] = false
       if (usage) {
-        usageBatchCache.set(accountID, { data: usage, ts: now })
+        usageBatchCache.set(accountID, { data: usage, ts: now, refreshKey: refreshKeys.get(accountID) ?? '' })
       } else {
         usageBatchCache.delete(accountID)
       }
@@ -939,7 +940,7 @@ const queueBatchedUsage = (account: Account, options?: { force?: boolean }) => {
     usageBatchCache.delete(cacheKey)
   } else {
     const cached = usageBatchCache.get(cacheKey)
-    if (cached && Date.now() - cached.ts < USAGE_BATCH_CACHE_TTL) {
+    if (cached && cached.refreshKey === buildAccountUsageRefreshKey(account) && Date.now() - cached.ts < USAGE_BATCH_CACHE_TTL) {
       setUsageBatchState(cacheKey, cached.data, null)
       setUsageBatchLoading(cacheKey, false)
       return
@@ -1522,7 +1523,7 @@ const shouldReplaceAutoRefreshRow = (current: Account, next: Account) => {
     current.rate_limit_reset_at !== next.rate_limit_reset_at ||
     current.overload_until !== next.overload_until ||
     current.temp_unschedulable_until !== next.temp_unschedulable_until ||
-    buildOpenAIUsageRefreshKey(current) !== buildOpenAIUsageRefreshKey(next) ||
+    buildAccountUsageRefreshKey(current) !== buildAccountUsageRefreshKey(next) ||
     buildGrokUsageRefreshKey(current) !== buildGrokUsageRefreshKey(next)
   )
 }

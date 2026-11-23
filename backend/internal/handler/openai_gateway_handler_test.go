@@ -1031,6 +1031,9 @@ func TestOpenAIResponses_FunctionCallOutputHTTPGuidanceDoesNotSuggestPreviousRes
 
 	require.Equal(t, http.StatusBadRequest, w.Code)
 	require.Contains(t, w.Body.String(), "Responses WebSocket v2")
+	require.Contains(t, w.Body.String(), "update the client")
+	require.Contains(t, w.Body.String(), "untrusted_as_tool_output = false")
+	require.NotContains(t, w.Body.String(), "previous_response_id is only supported")
 	require.NotContains(t, w.Body.String(), "reuse previous_response_id")
 }
 

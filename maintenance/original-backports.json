@@ -11,19 +11,21 @@
     "v0.2.20": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
     "v0.2.21": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
     "v0.2.22": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
-    "v0.2.23": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6"
+    "v0.2.23": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+    "v0.2.24": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24"
   },
-  "latest_reviewed_main_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+  "latest_reviewed_main_commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v0.2.23",
-  "reviewed_release_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+  "reviewed_release_tag": "v0.2.24",
+  "reviewed_release_commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_resolved_historical_deferrals_and_explicit_remaining_scope",
-    "source_head": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+    "source_head": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
     "implemented_with_local_regression": [
+      "Formal v0.2.24 selective OAuth rotation CAS, ToolSearch/buffered output, Gemini/AG retry+quota,408/403,image-SSE,stop/Kimi,compactionTTL,conditional test sampling and account snapshot invalidation; selected slices only. See maintenance/notes/upstream-sync-20261123-dual.md",
       "Formal v0.2.23: GPT-6.1 Terra/GPT-6.2 Sol/Astra, Ultra Fast entitlements/pricing, OpenAI/Anthropic cache usage and TTL, bounded stream/schema/tool fixes, retention/dedup/privacy and UI adaptations; see maintenance/notes/upstream-sync-20261118-v0223.md and the complete path/commit ledger.",
       "Toolchain, cooldown scopes and frontend lifecycle fixes",
       "2026-10-17 Responses created_at, Gemini compatibility thinking, subscription retirement/public catalogs and payment compatibility; dated sync note records local adaptations and verification",
@@ -573,5 +575,16 @@
       "item": "Cline/Command Code and request-ID trigram PostgreSQL fixtures",
       "status": "pending"
     }
-  ]
+  ],
+  "sync_20261123_v0224": {
+    "from_release": "v0.2.23",
+    "to_release": "v0.2.24",
+    "source_commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+    "source_commits": 110,
+    "source_paths": 190,
+    "note": "maintenance/notes/upstream-sync-20261123-dual.md",
+    "ledger": "maintenance/notes/original-selection-ledger-20261123-v0224.json",
+    "review_depth": "Complete inventory, selected behavior/local-caller review and named targeted gaps; deferred entries may be inventory-only.",
+    "observed_main_not_imported": "2af3f1e15c98c893a89255a037f551046883b8c0"
+  }
 }

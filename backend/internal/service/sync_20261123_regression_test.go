@@ -48,8 +48,13 @@ func TestCreateTestPayloadTemperaturePreservesCustomPrompt(t *testing.T) {
 			_, present := payload["temperature"]
 			require.Equal(t, tc.want, present)
 			require.Equal(t, 8192, payload["max_tokens"])
-			messages := payload["messages"].([]map[string]any)
-			require.Equal(t, "custom prompt", messages[0]["content"].([]map[string]any)[0]["text"])
+			messages, ok := payload["messages"].([]map[string]any)
+			require.True(t, ok)
+			require.Len(t, messages, 1)
+			content, ok := messages[0]["content"].([]map[string]any)
+			require.True(t, ok)
+			require.Len(t, content, 1)
+			require.Equal(t, "custom prompt", content[0]["text"])
 		})
 	}
 }

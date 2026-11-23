@@ -687,4 +687,18 @@ describe('OidcCallbackView', () => {
     expect(setToken).toHaveBeenCalledWith('2fa-access-token')
     expect(replace).toHaveBeenCalledWith('/profile')
   })
+  it('completes a verified-email fast-path TOTP fragment before opening the session', async () => {
+    window.location.hash = '#requires_2fa=1&temp_token=oidc-temp&user_email_masked=o***%40example.com&redirect=%2Fprofile'
+    login2FA.mockResolvedValue({ access_token: 'verified-token' })
+    const wrapper = mount(OidcCallbackView, { global: { stubs: { AuthLayout: { template: '<div><slot /></div>' }, Icon: true, RouterLink: { template: '<a><slot /></a>' }, transition: false } } })
+    await flushPromises()
+    expect(exchangePendingOAuthCompletion).not.toHaveBeenCalled()
+    expect(setToken).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="oidc-bind-login-totp"]').setValue('123456')
+    await wrapper.get('[data-testid="oidc-bind-login-totp-submit"]').trigger('click')
+    await flushPromises()
+    expect(login2FA).toHaveBeenCalledWith({ temp_token: 'oidc-temp', totp_code: '123456' })
+    expect(setToken).toHaveBeenCalledWith('verified-token')
+    expect(replace).toHaveBeenCalledWith('/profile')
+  })
 })

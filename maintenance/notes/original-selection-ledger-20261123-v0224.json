@@ -1,0 +1,2304 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-23",
+  "source_repository": "Wei-Shaw/sub2api",
+  "from_release": "v0.2.23",
+  "from_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
+  "to_release": "v0.2.24",
+  "to_commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+  "personal_version": "2.1.70",
+  "baseline_head": "df3d4234caa23d02fb555246b5310470c9d1beb5",
+  "source_commit_count": 110,
+  "source_nonmerge_commit_count": 65,
+  "source_path_count": 190,
+  "review_scope": "Complete ancestry/path inventory. Deep source/caller review only for selected changes and named targeted gaps. This is a selective checkpoint, not a full feature/security audit or merge.",
+  "commits": [
+    {
+      "commit": "bf292550a6d45088c46dd0792d9bffddb2c65e92",
+      "parents": [
+        "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484"
+      ],
+      "subject": "feat(websearch): add Exa as a web search emulation provider",
+      "decision": "deferred",
+      "reason": "Deferred new Exa search provider/configuration/UI integration",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "aa5a020bd16bcac8c9c18f71040abfa50e2c9984",
+      "parents": [
+        "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484"
+      ],
+      "subject": "feat(apicompat): return web_search sources in web_search_tool_result blocks",
+      "decision": "deferred",
+      "reason": "Deferred search-source rendering; hosted slot reconstruction is not this feature",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "e2631bbb385a8fa04a7b006678417713600aa270",
+      "parents": [
+        "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484"
+      ],
+      "subject": "feat(gateway): write Claude Code compaction requests at 5m cache TTL",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Claude compaction write breakpoint TTL5m",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "5e322694e72ef39ffb59ec7b5920e206239eb895",
+      "parents": [
+        "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484"
+      ],
+      "subject": "fix(apicompat): map ToolSearch to native tool_search for Codex OAuth",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Native Codex ToolSearch declaration/history/response conversions",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "30152d1b16fb2fbc5d3d58a8ca71d2bd6fea8a89",
+      "parents": [
+        "aa5a020bd16bcac8c9c18f71040abfa50e2c9984"
+      ],
+      "subject": "fix(apicompat): tolerate non-string action.url and skip unfinished web_search calls",
+      "decision": "deferred",
+      "reason": "Partial only: incomplete rebuilt search items are excluded; action.url/source schema rendering is deferred",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "3f1a7c6d9d1906989a19aba330d477b8e72b80c1",
+      "parents": [
+        "5e322694e72ef39ffb59ec7b5920e206239eb895"
+      ],
+      "subject": "fix(apicompat): keep forced tools, result text and reserved names intact",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Forced/deferred tool choice, result text and reserved-name consistency",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "f72ef070975445fe077c6c267369f08e38ca52e7",
+      "parents": [
+        "70ad8365d9b5a0be5ebaf3c0065ff385f8c081fd"
+      ],
+      "subject": "fix(openai): keep hosted output items in buffered compat responses",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Hosted done-items in empty buffered terminal",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "00b09b892d7bbbf14c004b4246771ffe3e019ad0",
+      "parents": [
+        "f72ef070975445fe077c6c267369f08e38ca52e7"
+      ],
+      "subject": "fix(openai): rebuild empty buffered terminal output from done items",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Indexed output slot reconstruction",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "fbe8c39a90e8b2b3153f418cc828dc6f97281ed9",
+      "parents": [
+        "00b09b892d7bbbf14c004b4246771ffe3e019ad0"
+      ],
+      "subject": "fix(apicompat): keep tool_use input a JSON object in buffered responses",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Buffered tool_use object input normalization",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "49ef5f6909661a2c0dfc88b586d83568fd3cde70",
+      "parents": [
+        "fbe8c39a90e8b2b3153f418cc828dc6f97281ed9"
+      ],
+      "subject": "fix(openai): render custom tool calls only from rebuilt buffered output",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Render custom client tools only on reconstructed output",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "5279823757cc8d836316243e5f37a13715ce4b81",
+      "parents": [
+        "49ef5f6909661a2c0dfc88b586d83568fd3cde70"
+      ],
+      "subject": "fix(openai): complete buffered item parts by their own index",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Indexed partial item completion",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "7f1ecfaa2dab996e39165ffbeadb71c0fb371927",
+      "parents": [
+        "5279823757cc8d836316243e5f37a13715ce4b81"
+      ],
+      "subject": "fix(openai): follow the streaming path for rebuilt buffered items",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Buffered stream shapes; retain local raw-reasoning separation/newline contracts",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "413f1cb08a449d855aaa5220b12940c93704bd88",
+      "parents": [
+        "7f1ecfaa2dab996e39165ffbeadb71c0fb371927"
+      ],
+      "subject": "fix(openai): keep xAI server-side search out of rebuilt buffered tool calls",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Reconstructed buffered xAI server search stays internal; retain local Grok billing dedup",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "2c587f78b07e35f23e79ac63d180a06234bee050",
+      "parents": [
+        "ef29203002bf134560b78627e675a79547b88ab3"
+      ],
+      "subject": "fix(grok): bill search calls from xAI usage success counts",
+      "decision": "deferred",
+      "reason": "Deferred: usage success-count precedence must be adapted without replacing stronger local call-ID dedup/real-terminal billing",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "e5e1162f424b09d037af65160f56f0d2a0afc4d9",
+      "parents": [
+        "3f1a7c6d9d1906989a19aba330d477b8e72b80c1",
+        "ef29203002bf134560b78627e675a79547b88ab3"
+      ],
+      "subject": "chore(apicompat): merge main into the native tool_search branch",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "fa796b309a613785396a0c658b710ba8c13b3a1f",
+      "parents": [
+        "9cd1a1eb21e84707685e1998dcb5a3d1ceafae49"
+      ],
+      "subject": "fix(accounts): refresh Claude and Gemini usage snapshots",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Claude/Gemini usage snapshot cache invalidation and request ownership",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "833cfcc2fb49ea35f2191b009cd2dc35a2784234",
+      "parents": [
+        "d70676756fd3a35b854d41aa46c07935bbef283f"
+      ],
+      "subject": "perf(gateway): skip the cache_control TTL walk when no 1h breakpoint exists",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "f42dad9b7113ad26dfcfc59b4ce1bfe3352c9493",
+      "parents": [
+        "d70676756fd3a35b854d41aa46c07935bbef283f"
+      ],
+      "subject": "fix(composite): adapt thinking to the Claude 5.5 model a route rewrites to",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "59645b7bea035d4f43072a2c0b62360eaa6e45fe",
+      "parents": [
+        "9cd1a1eb21e84707685e1998dcb5a3d1ceafae49"
+      ],
+      "subject": "perf(openai): skip the image-intent body scan when a request cannot declare one",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "487d42c9645d3e259e42a99a29edc9d1a9311e4c",
+      "parents": [
+        "59645b7bea035d4f43072a2c0b62360eaa6e45fe"
+      ],
+      "subject": "perf(openai): reuse an already-validated body when classifying image intent",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "62765bb4e761ec89f91aa7d409d4103f7075154e",
+      "parents": [
+        "487d42c9645d3e259e42a99a29edc9d1a9311e4c"
+      ],
+      "subject": "perf(openai): apply the image-intent precheck to the declaration scanners",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "0c571e9e271ebc295e505424700e9213d2401388",
+      "parents": [
+        "9cd1a1eb21e84707685e1998dcb5a3d1ceafae49"
+      ],
+      "subject": "perf(service): parse the gateway request body with a single root walk",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "844459e78595acb63dc4d97e0394106cfd9dbfa1",
+      "parents": [
+        "0c571e9e271ebc295e505424700e9213d2401388"
+      ],
+      "subject": "perf(openai): skip the redundant body validation when parsing responses requests",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "8d962ba494ae0adcd745629b1e4bcec1dc839b0e",
+      "parents": [
+        "844459e78595acb63dc4d97e0394106cfd9dbfa1"
+      ],
+      "subject": "perf(openai): use the validated parse path for chat completions too",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "fb52c6e136a9401d5c078bade0533b32715706f7",
+      "parents": [
+        "9cd1a1eb21e84707685e1998dcb5a3d1ceafae49"
+      ],
+      "subject": "fix(openai): protect rotated oauth credentials from enrichment timeout and race conditions",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Detached credential persistence with exact-snapshot CAS and atomic outbox",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "049e0f41b863b0e81527de088fb144db0a60e5d3",
+      "parents": [
+        "9cd1a1eb21e84707685e1998dcb5a3d1ceafae49"
+      ],
+      "subject": "perf(openai): stop copying the whole input array when stripping namespaces",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "09840b8027a308b46ed62268151d6de71877e09f",
+      "parents": [
+        "8d962ba494ae0adcd745629b1e4bcec1dc839b0e"
+      ],
+      "subject": "test(gateway): stop ignoring strings.Builder errors in the scan benchmark",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "596696356e2fb4a62d3e4797dc5cdcf71553cfdb",
+      "parents": [
+        "049e0f41b863b0e81527de088fb144db0a60e5d3"
+      ],
+      "subject": "style(openai): gofmt the namespace strip equivalence test",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "e7c587e14de55c286edc816fda2f18e550d58492",
+      "parents": [
+        "9cd1a1eb21e84707685e1998dcb5a3d1ceafae49"
+      ],
+      "subject": "perf(openai): stop walking every request body in the tool-schema sanitizer",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "d0c232401fb1ad977682602ab2d8af4c1b8ace26",
+      "parents": [
+        "fa796b309a613785396a0c658b710ba8c13b3a1f"
+      ],
+      "subject": "ci: rerun checks after allocation guard failure",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "bcb22d4de855635ffb2827a610ecde0c846461f0",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "fix(openai): stop pinning large request bodies after the handler",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "570d59e9ac0f32bf5caa51f0a1a72c60f40fbc01",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "fix(anthropic): expose metadata-backed long-context models",
+      "decision": "deferred",
+      "reason": "Deferred: metadata-backed long-context model variants must retain local group/allowlist/provider routing",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "f66984fc5df773522559396c4a7cda0a7a843f0e",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "fix(openai): keep relayed image usage on a single SSE data line",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Compact image usage before writing SSE data",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "18c42a29d2edb2e314eef5115021fe33b7fa5af6",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "perf(scheduler): omit expanded groups from account cache",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "77ba3346d1ae9aa3930dc1b347d05582e1bae93d",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "fix(openai): skip foreign-vendor models on ChatGPT OAuth accounts, passthrough included",
+      "decision": "deferred",
+      "reason": "Deferred: foreign model eligibility must preserve explicit native dispatch/channel mapping and Messages mapped-model scheduling",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "3b95559788e2538450c6c06765ae508b9f146a7e",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "fix(accounts): opt in to bulk passthrough model filter changes",
+      "decision": "deferred",
+      "reason": "No matching bulk passthrough model-filter write/UI locally; do not introduce that subsystem",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "f358f0a41a03c44230e6374e9e387d822047a9a0",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "feat(accounts): estimate Claude OAuth and setup-token window costs",
+      "decision": "deferred",
+      "reason": "Deferred estimated Claude window costs; retain actual usage display",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "65be27787cae797efb15af62a048215bf74f6cce",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "feat(frontend): warn on frequent manual token refreshes",
+      "decision": "deferred",
+      "reason": "Deferred manual-refresh warning UX",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "75290a9f26e554db29bd06422f4dd5f2a196e7f0",
+      "parents": [
+        "15871f904056f548dd874a1d069ffc6cdf777b78"
+      ],
+      "subject": "fix(accounts): omit temperature from account tests for models that reject it",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Conditional Claude/Bedrock account-test temperature; keep custom prompts",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "a4b72bef0977b9174fd4c3cc19a8ad055649145c",
+      "parents": [
+        "69d2fae91318359e4e25c0171eaf70364dad3629"
+      ],
+      "subject": "fix(admin): initialize default platform quotas for new users",
+      "decision": "deferred",
+      "reason": "Deferred: admin CreateUser default quota requires repository constructor/wire/caller changes; signup path alone does not cover it",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "2af3f1e15c98c893a89255a037f551046883b8c0",
+      "parents": [
+        "5af9afb588c4b014b3df9db7d4073af1f8ae01b6"
+      ],
+      "subject": "chore: sync VERSION to 0.2.23 [skip ci]",
+      "decision": "source_release_metadata",
+      "reason": "Source version/release notes only; keep personal2.1.70.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "44db3dd72b99467776be3db188be27767bc6b54d",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(gemini): keep trailing parts out of the final tool-result turn",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Final Gemini function-response trailing-parts turn split",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "e3872e16155f777f3a66b49523e447c386e6a1ff",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(openai): preserve VS Code IDE context in HTTP Responses",
+      "decision": "selected_behavior_or_regression",
+      "reason": "IDE context covered through expanded Codex context normalizer",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "e52bc308bb280272baa35c83f6fd109e215aeb1a",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(usage): record per-turn Responses reasoning effort",
+      "decision": "deferred",
+      "reason": "Deferred: per-turn configuration_update effort must align WS/session/native usage propagation",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "75de2de4802821f6dad801aa2bbb3639948b8f54",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(codex): preserve native audio input capabilities",
+      "decision": "deferred",
+      "reason": "Deferred: native audio modalities need metadata aggregation, account manifest/API-key completion consumers together",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "e2148a18138665623ce41293bdd14db850a78d5c",
+      "parents": [
+        "b5827cfd54d58c248a9480b800444d0b40f0c6ea"
+      ],
+      "subject": "fix(ops): weight average token rate by request duration",
+      "decision": "deferred",
+      "reason": "Deferred duration-weighted Ops average; local request-level rate semantics preserved",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "26e0be3392cdf7574f65491646b5f328b03eabef",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(gateway): ensure DeepSeek Anthropic tool-use history carries thinking blocks",
+      "decision": "previously_covered",
+      "reason": "Existing ensureDeepSeekThinkingReplayPlaceholders on native caller with regression; do not add a second repair",
+      "review_depth": "local_contract_or_prior_record"
+    },
+    {
+      "commit": "735bcb0573c9823880cf232db1dc670581ac77d4",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(antigravity): preserve upstream Gemini SSE comment frames",
+      "decision": "deferred",
+      "reason": "Deferred Antigravity Gemini SSE comment replay; separate transport/commit boundary tests needed",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "baf058f645a29c397a2062c822c425f3db4264fc",
+      "parents": [
+        "d0c232401fb1ad977682602ab2d8af4c1b8ace26",
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "chore: sync upstream main for current validation",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "155b83badbbe4bad3b7ba42f7a4a5c38fec88aa3",
+      "parents": [
+        "baf058f645a29c397a2062c822c425f3db4264fc"
+      ],
+      "subject": "fix(i18n): clarify Ultra Fast service tier hints",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "92fd567a47b83d2fe589f113198bf5a6c606c7ee",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(grok): accept five edit sources and classify input errors",
+      "decision": "deferred",
+      "reason": "Deferred: local Grok edit three-source contract/input errors require native transport test matrix",
+      "review_depth": "targeted_gap_review"
+    },
+    {
+      "commit": "fec3de4a73d99f579083673fe1f3991d25733e3a",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(gateway): resolve an issue where 'stop' and Kimi dynamic tool definitions were lost during protocol conversio",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Preserve stop and Kimi dynamic tools across protocol conversion",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "6d4fcbad47d3e0a133296a713502a6823a06e618",
+      "parents": [
+        "30152d1b16fb2fbc5d3d58a8ca71d2bd6fea8a89",
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "Merge remote-tracking branch 'origin/main' into upstream/bridge-web-search-sources",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "2cf2c33226947aea382e5809916a936319ec0400",
+      "parents": [
+        "bf292550a6d45088c46dd0792d9bffddb2c65e92",
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "Merge remote-tracking branch 'origin/main' into upstream/websearch-exa-provider",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "3eca473aa152dc5cd798a751ae7a0615c4ff0408",
+      "parents": [
+        "e2631bbb385a8fa04a7b006678417713600aa270",
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "Merge remote-tracking branch 'origin/main' into upstream/compaction-cache-ttl-5m",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "4480cd90a42df239f83e0cc14033efd439128c6a",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(openai): fail over upstream request timeouts",
+      "decision": "selected_behavior_or_regression",
+      "reason": "OpenAI408 failover at three OpenAI classifiers",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "3e190f7e057b1d9c1c1041b36d928f4413c3b2ca",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(typesafe): apply account model mapping to System One",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "2b67d1ede28a4175a4a3f4b2cdcafd6927bd2f21",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(gateway): reject request bodies whose duplicate fields disagree",
+      "decision": "previously_covered",
+      "reason": "Previously imported HTTP/WS duplicate guard companion at v2.3.117",
+      "review_depth": "local_contract_or_prior_record"
+    },
+    {
+      "commit": "747d228a215fe8c6c6ac2c3d3937e6d530f8681e",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "test(antigravity): a bare 429 on several accounts is request-scoped",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Multi-account429 regression",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "26b68da5c5f9a6e165d7abb04aadfdef2260a2c5",
+      "parents": [
+        "747d228a215fe8c6c6ac2c3d3937e6d530f8681e"
+      ],
+      "subject": "fix(antigravity): one request cools at most one account for a bare 429",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Request-scoped bare Antigravity429 cooldown",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "e7a556ff53f50d9907c088bab4ed560a5420cf04",
+      "parents": [
+        "26b68da5c5f9a6e165d7abb04aadfdef2260a2c5"
+      ],
+      "subject": "test(antigravity): a bare 429 after the retry loop cools no second account",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Post-loop429 regression",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "e0328a62acf0ecf55622c297069eec93cca045e5",
+      "parents": [
+        "e7a556ff53f50d9907c088bab4ed560a5420cf04"
+      ],
+      "subject": "fix(antigravity): a bare 429 after the retry loop cools no account the loop skipped",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Skipped account429 regression and post-loop guard",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "f2386f9b2d5712d920a5298884e75f6f29babbe9",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "feat(model-plaza): add copy button for model IDs",
+      "decision": "deferred",
+      "reason": "Inventory inspected; not selected in this compatibility-preserving pass. No code-equivalence or security-audit claim.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "d270d6434f5c0dfeb13bd8584db3db09bb139189",
+      "parents": [
+        "2b67d1ede28a4175a4a3f4b2cdcafd6927bd2f21"
+      ],
+      "subject": "fix(gateway): reject conflicting duplicates in nested objects too",
+      "decision": "previously_covered",
+      "reason": "Previously imported nested duplicate guards",
+      "review_depth": "local_contract_or_prior_record"
+    },
+    {
+      "commit": "ce86c1b3069382151908b39348233e19ee5d8d01",
+      "parents": [
+        "d270d6434f5c0dfeb13bd8584db3db09bb139189"
+      ],
+      "subject": "fix(gateway): close bypasses found in the duplicate-field audit",
+      "decision": "previously_covered",
+      "reason": "Previously imported duplicate scanner fixes",
+      "review_depth": "local_contract_or_prior_record"
+    },
+    {
+      "commit": "263a13f160a1f21ff0679a8b3b25ecc777c8095f",
+      "parents": [
+        "ce86c1b3069382151908b39348233e19ee5d8d01"
+      ],
+      "subject": "fix(gateway): close second-round audit findings on the duplicate scanner",
+      "decision": "previously_covered",
+      "reason": "Previously imported duplicate scanner audit followups",
+      "review_depth": "local_contract_or_prior_record"
+    },
+    {
+      "commit": "88d5a20b7381c1926fb4f38016c04de9aff62903",
+      "parents": [
+        "263a13f160a1f21ff0679a8b3b25ecc777c8095f"
+      ],
+      "subject": "fix(gateway): reject multipart parts with an RFC 2231 extended field name",
+      "decision": "previously_covered",
+      "reason": "Existing requestmodel.hasExtendedNameParam rejects extended multipart names",
+      "review_depth": "local_contract_or_prior_record"
+    },
+    {
+      "commit": "7ded9ffb46ee24b0b0fe9144ab0d7068affec126",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(antigravity): query quota from the account's forward endpoint",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Quota query uses account forward endpoint",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "a436766de3aff163e622d863aa7b3b6b1dc43b76",
+      "parents": [
+        "88d5a20b7381c1926fb4f38016c04de9aff62903"
+      ],
+      "subject": "fix(gateway): satisfy errcheck in duplicate-field scanner",
+      "decision": "previously_covered",
+      "reason": "Previously imported duplicate scanner errcheck",
+      "review_depth": "local_contract_or_prior_record"
+    },
+    {
+      "commit": "fe5e7fa404055cf03880045b4c06d5e6548991e5",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0"
+      ],
+      "subject": "fix(openai): stop alpha/search tool-level 403s from benching OAuth accounts",
+      "decision": "selected_behavior_or_regression",
+      "reason": "Alpha/search tool 403 distinguishes account access faults",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "16b53b60a8c9b83a6e4e93c8157b9b7756dc2c30",
+      "parents": [
+        "2af3f1e15c98c893a89255a037f551046883b8c0",
+        "fe5e7fa404055cf03880045b4c06d5e6548991e5"
+      ],
+      "subject": "Merge pull request #8982 from Wei-Shaw/fix/openai-alpha-search-403-account-penalty",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "c38a534be9a2e9600084b5f514badad828886958",
+      "parents": [
+        "16b53b60a8c9b83a6e4e93c8157b9b7756dc2c30",
+        "fb52c6e136a9401d5c078bade0533b32715706f7"
+      ],
+      "subject": "Merge pull request #8671 from xuemk/fix/openai-oauth-token-rotation-persistence",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "3027001928870a71160ac68e8a3001208a3ef790",
+      "parents": [
+        "c38a534be9a2e9600084b5f514badad828886958",
+        "3eca473aa152dc5cd798a751ae7a0615c4ff0408"
+      ],
+      "subject": "Merge pull request #8794 from Anankke/feat/compaction-cache-ttl-5m",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "fb60f041730f64c4d50d4811f1e416faf3b3f506",
+      "parents": [
+        "3027001928870a71160ac68e8a3001208a3ef790",
+        "2cf2c33226947aea382e5809916a936319ec0400"
+      ],
+      "subject": "Merge pull request #8801 from Anankke/feat/websearch-exa-provider",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "d36670a04185af3b3f62c597391eda67fbd00ab3",
+      "parents": [
+        "fb60f041730f64c4d50d4811f1e416faf3b3f506",
+        "6d4fcbad47d3e0a133296a713502a6823a06e618"
+      ],
+      "subject": "Merge pull request #8803 from Anankke/feat/web-search-sources-bridge",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "135aff88e12db62446a7f454b01b864cbbfc13c6",
+      "parents": [
+        "d36670a04185af3b3f62c597391eda67fbd00ab3",
+        "e5e1162f424b09d037af65160f56f0d2a0afc4d9"
+      ],
+      "subject": "Merge pull request #8804 from Anankke/fix/messages-bridge-native-tool-search",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "600e1e1888badd20e2adb4a14da15fe8605391ef",
+      "parents": [
+        "135aff88e12db62446a7f454b01b864cbbfc13c6",
+        "413f1cb08a449d855aaa5220b12940c93704bd88"
+      ],
+      "subject": "Merge pull request #8820 from Anankke/fix/buffered-hosted-output-items",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "84a293056a000715b38f66ad41b6f8b2484fc32e",
+      "parents": [
+        "600e1e1888badd20e2adb4a14da15fe8605391ef",
+        "18c42a29d2edb2e314eef5115021fe33b7fa5af6"
+      ],
+      "subject": "Merge pull request #8845 from r266-tech/codex/scheduler-compact-account-groups",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "29d9fe2ad0e091c104a24e916ff708ec057570cf",
+      "parents": [
+        "84a293056a000715b38f66ad41b6f8b2484fc32e",
+        "155b83badbbe4bad3b7ba42f7a4a5c38fec88aa3"
+      ],
+      "subject": "Merge pull request #8858 from wucm667/fix/issue-8854-passive-usage-refresh",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "3ad84e1333f4ae05ac1ce20221a940f2f2095e3d",
+      "parents": [
+        "29d9fe2ad0e091c104a24e916ff708ec057570cf",
+        "f42dad9b7113ad26dfcfc59b4ce1bfe3352c9493"
+      ],
+      "subject": "Merge pull request #8859 from Anankke/fix/composite-route-thinking-adapt",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "998d1c8e2ee2c59bc0e8b60b3a5dc62e4e20f148",
+      "parents": [
+        "3ad84e1333f4ae05ac1ce20221a940f2f2095e3d",
+        "833cfcc2fb49ea35f2191b009cd2dc35a2784234"
+      ],
+      "subject": "Merge pull request #8862 from lishuangqiang/perf/cache-control-ttl-short-circuit",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "9cf9921eb4e5b61b8eeb8139f6d8099fe3325725",
+      "parents": [
+        "998d1c8e2ee2c59bc0e8b60b3a5dc62e4e20f148",
+        "2c587f78b07e35f23e79ac63d180a06234bee050"
+      ],
+      "subject": "Merge pull request #8864 from Anankke/fix/grok-search-billing-usage",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "50c802c518de49bdd259637b9f71df3b8e2f9917",
+      "parents": [
+        "9cf9921eb4e5b61b8eeb8139f6d8099fe3325725",
+        "62765bb4e761ec89f91aa7d409d4103f7075154e"
+      ],
+      "subject": "Merge pull request #8866 from lishuangqiang/perf/image-intent-prefilter",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "a437224cd291f5cfa48d95252919e650d38c7141",
+      "parents": [
+        "50c802c518de49bdd259637b9f71df3b8e2f9917",
+        "09840b8027a308b46ed62268151d6de71877e09f"
+      ],
+      "subject": "Merge pull request #8868 from lishuangqiang/perf/gateway-request-single-scan",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "67b2df8d91ffc93c13fa176810008d14376c7e7b",
+      "parents": [
+        "a437224cd291f5cfa48d95252919e650d38c7141",
+        "596696356e2fb4a62d3e4797dc5cdcf71553cfdb"
+      ],
+      "subject": "Merge pull request #8870 from lishuangqiang/perf/openai-namespace-strip-copies",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "356cdccbe888854cf631127c9754b6051fa17e07",
+      "parents": [
+        "67b2df8d91ffc93c13fa176810008d14376c7e7b",
+        "e7c587e14de55c286edc816fda2f18e550d58492"
+      ],
+      "subject": "Merge pull request #8872 from lishuangqiang/perf/tool-schema-sanitizer",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "fb7d8fc7b91a101fe69800c3dca3917c83c32eaf",
+      "parents": [
+        "356cdccbe888854cf631127c9754b6051fa17e07",
+        "bcb22d4de855635ffb2827a610ecde0c846461f0"
+      ],
+      "subject": "Merge pull request #8875 from zhx8702/fix/openai-body-copy-reduction",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "490af330d7a7c3e7084c9ad6f50e5ba7766527a9",
+      "parents": [
+        "fb7d8fc7b91a101fe69800c3dca3917c83c32eaf",
+        "570d59e9ac0f32bf5caa51f0a1a72c60f40fbc01"
+      ],
+      "subject": "Merge pull request #8883 from wucm667/fix/issue-8880-anthropic-model-metadata",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "fe2d953f528ae05fd6fca494431a096fa6272d7e",
+      "parents": [
+        "490af330d7a7c3e7084c9ad6f50e5ba7766527a9",
+        "77ba3346d1ae9aa3930dc1b347d05582e1bae93d"
+      ],
+      "subject": "Merge pull request #8893 from SipengXie2024/fix/openai-oauth-skip-claude-models",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "6eb32ab4451ef51f6dea039bd840175d19d47e56",
+      "parents": [
+        "fe2d953f528ae05fd6fca494431a096fa6272d7e",
+        "3b95559788e2538450c6c06765ae508b9f146a7e"
+      ],
+      "subject": "Merge pull request #8899 from r266-tech/codex/bulk-passthrough-model-filter-opt-in",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "88ff563f7365dc55ff74b087bb43fa0a9e7018f9",
+      "parents": [
+        "6eb32ab4451ef51f6dea039bd840175d19d47e56",
+        "f358f0a41a03c44230e6374e9e387d822047a9a0"
+      ],
+      "subject": "Merge pull request #8900 from stevelee477/feat/claude-window-cost-estimate",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "2f49048cb80a8883df597bcfc4c66787d9662ed2",
+      "parents": [
+        "88ff563f7365dc55ff74b087bb43fa0a9e7018f9",
+        "65be27787cae797efb15af62a048215bf74f6cce"
+      ],
+      "subject": "Merge pull request #8902 from Ming-Sir-69/feat/refresh-button-risk-hint",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "69237d2ebd166674739b8ee5e6a343d0f3f635b4",
+      "parents": [
+        "2f49048cb80a8883df597bcfc4c66787d9662ed2",
+        "75290a9f26e554db29bd06422f4dd5f2a196e7f0"
+      ],
+      "subject": "Merge pull request #8911 from Echways/fix/anthropic-account-test-temperature",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "a912d13e62514cd4d6233126da0cd77bef901d2b",
+      "parents": [
+        "69237d2ebd166674739b8ee5e6a343d0f3f635b4",
+        "a4b72bef0977b9174fd4c3cc19a8ad055649145c"
+      ],
+      "subject": "Merge pull request #8918 from XYZ0901/codex/fix-admin-user-default-platform-quotas",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "16b67d9afd0f268ac46ef42a0c7dca15cd36d407",
+      "parents": [
+        "a912d13e62514cd4d6233126da0cd77bef901d2b",
+        "44db3dd72b99467776be3db188be27767bc6b54d"
+      ],
+      "subject": "Merge pull request #8923 from iam1maker/fix/gemini-final-turn-trailing-parts",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "a64189740286f936dccccae2184e75674d243d22",
+      "parents": [
+        "16b67d9afd0f268ac46ef42a0c7dca15cd36d407",
+        "e3872e16155f777f3a66b49523e447c386e6a1ff"
+      ],
+      "subject": "Merge pull request #8929 from superman2003/fix/codex-standalone-context-names",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "fe1f2b6d76cc1c535ae7bcebdc0e694aac9cb742",
+      "parents": [
+        "a64189740286f936dccccae2184e75674d243d22",
+        "e52bc308bb280272baa35c83f6fd109e215aeb1a"
+      ],
+      "subject": "Merge pull request #8931 from superman2003/fix/responses-requested-effort",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "320695ae72639efba68e25e1ff5094f7fbea46b9",
+      "parents": [
+        "fe1f2b6d76cc1c535ae7bcebdc0e694aac9cb742",
+        "75de2de4802821f6dad801aa2bbb3639948b8f54"
+      ],
+      "subject": "Merge pull request #8932 from superman2003/fix/codex-catalog-audio-input",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "1134f5dffbf96b4c9a82d81e2ec4f93c5cabbf06",
+      "parents": [
+        "320695ae72639efba68e25e1ff5094f7fbea46b9",
+        "e2148a18138665623ce41293bdd14db850a78d5c"
+      ],
+      "subject": "Merge pull request #8937 from TeacherLi07/fix/ops-duration-weighted-token-rate",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "50dc3141e7dea62f2ed3b92998c1ac4367172f1a",
+      "parents": [
+        "1134f5dffbf96b4c9a82d81e2ec4f93c5cabbf06",
+        "26e0be3392cdf7574f65491646b5f328b03eabef"
+      ],
+      "subject": "Merge pull request #8943 from alfadb/fix/deepseek-thinking-passback",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "55898028ad60b51b56dbd99734e2a372480ae846",
+      "parents": [
+        "50dc3141e7dea62f2ed3b92998c1ac4367172f1a",
+        "735bcb0573c9823880cf232db1dc670581ac77d4"
+      ],
+      "subject": "Merge pull request #8946 from r266-tech/codex/gemini-upstream-comment-frames",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "c03fc529b827c46ce6ba1ba04a84f4088d5f0f3b",
+      "parents": [
+        "55898028ad60b51b56dbd99734e2a372480ae846",
+        "92fd567a47b83d2fe589f113198bf5a6c606c7ee"
+      ],
+      "subject": "Merge pull request #8962 from wucm667/fix/issue-8957-grok-edit-input",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "ba5ddded9c6fa251d711d9a357881fcd14951c60",
+      "parents": [
+        "c03fc529b827c46ce6ba1ba04a84f4088d5f0f3b",
+        "fec3de4a73d99f579083673fe1f3991d25733e3a"
+      ],
+      "subject": "Merge pull request #8963 from Daiyangcheng/fix/responses-stop-passthrough",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "58659ec579ad6a84495bf3e96d71c2f1d7dfce63",
+      "parents": [
+        "ba5ddded9c6fa251d711d9a357881fcd14951c60",
+        "4480cd90a42df239f83e0cc14033efd439128c6a"
+      ],
+      "subject": "Merge pull request #8968 from wucm667/fix/issue-8967-image-timeout-failover",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "cdf3af4b84f884d78928155d126848259c932bb4",
+      "parents": [
+        "58659ec579ad6a84495bf3e96d71c2f1d7dfce63",
+        "3e190f7e057b1d9c1c1041b36d928f4413c3b2ca"
+      ],
+      "subject": "Merge pull request #8972 from r266-tech/codex/typesafe-apply-account-model-mapping",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "242556f973a27d8bc86af769fe814a983825d55a",
+      "parents": [
+        "cdf3af4b84f884d78928155d126848259c932bb4",
+        "e0328a62acf0ecf55622c297069eec93cca045e5"
+      ],
+      "subject": "Merge pull request #8973 from william-drakemond/pr/antigravity-bare429-request-scoped",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "1eea0d750a945c7c83a44b7bb8ff6232fc03521e",
+      "parents": [
+        "242556f973a27d8bc86af769fe814a983825d55a",
+        "f2386f9b2d5712d920a5298884e75f6f29babbe9"
+      ],
+      "subject": "Merge pull request #8976 from yan9651688/feat/model-plaza-copy-model-id",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "eb9143956f1e74458c6ca56af069c3e8604c3bd0",
+      "parents": [
+        "1eea0d750a945c7c83a44b7bb8ff6232fc03521e",
+        "7ded9ffb46ee24b0b0fe9144ab0d7068affec126"
+      ],
+      "subject": "Merge pull request #8979 from SipengXie2024/fix/antigravity-quota-forward-endpoint",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "62cebadf54b5b208d6dd9b93f1929d25263e67e8",
+      "parents": [
+        "eb9143956f1e74458c6ca56af069c3e8604c3bd0",
+        "f66984fc5df773522559396c4a7cda0a7a843f0e"
+      ],
+      "subject": "Merge pull request #8886 from SipengXie2024/fix/images-sse-usage-single-line",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    },
+    {
+      "commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+      "parents": [
+        "62cebadf54b5b208d6dd9b93f1929d25263e67e8",
+        "a436766de3aff163e622d863aa7b3b6b1dc43b76"
+      ],
+      "subject": "Merge commit from fork",
+      "decision": "merge_ancestry_inventory",
+      "reason": "Merge ancestry listed; leaf decisions carry adoption scope.",
+      "review_depth": "inventory_only"
+    }
+  ],
+  "paths": [
+    {
+      "status": "M",
+      "path": "backend/cmd/server/VERSION",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/cmd/server/wire_gen.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/gateway_compat_effort_policy_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/gateway_handler.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/gateway_handler_chat_completions.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/gateway_handler_responses.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/gateway_models_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/grok_media.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/grok_media_errors_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/openai_gateway_handler.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/openai_gateway_handler_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/openai_gateway_ws_model_allowlist_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/handler/openai_gateway_ws_model_conflict_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/openai_page_context.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/openai_page_context_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/request_body_limit.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/request_body_limit_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/request_body_read_log.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/handler/request_body_read_log_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/apicompat/anthropic_tool_search.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/apicompat/anthropic_tool_search_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/apicompat/chatcompletions_responses_bridge.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/apicompat/responses_to_anthropic.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/apicompat/responses_to_anthropic_tool_input_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/apicompat/responses_to_chatcompletions.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/apicompat/responses_web_search_sources.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/apicompat/responses_web_search_sources_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/apicompat/types.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/claude/sampling.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/claude/sampling_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/httputil/body_read_error.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/requestmodel/conflict.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/requestmodel/conflict_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/requestmodel/requestmodel.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/requestmodel/requestmodel_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/websearch/exa.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/pkg/websearch/exa_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/websearch/manager.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/websearch/provider.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/pkg/websearch/types.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/repository/account_repo.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/repository/account_repo_temp_unsched_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/repository/custom_admin_key_review_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/repository/ops_repo_openai_token_stats.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/repository/ops_repo_openai_token_stats_integration_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/repository/scheduler_cache.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/repository/scheduler_cache_integration_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/repository/scheduler_cache_payload_unit_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/repository/scheduler_cache_unit_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/securityaudit/coordinator.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/securityaudit/prompt_memory_optimization_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/securityaudit/prompt_scanner.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/securityaudit/prompt_service.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/securityaudit/prompt_snapshot.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/server/api_contract_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/server/middleware/group_model_allowlist_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/server/middleware/ingress_reject.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/server/middleware/request_body_read_failure.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/server/middleware/request_field_conflict.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/server/middleware/request_field_conflict_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/server/routes/composite_platform_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/server/routes/custom_admin_key_group_models_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/server/routes/gateway.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/server/routes/gateway_model_allowlist_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/server/routes/gateway_request_field_conflict_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/account.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/account_test_service.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/account_test_service_payload_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/account_test_service_typesafe.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/account_test_service_typesafe_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/account_usage_service.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/account_usage_window_cost_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/admin_service.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/admin_service_create_user_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/admin_user.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/anthropic_models_list.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/antigravity_bare429_after_loop_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/antigravity_bare429_request_scope_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/antigravity_bare429_scope.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_gateway_claude.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_gateway_compat.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_gateway_gemini.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_gateway_retry.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_gateway_service_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_gateway_streaming.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_quota_fetcher.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_quota_fetcher_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/antigravity_tool_result_images_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/auth_service.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/bedrock_request.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/claude55_thinking.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/composite_platform.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/composite_platform_thinking_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/gateway_claude_oauth_body.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/gateway_compaction_cache_ttl_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/gateway_request.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/gateway_request_json_bench_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/gateway_request_scan_benchmark_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/gateway_request_scan_equivalence_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/gateway_systemone.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/gateway_systemone_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/gemini_messages_compat_service.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/gemini_messages_compat_service_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/grok_media.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/grok_media_input_validation_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/grok_search_count.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/grok_search_usage_billing_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/image_generation_intent.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/image_generation_intent_prefilter_benchmark_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/image_generation_intent_prefilter_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/oauth_refresh_api.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/oauth_refresh_api_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_alpha_search.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_alpha_search_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_codex_model_metadata.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_codex_model_metadata_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_codex_models_service.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_codex_tool_names.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_cursor_warmup_pipeline_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_buffered_hosted_items.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_buffered_hosted_items_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_buffered_server_side_search_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_buffered_stream_parity_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_chat_completions.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_chat_completions_anthropic_native.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_deepseek_anthropic_thinking.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_deepseek_anthropic_thinking_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_grok_405_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_grok_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_kimi_dynamic_tools_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_messages.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_messages_anthropic_native.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_messages_tool_search_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_messages_web_search_sources_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_request_body.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_gateway_request_timeout_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_response_handling.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_service_hotpath_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_upstream_errors.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_gateway_usage.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_images_direct_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_images_responses.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_images_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_model_mapping.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_oauth_model_support_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_reasoning_effort_policy_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_responses_namespace.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_responses_namespace_benchmark_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_responses_namespace_equivalence_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_responses_tool_schema.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_responses_tool_schema_benchmark_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/openai_responses_tool_schema_scan_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_ws_forwarder_ingress.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_ws_forwarder_ingress_session_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_ws_http_bridge.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_ws_http_bridge_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/openai_ws_v2_passthrough_adapter.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/testdata/fuzz/FuzzOpenAIResponsesToolSchemaGatesAreNecessary/19981bffc2abbaf1",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/testdata/fuzz/FuzzOpenAIResponsesToolSchemaGatesAreNecessary/430233b3de39cf96",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/testdata/fuzz/FuzzOpenAIResponsesToolSchemaGatesAreNecessary/6c31f0fa5746a2cd",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/testdata/fuzz/FuzzOpenAIResponsesToolSchemaGatesAreNecessary/e90985907f88433e",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/token_refresh_service.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/token_refresh_service_candidates_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/token_refresh_service_test.go",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/upstream_models.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/upstream_models_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/user_platform_quota_defaults.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "backend/internal/service/websearch_config.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "A",
+      "path": "backend/internal/service/websearch_config_exa_test.go",
+      "decision": "deferred_inventory_only",
+      "reason": "Not copied; source path inventory alone is not an implementation-equivalence check."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/api/admin/settings.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/components/account/AccountUsageCell.vue",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/components/account/BulkEditAccountModal.vue",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/components/account/__tests__/AccountUsageCell.spec.ts",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/components/account/__tests__/BulkEditAccountModal.spec.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/components/admin/account/AccountActionMenu.vue",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/components/modelPlaza/PlazaModelPricingTable.vue",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/components/modelPlaza/__tests__/PlazaModelPricingTable.spec.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/i18n/locales/en/admin/accounts.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/i18n/locales/en/admin/overview.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/i18n/locales/en/admin/settings.ts",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/i18n/locales/en/dashboard.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/i18n/locales/zh/admin/accounts.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/i18n/locales/zh/admin/overview.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/i18n/locales/zh/admin/settings.ts",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/i18n/locales/zh/dashboard.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/utils/__tests__/accountUsageRefresh.spec.ts",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/utils/accountUsageRefresh.ts",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/views/admin/AccountsView.vue",
+      "decision": "selected_partial_path",
+      "reason": "Selected behavior adapted locally; other source changes in the same path are not implied."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/views/admin/SettingsView.vue",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/views/admin/__tests__/AccountsView.lite.spec.ts",
+      "decision": "preserved_local_frontend",
+      "reason": "Preserve local Vue UI; source feature/layout not selected unless explicit local changed path."
+    }
+  ]
+}

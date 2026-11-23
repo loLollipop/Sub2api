@@ -61,8 +61,18 @@ func ResponsesToAnthropicWithOptions(resp *ResponsesResponse, model string, requ
 				Type:  "tool_use",
 				ID:    fromResponsesCallID(item.CallID),
 				Name:  item.Name,
-				Input: sanitizeAnthropicToolUseInput(item.Name, item.Arguments),
+				Input: anthropicToolUseInput(item.Type, item.Name, item.Arguments),
 			})
+		case "custom_tool_call":
+			if !resp.RenderCustomToolCalls || (resp.XAIServerSideSearch && IsServerSideSearchCall(item.Type, item.CallID)) {
+				continue
+			}
+			blocks = append(blocks, AnthropicContentBlock{
+				Type: "tool_use", ID: fromResponsesCallID(item.CallID), Name: item.Name,
+				Input: anthropicToolUseInput(item.Type, item.Name, item.Input),
+			})
+		case "tool_search_call":
+			blocks = append(blocks, toolSearchCallToolUse(item))
 		case "local_shell_call":
 			name := item.Name
 			if name == "" {
@@ -164,6 +174,19 @@ func containsAnthropicToolUseBlock(blocks []AnthropicContentBlock) bool {
 		}
 	}
 	return false
+}
+
+func anthropicToolUseInput(itemType, name, raw string) json.RawMessage {
+	if trimmed := strings.TrimSpace(raw); strings.HasPrefix(trimmed, "{") && json.Valid([]byte(trimmed)) {
+		return sanitizeAnthropicToolUseInput(name, raw)
+	}
+	if itemType == "custom_tool_call" && raw != "" {
+		wrapped, err := json.Marshal(map[string]string{"input": raw})
+		if err == nil {
+			return wrapped
+		}
+	}
+	return json.RawMessage("{}")
 }
 
 func sanitizeAnthropicToolUseInput(name string, raw string) json.RawMessage {
@@ -680,6 +703,9 @@ func resToAnthHandleOutputItemDone(evt *ResponsesStreamEvent, state *ResponsesEv
 	// Handle web_search_call → synthesize server_tool_use + web_search_tool_result blocks.
 	if evt.Item.Type == "web_search_call" && evt.Item.Status == "completed" {
 		return resToAnthHandleWebSearchDone(evt, state)
+	}
+	if evt.Item.Type == "tool_search_call" {
+		return resToAnthHandleToolSearchDone(evt, state)
 	}
 	if evt.Item.Type == "local_shell_call" {
 		return resToAnthFinishLocalShell(evt, state)

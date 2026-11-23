@@ -271,8 +271,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Check if TOTP 2FA is enabled for this user
-	if h.totpService != nil && h.settingSvc.IsTotpEnabled(c.Request.Context()) && user.TotpEnabled {
+	// Check if TOTP 2FA is enabled for this user.
+	// 统一走 SettingService.LoginRequiresTOTP：功能开关读取失败时 fail-closed
+	// （要求动态码），与第三方 OAuth / passkey / pending OAuth 兑换同一口径。
+	// 这里不能用 IsTotpEnabled —— 它在设置读取失败时返回 false，会让密码登录
+	// 在设置存储抖动时静默跳过已启用账号的二次验证。
+	if h.settingSvc.LoginRequiresTOTP(c.Request.Context(), user) {
+		if h.totpService == nil {
+			response.ErrorFrom(c, service.ErrTotpUnavailable)
+			return
+		}
 		// Create a temporary login session for 2FA
 		tempToken, err := h.totpService.CreateLoginSession(c.Request.Context(), user.ID, user.Email)
 		if err != nil {
@@ -319,6 +327,11 @@ func (h *AuthHandler) Login2FA(c *gin.Context) {
 		"temp_token_len", len(req.TempToken),
 		"totp_code_len", len(req.TotpCode))
 
+	if h.totpService == nil {
+		response.ErrorFrom(c, service.ErrTotpUnavailable)
+		return
+	}
+
 	// Get the login session
 	session, err := h.totpService.GetLoginSession(c.Request.Context(), req.TempToken)
 	if err != nil || session == nil {
@@ -338,7 +351,8 @@ func (h *AuthHandler) Login2FA(c *gin.Context) {
 		"email", session.Email)
 
 	// Verify the TOTP code
-	if err := h.totpService.VerifyCode(c.Request.Context(), session.UserID, req.TotpCode); err != nil {
+	counter, err := h.totpService.VerifyLoginCode(c.Request.Context(), session.UserID, req.TotpCode)
+	if err != nil {
 		slog.Debug("login_2fa_verify_failed",
 			"user_id", session.UserID,
 			"error", err)
@@ -359,6 +373,20 @@ func (h *AuthHandler) Login2FA(c *gin.Context) {
 
 	if err := h.ensureBackendModeAllowsUser(c.Request.Context(), user); err != nil {
 		response.ErrorFrom(c, err)
+		return
+	}
+
+	if err := h.totpService.ConsumeLoginCode(c.Request.Context(), session.UserID, counter, req.TotpCode); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	consumed, err := h.totpService.ConsumeLoginSession(c.Request.Context(), req.TempToken)
+	if err != nil {
+		response.ErrorFrom(c, service.ErrTotpUnavailable)
+		return
+	}
+	if consumed == nil {
+		response.BadRequest(c, "Invalid or expired 2FA session")
 		return
 	}
 
@@ -418,9 +446,6 @@ func (h *AuthHandler) Login2FA(c *gin.Context) {
 			return
 		}
 	}
-
-	// Delete the login session (only after all checks pass)
-	_ = h.totpService.DeleteLoginSession(c.Request.Context(), req.TempToken)
 
 	if session.PendingOAuthBind == nil {
 		h.authService.RecordSuccessfulLogin(c.Request.Context(), user.ID)

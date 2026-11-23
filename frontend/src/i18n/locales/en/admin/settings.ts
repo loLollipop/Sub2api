@@ -518,7 +518,7 @@ export default {
         cacheTTL5m: '5 minutes',
         cacheTTL1h: '1 hour',
         anthropicCacheTTL1hInjection: 'Anthropic Cache TTL Injection',
-        anthropicCacheTTL1hInjectionHint: 'When enabled, existing ephemeral cache_control blocks in Anthropic OAuth/Setup Token request bodies are forced to 1h; response usage is billed back as 5m by default, with account-level TTL billing override taking priority. Individual API keys can override this (inherit / off / force 1h / force 5m); the key-level value wins.',
+        anthropicCacheTTL1hInjectionHint: 'When enabled, existing ephemeral cache_control blocks in Anthropic OAuth/Setup Token request bodies are forced to 1h, except Claude Code compaction requests, which use 5m; response usage is billed back as 5m by default, with account-level TTL billing override taking priority. Individual API keys can override this (inherit / off / force 1h / force 5m); the key-level value wins.',
         balancePreauthorizationEnabled: 'Balance preauthorization (hold)',
         balancePreauthorizationEnabledHint: 'Off by default. When on, the entry point freezes a predicted amount of balance and settles against actual usage at the end of the request. This and in-flight reservation below are two independent mechanisms; enabling both counts the same available balance twice, so pick one.',
         inflightReservationEnabled: 'In-flight balance reservation',

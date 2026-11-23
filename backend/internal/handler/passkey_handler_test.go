@@ -193,3 +193,35 @@ func TestPasskeyCredentialListRemainsAvailableWhenSignInDisabled(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, recorder.Code)
 	require.NotContains(t, recorder.Body.String(), "PASSKEY_DISABLED")
 }
+
+func TestPasskeyLoginRefusesAccountsRequiringTOTP(t *testing.T) {
+	user := &service.User{ID: 7, Status: service.StatusActive, Role: service.RoleUser, TotpEnabled: true}
+	for _, test := range []struct {
+		name, value string
+		err         error
+		reject      bool
+	}{
+		{name: "enabled", value: "true", reject: true},
+		{name: "settings unavailable", err: errors.New("database unavailable"), reject: true},
+		{name: "disabled", value: "false", reject: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &loginTOTPSettingRepo{values: map[string]string{service.SettingKeyTotpEnabled: test.value}}
+			if test.err != nil {
+				repo.errKey = service.SettingKeyTotpEnabled
+			}
+			settings := service.NewSettingService(repo, nil)
+			handler := NewPasskeyHandler(nil, nil, settings)
+			err := handler.ensureLoginAllowed(context.Background(), user)
+			if test.reject {
+				require.ErrorIs(t, err, service.ErrLoginTOTPRequired)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+	// Accounts without TOTP continue to use passkeys during a TOTP settings outage.
+	user.TotpEnabled = false
+	handler := NewPasskeyHandler(nil, nil, service.NewSettingService(&passkeySwitchSettingRepo{err: errors.New("database unavailable")}, nil))
+	require.NoError(t, handler.ensureLoginAllowed(context.Background(), user))
+}

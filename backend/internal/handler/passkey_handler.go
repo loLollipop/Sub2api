@@ -97,9 +97,7 @@ func (h *PasskeyHandler) BeginLogin(c *gin.Context) {
 }
 
 // FinishLogin validates a passkey assertion and creates a normal Sub2API token
-// session. User verification is mandatory, so a successful passkey assertion
-// already supplies phishing-resistant multi-factor authentication and does not
-// enter the separate TOTP challenge flow.
+// session. Accounts requiring TOTP must use a login flow with a TOTP challenge.
 func (h *PasskeyHandler) FinishLogin(c *gin.Context) {
 	if !h.requirePasskeysEnabled(c) {
 		return
@@ -114,7 +112,7 @@ func (h *PasskeyHandler) FinishLogin(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	if err = h.ensureBackendModeAllowsUser(c.Request.Context(), user); err != nil {
+	if err := h.ensureLoginAllowed(c.Request.Context(), user); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -226,6 +224,17 @@ func (h *PasskeyHandler) requirePasskeysEnabled(c *gin.Context) bool {
 		response.ErrorFrom(c, service.ErrPasskeysDisabled)
 	}
 	return enabled
+}
+
+// Until the passkey UI supports TOTP challenges, enforce account policy by refusing the login.
+func (h *PasskeyHandler) ensureLoginAllowed(ctx context.Context, user *service.User) error {
+	if err := h.ensureBackendModeAllowsUser(ctx, user); err != nil {
+		return err
+	}
+	if h.settingSvc.LoginRequiresTOTP(ctx, user) {
+		return service.ErrLoginTOTPRequired
+	}
+	return nil
 }
 
 func (h *PasskeyHandler) ensureBackendModeAllowsUser(ctx context.Context, user *service.User) error {

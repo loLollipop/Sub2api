@@ -669,8 +669,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		req.TencentCaptchaRegion = service.TencentCaptchaRegionCN
 	}
 
-	// Turnstile 参数验证
-	if req.TurnstileEnabled {
+	// Preserve omitted site keys when saving only part of the settings form.
+	if _, sent := sentFields["turnstile_site_key"]; !sent {
+		req.TurnstileSiteKey = previousSettings.TurnstileSiteKey
+	}
+	// Validate against the effective switch even when this payload omits it.
+	if turnstileEnabled {
 		// 检查必填字段
 		if req.TurnstileSiteKey == "" {
 			response.BadRequest(c, "Turnstile Site Key is required when enabled")

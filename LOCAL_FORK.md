@@ -30,6 +30,12 @@
 
 原生支付模块已退役，充值使用链动小铺及兑换码。服务器部署继续使用备份和校验后的受控发布流程。
 
+## 双源选择性同步（2026-11-23）
+
+二改正式检查点推进到 v2.3.153（`35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33`），原版推进到 v0.2.24（`5c2982a81b46e2142d0143d2f83c1ce9c4da1d24`）。选择性适配 Codex上下文/call_id、登录TOTP与重放、可信代理链、OAuth轮换CAS、请求体预算503、408/403/AG重试配额、ToolSearch与空终态输出、Gemini缓存/工具turn及账户快照刷新等。保留本地路由、计费、倍率和主题，个人VERSION仍为2.1.70；同步阶段仅修改工作树。用户随后授权提交 GitHub 并部署，个人发布版本准备推进至 v2.1.71，沿用 PR/CI、自有 Release/GHCR、备份实际恢复及受控切换流程；最终发布与线上验收另存证据。
+
+两源完整提交/路径盘点及选择依据见[同步记录](maintenance/notes/upstream-sync-20261123-dual.md)。scoped admin、hash-only/encryption与session大迁移未整组导入，管理出站SSRF、头像类型与自定义Key质量规则仍有明确延期；检查点不代表完整功能合并或安全全覆盖。最终验证状态和环境限制在记录及本地验收汇总中列明。
+
 ## 双源选择性同步（2026-11-18）
 
 原版正式检查点现推进至 v0.2.23（`5af9afb588c4b014b3df9db7d4073af1f8ae01b6`）；从 v0.2.22 起的真实 Git 范围为 32 个提交（20 非 merge、12 merge）和 90 个路径。此前摘要中的 34 个提交数经对象图复核已纠正。选择性适配 GPT-6.1 Terra/GPT-6.2、Ultra Fast、Fable/Mythos 5.2、Gemini4/Vertex、多协议 cache TTL/计费、可配置 Gemini retry、HTTP 请求体内存预算、流式/隐私边界及费用 rollup；补齐 AG 主动查询、刷新保留、Keys 独立用量/索引、compact usage 和公告懒加载，并校正本地已等效实现及历史误延期。二改检查点保持 v2.3.105，个人版本保持 2.1.67。后端20包3,018项回归、前后端构建与静态检查及真实窄屏交互通过；真实 PostgreSQL 并发/集成验证仍待完成。用户随后授权提交 GitHub 并部署，个人版本推进至 v2.1.68，采用 PR/CI、自有 Release/GHCR、备份恢复和新增迁移验证后的受控切换。最终发布与线上验收另存证据。完整取舍和验证限制见[原版同步记录](maintenance/notes/upstream-sync-20261118-v0223.md)及[逐项来源清单](maintenance/notes/original-selection-ledger-20261118-v0223.json)。

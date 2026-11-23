@@ -57,10 +57,13 @@ that explicitly pin 1 GiB can remove the key to use automatic sizing.
 ## Trusted client IPs
 
 `security.trust_forwarded_ip_for_api_key_acl` is enabled by default for upgrade
-compatibility. While enabled, raw forwarding headers take over client-IP
-resolution for logs and security-sensitive paths. Custom headers from
+compatibility. In either mode the TCP peer must belong to `server.trusted_proxies`
+before any forwarding header is accepted. Direct connections use their actual
+peer address. While enabled, custom headers from
 `security.forwarded_client_ip_headers` are checked in configured order before
-the built-in `CF-Connecting-IP`, `X-Real-IP`, and `X-Forwarded-For` fallback.
+the built-in headers. `X-Forwarded-For` is read from right to left, skipping
+trusted proxy hops; its first untrusted address is the client. If no such address
+exists, single-value `X-Real-IP` and then `CF-Connecting-IP` are considered.
 Header names are case-insensitive, normalized when loaded, de-duplicated, and
 limited to 16 unique valid HTTP field names. Header values must contain IP
 literals; comma-separated values are supported, invalid entries are skipped,
@@ -87,11 +90,11 @@ the process fails closed to trusted-proxy mode with no custom headers. If a
 migration write fails, the computed mode remains active for the current process
 and startup records a warning.
 
-Compatibility takeover accepts forwarded headers without validating the direct
-peer, including any configured custom header. Protect the origin from direct
-access while it is enabled. A CDN deployment must firewall the origin so only
-the CDN or load balancer can reach it, and that proxy must overwrite every
-trusted client-IP header rather than append an untrusted client value.
+Configure the proxy ranges before upgrading an existing compatibility-mode
+deployment; an empty list now ignores forwarding headers. A CDN deployment
+should also firewall the origin so only the CDN or load balancer can reach it.
+Proxies must overwrite custom single-value client-IP headers and append their
+actual peer to `X-Forwarded-For`.
 
 Example for a proxy on the same host:
 
@@ -142,7 +145,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;

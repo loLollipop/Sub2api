@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pquerna/otp"
+	"github.com/pquerna/otp/hotp"
 	"github.com/pquerna/otp/totp"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -19,6 +22,8 @@ var (
 	ErrTotpNotEnabled      = infraerrors.BadRequest("TOTP_NOT_ENABLED", "totp feature is not enabled")
 	ErrTotpAlreadyEnabled  = infraerrors.BadRequest("TOTP_ALREADY_ENABLED", "totp is already enabled for this account")
 	ErrTotpNotSetup        = infraerrors.BadRequest("TOTP_NOT_SETUP", "totp is not set up for this account")
+	ErrTotpUnavailable     = infraerrors.ServiceUnavailable("TOTP_UNAVAILABLE", "two-factor verification is unavailable")
+	ErrTotpCodeReplayed    = infraerrors.BadRequest("TOTP_CODE_REPLAYED", "totp code has already been used")
 	ErrTotpInvalidCode     = infraerrors.BadRequest("TOTP_INVALID_CODE", "invalid totp code")
 	ErrTotpSetupExpired    = infraerrors.BadRequest("TOTP_SETUP_EXPIRED", "totp setup session expired")
 	ErrTotpTooManyAttempts = infraerrors.TooManyRequests("TOTP_TOO_MANY_ATTEMPTS", "too many verification attempts, please try again later")
@@ -37,6 +42,10 @@ type TotpCache interface {
 	GetLoginSession(ctx context.Context, tempToken string) (*TotpLoginSession, error)
 	SetLoginSession(ctx context.Context, tempToken string, session *TotpLoginSession, ttl time.Duration) error
 	DeleteLoginSession(ctx context.Context, tempToken string) error
+
+	// MarkLoginCodeUsed atomically records a user/counter/code fingerprint.
+	MarkLoginCodeUsed(ctx context.Context, userID int64, codeDigest string, ttl time.Duration) (bool, error)
+	ConsumeLoginSession(ctx context.Context, tempToken string) (*TotpLoginSession, error)
 
 	// Rate limiting
 	IncrementVerifyAttempts(ctx context.Context, userID int64) (int, error)
@@ -95,6 +104,8 @@ const (
 	totpAttemptsTTL = 15 * time.Minute
 	maxTotpAttempts = 5
 	totpIssuer      = "Sub2API"
+	// Covers the entire accepted +/- one 30-second step window.
+	totpLoginReplayTTL = 5 * time.Minute
 )
 
 // TotpService handles TOTP operations
@@ -319,14 +330,62 @@ func (s *TotpService) VerifyCode(ctx context.Context, userID int64, code string)
 // verifyCode returns the exact account snapshot whose secret was verified.
 // Callers that mutate TOTP must use that snapshot as a write precondition.
 func (s *TotpService) verifyCode(ctx context.Context, userID int64, code string) (*User, error) {
+	user, _, err := s.verifyCodeWithCounter(ctx, userID, code, false)
+	return user, err
+}
+
+// VerifyLoginCode verifies without consuming a code until the account checks pass.
+func (s *TotpService) VerifyLoginCode(ctx context.Context, userID int64, code string) (int64, error) {
+	_, counter, err := s.verifyCodeWithCounter(ctx, userID, code, true)
+	return counter, err
+}
+
+// ConsumeLoginCode is independent of payment and step-up features.
+func (s *TotpService) ConsumeLoginCode(ctx context.Context, userID, counter int64, code string) error {
+	if s == nil || s.cache == nil {
+		return ErrTotpUnavailable
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%d:%d:%s", userID, counter, strings.TrimSpace(code))))
+	consumed, err := s.cache.MarkLoginCodeUsed(ctx, userID, hex.EncodeToString(sum[:]), totpLoginReplayTTL)
+	if err != nil {
+		return ErrTotpUnavailable
+	}
+	if !consumed {
+		return ErrTotpCodeReplayed
+	}
+	return nil
+}
+
+// Match the code's actual counter, so crossing a clock boundary cannot bypass replay protection.
+func matchedLoginTotpCounter(code, secret string, now time.Time) (int64, bool, error) {
+	current := now.Unix() / 30
+	for _, counter := range []int64{current, current + 1, current - 1} {
+		valid, err := hotp.ValidateCustom(code, uint64(counter), secret, hotp.ValidateOpts{Digits: otp.DigitsSix, Algorithm: otp.AlgorithmSHA1})
+		if err != nil {
+			return 0, false, err
+		}
+		if valid {
+			return counter, true, nil
+		}
+	}
+	return 0, false, nil
+}
+
+func (s *TotpService) verifyCodeWithCounter(ctx context.Context, userID int64, code string, login bool) (*User, int64, error) {
+	if login && (s == nil || s.cache == nil || s.encryptor == nil) {
+		return nil, 0, ErrTotpUnavailable
+	}
 	slog.Debug("totp_verify_code_called",
 		"user_id", userID,
 		"code_len", len(code))
 
 	// Check rate limiting
 	attempts, err := s.cache.GetVerifyAttempts(ctx, userID)
+	if login && err != nil {
+		return nil, 0, ErrTotpUnavailable
+	}
 	if err == nil && attempts >= maxTotpAttempts {
-		return nil, ErrTotpTooManyAttempts
+		return nil, 0, ErrTotpTooManyAttempts
 	}
 
 	// Get user
@@ -335,7 +394,7 @@ func (s *TotpService) verifyCode(ctx context.Context, userID int64, code string)
 		slog.Debug("totp_verify_get_user_failed",
 			"user_id", userID,
 			"error", err)
-		return nil, infraerrors.InternalServer("TOTP_VERIFY_ERROR", "failed to verify totp code")
+		return nil, 0, infraerrors.InternalServer("TOTP_VERIFY_ERROR", "failed to verify totp code")
 	}
 
 	if !user.TotpEnabled || user.TotpSecretEncrypted == nil {
@@ -343,7 +402,7 @@ func (s *TotpService) verifyCode(ctx context.Context, userID int64, code string)
 			"user_id", userID,
 			"enabled", user.TotpEnabled,
 			"has_secret", user.TotpSecretEncrypted != nil)
-		return nil, ErrTotpNotSetup
+		return nil, 0, ErrTotpNotSetup
 	}
 
 	slog.Debug("totp_verify_encrypted_secret",
@@ -356,7 +415,7 @@ func (s *TotpService) verifyCode(ctx context.Context, userID int64, code string)
 		slog.Debug("totp_verify_decrypt_failed",
 			"user_id", userID,
 			"error", err)
-		return nil, infraerrors.InternalServer("TOTP_VERIFY_ERROR", "failed to verify totp code")
+		return nil, 0, infraerrors.InternalServer("TOTP_VERIFY_ERROR", "failed to verify totp code")
 	}
 
 	slog.Debug("totp_verify_decrypted",
@@ -364,7 +423,10 @@ func (s *TotpService) verifyCode(ctx context.Context, userID int64, code string)
 		"secret_len", len(secret))
 
 	// Verify the code
-	valid := totp.Validate(code, secret)
+	counter, valid, validateErr := matchedLoginTotpCounter(code, secret, time.Now())
+	if validateErr != nil && login {
+		return nil, 0, ErrTotpUnavailable
+	}
 	slog.Debug("totp_verify_result",
 		"user_id", userID,
 		"valid", valid,
@@ -373,14 +435,18 @@ func (s *TotpService) verifyCode(ctx context.Context, userID int64, code string)
 
 	if !valid {
 		// Increment failed attempts
-		_, _ = s.cache.IncrementVerifyAttempts(ctx, userID)
-		return nil, ErrTotpInvalidCode
+		if _, err := s.cache.IncrementVerifyAttempts(ctx, userID); login && err != nil {
+			return nil, 0, ErrTotpUnavailable
+		}
+		return nil, 0, ErrTotpInvalidCode
 	}
 
 	// Clear attempt counter on success
-	_ = s.cache.ClearVerifyAttempts(ctx, userID)
+	if err := s.cache.ClearVerifyAttempts(ctx, userID); login && err != nil {
+		return nil, 0, ErrTotpUnavailable
+	}
 
-	return user, nil
+	return user, counter, nil
 }
 
 // StepUpGrantTTL 敏感操作 step-up 验证的有效窗口（sudo 模式）。
@@ -452,6 +518,11 @@ func (s *TotpService) createLoginSession(
 // GetLoginSession retrieves a login session
 func (s *TotpService) GetLoginSession(ctx context.Context, tempToken string) (*TotpLoginSession, error) {
 	return s.cache.GetLoginSession(ctx, tempToken)
+}
+
+// ConsumeLoginSession atomically removes a challenge before tokens can be issued.
+func (s *TotpService) ConsumeLoginSession(ctx context.Context, tempToken string) (*TotpLoginSession, error) {
+	return s.cache.ConsumeLoginSession(ctx, tempToken)
 }
 
 // DeleteLoginSession deletes a login session

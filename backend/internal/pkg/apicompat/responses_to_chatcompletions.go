@@ -62,6 +62,14 @@ func ResponsesToChatCompletionsWithOptions(resp *ResponsesResponse, model string
 					Arguments: item.Arguments,
 				},
 			})
+		case "custom_tool_call":
+			if !resp.RenderCustomToolCalls || (resp.XAIServerSideSearch && IsServerSideSearchCall(item.Type, item.CallID)) {
+				continue
+			}
+			toolCalls = append(toolCalls, ChatToolCall{
+				ID: item.CallID, Type: "function",
+				Function: ChatFunctionCall{Name: item.Name, Arguments: item.Input},
+			})
 		case "reasoning":
 			if requireReasoningContent {
 				reasoningText += responsesReasoningContentText(item.Content)

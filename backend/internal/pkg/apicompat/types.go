@@ -83,6 +83,7 @@ type AnthropicContentBlock struct {
 	ToolUseID string          `json:"tool_use_id,omitempty"`
 	Content   json.RawMessage `json:"content,omitempty"` // string or []AnthropicContentBlock
 	IsError   bool            `json:"is_error,omitempty"`
+	ToolName  string          `json:"tool_name,omitempty"`
 }
 
 func (b AnthropicContentBlock) MarshalJSON() ([]byte, error) {
@@ -118,6 +119,7 @@ type AnthropicImageSource struct {
 
 // AnthropicTool describes a tool available to the model.
 type AnthropicTool struct {
+	DeferLoading bool                   `json:"defer_loading,omitempty"`
 	Type         string                 `json:"type,omitempty"` // e.g. "web_search_20250305" for server tools
 	Name         string                 `json:"name"`
 	Description  string                 `json:"description,omitempty"`
@@ -419,6 +421,8 @@ type ResponsesRequest struct {
 	PromptCacheOptions json.RawMessage        `json:"prompt_cache_options,omitempty"`
 	PromptCacheKey     string                 `json:"prompt_cache_key,omitempty"`
 	PreviousResponseID string                 `json:"previous_response_id,omitempty"`
+	// Preserve Chat stop sequences when a Responses-shaped request is bridged back.
+	Stop json.RawMessage `json:"stop,omitempty"`
 }
 
 // ResponsesReasoning configures reasoning effort in the Responses API.
@@ -522,6 +526,7 @@ type ResponsesContentPart struct {
 
 // ResponsesTool describes a tool in the Responses API.
 type ResponsesTool struct {
+	Execution    string                 `json:"execution,omitempty"`
 	CacheControl *AnthropicCacheControl `json:"cache_control,omitempty"`
 	Type         string                 `json:"type"` // "function" | "custom" | "web_search" | "x_search" | "local_shell" etc.
 	Name         string                 `json:"name,omitempty"`
@@ -588,8 +593,13 @@ func (u unixSeconds) MarshalJSON() ([]byte, error) {
 
 // ResponsesResponse is the non-streaming response from POST /v1/responses.
 type ResponsesResponse struct {
-	ID     string `json:"id"`
-	Object string `json:"object"` // "response"
+	BufferedOutputRebuilt bool `json:"-"`
+	// Buffered reconstruction renders client custom tools while keeping xAI
+	// server searches internal. These flags never appear on the wire.
+	RenderCustomToolCalls bool   `json:"-"`
+	XAIServerSideSearch   bool   `json:"-"`
+	ID                    string `json:"id"`
+	Object                string `json:"object"` // "response"
 	// CreatedAt is the unix creation timestamp. Strict Responses clients declare
 	// it non-optional and abort with `missing field 'created_at'` when it is
 	// absent, so it is always emitted — no omitempty. Same rule as ID (see the

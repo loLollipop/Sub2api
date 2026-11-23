@@ -3,6 +3,7 @@ package ip
 
 import (
 	"net"
+	"net/netip"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,22 +14,55 @@ const forwardedIPSettingsKey = "sub2api.forwarded_ip_settings"
 type forwardedIPSettings struct {
 	trustForwarded bool
 	headers        []string
+	trustedProxies []netip.Prefix
 }
 
-// SetForwardedIPSettings snapshots the forwarded-IP mode and custom header list
-// for this request.
-func SetForwardedIPSettings(c *gin.Context, enabled bool, headers []string) {
+// SetForwardedIPSettings snapshots forwarding settings and trusted proxy ranges.
+// Omitted proxy ranges trust no forwarding headers.
+func SetForwardedIPSettings(c *gin.Context, enabled bool, headers []string, trustedProxies ...[]string) {
 	if c == nil {
 		return
+	}
+	var prefixes []netip.Prefix
+	if len(trustedProxies) > 0 {
+		prefixes = parseTrustedProxyPrefixes(trustedProxies[0])
 	}
 	c.Set(forwardedIPSettingsKey, forwardedIPSettings{
 		trustForwarded: enabled,
 		headers:        append([]string(nil), headers...),
+		trustedProxies: prefixes,
 	})
 }
 
-// SetLegacyForwardedIPTrust records whether raw forwarding headers override
-// Gin's server.trusted_proxies chain for this request.
+func parseTrustedProxyPrefixes(values []string) []netip.Prefix {
+	prefixes := make([]netip.Prefix, 0, len(values))
+	for _, raw := range values {
+		raw = strings.TrimSpace(raw)
+		if prefix, err := netip.ParsePrefix(raw); err == nil {
+			prefixes = append(prefixes, prefix.Masked())
+		} else if addr, err := netip.ParseAddr(raw); err == nil {
+			addr = addr.Unmap()
+			prefixes = append(prefixes, netip.PrefixFrom(addr, addr.BitLen()))
+		}
+	}
+	return prefixes
+}
+
+func engineTrustedProxy(raw string, prefixes []netip.Prefix) bool {
+	addr, err := netip.ParseAddr(raw)
+	if err != nil {
+		return false
+	}
+	addr = addr.Unmap()
+	for _, prefix := range prefixes {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
+// SetLegacyForwardedIPTrust selects forwarding mode without trusting any proxy.
 func SetLegacyForwardedIPTrust(c *gin.Context, enabled bool) {
 	SetForwardedIPSettings(c, enabled, nil)
 }
@@ -50,10 +84,8 @@ func requestUsesLegacyForwardedIPTrust(c *gin.Context) bool {
 	return !ok || settings.trustForwarded
 }
 
-// GetClientIP resolves the client address using the legacy forwarding-header
-// precedence used before the trusted-proxy hardening. It remains the
-// compatibility path for request metadata and usage/error logs; security-
-// sensitive callers must use GetTrustedClientIP or GetSecurityClientIP.
+// GetClientIP accepts forwarding headers only from a configured trusted peer.
+// XFF is traversed from the nearest proxy towards the client.
 func GetClientIP(c *gin.Context) string {
 	if c == nil {
 		return ""
@@ -63,34 +95,40 @@ func GetClientIP(c *gin.Context) string {
 	}
 
 	settings, _ := requestForwardedIPSettings(c)
-	customIP, customFallback := resolveCustomForwardedClientIP(c, settings.headers)
+	if c.Request == nil {
+		return ""
+	}
+	peer := normalizeIP(c.Request.RemoteAddr)
+	if !engineTrustedProxy(peer, settings.trustedProxies) {
+		return peer
+	}
+	customIP, customFallback := resolveCustomForwardedClientIP(c, settings.headers, settings.trustedProxies)
 	if customIP != "" {
 		return customIP
 	}
 
-	// Preserve the historical precedence used by existing reverse-proxy
-	// deployments, while skipping an internal proxy address when a public XFF
-	// value is available. This covers Docker/Nginx setups that accidentally
-	// write the bridge address into X-Real-IP.
-	legacyIP, legacyFallback := resolveLegacyForwardedHeaderIP(c)
+	legacyIP := resolveLegacyForwardedHeaderIP(c, settings.trustedProxies)
 	if legacyIP != "" {
 		return legacyIP
 	}
 	if customFallback != "" {
 		return customFallback
 	}
-	if legacyFallback != "" {
-		return legacyFallback
-	}
-	return normalizeIP(c.ClientIP())
+	return peer
 }
 
-func resolveCustomForwardedClientIP(c *gin.Context, headers []string) (string, string) {
+func resolveCustomForwardedClientIP(c *gin.Context, headers []string, trustedProxies []netip.Prefix) (string, string) {
 	if c == nil {
 		return "", ""
 	}
 	var fallback string
 	for _, header := range headers {
+		if strings.EqualFold(header, "X-Forwarded-For") {
+			if client := rightmostForwardedForClientIP(strings.Join(c.Request.Header.Values(header), ","), trustedProxies); client != "" {
+				return client, fallback
+			}
+			continue
+		}
 		for _, value := range c.Request.Header.Values(header) {
 			for _, candidate := range strings.Split(value, ",") {
 				parsed := net.ParseIP(strings.TrimSpace(candidate))
@@ -111,40 +149,25 @@ func resolveCustomForwardedClientIP(c *gin.Context, headers []string) (string, s
 	return "", fallback
 }
 
-func resolveLegacyForwardedHeaderIP(c *gin.Context) (string, string) {
-	var fallback string
-	if forwarded := normalizeValidIP(c.GetHeader("CF-Connecting-IP")); forwarded != "" {
-		fallback = forwarded
-		if !isPrivateIP(forwarded) {
-			return forwarded, fallback
-		}
+func resolveLegacyForwardedHeaderIP(c *gin.Context, trustedProxies []netip.Prefix) string {
+	if client := rightmostForwardedForClientIP(c.GetHeader("X-Forwarded-For"), trustedProxies); client != "" {
+		return client
 	}
 	if realIP := normalizeValidIP(c.GetHeader("X-Real-IP")); realIP != "" {
-		if fallback == "" {
-			fallback = realIP
-		}
-		if !isPrivateIP(realIP) {
-			return realIP, fallback
+		return realIP
+	}
+	return normalizeValidIP(c.GetHeader("CF-Connecting-IP"))
+}
+
+func rightmostForwardedForClientIP(raw string, trustedProxies []netip.Prefix) string {
+	parts := strings.Split(raw, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		candidate := normalizeValidIP(parts[i])
+		if candidate != "" && !engineTrustedProxy(candidate, trustedProxies) {
+			return candidate
 		}
 	}
-	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
-		ips := strings.Split(xff, ",")
-		for _, candidate := range ips {
-			candidate = normalizeValidIP(candidate)
-			if candidate != "" && !isPrivateIP(candidate) {
-				return candidate, fallback
-			}
-		}
-		if fallback == "" {
-			for _, candidate := range ips {
-				if candidate = normalizeValidIP(candidate); candidate != "" {
-					fallback = candidate
-					break
-				}
-			}
-		}
-	}
-	return "", fallback
+	return ""
 }
 
 // GetTrustedClientIP 从 Gin 的可信代理解析链提取客户端 IP。
@@ -158,9 +181,8 @@ func GetTrustedClientIP(c *gin.Context) string {
 }
 
 // GetSecurityClientIP returns the address used by security-sensitive paths.
-// When legacy forwarded-IP trust is enabled, raw forwarding headers take over
-// client-IP resolution. When disabled, Gin's server.trusted_proxies chain is
-// authoritative.
+// Forwarding mode requires a trusted TCP peer; otherwise use its actual address.
+// When disabled, Gin's server.trusted_proxies chain is authoritative.
 func GetSecurityClientIP(c *gin.Context, trustForwarded bool) string {
 	if requestSettings, ok := requestForwardedIPSettings(c); ok {
 		trustForwarded = requestSettings.trustForwarded

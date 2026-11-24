@@ -10,7 +10,7 @@
 | **项目仓库** | loLollipop/Sub2api |
 | **技术栈** | Go 后端 (Ent ORM + Gin) + Vue3 前端 (pnpm) |
 | **数据库** | PostgreSQL 16 + Redis |
-| **包管理** | 后端: go modules, 前端: **pnpm**（不是 npm） |
+| **包管理** | 后端: go modules；控制台: pnpm；独立画布: npm（canvas/web/package-lock.json） |
 
 ## 二、本地环境配置
 
@@ -54,7 +54,7 @@ npm install -g pnpm
 ### CI 要求
 
 - Go 版本必须是 **1.27.4**：三个 workflow 都用 `go-version-file: backend/go.mod` 取版本，随后硬断言 `go version | grep -q 'go1.27.4'`。升级 Go 时要同时改 `backend/go.mod`、`backend-ci.yml`（两处）、`release.yml`、`security-scan.yml` 里的这句断言，以及三个 Dockerfile 里的 Go 构建镜像（`Dockerfile` / `deploy/Dockerfile` 的 `ARG GOLANG_IMAGE`、`backend/Dockerfile` 的 `FROM golang:`）。
-- 前端使用 `pnpm install --frozen-lockfile`，必须提交 `pnpm-lock.yaml`
+- 控制台使用 `pnpm install --frozen-lockfile`；画布在仓库根目录运行 `npm --prefix canvas/web ci --ignore-scripts --no-audit --no-fund`。两者分别维护锁文件。控制台 build 会先构建 Vue，再构建画布，最后使用 Go embed 编译后端；详见 `canvas/README.md`。
 
 ### 本地测试命令
 

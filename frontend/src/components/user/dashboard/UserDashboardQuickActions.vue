@@ -5,6 +5,10 @@
         <Icon class="signal-action-icon" name="key" size="sm" />
         <span class="signal-action-label">{{ t('dashboard.createApiKey') }}</span>
       </RouterLink>
+      <RouterLink class="signal-action" to="/infinite-canvas">
+        <Icon class="signal-action-icon" name="sparkles" size="sm" />
+        <span class="signal-action-label">{{ t('infiniteCanvas.title') }}</span>
+      </RouterLink>
       <RouterLink class="signal-action" to="/usage">
         <Icon class="signal-action-icon" name="chart" size="sm" />
         <span class="signal-action-label">{{ t('dashboard.viewUsage') }}</span>
@@ -47,8 +51,8 @@ onMounted(() => {
 
 <style scoped>
 .signal-actions { display: grid; gap: 10px; min-width: 0; }
-.signal-actions-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; min-width: 0; }
-.signal-actions-list--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.signal-actions-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; min-width: 0; }
+.signal-actions-list--five { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .signal-action { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 46px; padding: 12px; border: 1px solid var(--signal-line); border-radius: 10px; background: var(--signal-surface); color: var(--signal-text); text-align: left; transition: background-color 140ms ease; }
 .signal-action-icon { width: 16px; height: 16px; flex: 0 0 16px; color: var(--signal-muted); }
 .signal-action-label { min-width: 0; font-size: 13px; line-height: 20px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

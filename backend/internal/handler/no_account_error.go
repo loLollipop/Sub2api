@@ -37,6 +37,23 @@ type noAccountErrorClassification struct {
 	ModelNotFound bool
 }
 
+// clientNoAccountMessage keeps scheduler diagnostics in server logs. The
+// caller receives a stable capacity message; precise model/plan verdicts keep
+// their existing public text and status.
+func clientNoAccountMessage(cls noAccountErrorClassification) string {
+	if cls.ModelNotFound {
+		return cls.Message
+	}
+	switch cls.Status {
+	case http.StatusServiceUnavailable:
+		return "No available accounts for this request. Please retry later."
+	case http.StatusTooManyRequests:
+		return "No available accounts: all available accounts are currently rate-limited. Please retry later."
+	default:
+		return cls.Message
+	}
+}
+
 var selectionModelRateLimitedPattern = regexp.MustCompile(`(?:model_rate_limited|rate_limited)=(\d+)`)
 var selectionPoolPattern = regexp.MustCompile(`pool=(\d+)`)
 var selectionModelNotSupportedPattern = regexp.MustCompile(`model_not_supported=(\d+)`)

@@ -33,6 +33,17 @@ const (
 //go:embed all:dist
 var frontendFS embed.FS
 
+func bundledCanvasFS() fs.FS {
+	assets, err := fs.Sub(frontendFS, "dist/canvas")
+	if err != nil {
+		return nil
+	}
+	if _, err := fs.Stat(assets, "index.html"); err != nil {
+		return nil
+	}
+	return assets
+}
+
 // PublicSettingsProvider is an interface to fetch public settings
 type PublicSettingsProvider interface {
 	GetPublicSettingsForInjection(ctx context.Context) (any, error)

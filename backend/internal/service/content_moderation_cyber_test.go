@@ -149,8 +149,8 @@ func TestRecordCyberPolicyEvent_WritesLogWhenEnabled(t *testing.T) {
 	// endpoint
 	require.Equal(t, "/v1/responses", log.Endpoint)
 
-	// violation count >= 1 (side-effects ran)
-	require.GreaterOrEqual(t, log.ViolationCount, 1)
+	// Default cyber events are logged without contributing to auto-ban counts.
+	require.Zero(t, log.ViolationCount)
 
 	// Error field should also contain the upstream body JSON
 	require.True(t, strings.Contains(log.Error, "cyber_policy") || strings.Contains(log.Error, "flagged"),
@@ -194,9 +194,8 @@ func TestRecordCyberPolicyEvent_RespectsContentModerationScope(t *testing.T) {
 			config:     `{"enabled":false,"mode":"off","sample_rate":0,"all_groups":false,"group_ids":[7],"model_filter":{"type":"include","models":["gpt-5"]},"ban_threshold":1}`,
 			groupID:    &groupID,
 			model:      "gpt-5",
-			wantCalls:  []bool{false},
 			wantLogs:   1,
-			wantBanned: true,
+			wantBanned: false,
 		},
 	}
 
@@ -374,11 +373,14 @@ func TestApplyFlaggedAccountSideEffects_PassesExcludeCyberFlag(t *testing.T) {
 	userID := int64(42)
 
 	cfgExclude := defaultContentModerationConfig()
+	cfgExclude.Enabled = true
 	cfgExclude.CyberPolicyExcludeFromBanCount = true
 	svc.applyFlaggedAccountSideEffects(context.Background(), cfgExclude, &ContentModerationLog{Flagged: true, UserID: &userID})
 
-	cfgDefault := defaultContentModerationConfig() // 默认 false
-	svc.applyFlaggedAccountSideEffects(context.Background(), cfgDefault, &ContentModerationLog{Flagged: true, UserID: &userID})
+	cfgInclude := defaultContentModerationConfig()
+	cfgInclude.Enabled = true
+	cfgInclude.CyberPolicyExcludeFromBanCount = false
+	svc.applyFlaggedAccountSideEffects(context.Background(), cfgInclude, &ContentModerationLog{Flagged: true, UserID: &userID})
 
 	require.Equal(t, []bool{true, false}, repo.snapshotCountCalls(),
 		"applyFlaggedAccountSideEffects 必须把 cfg.CyberPolicyExcludeFromBanCount 透传给 COUNT 查询")
@@ -412,11 +414,12 @@ func TestRecordCyberPolicyEvent_ExcludeFromBanCount_SkipsBanJudgment(t *testing.
 	require.False(t, logs[0].AutoBanned)
 }
 
-func TestRecordCyberPolicyEvent_DefaultCountsTowardBan(t *testing.T) {
+func TestRecordCyberPolicyEvent_ExplicitEnabledPolicyCountsTowardBan(t *testing.T) {
 	repo := &banCountArgsTestRepo{}
 	svc := NewContentModerationService(
 		&contentModerationTestSettingRepo{values: map[string]string{
-			SettingKeyRiskControlEnabled: "true",
+			SettingKeyRiskControlEnabled:      "true",
+			SettingKeyContentModerationConfig: `{"enabled":true,"cyber_policy_exclude_from_ban_count":false}`,
 		}},
 		repo, nil, nil, nil, nil, nil, nil,
 	)
@@ -431,8 +434,8 @@ func TestRecordCyberPolicyEvent_DefaultCountsTowardBan(t *testing.T) {
 	})
 
 	require.Equal(t, []bool{false}, repo.snapshotCountCalls(),
-		"默认配置必须执行计数查询且不排除 cyber 行")
+		"显式开启审核并计入 cyber 时必须执行计数查询")
 	logs := repo.snapshotLogs()
 	require.Len(t, logs, 1)
-	require.GreaterOrEqual(t, logs[0].ViolationCount, 1, "默认路径行为不变（现状回归）")
+	require.GreaterOrEqual(t, logs[0].ViolationCount, 1, "保留已有显式计数规则")
 }

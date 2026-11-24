@@ -44,6 +44,7 @@ archives:
       - LICENSE*
       - NOTICE.md
       - LOCAL_FORK.md
+      - canvas/LICENSE
       - README*
       - deploy/*
       - src: backend/scripts/quality-renderer/*.mjs
@@ -82,6 +83,7 @@ dockers:
       - LICENSE
       - NOTICE.md
       - LOCAL_FORK.md
+      - canvas/LICENSE
       - deploy/docker-entrypoint.sh
       - deploy/update-orchestrator.sh
       - backend/resources
@@ -102,6 +104,7 @@ dockers:
       - LICENSE
       - NOTICE.md
       - LOCAL_FORK.md
+      - canvas/LICENSE
       - deploy/docker-entrypoint.sh
       - deploy/update-orchestrator.sh
       - backend/resources
@@ -123,6 +126,7 @@ dockers:
       - LICENSE
       - NOTICE.md
       - LOCAL_FORK.md
+      - canvas/LICENSE
       - deploy/docker-entrypoint.sh
       - deploy/update-orchestrator.sh
       - backend/resources
@@ -144,6 +148,7 @@ dockers:
       - LICENSE
       - NOTICE.md
       - LOCAL_FORK.md
+      - canvas/LICENSE
       - deploy/docker-entrypoint.sh
       - deploy/update-orchestrator.sh
       - backend/resources

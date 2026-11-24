@@ -40,6 +40,8 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/auth/__tests__/WechatCallbackView.spec.ts \
 	src/views/auth/__tests__/OAuthCallbackView.spec.ts \
 	src/views/auth/__tests__/OidcCallbackView.spec.ts \
+	src/utils/__tests__/infiniteCanvas.spec.ts \
+	src/utils/__tests__/infiniteCanvasSession.spec.ts \
 	src/utils/__tests__/accountUsageRefresh.spec.ts \
 	src/utils/__tests__/upstreamFailure.spec.ts \
 	src/views/user/__tests__/PaymentView.spec.ts \
@@ -126,7 +128,7 @@ build: build-frontend build-backend
 build-backend:
 	@$(MAKE) -C backend build
 
-# 编译前端（需要已安装依赖）
+# 编译控制台及原版图片画布（两者需分别安装锁定依赖，见 canvas/README.md）
 build-frontend:
 	@pnpm --dir frontend run build
 

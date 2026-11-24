@@ -1,0 +1,1184 @@
+{
+  "date": "2026-11-24",
+  "scope": "Selective source behavior backports and original Infinite Canvas image-only integration; not a complete upstream merge.",
+  "personal_head": "c5d9382f9922386c25e8fd4bfe0ac2e323e4719c",
+  "personal_version": "2.1.72",
+  "sources": {
+    "fork": {
+      "from": "48a099e125e09142ca85a13fb263363801bb8f78",
+      "to": "22b47efd2062325e8a2924a6f006457858a9dd93",
+      "tag": "v2.3.158",
+      "commit_count": 14,
+      "path_count": 98,
+      "review_depth": "All commits/paths inventoried; source implementation/callers read for selected slices and canvas reference. Deferred paths are not claimed line-by-line audited.",
+      "commits": [
+        {
+          "commit": "22b47efd2062325e8a2924a6f006457858a9dd93",
+          "subject": "docs(release): 添加 v2.3.158 发版说明 (#601)",
+          "decision": "excluded_source_release_metadata",
+          "reason": "Keep personal VERSION 2.1.72 and this project's release process."
+        },
+        {
+          "commit": "b53c954d10c072a3e3451be4018be47d68cb2cb8",
+          "subject": "feat(keys): 页面过期自动提示并强制刷新；创建 Key 弹窗改成 Quiet 流程；登录密码交给浏览器自动填充 (#600)",
+          "decision": "deferred",
+          "reason": "Quiet key flows/factor grants and forced-refresh UI are independent from built-in canvas; preserve current local key contracts."
+        },
+        {
+          "commit": "8324a8a5902164a78148f09ac64a8e7b7b77b985",
+          "subject": "fix(内容审核): 主开关联动自动封禁、cyber_policy 默认不计入封禁、封禁通知管理员 (#599)",
+          "decision": "selected_slices",
+          "reason": "Master-switch enforcement before counting/ban; cyber default exclusion with explicit stored policy retained; matching UI. Admin email routing not imported."
+        },
+        {
+          "commit": "2fbe459ee2b0f1fa1dc4a0031280de9079853abf",
+          "subject": "chore: sync VERSION to 2.3.157 [skip ci]",
+          "decision": "excluded_source_release_metadata",
+          "reason": "Keep personal VERSION 2.1.72 and this project's release process."
+        },
+        {
+          "commit": "6aaaccd6a55a3911d4cdc8af522c709841001a81",
+          "subject": "docs(release): 添加 v2.3.157 发版说明 (#598)",
+          "decision": "excluded_source_release_metadata",
+          "reason": "Keep personal VERSION 2.1.72 and this project's release process."
+        },
+        {
+          "commit": "49fd05e81710d5dcdcbe84ee9943e8a2cea5d78c",
+          "subject": "fix(usage): 筛选面板改成整齐网格，修搜索下拉的裁切 / 不能边输边搜 / 「全部」显示成「请选择」 (#597)",
+          "decision": "deferred",
+          "reason": "Retain local filters/theme; source grid/combobox change depends on Nuxt UI."
+        },
+        {
+          "commit": "10173c147860027c446fac66b2cbb6374f8c039a",
+          "subject": "fix(gateway): 选不到账号的错误响应不再暴露调度内部诊断，分类改读结构化计数 (#593)",
+          "decision": "selected_slices",
+          "reason": "Caller-facing capacity error privacy adapted at all five raw-error entrypoints. Structured scheduling counts/model catalog expansion remain deferred."
+        },
+        {
+          "commit": "bd8cc065af62c108ec6b039c9b7a96a634420644",
+          "subject": "chore: sync VERSION to 2.3.156 [skip ci]",
+          "decision": "excluded_source_release_metadata",
+          "reason": "Keep personal VERSION 2.1.72 and this project's release process."
+        },
+        {
+          "commit": "ec0f9a2cc3f66c28676274417ff37f35cb2ae1b0",
+          "subject": "docs(release): 添加 v2.3.156 发版说明 (#596)",
+          "decision": "excluded_source_release_metadata",
+          "reason": "Keep personal VERSION 2.1.72 and this project's release process."
+        },
+        {
+          "commit": "bb88f8157181b83ef287a567c0724270d26ee52f",
+          "subject": "test(cryptopay): 链证明缓存在测试进程里默认失效，修 wrong_chain 用例偶发失败 (#595)",
+          "decision": "excluded_removed_module",
+          "reason": "Native crypto payments remain retired."
+        },
+        {
+          "commit": "f03d1aefd233803855b7a4fe0f6e3ca6cdbd257a",
+          "subject": "fix(security): outbound model sync and account-test requests only reach public hosts (#591)",
+          "decision": "deferred",
+          "reason": "Public-host validation depends on previously deferred outbound resolver/safe-dial infrastructure; no claim to fix model-sync SSRF in this slice."
+        },
+        {
+          "commit": "b5c6143292522589eb0a0c065b557ffd2727b03b",
+          "subject": "feat(backup): 关键表快照模式（排除大表数据 + age 加密 + 体积上限，默认关闭） (#583)",
+          "decision": "deferred",
+          "reason": "Critical-table snapshots, encryption and size-cap configuration are an independent backup lifecycle/dependency change."
+        },
+        {
+          "commit": "e3426c42237a8f5e776143d8fdf80fe62f1b63b8",
+          "subject": "fix(gateway): 智能路由入口协议守卫按全部候选分组判定；Responses 桥入站 query 改白名单 (#592)",
+          "decision": "deferred",
+          "reason": "Local ingress protocol guards and Responses bridge differ; retain native routing and existing allowlisted conversion behavior."
+        },
+        {
+          "commit": "b828bd54b030483d2c763a58f6cada3a4c7119e2",
+          "subject": "chore: sync VERSION to 2.3.155 [skip ci]",
+          "decision": "excluded_source_release_metadata",
+          "reason": "Keep personal VERSION 2.1.72 and this project's release process."
+        }
+      ],
+      "paths": [
+        {
+          "path": ".github/privacy-fixture-allowlist.json",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/cmd/server/VERSION",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/cmd/server/wire_gen.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/go.mod",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/go.sum",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/config/backup_config_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/config/config.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/cryptopay/scanner/chain_proof_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/admin/account_handler_available_models_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/admin/backup_handler_restore_guard_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/gateway_handler.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/handler/gateway_handler_chat_completions.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/handler/gateway_handler_responses.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/handler/gateway_protocol_mismatch.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/gateway_protocol_mismatch_routes_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/gemini_v1beta_handler.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/handler/no_account_error.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/handler/no_account_error_disclosure_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/no_account_error_e2e_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/no_account_error_entrypoints_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/no_account_error_smart_route_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/no_account_error_structured_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/no_account_error_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/setting_handler_public_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/wire.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/account_ops_scan_r4_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/backup_pg_dumper.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/backup_pg_dumper_critical_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/backup_pg_dumper_failure_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/http_upstream.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/http_upstream_public_hosts_dial_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/model_sync_ssrf_e2e_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/account_test_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/api_key_verification.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/api_key_verification_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/backup_archive.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/backup_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/backup_service_closing_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/backup_service_critical_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/backup_service_integrity_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/backup_service_retention_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/backup_service_stale_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/channel_monitor_ssrf.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/content_moderation.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/service/content_moderation_autoban_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/content_moderation_cyber_test.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/service/content_moderation_test.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/service/crs_sync_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/email_service_smtp_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_forward_as_responses.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_forward_as_responses_query_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_key_routes.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_model_availability.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_model_availability_keys_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_scheduling.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/http_upstream_profile.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_account_scheduler.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_deepseek_tools.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_gateway_scheduling.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/outbound_host_public_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/scheduler_model_buckets.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/security_penalty_provider.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/security_penalty_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/selection_failure_error.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/selection_failure_error_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/selection_failure_openai_producer_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/testmain_no_unit_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/upstream_billing_probe_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/upstream_model_sync_ssrf_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/upstream_models.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "deploy/config.example.yaml",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "docs/release-notes/v2.3.156.md",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "docs/release-notes/v2.3.157.md",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "docs/release-notes/v2.3.158.md",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/App.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/admin/usage/UsageFilters.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/admin/usage/__tests__/UsageFilters.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/common/AppUpdateBanner.vue",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/common/AppUpdateDialog.vue",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/common/DateRangePicker.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/common/QuietStepHead.vue",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/common/__tests__/DateRangePicker.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/keys/KeyFactorVerification.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/keys/__tests__/KeyFactorVerification.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/composables/__tests__/useAppUpdate.spec.ts",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/composables/useAppUpdate.ts",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/en/admin/overview.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/en/admin/resources.ts",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "frontend/src/i18n/locales/en/common.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/en/dashboard.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/zh/admin/overview.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/zh/admin/resources.ts",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "frontend/src/i18n/locales/zh/common.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/zh/dashboard.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/admin/BackupView.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/admin/__tests__/BackupView.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/user/KeysView.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/user/__tests__/KeysView.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        }
+      ]
+    },
+    "original": {
+      "from": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+      "to": "348997267d756eab5729bb6b78a275a15d18796a",
+      "tag": "v0.2.25",
+      "commit_count": 15,
+      "path_count": 91,
+      "review_depth": "All commits/paths inventoried; source implementation/callers read for selected slices and canvas reference. Deferred paths are not claimed line-by-line audited.",
+      "commits": [
+        {
+          "commit": "348997267d756eab5729bb6b78a275a15d18796a",
+          "subject": "Merge pull request #9052 from Wei-Shaw/feat/header-override-identity-variables",
+          "decision": "reviewed_metadata",
+          "reason": "Merge identity only; constituent behavior decisions recorded separately."
+        },
+        {
+          "commit": "c5147eab167f07242c637c9de7b2f3e187fee693",
+          "subject": "fix(accounts): 身份上报变量审计修复",
+          "decision": "deferred",
+          "reason": "Group-name/note auto-sync, billing display expansion and identity-reporting header variables form independent account/API/UI changes; retain current local privacy and repository update semantics."
+        },
+        {
+          "commit": "0f1e3c1f6ad5442c309818dff8da71dba46e7b2d",
+          "subject": "feat(accounts): 请求头覆写支持身份上报变量",
+          "decision": "deferred",
+          "reason": "Group-name/note auto-sync, billing display expansion and identity-reporting header variables form independent account/API/UI changes; retain current local privacy and repository update semantics."
+        },
+        {
+          "commit": "00c51f07d2d2707d73808fee78c149735478006e",
+          "subject": "Merge pull request #9045 from itzhan/fix/openai-passthrough-400-error-forwarding",
+          "decision": "reviewed_metadata",
+          "reason": "Merge identity only; constituent behavior decisions recorded separately."
+        },
+        {
+          "commit": "4d4433df09d27e7122e58559f77098c8e077b312",
+          "subject": "Merge pull request #9008 from Brisbanehuang/codex/key-billing-group-details",
+          "decision": "reviewed_metadata",
+          "reason": "Merge identity only; constituent behavior decisions recorded separately."
+        },
+        {
+          "commit": "eabf37852a2fde06afe5cebcaefd19b307add1bc",
+          "subject": "fix(openai): compact response.failed 改写容量降载码，空白 code 回退内嵌提取",
+          "decision": "selected_slices",
+          "reason": "Compact terminal code preservation with capacity codes normalized, embedded-code fallback for blank codes."
+        },
+        {
+          "commit": "34423bf1e10f8464e3d22b9ae77c81e2624e54a5",
+          "subject": "fix(accounts): 上游分组文字先修剪再校验控制字符",
+          "decision": "deferred",
+          "reason": "Group-name/note auto-sync, billing display expansion and identity-reporting header variables form independent account/API/UI changes; retain current local privacy and repository update semantics."
+        },
+        {
+          "commit": "797fde4e95ca2cf61c94c850b44c911cc62f0756",
+          "subject": "fix(deps): 升级 gorilla/websocket 修复 GO-2026-6278",
+          "decision": "already_covered",
+          "reason": "Local gorilla/websocket was already upgraded with the prior v2.1.72 synchronization."
+        },
+        {
+          "commit": "ba9df6f1c31e87c5d476543fd0c02e3c6e3620d8",
+          "subject": "fix(deps): 升级 gorilla/websocket 修复 GO-2026-6278",
+          "decision": "already_covered",
+          "reason": "Same dependency repair already present locally."
+        },
+        {
+          "commit": "38903b6d1d4565cdadc6faa8cefc9cbbad3c6f9e",
+          "subject": "fix(accounts): 上游分组文字入库前校验，include 支持多值",
+          "decision": "deferred",
+          "reason": "Group-name/note auto-sync, billing display expansion and identity-reporting header variables form independent account/API/UI changes; retain current local privacy and repository update semantics."
+        },
+        {
+          "commit": "4339d50615ecbfab36f0cf35945507ba2a4e3681",
+          "subject": "fix(openai): 修复透传错误脱敏越界并收紧结构化错误字段",
+          "decision": "selected_slices",
+          "reason": "Unicode-safe host masking and bounded scalar error type/code/param; do not echo arbitrary error extensions."
+        },
+        {
+          "commit": "2b7437832182004a390d75177bf9a4bac367605c",
+          "subject": "fix(openai): preserve invalid_encrypted_content and apply error passthrough rules in passthrough mode",
+          "decision": "selected_slices",
+          "reason": "Structured deterministic encrypted/context-window errors, administrator error rules, safe header envelope; retain local financial guard and status semantics."
+        },
+        {
+          "commit": "03aa05fd9fa0d33757aa70833da170adbe9f1263",
+          "subject": "feat(accounts): 按账号自动同步上游分组名称与备注",
+          "decision": "deferred",
+          "reason": "Group-name/note auto-sync, billing display expansion and identity-reporting header variables form independent account/API/UI changes; retain current local privacy and repository update semantics."
+        },
+        {
+          "commit": "a95c9e263193c17eef84fd5dc15ae5202773e9b4",
+          "subject": "feat(accounts): 支持从上游分组同步账号名称与备注",
+          "decision": "deferred",
+          "reason": "Group-name/note auto-sync, billing display expansion and identity-reporting header variables form independent account/API/UI changes; retain current local privacy and repository update semantics."
+        },
+        {
+          "commit": "328db26f450edbdf9f8d4344a3ea903ac6396842",
+          "subject": "chore: sync VERSION to 0.2.24 [skip ci]",
+          "decision": "excluded_source_release_metadata",
+          "reason": "Keep personal VERSION 2.1.72 and this project's release process."
+        }
+      ],
+      "paths": [
+        {
+          "path": "backend/cmd/server/VERSION",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/go.mod",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/go.sum",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/admin/account_handler.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/admin/account_upstream_billing_probe.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/admin/account_upstream_billing_probe_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/handler/gateway_key_billing.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/account_repo.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/account_repo_grok_managed_extra_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/account_repo_ollama_cloud_usage_integration_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/account_repo_opencode_go_usage_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/account_repo_upstream_billing_probe_cas_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/account_repo_upstream_billing_probe_update_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/repository/upstream_billing_probe_persistence_integration_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/server/api_contract_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/server/middleware/api_key_auth.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/server/middleware/api_key_auth_google.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/server/middleware/api_key_auth_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/server/routes/admin.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/server/routes/gateway_key_billing_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/account_header_override.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/account_header_override_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/account_header_override_vars.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/account_header_override_vars_test.go",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/account_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/account_test_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/account_test_service_cn_adaptive.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/admin_account.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/admin_account_upstream_billing_probe_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/admin_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/api_key_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/cline_usage.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/cn_provider_balance_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/cn_provider_quota_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/command_code_usage.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/crs_sync_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/error_passthrough_runtime.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/service/gateway_anthropic_passthrough.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_count_tokens.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/gateway_upstream_request.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/grok_audio.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/grok_media.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/grok_observed_models.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/grok_quota_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/model_protocol_catalog.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_alpha_search.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_apikey_responses_probe.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_codex_models_service.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_compact_stream_bridge.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/service/openai_embeddings.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_gateway_cc_pipeline.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_gateway_count_tokens.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_gateway_forward.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_gateway_grok.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_gateway_messages_anthropic_native.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_gateway_passthrough.go",
+          "source_status": "M",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/service/openai_images.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_passthrough_error_forwarding_test.go",
+          "source_status": "A",
+          "decision": "selected_slices"
+        },
+        {
+          "path": "backend/internal/service/openai_ws_forwarder_payload.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/openai_ws_pool.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/ops_upstream_context.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/seedance.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/upstream_billing_probe.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/upstream_billing_probe_multiplatform_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/upstream_billing_probe_test.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "backend/internal/service/upstream_models.go",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/api/__tests__/admin.accounts.upstreamBillingProbe.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/api/admin/accounts.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/api/admin/ops.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/BulkEditAccountModal.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/CreateAccountModal.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/EditAccountModal.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/HeaderOverrideEditor.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/UpstreamGroupSyncButton.vue",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/__tests__/CreateAccountModal.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/__tests__/EditAccountModal.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/__tests__/HeaderOverrideEditor.spec.ts",
+          "source_status": "A",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/__tests__/credentialsBuilder.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/components/account/credentialsBuilder.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/en/admin/accounts.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/en/admin/ops.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/zh/admin/accounts.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/i18n/locales/zh/admin/ops.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/types/index.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/admin/AccountsView.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/admin/__tests__/AccountsView.lite.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/admin/ops/components/OpsErrorDetailModal.vue",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/admin/ops/components/__tests__/OpsErrorDetailModal.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/admin/ops/utils/__tests__/errorDetailResponse.spec.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        },
+        {
+          "path": "frontend/src/views/admin/ops/utils/errorDetailResponse.ts",
+          "source_status": "M",
+          "decision": "inventory_only_deferred_or_metadata"
+        }
+      ]
+    }
+  },
+  "canvas": {
+    "source_reference": "kiss-kedaya/sub2api@22b47efd2062325e8a2924a6f006457858a9dd93",
+    "reviewed_paths": [
+      "frontend/src/views/user/InfiniteCanvasView.vue",
+      "frontend/src/utils/infiniteCanvas.ts",
+      "frontend/src/utils/infiniteCanvasSession.ts",
+      "backend/internal/web/canvas_proxy.go"
+    ],
+    "decision": "User requested the fork's same-origin iframe framework and supplied the original Infinite Canvas source. Vendor its React UI; expose image generation/editing only.",
+    "retained_source_contracts": [
+      "Authenticated canvas route/navigation",
+      "Explicit key creation",
+      "Never rotate credentials on page load",
+      "Owner isolation",
+      "Existing API-key authorized gateway billing"
+    ],
+    "local_implementation": [
+      "Original React canvas UI, image/text/config/group nodes, connections, reference images, local assets, crop/mask/export",
+      "Dedicated API key restricted to one authorized active OpenAI/Grok image-enabled group; explicit creation only",
+      "Same-origin parent/iframe postMessage handshake with strict source/origin checks; no URL or persisted API credentials",
+      "Image generation/editing via existing /v1/images endpoints; model list from the selected group",
+      "No video/audio/text-generation transports, video/audio creation/upload routes or Agent entry",
+      "Owner-scoped IndexedDB projects/image bytes; existing group accounting unchanged; no automatic paid retries",
+      "Frontend build includes canvas after the Vue build; Go embed, Docker and release CI ship the runtime",
+      "Small viewport fit corrections preserve original UI"
+    ],
+    "runtime_source": {
+      "repository": "basketikun/infinite-canvas",
+      "commit": "9cd3deacbcc598361807afc16c059a80dd18b6f9",
+      "license": "MIT",
+      "path": "canvas/web"
+    }
+  }
+}

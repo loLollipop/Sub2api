@@ -1536,6 +1536,7 @@ func TestContentModerationAutoBanSkipsAdminAccount(t *testing.T) {
 	})
 
 	cfg := defaultContentModerationConfig()
+	cfg.Enabled = true
 	cfg.BanThreshold = 2
 	cfg.ViolationWindowHours = 24
 
@@ -1563,6 +1564,7 @@ func TestContentModerationAutoBanSkipsAdminAccount(t *testing.T) {
 
 func TestContentModerationAutoBanDisablesRegularUserAtThreshold(t *testing.T) {
 	cfg := defaultContentModerationConfig()
+	cfg.Enabled = true
 	cfg.BanThreshold = 2
 	cfg.ViolationWindowHours = 24
 
@@ -1585,6 +1587,7 @@ func TestContentModerationAutoBanDisablesRegularUserAtThreshold(t *testing.T) {
 
 func TestContentModerationAdminBelowBanThresholdRecordsViolationOnly(t *testing.T) {
 	cfg := defaultContentModerationConfig()
+	cfg.Enabled = true
 	cfg.BanThreshold = 2
 	cfg.ViolationWindowHours = 24
 
@@ -1837,10 +1840,10 @@ func TestContentModerationUpdateConfig_CyberPolicyExcludeFromBanCount(t *testing
 	settingRepo := &contentModerationTestSettingRepo{values: map[string]string{}}
 	svc := NewContentModerationService(settingRepo, nil, nil, nil, nil, nil, nil, nil)
 
-	// 默认值必须是 false（计入，保持现状）
+	// 新配置默认排除 cyber，显式配置 false 仍保留运营方选择。
 	view, err := svc.GetConfig(context.Background())
 	require.NoError(t, err)
-	require.False(t, view.CyberPolicyExcludeFromBanCount, "默认必须计入封号计数")
+	require.True(t, view.CyberPolicyExcludeFromBanCount, "默认排除 cyber 封号计数")
 
 	// 指针式部分更新为 true
 	exclude := true

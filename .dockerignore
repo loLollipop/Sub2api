@@ -85,3 +85,8 @@ deploy/redis_data/
 .claude/
 issues/
 CLAUDE.md
+
+# Image canvas build dependencies and generated files
+canvas/web/node_modules/
+canvas/web/tsconfig.tsbuildinfo
+!canvas/CHANGELOG.md

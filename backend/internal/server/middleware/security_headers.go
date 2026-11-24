@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -128,6 +129,23 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 			c.Header("Content-Security-Policy", csp)
 		}
 		c.Next()
+	}
+}
+
+// AllowSameOriginEmbedHeaders permits the explicitly selected canvas response
+// to be embedded by this origin while preserving every other CSP directive.
+func AllowSameOriginEmbedHeaders(header http.Header) {
+	if header == nil {
+		return
+	}
+	header.Set("X-Frame-Options", "SAMEORIGIN")
+	values := header.Values("Content-Security-Policy")
+	if len(values) == 0 {
+		return
+	}
+	header.Del("Content-Security-Policy")
+	for _, csp := range values {
+		header.Add("Content-Security-Policy", rewriteCSPFrameAncestors(csp, "'self'"))
 	}
 }
 

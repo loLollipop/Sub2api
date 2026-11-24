@@ -12,19 +12,21 @@
     "v0.2.21": "10ba8f9b4dc2e6023d4a9879ab77b21841babd10",
     "v0.2.22": "b0fa9f3e6eeab1968a53e1289b69daa4bb40ca2b",
     "v0.2.23": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
-    "v0.2.24": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24"
+    "v0.2.24": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+    "v0.2.25": "348997267d756eab5729bb6b78a275a15d18796a"
   },
-  "latest_reviewed_main_commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+  "latest_reviewed_main_commit": "348997267d756eab5729bb6b78a275a15d18796a",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v0.2.24",
-  "reviewed_release_commit": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+  "reviewed_release_tag": "v0.2.25",
+  "reviewed_release_commit": "348997267d756eab5729bb6b78a275a15d18796a",
   "checkpoint_meaning": "Selectively reviewed/backported source history, not a complete merge of the upstream release.",
   "base_commit": "60afb8d325785f37f0a09df02b5b21ad9ddf2960",
   "selection_policy": "selective-behavior-backport-with-regression-tests",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_resolved_historical_deferrals_and_explicit_remaining_scope",
-    "source_head": "5c2982a81b46e2142d0143d2f83c1ce9c4da1d24",
+    "source_head": "348997267d756eab5729bb6b78a275a15d18796a",
     "implemented_with_local_regression": [
+      "Formal v0.2.25 selected deterministic passthrough errors/rules, Unicode-safe bounded error metadata and compact terminal codes. Account metadata/header identity features deferred. See maintenance/notes/upstream-sync-20261124-dual-canvas.md",
       "Formal v0.2.24 selective OAuth rotation CAS, ToolSearch/buffered output, Gemini/AG retry+quota,408/403,image-SSE,stop/Kimi,compactionTTL,conditional test sampling and account snapshot invalidation; selected slices only. See maintenance/notes/upstream-sync-20261123-dual.md",
       "Formal v0.2.23: GPT-6.1 Terra/GPT-6.2 Sol/Astra, Ultra Fast entitlements/pricing, OpenAI/Anthropic cache usage and TTL, bounded stream/schema/tool fixes, retention/dedup/privacy and UI adaptations; see maintenance/notes/upstream-sync-20261118-v0223.md and the complete path/commit ledger.",
       "Toolchain, cooldown scopes and frontend lifecycle fixes",
@@ -586,5 +588,19 @@
     "ledger": "maintenance/notes/original-selection-ledger-20261123-v0224.json",
     "review_depth": "Complete inventory, selected behavior/local-caller review and named targeted gaps; deferred entries may be inventory-only.",
     "observed_main_not_imported": "2af3f1e15c98c893a89255a037f551046883b8c0"
+  },
+  "dual_canvas_sync_20261124": {
+    "from_release": "v0.2.24",
+    "to_release": "v0.2.25",
+    "source_commit": "348997267d756eab5729bb6b78a275a15d18796a",
+    "source_commits": 15,
+    "source_paths": 91,
+    "note": "maintenance/notes/upstream-sync-20261124-dual-canvas.md",
+    "ledger": "maintenance/notes/dual-selection-ledger-20261124-canvas.json",
+    "scope": "Selected deterministic passthrough errors, bounded scalar error metadata, Unicode-safe host masking, compact terminal code compatibility; existing dependency repair already covered.",
+    "review_depth": "All commits/paths inventoried; source implementation/callers read for selected slices and canvas reference. Deferred paths are not claimed line-by-line audited.",
+    "release_status": "local_worktree_only",
+    "prior_canvas_exclusion_superseded": true,
+    "observed_main_not_imported": "0f6671457132425d1b84f3d80536b53e02942424"
   }
 }

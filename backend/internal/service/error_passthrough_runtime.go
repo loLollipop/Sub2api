@@ -3,6 +3,8 @@ package service
 import (
 	"net/http"
 
+	"github.com/Wei-Shaw/sub2api/internal/model"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,23 +43,33 @@ func applyErrorPassthroughRule(
 	defaultErrType string,
 	defaultErrMsg string,
 ) (status int, errType string, errMsg string, matched bool) {
+	status, errType, errMsg, _, matched = applyErrorPassthroughRuleWithRule(c, platform, upstreamStatus, responseBody, defaultStatus, defaultErrType, defaultErrMsg)
+	return
+}
+
+// applyErrorPassthroughRuleWithRule also returns the matched rule without
+// dropping the local financial-error privacy and monitoring policy.
+func applyErrorPassthroughRuleWithRule(
+	c *gin.Context, platform string, upstreamStatus int, responseBody []byte,
+	defaultStatus int, defaultErrType, defaultErrMsg string,
+) (status int, errType string, errMsg string, rule *model.ErrorPassthroughRule, matched bool) {
 	status = defaultStatus
 	errType = defaultErrType
 	errMsg = defaultErrMsg
 
 	// Rules must not expose financial failures or bypass the existing retry/health path.
 	if IsUpstreamFinancialError(upstreamStatus, responseBody) {
-		return http.StatusBadGateway, "upstream_error", UpstreamUnavailableMessage, false
+		return http.StatusBadGateway, "upstream_error", UpstreamUnavailableMessage, nil, false
 	}
 
 	svc := getBoundErrorPassthroughService(c)
 	if svc == nil {
-		return status, errType, errMsg, false
+		return status, errType, errMsg, nil, false
 	}
 
-	rule := svc.MatchRule(platform, upstreamStatus, responseBody)
+	rule = svc.MatchRule(platform, upstreamStatus, responseBody)
 	if rule == nil {
-		return status, errType, errMsg, false
+		return status, errType, errMsg, nil, false
 	}
 
 	status = upstreamStatus
@@ -80,5 +92,5 @@ func applyErrorPassthroughRule(
 	if upstreamFinancialMessage(errMsg) {
 		status, errMsg = http.StatusBadGateway, UpstreamUnavailableMessage
 	}
-	return status, errType, ClientUpstreamErrorMessage(errMsg), true
+	return status, errType, ClientUpstreamErrorMessage(errMsg), rule, true
 }

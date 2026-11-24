@@ -175,7 +175,7 @@ type ContentModerationConfig struct {
 	ModelFilter          ContentModerationModelFilter `json:"model_filter"`
 	// CyberPolicyExcludeFromBanCount 为 true 时，cyber_policy 命中不参与自动封号计数：
 	// 当次不判定封号，且历史 cyber 行在 CountFlaggedByUserSince 中被排除。
-	// 默认 false（计入，与历史行为一致；旧配置 JSON 无此字段时反序列化为 false）。
+	// 默认 true（排除）；旧配置显式保存的 false 仍尊重运营方的选择。
 	CyberPolicyExcludeFromBanCount bool `json:"cyber_policy_exclude_from_ban_count"`
 }
 
@@ -2110,6 +2110,11 @@ func (s *ContentModerationService) applyFlaggedAccountSideEffects(ctx context.Co
 	if s == nil || cfg == nil || log == nil || !log.Flagged || log.UserID == nil || *log.UserID <= 0 {
 		return false
 	}
+	// The master switch also covers asynchronously recorded upstream cyber hits.
+	// Do not count violations or disable a user while moderation is switched off.
+	if !cfg.Enabled {
+		return false
+	}
 	count := 1
 	if s.repo != nil && cfg.ViolationWindowHours > 0 {
 		since := time.Now().Add(-time.Duration(cfg.ViolationWindowHours) * time.Hour)
@@ -2305,7 +2310,7 @@ func defaultContentModerationConfig() *ContentModerationConfig {
 			Type:   ContentModerationModelFilterAll,
 			Models: []string{},
 		},
-		CyberPolicyExcludeFromBanCount: false,
+		CyberPolicyExcludeFromBanCount: true,
 	}
 }
 
@@ -2414,6 +2419,9 @@ func (cfg *ContentModerationConfig) normalize() {
 	cfg.BlockedKeywords = normalizeBlockedKeywords(cfg.BlockedKeywords)
 	cfg.KeywordBlockingMode = normalizeKeywordBlockingMode(cfg.KeywordBlockingMode)
 	cfg.ModelFilter = normalizeContentModerationModelFilter(cfg.ModelFilter)
+	if !cfg.Enabled {
+		cfg.AutoBanEnabled = false
+	}
 }
 
 func (cfg *ContentModerationConfig) includesGroup(groupID *int64) bool {

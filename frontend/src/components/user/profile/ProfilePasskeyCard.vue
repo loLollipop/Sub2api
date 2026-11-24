@@ -69,8 +69,20 @@
         </div>
 
         <div
+          v-else-if="loadError"
+          class="flex flex-col items-center gap-3 rounded-lg border border-red-200 px-4 py-6 text-center dark:border-red-900/40"
+          data-testid="passkey-load-error"
+        >
+          <p class="text-sm text-red-600 dark:text-red-300">{{ t('profile.passkey.loadFailed') }}</p>
+          <button type="button" class="btn btn-secondary btn-sm" :disabled="busy" @click="loadCredentials">
+            {{ t('profile.passkey.retry') }}
+          </button>
+        </div>
+
+        <div
           v-else-if="credentials.length === 0 && !showAddForm"
           :class="embedded ? 'text-xs text-gray-500 dark:text-gray-400' : 'rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400'"
+          data-testid="passkey-empty"
         >
           {{ t('profile.passkey.empty') }}
         </div>
@@ -184,6 +196,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const supported = passkeyAPI.isSupported()
 const loading = ref(false)
+const loadError = ref(false)
 const busy = ref(false)
 const showAddForm = ref(false)
 const newName = ref('')
@@ -192,27 +205,42 @@ const deleteTarget = ref<PasskeyCredentialSummary | null>(null)
 const deletePassword = ref('')
 const credentials = ref<PasskeyCredentialSummary[]>([])
 
-// apiClient 拦截器把错误规范化为 { code, reason, message }；
-// 透出后端消息（如密码错误），否则回退到通用文案。
+const passkeyErrorKeys: Record<string, string> = {
+  PASSKEY_CHALLENGE_EXPIRED: 'profile.passkey.challengeExpired',
+  PASSKEY_SESSION_INVALID: 'profile.passkey.challengeExpired',
+  PASSKEY_CHALLENGE_MISMATCH: 'profile.passkey.challengeMismatch',
+  PASSKEY_ORIGIN_MISMATCH: 'profile.passkey.originMismatch',
+  PASSKEY_RP_ID_MISMATCH: 'profile.passkey.rpIdMismatch',
+  PASSKEY_VERIFICATION_FAILED: 'profile.passkey.verificationFailed',
+  PASSWORD_REQUIRED: 'profile.passkey.passwordRequired',
+  PASSWORD_INCORRECT: 'profile.passkey.passwordIncorrect'
+}
+
 function extractErrorMessage(error: unknown, fallback: string): string {
-  const message = (error as { message?: string }).message
+  const candidate = error as { reason?: string; code?: string | number; message?: string } | null
+  const reason = candidate?.reason ?? (typeof candidate?.code === 'string' ? candidate.code : '')
+  if (Object.prototype.hasOwnProperty.call(passkeyErrorKeys, reason)) {
+    return t(passkeyErrorKeys[reason])
+  }
+  const message = candidate?.message
   return typeof message === 'string' && message.length > 0 ? message : fallback
 }
 
 async function loadCredentials(): Promise<void> {
   if (!props.enabled) {
     credentials.value = []
+    loadError.value = false
     return
   }
   loading.value = true
+  loadError.value = false
   try {
     credentials.value = await passkeyAPI.list()
   } catch (error) {
-    // 字符串错误码在 reason 字段（code 是数字状态码）；
-    // 设置变更竞态下后端仍可能返回 PASSKEY_DISABLED，静默处理
-    const reason = (error as { reason?: string }).reason
+    const reason = (error as { reason?: string } | null)?.reason
+    credentials.value = []
     if (reason !== 'PASSKEY_DISABLED') {
-      appStore.showError(t('profile.passkey.loadFailed'))
+      loadError.value = true
     }
   } finally {
     loading.value = false
@@ -228,7 +256,9 @@ async function addPasskey(): Promise<void> {
     cancelAdd()
     await loadCredentials()
   } catch (error) {
-    if (!(error instanceof DOMException && error.name === 'NotAllowedError')) {
+    if (error instanceof DOMException && error.name === 'NotAllowedError') {
+      appStore.showWarning(t('profile.passkey.cancelled'))
+    } else {
       appStore.showError(extractErrorMessage(error, t('profile.passkey.addFailed')))
     }
   } finally {
@@ -250,8 +280,8 @@ async function renamePasskey(credential: PasskeyCredentialSummary): Promise<void
     await passkeyAPI.rename(credential.id, name)
     credential.name = name
     appStore.showSuccess(t('profile.passkey.renamed'))
-  } catch {
-    appStore.showError(t('profile.passkey.renameFailed'))
+  } catch (error) {
+    appStore.showError(extractErrorMessage(error, t('profile.passkey.renameFailed')))
   } finally {
     busy.value = false
   }
@@ -276,6 +306,7 @@ async function confirmDelete(): Promise<void> {
     credentials.value = credentials.value.filter((item) => item.id !== credential.id)
     appStore.showSuccess(t('profile.passkey.deleted'))
     closeDeleteDialog()
+    await loadCredentials()
   } catch (error) {
     // 密码错误等失败保持对话框打开，允许重试
     appStore.showError(extractErrorMessage(error, t('profile.passkey.deleteFailed')))

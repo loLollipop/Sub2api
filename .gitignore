@@ -182,6 +182,7 @@ docs/*
 !docs/ASYNC_IMAGE_TASKS.md
 !docs/BATCH_IMAGE_MVP.md
 !docs/COMPOSITE_GROUPS.md
+!docs/gateway-base-url.md
 !docs/PLUGIN_DEVELOPMENT.md
 !docs/legal/
 !docs/legal/*.md

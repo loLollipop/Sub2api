@@ -2,29 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.153",
-  "imported_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
+  "imported_version": "2.3.155",
+  "imported_commit": "48a099e125e09142ca85a13fb263363801bb8f78",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.153",
-  "latest_observed_release_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
-  "latest_observed_main_commit": "020862cea3431c4b48ed14f7168e6acf1c0d7a70",
+  "latest_observed_version": "2.3.155",
+  "latest_observed_release_commit": "48a099e125e09142ca85a13fb263363801bb8f78",
+  "latest_observed_main_commit": "f03d1aefd233803855b7a4fe0f6e3ca6cdbd257a",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.153",
-  "reviewed_release_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
+  "reviewed_release_tag": "v2.3.155",
+  "reviewed_release_commit": "48a099e125e09142ca85a13fb263363801bb8f78",
   "observed_delta_review": {
-    "from_commit": "13674d757916d41ef6bac6f9269ff61afe430f8e",
-    "to_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
-    "status": "formal_v23153_selective_backport",
-    "scope": "Login TOTP fail-closed/replay, trusted proxy chain, Codex contexts, cached usage/body-budget503 and Turnstile partial saves; retain local routing/billing/theme.",
-    "review_depth": "Complete333-commit/1185-path inventory; selected source slices/local callers and explicitly named gaps deeply checked. Deferred entries are not code-audited.",
-    "evidence": "maintenance/notes/upstream-sync-20261123-dual.md",
-    "selection_ledger": "maintenance/notes/upstream-selection-ledger-20261123-v23153.json"
+    "from_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
+    "to_commit": "48a099e125e09142ca85a13fb263363801bb8f78",
+    "status": "formal_v23155_selective_backport",
+    "scope": "Hardened gateway aliases, independent Passkey ceremony/error/feedback fixes, gorilla/websocket and otel vulnerability updates; preserve native routing/billing/theme and factor policy.",
+    "review_depth": "Complete 43-commit/336-path inventory; selected source slices and local callers checked. Deferred modules are not claimed as fully code-audited.",
+    "evidence": "maintenance/notes/upstream-sync-20261124-v23155.md",
+    "selection_ledger": "maintenance/notes/upstream-selection-ledger-20261124-v23155.json"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
+    "source_head": "48a099e125e09142ca85a13fb263363801bb8f78",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -32,6 +32,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.154-v2.3.155 hardened gateway aliases, Passkey ceremony/error/feedback slice and security dependency updates. Keep personal 2.1.71; see maintenance/notes/upstream-sync-20261124-v23155.md",
       "Formal v2.3.118-v2.3.153 selective login/TOTP, trusted proxy, Codex context, Gemini cache usage, request-body-budget503 and Turnstile fixes; original v0.2.24 protocol/rotation companion. Keep personal2.1.70; see maintenance/notes/upstream-sync-20261123-dual.md",
       "Formal v2.3.114-v2.3.117: GPT-6.2 cacheable stable guidance, provider-scoped Gemini tier prices and duplicate-field ingress protection with original v0.2.24 WebSocket companion guards. Preserve local static pricing, Carbon tiered aliases, body budgets, privacy and VERSION2.1.69. Regression and Linux backend build passed; see maintenance/notes/upstream-sync-20261120-v23117.md.",
       "Formal v2.3.106-v2.3.113: bounded Retry-After export continuation and drift checks for both roles; session-owned auth coalescing/force/visibility, quality-history left alignment, cross-gateway acknowledgement visibility, Gemini prelude recovery/named-error priority, decoder-close synchronization and explicit terminal-response commitment. Default Ops error retention7d preserves explicit zero/settings. Native billing/routing/theme and VERSION2.1.68 retained. See maintenance/notes/upstream-sync-20261120-v23113.md.",
@@ -1597,5 +1598,52 @@
       "live_database_redis_integration": false
     },
     "publication": "User subsequently authorized GitHub submission and deployment as personal v2.1.71. PR/CI, immutable artifacts, backup/restore and production acceptance are recorded separately in development/diagnostics/sub2api-release-v2171-20261123/; synchronization-time evidence remains unchanged."
+  },
+  "fork_sync_20261124_v23155": {
+    "baseline_head": "bef8a4397f42959c7c2f018ef307807215be7ba5",
+    "source_release": "v2.3.155",
+    "source_commit": "48a099e125e09142ca85a13fb263363801bb8f78",
+    "observed_main_not_imported": "f03d1aefd233803855b7a4fe0f6e3ca6cdbd257a",
+    "source_commits": 43,
+    "source_nonmerge_commits": 43,
+    "source_paths": 336,
+    "personal_version": "2.1.71",
+    "note": "maintenance/notes/upstream-sync-20261124-v23155.md",
+    "ledger": "maintenance/notes/upstream-selection-ledger-20261124-v23155.json",
+    "implemented": [
+      "gateway Base URL aliases with final source hardening and local gateway-family filter",
+      "Passkey scoped one-shot Redis sessions and fixed 400 failure reasons; local Vue feedback",
+      "gorilla/websocket and otel fixed dependency versions"
+    ],
+    "already_covered": [
+      "smart-route rich group dropdown",
+      "audit body omission for existing local Passkey finish endpoints"
+    ],
+    "deferred": [
+      "full TOTP/Passkey factor grants and Key seal/reveal verification",
+      "5xx metric and alert schema migration",
+      "Responses-to-Anthropic passthrough catalog/routing/raw-field expansion"
+    ],
+    "preserved": [
+      "personal Vue/Tailwind theme",
+      "native vendor routing, group conversion switch and billing",
+      "strict login TOTP and anti-replay",
+      "existing SQL and protected untracked usage tests",
+      "personal release and controlled production deployment"
+    ],
+    "verification": {
+      "status": "passed_with_explicit_integration_and_scope_limits",
+      "evidence": "development/diagnostics/sub2api-sync-v23155-20261124/final-acceptance.json",
+      "backend_focused_top_level": 179,
+      "backend_focused_test_and_subtest_events": 288,
+      "websocket_timing_repeats": 5,
+      "frontend_tests": 56,
+      "browser_checks": 4,
+      "linux_embed_build": "passed",
+      "backend_lint": "passed; golangci-lint2.14.0,0issues",
+      "govulncheck": "no vulnerabilities found",
+      "live_database_redis_integration": false
+    },
+    "publication": "local working tree only; no commit/push/release/deployment"
   }
 }

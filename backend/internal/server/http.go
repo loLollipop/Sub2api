@@ -113,7 +113,9 @@ func configureTrustedProxies(r *gin.Engine, cfg config.ServerConfig) {
 
 // ProvideHTTPServer 提供 HTTP 服务器
 func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
-	httpHandler := http.Handler(router)
+	// Resolve only registered gateway aliases before Gin matches the route.
+	// Canonical and aliased requests share authentication and billing handlers.
+	httpHandler := middleware2.GatewayPathAlias(router)
 	server := &http.Server{
 		Addr:           cfg.Server.Address(),
 		Handler:        httpHandler,

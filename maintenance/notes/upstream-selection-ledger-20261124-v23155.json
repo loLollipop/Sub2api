@@ -1,0 +1,788 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-24",
+  "source_repository": "kiss-kedaya/sub2api",
+  "from_release": "v2.3.153",
+  "from_commit": "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33",
+  "to_release": "v2.3.155",
+  "to_commit": "48a099e125e09142ca85a13fb263363801bb8f78",
+  "baseline_head": "bef8a4397f42959c7c2f018ef307807215be7ba5",
+  "personal_version": "2.1.71",
+  "source_commit_count": 43,
+  "source_nonmerge_commit_count": 43,
+  "source_path_count": 336,
+  "review_scope": "Complete ancestry/path inventory; selected slices and local callers inspected. Deferred modules were not a full line-by-line or security audit.",
+  "commits": [
+    {
+      "commit": "dd5395122fe1dcfaa93071f116e17d331ee4f16a",
+      "parents": [
+        "35f6cd4f7f2d7670d9d4d7c1f763fed359cbaa33"
+      ],
+      "subject": "chore: sync VERSION to 2.3.153 [skip ci]",
+      "decision": "release_metadata",
+      "reason": "Keep personal VERSION 2.1.71.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "020862cea3431c4b48ed14f7168e6acf1c0d7a70",
+      "parents": [
+        "dd5395122fe1dcfaa93071f116e17d331ee4f16a"
+      ],
+      "subject": "fix(handler): 恢复 sweepGate 测试缝并由 service 装配，修复 main 编译失败 (#560)",
+      "decision": "not_applicable",
+      "reason": "The sweepGate repair belongs to the retired crypto signer/sweeper module; no local handler or service caller.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "b24f8463b9ebc4c28602aa4f9543567eeb0f5d4e",
+      "parents": [
+        "020862cea3431c4b48ed14f7168e6acf1c0d7a70"
+      ],
+      "subject": "fix(auth): passkey 注册跨实例会话、错误码细分、2FA 门禁与前端反馈 (#558)",
+      "decision": "partially_adapted",
+      "reason": "Adopt independent scoped Redis ceremony tokens, TTL/one-shot validation, 400 error taxonomy and local Vue feedback; preserve existing password enrollment/deletion and login TOTP gates. Source five-minute shared factor grants are deferred with the absent grant subsystem.",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "ae1ea3ecd70c27cd5a164bc8b6677cc9d2894092",
+      "parents": [
+        "b24f8463b9ebc4c28602aa4f9543567eeb0f5d4e"
+      ],
+      "subject": "refactor(ui): Nuxt UI 迁移第一批（用户资料设置 + 管理端设置表单 + 手写 tooltip） (#559)",
+      "decision": "preserved_local_ui",
+      "reason": "Nuxt UI first-batch conversion conflicts with the existing Vue/Tailwind profile and settings layouts; no new UI framework dependency.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "9b65d8a5d82dd12a059ea6bd67eee2ac393ab0ab",
+      "parents": [
+        "ae1ea3ecd70c27cd5a164bc8b6677cc9d2894092"
+      ],
+      "subject": "feat(keys): 智能路由「添加分组」下拉复用普通分组的富样式行 (#555)",
+      "decision": "already_covered",
+      "reason": "Local smart-route and ordinary group dropdowns already render GroupOptionItem with platform, rate, description and monitor status. Preserve lazy status fetching and existing selection/order.",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "d6aef1437d12c4a49ce2c20ee360d63e048a9b7f",
+      "parents": [
+        "9b65d8a5d82dd12a059ea6bd67eee2ac393ab0ab"
+      ],
+      "subject": "fix(crypto): 链上直充概览状态口径与主操作整改 (#556)",
+      "decision": "excluded_retired_payment",
+      "reason": "Native chain-deposit overview and signer controls are retired locally.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "8f7575c691d1ddeb3443519f6c8ef93fc80acbf1",
+      "parents": [
+        "d6aef1437d12c4a49ce2c20ee360d63e048a9b7f"
+      ],
+      "subject": "fix(test): 修复 main 存量 golangci-lint 失败（7 处） (#562)",
+      "decision": "source_test_fixes_not_copied",
+      "reason": "Source fixture lint fixes concern excluded crypto/scoped-admin/retention chains. Imported Passkey tests use checked assertions; local lint is validated separately.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "5628e3693303e186864c90322d9aac839a76f6d2",
+      "parents": [
+        "8f7575c691d1ddeb3443519f6c8ef93fc80acbf1"
+      ],
+      "subject": "fix(keys): Key 列表列统一渲染后端掩码，完整明文改由复制按钮与浮条取用 (#563)",
+      "decision": "deferred_key_secret_ui",
+      "reason": "Masked-only list/copy-on-reveal UI is coupled to source hash-only/seal/reveal workflow that has not been adopted. Preserve the local Key API and UI contract.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "4368c0d0a0c07f02250426c1a947eb6e94d0d690",
+      "parents": [
+        "5628e3693303e186864c90322d9aac839a76f6d2"
+      ],
+      "subject": "fix(gateway): 容忍 Base URL 的 0~N 个 /v1 前缀与裸协议路径 (#569)",
+      "decision": "selected_with_followups",
+      "reason": "Adopt gateway Base URL normalization together with #578/#579/#587 bounds, Gin diagnostic ordering and panel-route isolation; do not import the original unbounded implementation.",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "4925efd6f228ab66bc2a1d3f06413f43fdabe999",
+      "parents": [
+        "4368c0d0a0c07f02250426c1a947eb6e94d0d690"
+      ],
+      "subject": "feat(auth): 双因子因子策略（TOTP+Passkey）与登录/step-up 编排 (#561)",
+      "decision": "deferred_factor_policy",
+      "reason": "Full TOTP/Passkey factor policy changes login, grants, sessions, handlers and UI together. Keep the previously tested local TOTP fail-closed/replay protection; do not transplant a partial factor-policy migration.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "da5538089e2e0a15751c6a3768d639a427cecd29",
+      "parents": [
+        "4925efd6f228ab66bc2a1d3f06413f43fdabe999"
+      ],
+      "subject": "fix(ui): 统一全站开关为 USwitch，修复暗色主题配色 (#557)",
+      "decision": "preserved_local_ui",
+      "reason": "Global USwitch/theme replacement conflicts with local cold gray-blue Vue/Tailwind styling.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "9ec0e9e076c1919f29b39bdacdac49413cfad0a7",
+      "parents": [
+        "da5538089e2e0a15751c6a3768d639a427cecd29"
+      ],
+      "subject": "fix(ops): 拆分上游透传 5xx 与网关自产 5xx 告警指标，避免误报 (#564)",
+      "decision": "deferred_ops_metric_migration",
+      "reason": "5xx semantics split requires new SQL/indexes, repository metrics and alert UI, with operator reconfiguration of existing thresholds. Preserve existing alert contract until a coordinated migration is requested.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "a4186f20a10055910ccc0f7859dea8b25dd0f68c",
+      "parents": [
+        "9ec0e9e076c1919f29b39bdacdac49413cfad0a7"
+      ],
+      "subject": "feat(home): 重构首页信息层级并移除三张功能卡 (#566)",
+      "decision": "preserved_local_ui",
+      "reason": "Preserve the existing local landing page and feature navigation.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "9eac843a88e988e4cdadeff070be439db42c7e3d",
+      "parents": [
+        "a4186f20a10055910ccc0f7859dea8b25dd0f68c"
+      ],
+      "subject": "feat(ui): 记录列表/验证码/社交登录抽共享组件并收敛重复语义样式 (#565)",
+      "decision": "preserved_local_ui",
+      "reason": "Transaction/code/social-login shared UI refactor depends on source Nuxt UI layouts; no local functional defect established.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "2c7dd94207b1198ece18495583a7423954f68ac2",
+      "parents": [
+        "9eac843a88e988e4cdadeff070be439db42c7e3d"
+      ],
+      "subject": "feat(admin): 用户 Key 智能路由标识 + 分组改绑/分组配置二次验证与审计 (#568)",
+      "decision": "deferred_admin_factor_grants",
+      "reason": "Admin Key-route markers and group/password step-up gates depend on the unadopted factor-grant workflow. No local access-control weakening imported.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "1bcd1638f969e15f7c0752966bfcb8b816d408d6",
+      "parents": [
+        "2c7dd94207b1198ece18495583a7423954f68ac2"
+      ],
+      "subject": "feat(keys): 创建/二次查看 Key 强制三选一身份校验并修复自动填充串扰 (#567)",
+      "decision": "deferred_key_verification_subsystem",
+      "reason": "Key creation/reveal multi-factor verification includes seal/auth-factor schema and receipt workflows absent locally; do not introduce the entire module as an incidental sync.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "5ca24f35d87788e90764ef61f296d89f516028a5",
+      "parents": [
+        "1bcd1638f969e15f7c0752966bfcb8b816d408d6"
+      ],
+      "subject": "fix(admin): 模型白名单同步/预览免二次验证，修复 step-up 弹窗无确认按钮 (#570)",
+      "decision": "deferred_policy_ui",
+      "reason": "Source model-sync exemption and dual-factor step-up dialog target absent adminroutepolicy/factor selection. Preserve existing local permission gates.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "69decd5d6bace0edc4be1f6105de03c8db28fec9",
+      "parents": [
+        "5ca24f35d87788e90764ef61f296d89f516028a5"
+      ],
+      "subject": "fix(monitor): 缓存率 < 30% 的渠道状态条判为黑色 (#571)",
+      "decision": "preserved_local_thresholds",
+      "reason": "Hard-coded cache-hit <30 percent critical color would override local configurable monitoring thresholds; retain the previous explicit deferral.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "441522c580fda0066dc832cb8320faadcc55516c",
+      "parents": [
+        "69decd5d6bace0edc4be1f6105de03c8db28fec9"
+      ],
+      "subject": "fix(service): 白名单自动同步后按新白名单回填 upstream_model_metadata (#573)",
+      "decision": "not_applicable",
+      "reason": "Whitelist auto-sync/metadata registry remain excluded locally; this refresh has no local caller.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "92f1e5b96b0a9051e55833323e5ad16c5f3fd26d",
+      "parents": [
+        "441522c580fda0066dc832cb8320faadcc55516c"
+      ],
+      "subject": "fix(test): urlvalidator 测试改用 per-call 注入解析器，修掉并行抖动 (#574)",
+      "decision": "not_applicable",
+      "reason": "The source outbound resolver-injection module/tests are absent locally. Do not claim the still-deferred comprehensive outbound SSRF work is fixed.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "7e0a114fb758e9c3b89d492a109750658fde3fae",
+      "parents": [
+        "92f1e5b96b0a9051e55833323e5ad16c5f3fd26d"
+      ],
+      "subject": "fix(gateway): 修复 Anthropic 透传账号无法走 /v1/responses 跨协议转换 (#572)",
+      "decision": "deferred_protocol_policy",
+      "reason": "The changes combine passthrough catalog/scheduling expansion, new public PROTOCOL_MISMATCH codes, cross-family routing and raw-field forwarding. Local native-provider routing and stable group-gated error contracts require separate end-to-end adaptation.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "4c928e1e86bb67c54881026e8b50b9b020b5931c",
+      "parents": [
+        "7e0a114fb758e9c3b89d492a109750658fde3fae"
+      ],
+      "subject": "fix(ops): 收口 5xx 告警口径拆分——禁用标准名存量规则、补会话级超时、审计掩码 X-Reveal-Grant (#575)",
+      "decision": "deferred_ops_followup",
+      "reason": "Companion 5xx migration disables/relabels existing alert rules. X-Reveal-Grant handling serves an absent Key reveal endpoint; retain local existing audit suppression.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "582546d04e718be95e0c15cce62ffdc91c45d631",
+      "parents": [
+        "4c928e1e86bb67c54881026e8b50b9b020b5931c"
+      ],
+      "subject": "refactor(admin): 重构使用记录筛选区为 Nuxt UI 组件规范 (#576)",
+      "decision": "preserved_local_ui",
+      "reason": "Preserve local usage filter placement, time presets, reasoning-effort column and Vue styling.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "7fa85f9014e29c7cce4241733e0d5e518cce5bd5",
+      "parents": [
+        "582546d04e718be95e0c15cce62ffdc91c45d631"
+      ],
+      "subject": "fix(keys): 补齐下发/变更明文入口的身份校验，修掉 #567 的三个绕过口 (#577)",
+      "decision": "not_applicable",
+      "reason": "Rotation/bulk-key-verification hardening fixes source #567, a subsystem not adopted locally; not an existing local rotate/reveal endpoint repair.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "cf148ec74e7e417488f9ea1a3570e6a6329a5cfb",
+      "parents": [
+        "7fa85f9014e29c7cce4241733e0d5e518cce5bd5"
+      ],
+      "subject": "fix(gateway): 带前缀路由的重复版本段折叠（/antigravity/v1/v1/messages 由 404 恢复为 401） (#578)",
+      "decision": "selected",
+      "reason": "Include prefixed duplicate-version handling in the final hardened gateway alias implementation.",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "c4c503f7daef4016775c30538165ba6e175cb02e",
+      "parents": [
+        "cf148ec74e7e417488f9ea1a3570e6a6329a5cfb"
+      ],
+      "subject": "fix(cryptopay): 分片锁态不再冻结充值扫描游标（修复 BSC 卡死 0 块/分） (#581)",
+      "decision": "excluded_retired_payment",
+      "reason": "Native crypto scan concurrency/threshold work belongs to the retired chain-deposit module.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "ddf343c89458571fb4a8874e8d9221df6d15f6c2",
+      "parents": [
+        "c4c503f7daef4016775c30538165ba6e175cb02e"
+      ],
+      "subject": "fix(canvas): 进入无限画布不再自动轮换密钥，创建/轮换改为确认并接入身份校验 (#580)",
+      "decision": "excluded_canvas_runtime",
+      "reason": "Infinite-canvas auto-rotation confirmation and verification are part of the retired canvas/key-verification runtime.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "db253c7a16a8e42f7c617176b3fc6be213381a5e",
+      "parents": [
+        "ddf343c89458571fb4a8874e8d9221df6d15f6c2"
+      ],
+      "subject": "fix(gateway): codex 前缀族剥离任意版本段，antigravity 前缀族保守补版本段 (#579)",
+      "decision": "selected_with_source_limits",
+      "reason": "Include versionless Codex prefix handling and conservative missing-version rules; retain final source guard limits rather than promising unlimited normalization.",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "38b128470a2bf50c0a2478483790b410cb7b5a69",
+      "parents": [
+        "db253c7a16a8e42f7c617176b3fc6be213381a5e"
+      ],
+      "subject": "docs(release): 添加 v2.3.154 发版说明 (#582)",
+      "decision": "source_release_docs",
+      "reason": "Source release notes reviewed; write local scoped synchronization notes instead of copying source feature/deployment claims.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "cf8d87c3f970383c82930321560866efdb41ddef",
+      "parents": [
+        "38b128470a2bf50c0a2478483790b410cb7b5a69"
+      ],
+      "subject": "chore: sync VERSION to 2.3.148-bsc1 [skip ci]",
+      "decision": "release_metadata",
+      "reason": "Source sidecar version marker only; keep personal VERSION.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "da6c524ac9cd58e61e6bf509daf99690fa059384",
+      "parents": [
+        "cf8d87c3f970383c82930321560866efdb41ddef"
+      ],
+      "subject": "fix(gateway): Responses→Anthropic 桥整包透传改为透明账号的账号级选择，其余账号恢复 2.3.153 口径；上游错误文案恢复脱敏 (#584)",
+      "decision": "deferred_protocol_followup",
+      "reason": "Source #584 repairs regressions introduced by deferred #572. Preserve existing typed conversion and clientprivacy sanitization; no claim to implement account-wide unmapped-field passthrough.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "e17fda67f5740556314495a09a2ad744f140a6d1",
+      "parents": [
+        "da6c524ac9cd58e61e6bf509daf99690fa059384"
+      ],
+      "subject": "chore: sync VERSION to 2.3.154 [skip ci]",
+      "decision": "release_metadata",
+      "reason": "Keep personal VERSION 2.1.71.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "37ba1951bdd1aab75047fd7b1797516b4adaa80a",
+      "parents": [
+        "e17fda67f5740556314495a09a2ad744f140a6d1"
+      ],
+      "subject": "chore: sync VERSION to 2.3.148-bsc2 [skip ci]",
+      "decision": "release_metadata",
+      "reason": "Source crypto sidecar version marker only.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "0ad7d56f4e95cab970ad7018df7710b7f719cfae",
+      "parents": [
+        "37ba1951bdd1aab75047fd7b1797516b4adaa80a"
+      ],
+      "subject": "chore: sync VERSION to 2.3.148-bsc3 [skip ci]",
+      "decision": "release_metadata",
+      "reason": "Source crypto sidecar version marker only.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "4c467547076a1d6ea770099313db64906919455f",
+      "parents": [
+        "0ad7d56f4e95cab970ad7018df7710b7f719cfae"
+      ],
+      "subject": "chore: sync VERSION to 2.3.148-bsc4 [skip ci]",
+      "decision": "release_metadata",
+      "reason": "Source crypto sidecar version marker only.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "827d03d91356881760a7969bc137493bda2f4adc",
+      "parents": [
+        "4c467547076a1d6ea770099313db64906919455f"
+      ],
+      "subject": "chore: sync VERSION to 2.3.148-bsc5 [skip ci]",
+      "decision": "release_metadata",
+      "reason": "Source crypto sidecar version marker only.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "fba961f4079071b5aa2f31dbba7ea172d78cba58",
+      "parents": [
+        "827d03d91356881760a7969bc137493bda2f4adc"
+      ],
+      "subject": "chore: sync VERSION to 2.3.148-bsc6 [skip ci]",
+      "decision": "release_metadata",
+      "reason": "Source crypto sidecar version marker only.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "f9c441314102503573152977fd0ddbeaed0b50f3",
+      "parents": [
+        "fba961f4079071b5aa2f31dbba7ea172d78cba58"
+      ],
+      "subject": "fix(deps): 升级 otel 到 v1.47.0、gorilla/websocket 到修复提交（govulncheck GO-2026-6278/6974/6975） (#586)",
+      "decision": "selected_dependency_upgrade",
+      "reason": "Upgrade gorilla/websocket to the source fixed pseudo-version and otel API/metric/trace to 1.47.0 through Go module resolution; retain the smaller local dependency graph and record required transitive updates.",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "2b470b17e96f6bf96479f4ba27ecc618479320d2",
+      "parents": [
+        "f9c441314102503573152977fd0ddbeaed0b50f3"
+      ],
+      "subject": "fix(cryptopay): 公共 RPC 限流/额度下充值扫链反复卡死（区间上限学习、逐链退避、守卫独立锁、失败批次重跑） (#585)",
+      "decision": "excluded_retired_payment",
+      "reason": "Public-RPC quota/range learning and scanner retry/idle locks belong to retired crypto payments.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "28b2f21730297478e30d431ce497a3ee2c63c92c",
+      "parents": [
+        "2b470b17e96f6bf96479f4ba27ecc618479320d2"
+      ],
+      "subject": "fix(auth,audit): 破玻璃重置 2FA 撤销全部因子的 step-up 授权；Passkey finish 请求体不入审计库 (#588)",
+      "decision": "not_applicable_or_covered",
+      "reason": "Break-glass CLI and factor grants do not exist locally; added source Passkey finish routes are absent. Both existing local Passkey login/registration finish routes already omit audit request bodies.",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "19c5304cf16c03c49c97afe948801f40f6b31177",
+      "parents": [
+        "28b2f21730297478e30d431ce497a3ee2c63c92c"
+      ],
+      "subject": "fix(gateway): 路径别名加固（超多版本段 DoS、未命中诊断回到 gin 链内、别名索引只收网关族路由） (#587)",
+      "decision": "selected_with_local_adaptation",
+      "reason": "Adopt 16-segment bound, linear scan, diagnostics after Gin global middleware and gateway-only route index. Replace absent ipnotice dependency with a private explicit gateway-family filter; test earlier rejection via local fixtures, without importing Honeypot/IP-risk modules.",
+      "review_depth": "source_slice_and_local_callers"
+    },
+    {
+      "commit": "2e4de2605ca58df1563d1c2b3ffe92ba44e4d293",
+      "parents": [
+        "19c5304cf16c03c49c97afe948801f40f6b31177"
+      ],
+      "subject": "fix(keys): 密钥身份校验加固——轮换/封存补限流、密码失败预算、动态码一次性、本地密码判断 (#589)",
+      "decision": "deferred_key_verification_followup",
+      "reason": "Verification budgets, reveal/seal throttles and one-shot codes harden the source #567 chain absent locally. Existing login TOTP replay prevention remains intact.",
+      "review_depth": "inventory_and_local_module_contract"
+    },
+    {
+      "commit": "48a099e125e09142ca85a13fb263363801bb8f78",
+      "parents": [
+        "2e4de2605ca58df1563d1c2b3ffe92ba44e4d293"
+      ],
+      "subject": "docs(release): 添加 v2.3.155 发版说明 (#590)",
+      "decision": "source_release_docs",
+      "reason": "Formal v2.3.155 source identity pinned. Do not copy source install/blue-green instructions into this controlled deployment.",
+      "review_depth": "inventory_and_local_module_contract"
+    }
+  ],
+  "net_source_paths": [
+    "M\t.gitignore",
+    "M\tREADME.md",
+    "M\tREADME_CN.md",
+    "M\tbackend/cmd/server/VERSION",
+    "M\tbackend/cmd/server/admin_2fa_reset.go",
+    "A\tbackend/cmd/server/admin_2fa_reset_stepup_test.go",
+    "M\tbackend/cmd/server/wire_gen.go",
+    "M\tbackend/go.mod",
+    "M\tbackend/go.sum",
+    "M\tbackend/internal/cryptopay/config.go",
+    "M\tbackend/internal/cryptopay/deposit_confirm_credit_test.go",
+    "A\tbackend/internal/cryptopay/idle_guard_pacer_test.go",
+    "M\tbackend/internal/cryptopay/rpc/backoff.go",
+    "M\tbackend/internal/cryptopay/rpc/errors.go",
+    "M\tbackend/internal/cryptopay/rpc/pool.go",
+    "A\tbackend/internal/cryptopay/rpc/range_limit_test.go",
+    "A\tbackend/internal/cryptopay/rpc_throttle_default_test.go",
+    "A\tbackend/internal/cryptopay/scan_signer_lock_guard_test.go",
+    "A\tbackend/internal/cryptopay/scanner/batch_retry_test.go",
+    "A\tbackend/internal/cryptopay/scanner/chain_pause_test.go",
+    "A\tbackend/internal/cryptopay/scanner/chain_proof_test.go",
+    "M\tbackend/internal/cryptopay/scanner/evm.go",
+    "A\tbackend/internal/cryptopay/scanner/guard_lock_key_test.go",
+    "M\tbackend/internal/cryptopay/scanner/head_observe_test.go",
+    "M\tbackend/internal/cryptopay/scanner/logs_split_test.go",
+    "M\tbackend/internal/cryptopay/scanner/receipt.go",
+    "M\tbackend/internal/cryptopay/scanner/worker.go",
+    "M\tbackend/internal/cryptopay/scanner/worker_lock_test.go",
+    "M\tbackend/internal/cryptopay/scanner/worker_regression_test.go",
+    "M\tbackend/internal/cryptopay/security.go",
+    "M\tbackend/internal/cryptopay/service.go",
+    "M\tbackend/internal/handler/admin/admin_helpers_test.go",
+    "M\tbackend/internal/handler/admin/ops_alerts_handler.go",
+    "M\tbackend/internal/handler/admin/setting_handler_totp_disable_test.go",
+    "M\tbackend/internal/handler/admin/small_request_retention_handler_test.go",
+    "M\tbackend/internal/handler/admin/user_handler.go",
+    "M\tbackend/internal/handler/admin/user_handler_admin_email_stepup_test.go",
+    "M\tbackend/internal/handler/admin/user_handler_create_stepup_test.go",
+    "A\tbackend/internal/handler/admin/user_handler_group_config_audit_test.go",
+    "M\tbackend/internal/handler/admin/user_handler_password_stepup_test.go",
+    "M\tbackend/internal/handler/admin/user_handler_role_totp_test.go",
+    "A\tbackend/internal/handler/api_key_account_types_test.go",
+    "M\tbackend/internal/handler/api_key_handler.go",
+    "A\tbackend/internal/handler/api_key_legacy_seal_test.go",
+    "A\tbackend/internal/handler/api_key_password_budget_test.go",
+    "A\tbackend/internal/handler/api_key_plaintext_guard_test.go",
+    "M\tbackend/internal/handler/api_key_secret_handler.go",
+    "M\tbackend/internal/handler/api_key_secret_handler_test.go",
+    "A\tbackend/internal/handler/api_key_verification_handler.go",
+    "A\tbackend/internal/handler/api_key_verification_handler_test.go",
+    "M\tbackend/internal/handler/auth_email_oauth_totp_test.go",
+    "M\tbackend/internal/handler/auth_handler.go",
+    "M\tbackend/internal/handler/auth_oauth_pending_flow_test.go",
+    "M\tbackend/internal/handler/crypto_handler.go",
+    "M\tbackend/internal/handler/crypto_signer_unlock_handler_test.go",
+    "M\tbackend/internal/handler/crypto_sweep_readiness.go",
+    "A\tbackend/internal/handler/dto/api_key_route_mode_test.go",
+    "M\tbackend/internal/handler/dto/mappers.go",
+    "M\tbackend/internal/handler/dto/types.go",
+    "M\tbackend/internal/handler/gateway_handler.go",
+    "M\tbackend/internal/handler/gateway_handler_chat_completions.go",
+    "M\tbackend/internal/handler/gateway_handler_responses.go",
+    "A\tbackend/internal/handler/gateway_protocol_mismatch.go",
+    "M\tbackend/internal/handler/idempotency_helper.go",
+    "A\tbackend/internal/handler/login_factor_policy_test.go",
+    "M\tbackend/internal/handler/no_account_error.go",
+    "M\tbackend/internal/handler/no_account_error_test.go",
+    "M\tbackend/internal/handler/passkey_handler.go",
+    "M\tbackend/internal/handler/passkey_handler_test.go",
+    "M\tbackend/internal/handler/totp_handler.go",
+    "M\tbackend/internal/handler/twofa_grant.go",
+    "M\tbackend/internal/handler/twofa_grant_test.go",
+    "M\tbackend/internal/handler/user_handler.go",
+    "M\tbackend/internal/handler/wire.go",
+    "M\tbackend/internal/integration/totp_disable_test.go",
+    "M\tbackend/internal/pkg/adminroutepolicy/policy.go",
+    "M\tbackend/internal/pkg/adminroutepolicy/policy_test.go",
+    "A\tbackend/internal/pkg/apicompat/responses_to_anthropic_passthrough.go",
+    "A\tbackend/internal/pkg/apicompat/responses_to_anthropic_passthrough_test.go",
+    "M\tbackend/internal/pkg/apicompat/responses_to_anthropic_request.go",
+    "M\tbackend/internal/repository/api_key_repo_last_used_unit_test.go",
+    "M\tbackend/internal/repository/api_key_secret_repo.go",
+    "A\tbackend/internal/repository/api_key_verification_cache.go",
+    "A\tbackend/internal/repository/api_key_verification_cache_test.go",
+    "M\tbackend/internal/repository/migrations_runner.go",
+    "A\tbackend/internal/repository/migrations_runner_ops_5xx_rename_test.go",
+    "A\tbackend/internal/repository/ops_repo_error_5xx.go",
+    "A\tbackend/internal/repository/ops_repo_error_5xx_test.go",
+    "M\tbackend/internal/repository/passkey_session_store.go",
+    "A\tbackend/internal/repository/passkey_session_store_test.go",
+    "M\tbackend/internal/repository/totp_cache.go",
+    "A\tbackend/internal/repository/totp_stepup_factor_test.go",
+    "M\tbackend/internal/repository/totp_stepup_grant_test.go",
+    "M\tbackend/internal/server/api_contract_test.go",
+    "M\tbackend/internal/server/http.go",
+    "A\tbackend/internal/server/http_path_alias_test.go",
+    "M\tbackend/internal/server/middleware/admin_machine_guard_test.go",
+    "A\tbackend/internal/server/middleware/api_key_password_rate_limit_test.go",
+    "A\tbackend/internal/server/middleware/api_key_verification_rate_limit_test.go",
+    "M\tbackend/internal/server/middleware/audit_log.go",
+    "A\tbackend/internal/server/middleware/audit_log_passkey_test.go",
+    "A\tbackend/internal/server/middleware/audit_log_reveal_grant_test.go",
+    "A\tbackend/internal/server/middleware/audit_log_verification_test.go",
+    "A\tbackend/internal/server/middleware/gateway_path_alias.go",
+    "A\tbackend/internal/server/middleware/gateway_path_alias_test.go",
+    "A\tbackend/internal/server/middleware/gateway_path_hardening_test.go",
+    "A\tbackend/internal/server/middleware/gateway_path_index.go",
+    "A\tbackend/internal/server/middleware/gateway_path_strip.go",
+    "M\tbackend/internal/server/middleware/logger.go",
+    "M\tbackend/internal/server/middleware/panel_rate_limit.go",
+    "M\tbackend/internal/server/middleware/step_up.go",
+    "M\tbackend/internal/server/middleware/step_up_bypass_audit_test.go",
+    "A\tbackend/internal/server/middleware/step_up_factor_matrix_test.go",
+    "M\tbackend/internal/server/middleware/step_up_test.go",
+    "M\tbackend/internal/server/middleware/two_factor_rate_limit.go",
+    "M\tbackend/internal/server/router.go",
+    "A\tbackend/internal/server/router_verification_budget_test.go",
+    "M\tbackend/internal/server/routes/admin_low_risk_release_test.go",
+    "M\tbackend/internal/server/routes/admin_machine_default_deny_test.go",
+    "M\tbackend/internal/server/routes/admin_step_up_routes_test.go",
+    "M\tbackend/internal/server/routes/auth.go",
+    "M\tbackend/internal/server/routes/gateway.go",
+    "A\tbackend/internal/server/routes/gateway_path_alias_panel_test.go",
+    "A\tbackend/internal/server/routes/gateway_path_alias_test.go",
+    "M\tbackend/internal/server/routes/totp_stepup_response_test.go",
+    "M\tbackend/internal/server/routes/user.go",
+    "M\tbackend/internal/server/routes/user_api_key_secret_routes_test.go",
+    "A\tbackend/internal/server/routes/user_key_routes_step_up_test.go",
+    "A\tbackend/internal/server/routes/user_key_verification_rate_limit_test.go",
+    "M\tbackend/internal/service/account.go",
+    "M\tbackend/internal/service/account_anthropic_passthrough_test.go",
+    "M\tbackend/internal/service/account_test_service.go",
+    "M\tbackend/internal/service/api_key_routes.go",
+    "M\tbackend/internal/service/api_key_routes_test.go",
+    "M\tbackend/internal/service/api_key_secret.go",
+    "M\tbackend/internal/service/api_key_secret_test.go",
+    "A\tbackend/internal/service/api_key_verification.go",
+    "A\tbackend/internal/service/api_key_verification_budget_test.go",
+    "A\tbackend/internal/service/api_key_verification_email_bind_test.go",
+    "A\tbackend/internal/service/api_key_verification_legacy_seal_test.go",
+    "A\tbackend/internal/service/api_key_verification_local_password_test.go",
+    "A\tbackend/internal/service/api_key_verification_test.go",
+    "A\tbackend/internal/service/api_key_verification_totp_test.go",
+    "M\tbackend/internal/service/audit_log.go",
+    "M\tbackend/internal/service/cross_protocol_conversion.go",
+    "M\tbackend/internal/service/gateway_forward_as_chat_completions.go",
+    "M\tbackend/internal/service/gateway_forward_as_responses.go",
+    "A\tbackend/internal/service/gateway_forward_as_responses_error_privacy_test.go",
+    "M\tbackend/internal/service/gateway_key_routes.go",
+    "M\tbackend/internal/service/gateway_model_availability.go",
+    "M\tbackend/internal/service/gateway_models_catalog.go",
+    "M\tbackend/internal/service/gateway_scheduling.go",
+    "M\tbackend/internal/service/idempotency.go",
+    "M\tbackend/internal/service/model_whitelist_auto_sync_runner.go",
+    "M\tbackend/internal/service/openai_gateway_model_availability.go",
+    "M\tbackend/internal/service/openai_gateway_responses_anthropic_native.go",
+    "M\tbackend/internal/service/ops_alert_evaluator_service.go",
+    "A\tbackend/internal/service/ops_error_5xx_metric.go",
+    "A\tbackend/internal/service/ops_error_5xx_metric_test.go",
+    "M\tbackend/internal/service/ops_port.go",
+    "M\tbackend/internal/service/ops_repo_mock_test.go",
+    "M\tbackend/internal/service/passkey.go",
+    "A\tbackend/internal/service/passkey_cross_instance_test.go",
+    "M\tbackend/internal/service/passkey_test.go",
+    "A\tbackend/internal/service/responses_anthropic_selection_test.go",
+    "A\tbackend/internal/service/responses_to_anthropic_bridge_default_test.go",
+    "A\tbackend/internal/service/responses_to_anthropic_bridge_test.go",
+    "M\tbackend/internal/service/totp_service.go",
+    "A\tbackend/internal/service/two_factor_policy.go",
+    "A\tbackend/internal/service/two_factor_policy_test.go",
+    "M\tbackend/internal/service/twofa_grant.go",
+    "A\tbackend/internal/service/twofa_grant_factor_test.go",
+    "M\tbackend/internal/service/twofa_grant_test.go",
+    "A\tbackend/internal/service/upstream_model_metadata_registry_cache_test.go",
+    "A\tbackend/internal/service/upstream_model_metadata_resync_test.go",
+    "M\tbackend/internal/service/upstream_models.go",
+    "M\tbackend/internal/service/wire.go",
+    "M\tbackend/internal/util/urlvalidator/outbound.go",
+    "M\tbackend/internal/util/urlvalidator/outbound_test.go",
+    "A\tbackend/migrations/337_api_key_secret_auth_factor.sql",
+    "A\tbackend/migrations/337_api_key_secret_auth_factor_migration_test.go",
+    "A\tbackend/migrations/337_ops_error_5xx_split_v2.sql",
+    "A\tbackend/migrations/338_ops_error_logs_5xx_time_index_notx.sql",
+    "A\tbackend/migrations/339_ops_error_5xx_rule_reconcile.sql",
+    "A\tbackend/migrations/339_ops_error_5xx_rule_reconcile_migration_test.go",
+    "A\tbackend/migrations/ops_error_5xx_split_migration_test.go",
+    "A\tdocs/gateway-base-url.md",
+    "A\tdocs/release-notes/v2.3.154.md",
+    "A\tdocs/release-notes/v2.3.155.md",
+    "A\tdocs/two-factor-factor-policy.md",
+    "A\tfrontend/nuxt-ui.config.ts",
+    "M\tfrontend/src/__tests__/integration/usage-reasoning-effort.spec.ts",
+    "A\tfrontend/src/__tests__/nuxtUiBatch1.spec.ts",
+    "A\tfrontend/src/__tests__/sharedPatternsReuse.spec.ts",
+    "M\tfrontend/src/api/admin/ops.ts",
+    "M\tfrontend/src/api/auth.ts",
+    "M\tfrontend/src/api/keys.ts",
+    "M\tfrontend/src/api/passkey.ts",
+    "M\tfrontend/src/api/totp.ts",
+    "M\tfrontend/src/components/admin/payment/OrderStatsCards.vue",
+    "M\tfrontend/src/components/admin/settings/RegistrationEmailBlacklistEditor.vue",
+    "M\tfrontend/src/components/admin/usage/UsageCleanupDialog.vue",
+    "M\tfrontend/src/components/admin/usage/UsageFilters.vue",
+    "M\tfrontend/src/components/admin/usage/__tests__/UsageFilters.spec.ts",
+    "M\tfrontend/src/components/admin/user/GroupReplaceModal.vue",
+    "M\tfrontend/src/components/admin/user/UserAllowedGroupsModal.vue",
+    "M\tfrontend/src/components/admin/user/UserApiKeysModal.vue",
+    "M\tfrontend/src/components/admin/user/UserBalanceHistoryModal.vue",
+    "A\tfrontend/src/components/admin/user/__tests__/GroupReplaceModal.spec.ts",
+    "A\tfrontend/src/components/admin/user/__tests__/UserAllowedGroupsModal.spec.ts",
+    "M\tfrontend/src/components/admin/user/__tests__/UserApiKeysModal.spec.ts",
+    "M\tfrontend/src/components/auth/DingTalkOAuthSection.vue",
+    "M\tfrontend/src/components/auth/EmailOAuthButtons.vue",
+    "M\tfrontend/src/components/auth/EmailVerifyCard.vue",
+    "M\tfrontend/src/components/auth/LinuxDoOAuthSection.vue",
+    "M\tfrontend/src/components/auth/OidcOAuthSection.vue",
+    "A\tfrontend/src/components/auth/PasskeyLoginModal.vue",
+    "M\tfrontend/src/components/auth/TotpStepUpDialog.vue",
+    "A\tfrontend/src/components/auth/VerificationCodeInput.vue",
+    "M\tfrontend/src/components/auth/WechatOAuthSection.vue",
+    "M\tfrontend/src/components/auth/__tests__/EmailOAuthButtons.spec.ts",
+    "A\tfrontend/src/components/auth/__tests__/TotpStepUpDialog.dualFactor.spec.ts",
+    "M\tfrontend/src/components/auth/__tests__/TotpStepUpDialog.spec.ts",
+    "A\tfrontend/src/components/auth/__tests__/VerificationCodeInput.spec.ts",
+    "M\tfrontend/src/components/channels/SupportedModelChip.vue",
+    "M\tfrontend/src/components/channels/__tests__/SupportedModelChip.spec.ts",
+    "M\tfrontend/src/components/common/README.md",
+    "M\tfrontend/src/components/common/SearchInput.vue",
+    "A\tfrontend/src/components/common/SocialLoginButtons.vue",
+    "M\tfrontend/src/components/common/Toggle.vue",
+    "M\tfrontend/src/components/common/TotpCodeInput.vue",
+    "A\tfrontend/src/components/common/TransactionList.vue",
+    "A\tfrontend/src/components/common/TransactionListCard.vue",
+    "A\tfrontend/src/components/common/__tests__/SearchInput.spec.ts",
+    "A\tfrontend/src/components/common/__tests__/SocialLoginButtons.spec.ts",
+    "A\tfrontend/src/components/common/__tests__/SwitchTheme.spec.ts",
+    "M\tfrontend/src/components/common/__tests__/Toggle.spec.ts",
+    "A\tfrontend/src/components/common/__tests__/TransactionListCard.spec.ts",
+    "A\tfrontend/src/components/common/__tests__/transactionList.spec.ts",
+    "A\tfrontend/src/components/common/socialLogin.ts",
+    "A\tfrontend/src/components/common/transactionList.ts",
+    "A\tfrontend/src/components/crypto/CryptoOverviewStatusBar.vue",
+    "M\tfrontend/src/components/crypto/CryptoWalletSecurityPanel.vue",
+    "M\tfrontend/src/components/crypto/__tests__/CryptoWalletSecurityPanel.spec.ts",
+    "A\tfrontend/src/components/crypto/overviewStatus.ts",
+    "M\tfrontend/src/components/crypto/signer/SignerShardsPanel.vue",
+    "M\tfrontend/src/components/crypto/signer/__tests__/SignerShardsPanel.spec.ts",
+    "M\tfrontend/src/components/dashboard/dashboardUi.ts",
+    "M\tfrontend/src/components/keys/ApiKeySecretDialog.vue",
+    "A\tfrontend/src/components/keys/KeyFactorVerification.vue",
+    "M\tfrontend/src/components/keys/RevealApiKeyDialog.vue",
+    "M\tfrontend/src/components/keys/__tests__/ApiKeySecretDialog.spec.ts",
+    "A\tfrontend/src/components/keys/__tests__/KeyFactorVerification.spec.ts",
+    "M\tfrontend/src/components/keys/__tests__/RevealApiKeyDialog.spec.ts",
+    "M\tfrontend/src/components/user/monitor/ChannelMonitorV3Card.vue",
+    "M\tfrontend/src/components/user/monitor/ChannelMonitorV3Timeline.vue",
+    "M\tfrontend/src/components/user/monitor/__tests__/ChannelMonitorV3Card.statusBadge.spec.ts",
+    "M\tfrontend/src/components/user/monitor/__tests__/ChannelMonitorV3Timeline.unknownBar.spec.ts",
+    "M\tfrontend/src/components/user/profile/ProfileBalanceNotifyCard.vue",
+    "M\tfrontend/src/components/user/profile/ProfileBarkCard.vue",
+    "M\tfrontend/src/components/user/profile/ProfileEditForm.vue",
+    "M\tfrontend/src/components/user/profile/ProfileIdentityBindingsSection.vue",
+    "M\tfrontend/src/components/user/profile/ProfilePasskeyCard.vue",
+    "M\tfrontend/src/components/user/profile/ProfilePasswordForm.vue",
+    "M\tfrontend/src/components/user/profile/ProfileTotpCard.vue",
+    "M\tfrontend/src/components/user/profile/__tests__/ProfileBalanceNotifyCard.spec.ts",
+    "M\tfrontend/src/components/user/profile/__tests__/ProfileBarkCard.spec.ts",
+    "M\tfrontend/src/components/user/profile/__tests__/ProfilePasskeyCard.spec.ts",
+    "M\tfrontend/src/components/user/profile/__tests__/ProfileTotpCard.spec.ts",
+    "M\tfrontend/src/composables/__tests__/useTotpAttemptLimit.spec.ts",
+    "M\tfrontend/src/composables/useTotpAttemptLimit.ts",
+    "A\tfrontend/src/features/channel-monitor-v2/__tests__/monitorBarClass.spec.ts",
+    "M\tfrontend/src/features/channel-monitor-v2/monitorFormat.ts",
+    "M\tfrontend/src/features/mihomo/MihomoSettings.vue",
+    "M\tfrontend/src/i18n/locales/en/admin/crypto.ts",
+    "M\tfrontend/src/i18n/locales/en/admin/ops.ts",
+    "M\tfrontend/src/i18n/locales/en/admin/overview.ts",
+    "M\tfrontend/src/i18n/locales/en/admin/resources.ts",
+    "M\tfrontend/src/i18n/locales/en/channelMonitorV3.ts",
+    "M\tfrontend/src/i18n/locales/en/common.ts",
+    "M\tfrontend/src/i18n/locales/en/dashboard.ts",
+    "M\tfrontend/src/i18n/locales/en/deposit.ts",
+    "M\tfrontend/src/i18n/locales/en/landing.ts",
+    "M\tfrontend/src/i18n/locales/en/misc.ts",
+    "M\tfrontend/src/i18n/locales/zh/admin/crypto.ts",
+    "M\tfrontend/src/i18n/locales/zh/admin/ops.ts",
+    "M\tfrontend/src/i18n/locales/zh/admin/overview.ts",
+    "M\tfrontend/src/i18n/locales/zh/admin/resources.ts",
+    "M\tfrontend/src/i18n/locales/zh/channelMonitorV3.ts",
+    "M\tfrontend/src/i18n/locales/zh/common.ts",
+    "M\tfrontend/src/i18n/locales/zh/dashboard.ts",
+    "M\tfrontend/src/i18n/locales/zh/deposit.ts",
+    "M\tfrontend/src/i18n/locales/zh/landing.ts",
+    "M\tfrontend/src/i18n/locales/zh/misc.ts",
+    "M\tfrontend/src/stores/__tests__/auth.spec.ts",
+    "M\tfrontend/src/stores/auth.ts",
+    "M\tfrontend/src/style.css",
+    "M\tfrontend/src/styles/nuxt-ui-theme.css",
+    "M\tfrontend/src/types/index.ts",
+    "M\tfrontend/src/utils/__tests__/infiniteCanvasSession.spec.ts",
+    "M\tfrontend/src/utils/infiniteCanvasSession.ts",
+    "A\tfrontend/src/utils/otp.ts",
+    "M\tfrontend/src/views/HomeView.vue",
+    "D\tfrontend/src/views/__tests__/HomeView.compact.spec.ts",
+    "A\tfrontend/src/views/__tests__/HomeView.spec.ts",
+    "M\tfrontend/src/views/admin/CryptoView.vue",
+    "M\tfrontend/src/views/admin/PromoCodesView.vue",
+    "M\tfrontend/src/views/admin/RequestCaptureView.vue",
+    "M\tfrontend/src/views/admin/RiskControlView.vue",
+    "M\tfrontend/src/views/admin/UsageView.vue",
+    "M\tfrontend/src/views/admin/__tests__/BackupView.spec.ts",
+    "A\tfrontend/src/views/admin/__tests__/CryptoView.overview.spec.ts",
+    "M\tfrontend/src/views/admin/__tests__/SettingsView.spec.ts",
+    "M\tfrontend/src/views/admin/__tests__/UsageView.spec.ts",
+    "M\tfrontend/src/views/admin/affiliates/AdminAffiliateRecordsTable.vue",
+    "M\tfrontend/src/views/admin/ops/components/OpsAlertRulesCard.vue",
+    "M\tfrontend/src/views/auth/DingTalkCallbackView.vue",
+    "M\tfrontend/src/views/auth/LinuxDoCallbackView.vue",
+    "M\tfrontend/src/views/auth/LoginView.vue",
+    "M\tfrontend/src/views/auth/OidcCallbackView.vue",
+    "M\tfrontend/src/views/auth/RegisterView.vue",
+    "M\tfrontend/src/views/auth/WechatCallbackView.vue",
+    "M\tfrontend/src/views/auth/__tests__/EmailVerifyView.spec.ts",
+    "A\tfrontend/src/views/auth/__tests__/LoginView.dualFactor.spec.ts",
+    "M\tfrontend/src/views/auth/__tests__/LoginView.spec.ts",
+    "M\tfrontend/src/views/auth/__tests__/RegisterView.spec.ts",
+    "M\tfrontend/src/views/user/AffiliateView.vue",
+    "M\tfrontend/src/views/user/DepositView.vue",
+    "M\tfrontend/src/views/user/InfiniteCanvasView.vue",
+    "M\tfrontend/src/views/user/KeysView.vue",
+    "M\tfrontend/src/views/user/__tests__/DepositView.spec.ts",
+    "M\tfrontend/src/views/user/__tests__/InfiniteCanvasView.spec.ts",
+    "M\tfrontend/src/views/user/__tests__/KeysView.spec.ts",
+    "M\tfrontend/tsconfig.node.json",
+    "M\tfrontend/vite.config.ts",
+    "M\tfrontend/vitest.config.ts"
+  ],
+  "main_not_imported": "f03d1aefd233803855b7a4fe0f6e3ca6cdbd257a",
+  "evidence_directory": "development/diagnostics/sub2api-sync-v23155-20261124",
+  "publication": "local working tree only; no commit/push/release/deployment"
+}

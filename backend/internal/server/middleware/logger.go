@@ -62,6 +62,12 @@ func Logger() gin.HandlerFunc {
 			zap.String("method", method),
 			zap.String("path", path),
 		}
+		if alias, ok := gatewayPathAliasInfoFromContext(c.Request.Context()); ok {
+			fields = append(fields,
+				zap.String("gateway_original_path", alias.Original),
+				zap.String("gateway_path_alias_rule", string(alias.Rule)),
+			)
+		}
 		if rejected {
 			fields = append(fields,
 				zap.String("ingress_reject_reason", string(reason)),

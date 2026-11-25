@@ -147,8 +147,6 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: frontend
 
-      - name: Install image canvas dependencies
-        run: npm --prefix canvas/web ci --ignore-scripts --no-audit --no-fund
       - name: Build frontend
         run: pnpm run build
         working-directory: frontend

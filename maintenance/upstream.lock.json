@@ -2,29 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.158",
-  "imported_commit": "22b47efd2062325e8a2924a6f006457858a9dd93",
+  "imported_version": "2.3.164",
+  "imported_commit": "078bc0375fa0d842c6c0b6872216b997e3427b08",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.158",
-  "latest_observed_release_commit": "22b47efd2062325e8a2924a6f006457858a9dd93",
-  "latest_observed_main_commit": "4902f6d7b7264fdeb667d8aca5c170dc38c61f11",
+  "latest_observed_version": "2.3.164",
+  "latest_observed_release_commit": "078bc0375fa0d842c6c0b6872216b997e3427b08",
+  "latest_observed_main_commit": "1146779d625f9775464acc9a25cdb42e9669a157",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.158",
-  "reviewed_release_commit": "22b47efd2062325e8a2924a6f006457858a9dd93",
+  "reviewed_release_tag": "v2.3.164",
+  "reviewed_release_commit": "078bc0375fa0d842c6c0b6872216b997e3427b08",
   "observed_delta_review": {
-    "from_commit": "48a099e125e09142ca85a13fb263363801bb8f78",
-    "to_commit": "22b47efd2062325e8a2924a6f006457858a9dd93",
-    "status": "formal_v23158_selective_backport_with_original_image_canvas",
-    "scope": "Capacity-error privacy and moderation master gates/default policy; restore the fork iframe framework with vendored basketikun/infinite-canvas image-only runtime.",
-    "review_depth": "All commits/paths inventoried; source implementation/callers read for selected slices and canvas reference. Deferred paths are not claimed line-by-line audited.",
-    "evidence": "maintenance/notes/upstream-sync-20261124-dual-canvas.md",
-    "selection_ledger": "maintenance/notes/dual-selection-ledger-20261124-canvas.json"
+    "from_commit": "22b47efd2062325e8a2924a6f006457858a9dd93",
+    "to_commit": "078bc0375fa0d842c6c0b6872216b997e3427b08",
+    "status": "formal_v23164_selective_backport_remove_infinite_canvas",
+    "scope": "Gateway base-URL slash compatibility; backend-mode Passkey completion; independent usage summary/endpoints; boot graph, parallel locale/route loading and title; focus-aware jittered balance refresh. Remove the entire canvas integration at user request.",
+    "review_depth": "All 35 commits and 139 changed paths inventoried; selected source implementations, callers and tests reviewed. Explicit deferrals do not imply a full line-by-line audit.",
+    "evidence": "maintenance/notes/upstream-sync-20261125-v23164-no-canvas.md",
+    "selection_ledger": "maintenance/notes/fork-selection-ledger-20261125-v23164.json"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "22b47efd2062325e8a2924a6f006457858a9dd93",
+    "source_head": "078bc0375fa0d842c6c0b6872216b997e3427b08",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -32,6 +32,7 @@
       "Formal v2.3.5: schedulable-timer confirmation and requestcapture diagnostic test fixes have no local module/caller. Review and monitoring checkpoints updated without importing deferred modules; see maintenance/notes/upstream-sync-20261103-v2305.md."
     ],
     "implemented_with_local_regression": [
+      "Formal v2.3.159-v2.3.164 selected gateway slash/base-URL, backend-mode Passkey, scoped usage statistics, first-load and balance-refresh adaptations. Entire canvas runtime/integration removed by user request; image APIs/groups and local billing preserved. See maintenance/notes/upstream-sync-20261125-v23164-no-canvas.md.",
       "Capacity-error privacy and moderation master gates/default policy; restore the fork iframe framework with vendored basketikun/infinite-canvas image-only runtime. See maintenance/notes/upstream-sync-20261124-dual-canvas.md",
       "Formal v2.3.154-v2.3.155 hardened gateway aliases, Passkey ceremony/error/feedback slice and security dependency updates. Keep personal 2.1.71; see maintenance/notes/upstream-sync-20261124-v23155.md",
       "Formal v2.3.118-v2.3.153 selective login/TOTP, trusted proxy, Codex context, Gemini cache usage, request-body-budget503 and Turnstile fixes; original v0.2.24 protocol/rotation companion. Keep personal2.1.70; see maintenance/notes/upstream-sync-20261123-dual.md",
@@ -93,7 +94,8 @@
     ],
     "excluded_by_user": [
       "LinuxDo OAuth referral propagation",
-      "Multi-code affiliate expansion and per-code rebate statistics"
+      "Multi-code affiliate expansion and per-code rebate statistics",
+      "Infinite Canvas: Vue iframe host, React runtime and source, key setup helpers, static proxy/CSP extensions, build/release dependencies and navigation, removed on 2026-11-25. Preserve image-generation groups and gateway APIs."
     ],
     "verification_limits": [
       "Full frontend387 files/3095 tests, typecheck/lint/build and Mixed1004 HTTP/SSE tests/subtests passed",

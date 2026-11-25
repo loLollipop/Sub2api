@@ -34,4 +34,4 @@
 
 浏览器验收使用实际编译的 Vue 宿主和原 React 画布，所有 API 均为本地隔离 fixture；不调用生产或付费模型。最终结果和截图见 `development/diagnostics/sub2api-dual-canvas-20261124/browser-real-canvas-result.json` 及同目录 `real-canvas-*`。目录中早期自制画布的截图、浏览器日志与构建结果已被本方案取代，不能作为本方案验收依据。
 
-没有实付请求，实际账号的上游图片质量及特定模型参数未做付费实测。同步阶段本地没有执行 Docker 镜像构建或 GitHub workflow；发布阶段的远程 CI 和制品结果记录于 `development/diagnostics/sub2api-release-v2173-20261124`，不回写此前本地验收日志。画布在浏览器本地保存，跨设备不会自动同步，清理站点数据前应导出。使用方式、依赖安装、源码维护和许可见 [画布说明](../../canvas/README.md)。
+没有实付请求，实际账号的上游图片质量及特定模型参数未做付费实测。同步阶段本地没有执行 Docker 镜像构建或 GitHub workflow；发布阶段的远程 CI 和制品结果记录于 `development/diagnostics/sub2api-release-v2173-20261124`，不回写此前本地验收日志。画布在浏览器本地保存，跨设备不会自动同步，清理站点数据前应导出。使用方式、依赖安装、源码维护和许可见 [画布说明](https://github.com/loLollipop/Sub2api/blob/ebab5e103370c6ad84ee2559e3b62c9e0d335648/canvas/README.md)。

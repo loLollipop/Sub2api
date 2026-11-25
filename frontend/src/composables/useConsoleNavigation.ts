@@ -443,7 +443,6 @@ export function useConsoleNavigation() {
     }
     items.push(
       { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-      { path: '/infinite-canvas', label: t('infiniteCanvas.title'), icon: BatchImageIcon },
       { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
       { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
       { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },

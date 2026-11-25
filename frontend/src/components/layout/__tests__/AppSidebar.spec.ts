@@ -284,8 +284,8 @@ describe('AppSidebar user navigation', () => {
     expect(navigationSource).not.toContain("{ path: '/subscriptions'")
   })
 
-  it('restores the built-in canvas and keeps ticket destinations removed', () => {
-    expect(navigationSource).toContain("{ path: '/infinite-canvas'")
+  it('omits the removed canvas and ticket destinations', () => {
+    expect(navigationSource).not.toContain("{ path: '/infinite-canvas'")
     expect(navigationSource).not.toContain("t('nav.infiniteCanvas')")
     expect(navigationSource).not.toContain("path: '/tickets'")
     expect(navigationSource).not.toContain("path: '/admin/tickets'")

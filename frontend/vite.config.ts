@@ -77,6 +77,35 @@ function injectPublicSettings(backendUrl: string): Plugin {
   }
 }
 
+export type ChunkContext = {
+  getModuleInfo: (id: string) => { isEntry: boolean; importedIds: readonly string[] } | null
+  getModuleIds: () => IterableIterator<string>
+}
+
+export function createBootGraph() {
+  let boot: Set<string> | undefined
+  return (id: string, ctx: ChunkContext): boolean => {
+    if (!boot) {
+      boot = new Set<string>()
+      const queue: string[] = []
+      // tsconfig.node.json has no `target`, so `for...of` over an iterator does not type-check here: walk it by hand
+      const ids = ctx.getModuleIds()
+      for (let item = ids.next(); !item.done; item = ids.next()) {
+        if (ctx.getModuleInfo(item.value)?.isEntry) queue.push(item.value)
+      }
+      while (queue.length > 0) {
+        const current = queue.pop() as string
+        if (boot.has(current)) continue
+        boot.add(current)
+        for (const next of ctx.getModuleInfo(current)?.importedIds ?? []) queue.push(next)
+      }
+    }
+    return boot.has(id)
+  }
+}
+
+const isLoadedAtBoot = createBootGraph()
+
 export default defineConfig(({ mode }) => {
   if (mode === 'console-preview') {
     throw new Error('console-preview is local dev only; use pnpm run dev:console')
@@ -116,7 +145,7 @@ export default defineConfig(({ mode }) => {
          * 手动分包配置
          * 分离第三方库并按功能合并应用代码，避免循环依赖
          */
-        manualChunks(id: string) {
+        manualChunks(id: string, ctx: ChunkContext) {
           if (id.includes('node_modules')) {
             // Vue 核心库
             if (
@@ -149,7 +178,8 @@ export default defineConfig(({ mode }) => {
               return 'vendor-i18n'
             }
 
-            // 其他小型第三方库合并
+            // 仅首屏静态依赖进入共享块，其他依赖随懒加载页面按需下载。
+            if (!isLoadedAtBoot(id, ctx)) return undefined
             return 'vendor-misc'
           }
 

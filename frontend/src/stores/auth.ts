@@ -19,7 +19,8 @@ const AUTH_USER_KEY = 'auth_user'
 const REFRESH_TOKEN_KEY = 'refresh_token'
 const TOKEN_EXPIRES_AT_KEY = 'token_expires_at' // 存储过期时间戳而非有效期
 const PENDING_AUTH_SESSION_KEY = 'pending_auth_session'
-const AUTO_REFRESH_INTERVAL = 90 * 1000
+const AUTO_REFRESH_MIN_DELAY = 60 * 1000
+const AUTO_REFRESH_MAX_DELAY = 10 * 60 * 1000
 const AUTH_REFRESH_MIN_INTERVAL = 5 * 1000
 const TOKEN_REFRESH_BUFFER = 120 * 1000 // 120 seconds before expiry to refresh token
 
@@ -84,7 +85,8 @@ export const useAuthStore = defineStore('auth', () => {
   const tokenExpiresAt = ref<number | null>(null) // 过期时间戳（毫秒）
   const runMode = ref<'standard' | 'simple'>('standard')
   const pendingAuthSession = ref<PendingAuthSessionSummary | null>(null)
-  let refreshIntervalId: ReturnType<typeof setInterval> | null = null
+  let autoRefreshTimeoutId: ReturnType<typeof setTimeout> | null = null
+  let autoRefreshActive = false
   let lastRefreshAt = 0
   let refreshGeneration = 0
   let refreshRevision = 0
@@ -146,33 +148,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /**
-   * Start auto-refresh interval for user data
-   * Refreshes visible tabs every 90 seconds and catches up when shown again.
-   */
-  function startAutoRefresh(): void {
-    // Clear existing interval if any
-    stopAutoRefresh()
-    document.addEventListener('visibilitychange', refreshWhenVisible)
-
-    refreshIntervalId = setInterval(() => {
-      if (document.hidden) return
-      if (token.value) {
-        refreshUser().catch((error) => {
-          console.error('Auto-refresh user failed:', error)
-        })
-      }
-    }, AUTO_REFRESH_INTERVAL)
+  // Spread background refreshes across tabs; returning to the page refreshes immediately.
+  function armAutoRefresh(): void {
+    if (autoRefreshTimeoutId) clearTimeout(autoRefreshTimeoutId)
+    const delay = AUTO_REFRESH_MIN_DELAY + Math.floor(Math.random() * (AUTO_REFRESH_MAX_DELAY - AUTO_REFRESH_MIN_DELAY + 1))
+    autoRefreshTimeoutId = setTimeout(() => {
+      autoRefreshTimeoutId = null
+      armAutoRefresh()
+      refreshWhenVisible()
+    }, delay)
   }
 
-  /**
-   * Stop auto-refresh interval
-   */
+  function startAutoRefresh(): void {
+    stopAutoRefresh()
+    autoRefreshActive = true
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
+    armAutoRefresh()
+  }
+
   function stopAutoRefresh(): void {
+    autoRefreshActive = false
     document.removeEventListener('visibilitychange', refreshWhenVisible)
-    if (refreshIntervalId) {
-      clearInterval(refreshIntervalId)
-      refreshIntervalId = null
+    window.removeEventListener('focus', refreshWhenVisible)
+    if (autoRefreshTimeoutId) {
+      clearTimeout(autoRefreshTimeoutId)
+      autoRefreshTimeoutId = null
     }
   }
 
@@ -479,6 +480,7 @@ export const useAuthStore = defineStore('auth', () => {
         const { run_mode: _run_mode, ...userData } = response.data
         user.value = userData
         lastRefreshAt = Date.now()
+        if (autoRefreshActive) armAutoRefresh()
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData))
         return userData
       } catch (error) {

@@ -184,19 +184,19 @@ describe('SIGNAL dashboard accounting and access contracts', () => {
   })
 
   it('keeps all destinations and applies the existing affiliate and batch-image visibility gates', async () => {
-    const router = createRouter({ history: createMemoryHistory(), routes: ['/', '/keys', '/infinite-canvas', '/usage', '/batch-image', '/affiliate', '/redeem'].map(path => ({ path, component: { template: '<div />' } })) })
+    const router = createRouter({ history: createMemoryHistory(), routes: ['/', '/keys', '/usage', '/batch-image', '/affiliate', '/redeem'].map(path => ({ path, component: { template: '<div />' } })) })
     const wrapper = mount(Actions, { global: { plugins: [router] } })
     const destinations = () => wrapper.findAll('a').map(link => link.attributes('href'))
     expect(refreshBatchImageAccess).toHaveBeenCalledOnce()
-    expect(destinations()).toEqual(['/keys', '/infinite-canvas', '/usage', '/redeem'])
+    expect(destinations()).toEqual(['/keys', '/usage', '/redeem'])
     expect(wrapper.findAll('button')).toHaveLength(0)
     affiliateEnabled.value = true
     await flushPromises()
-    expect(destinations()).toEqual(['/keys', '/infinite-canvas', '/usage', '/affiliate', '/redeem'])
+    expect(destinations()).toEqual(['/keys', '/usage', '/affiliate', '/redeem'])
     expect(wrapper.get('a[href="/affiliate"]').text()).toBe('dashboard.inviteRecords')
     canUseBatchImage.value = true
     await flushPromises()
-    expect(destinations()).toEqual(['/keys', '/infinite-canvas', '/usage', '/affiliate', '/redeem', '/batch-image'])
+    expect(destinations()).toEqual(['/keys', '/usage', '/affiliate', '/redeem', '/batch-image'])
     isSimpleMode.value = true
     await flushPromises()
     expect(destinations()).not.toContain('/affiliate')

@@ -16,6 +16,11 @@ vi.mock('@/stores', () => ({
   useAdminSettingsStore: () => ({ customMenuItems: [] }),
   useAppStore: () => ({ siteName: 'Test', siteLogo: '', cachedPublicSettings: null, fetchPublicSettings: async () => {} }),
 }))
+vi.mock('@/stores/app', () => ({
+  useAppStore: () => ({ siteName: 'Test', siteLogo: '', cachedPublicSettings: null }),
+}))
+vi.mock('@/stores/auth', () => ({ useAuthStore: () => context.auth }))
+vi.mock('@/stores/adminSettings', () => ({ useAdminSettingsStore: () => ({ customMenuItems: [] }) }))
 vi.mock('vue-router', () => ({
   RouterView: { template: '<div />' },
   useRouter: () => ({ afterEach: context.afterEach, replace: vi.fn() }),

@@ -1,0 +1,599 @@
+{
+  "source": "kiss-kedaya/sub2api",
+  "from_release": "v2.3.158",
+  "from_commit": "22b47efd2062325e8a2924a6f006457858a9dd93",
+  "to_release": "v2.3.164",
+  "to_commit": "078bc0375fa0d842c6c0b6872216b997e3427b08",
+  "commits": [
+    {
+      "commit": "4902f6d7b7264fdeb667d8aca5c170dc38c61f11",
+      "subject": "chore: sync VERSION to 2.3.158 [skip ci]",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "commit": "a0de157c9bb68adc13b1498763dc9419aebcea75",
+      "subject": "feat(keys): 创建/轮换 Key 不再强制输入登录密码，只有开了 TOTP/Passkey 才强制 (#603)",
+      "decision": "deferred",
+      "reason": "API Key seal/rotate/factor workflows remain excluded; local key creation does not use this verification flow.",
+      "changed_paths": [
+        "backend/internal/handler/api_key_account_types_test.go",
+        "backend/internal/handler/api_key_plaintext_guard_test.go",
+        "backend/internal/handler/api_key_verification_handler.go",
+        "backend/internal/handler/api_key_verification_handler_test.go",
+        "backend/internal/service/api_key_verification.go",
+        "backend/internal/service/api_key_verification_email_bind_test.go",
+        "backend/internal/service/api_key_verification_test.go",
+        "frontend/src/api/keys.ts",
+        "frontend/src/types/index.ts",
+        "frontend/src/utils/__tests__/apiKeyVerification.spec.ts",
+        "frontend/src/utils/apiKeyVerification.ts",
+        "frontend/src/views/user/InfiniteCanvasView.vue",
+        "frontend/src/views/user/KeysView.vue",
+        "frontend/src/views/user/__tests__/InfiniteCanvasView.spec.ts",
+        "frontend/src/views/user/__tests__/KeysView.spec.ts"
+      ]
+    },
+    {
+      "commit": "af357300550a577917b6388c66db85c83e5ab30c",
+      "subject": "fix(keys): 页面过期后只在换页时整页刷新，同页改查询串/锚点不再重载 (#602)",
+      "decision": "not_applicable",
+      "reason": "The upstream useAppUpdate reloader is not installed in the local Vue console; no same-page forced reload to change.",
+      "changed_paths": [
+        "frontend/src/composables/__tests__/useAppUpdate.spec.ts",
+        "frontend/src/composables/useAppUpdate.ts"
+      ]
+    },
+    {
+      "commit": "4ce228c75feb86f87b562c5aec937ae20a4b0f03",
+      "subject": "fix(monitor): 去掉渠道状态时间线上方「缓存率 < 30% 视为不可用（黑格）」的说明行 (#604)",
+      "decision": "already_satisfied",
+      "reason": "Local timeline already omits this cache-ratio legend; preserve existing native monitor semantics.",
+      "changed_paths": [
+        "frontend/src/components/user/monitor/ChannelMonitorV3Timeline.vue",
+        "frontend/src/components/user/monitor/__tests__/ChannelMonitorV3Timeline.unknownBar.spec.ts",
+        "frontend/src/i18n/locales/en/channelMonitorV3.ts",
+        "frontend/src/i18n/locales/zh/channelMonitorV3.ts"
+      ]
+    },
+    {
+      "commit": "272ce634b5c7e990383a8c4b7d1103110e062115",
+      "subject": "fix(billing): 统一 Claude 模型准入闸门并按真价锚定计费 (#605)",
+      "decision": "deferred",
+      "reason": "Do not force official Claude prices or rebase explicitly configured group multipliers. Source gate has no production readers, as its source comments note; preserve actual-served-model billing and local cross-provider routing.",
+      "changed_paths": [
+        "backend/internal/handler/openai_gateway_handler.go",
+        "backend/internal/service/api_key_routes.go",
+        "backend/internal/service/billing_service.go",
+        "backend/internal/service/claude_model_admission_gate.go",
+        "backend/internal/service/claude_model_admission_gate_test.go",
+        "backend/internal/service/claude_pricing_anchor.go",
+        "backend/internal/service/gateway_usage_billing.go",
+        "backend/internal/service/model_pricing_resolver.go",
+        "backend/internal/service/openai_compatible_upstream_platforms.go",
+        "backend/internal/service/openai_gateway_scheduling.go",
+        "backend/internal/service/openai_gateway_usage.go"
+      ]
+    },
+    {
+      "commit": "5214de6eeeb4f8456f998e442d06b8543fe49c6c",
+      "subject": "feat(balance): 回到页面就刷新余额、后台随机 1-10 分钟刷新，顶栏余额框加刷新呼吸灯 (#607)",
+      "decision": "selected_partial",
+      "reason": "Adapt focus/visibility refresh and random 1-10 minute polling; retain local session-generation, forced-refresh and coalescing safeguards. Keep local header styling.",
+      "changed_paths": [
+        "frontend/src/components/layout/AppHeader.vue",
+        "frontend/src/components/layout/__tests__/AppHeaderBalanceSync.spec.ts",
+        "frontend/src/composables/__tests__/useBalanceSyncIndicator.spec.ts",
+        "frontend/src/composables/useBalanceSyncIndicator.ts",
+        "frontend/src/stores/__tests__/auth.spec.ts",
+        "frontend/src/stores/auth.ts"
+      ]
+    },
+    {
+      "commit": "9bf82a63f55f56ee47ff49583d7831ddf7dc6c05",
+      "subject": "feat(keys): 创建后的密钥回执改成安静版，并且不再让用户输两遍登录密码 (#608)",
+      "decision": "deferred",
+      "reason": "Quiet key receipts and plaintext rotation/password flows belong to the excluded sealed-key workflow.",
+      "changed_paths": [
+        "frontend/src/components/keys/ApiKeySecretDialog.vue",
+        "frontend/src/components/keys/__tests__/ApiKeySecretDialog.spec.ts",
+        "frontend/src/components/keys/quietUi.ts",
+        "frontend/src/i18n/locales/en/dashboard.ts",
+        "frontend/src/i18n/locales/zh/dashboard.ts",
+        "frontend/src/views/user/KeysView.vue",
+        "frontend/src/views/user/__tests__/KeysView.spec.ts"
+      ]
+    },
+    {
+      "commit": "69e7383f0594859a1828b811176390f3f2a5b0cc",
+      "subject": "perf(usage): 使用记录页的统计卡片先出，分组图和翻页不再每次扫表 (#610)",
+      "decision": "selected_partial",
+      "reason": "Adapt scoped summary/endpoints queries, matching rollup selection and independent UI loading. Preserve deleted-group/account-cost contracts. New shared statistics/list-total caching and group-query signature changes remain deferred.",
+      "changed_paths": [
+        "backend/internal/handler/usage_handler.go",
+        "backend/internal/handler/usage_handler_request_type_test.go",
+        "backend/internal/pkg/usagestats/usage_log_types.go",
+        "backend/internal/pkg/usagestats/usage_log_types_test.go",
+        "backend/internal/repository/dashboard_dimension_rollup_reader.go",
+        "backend/internal/repository/usage_log_repo_query.go",
+        "backend/internal/repository/usage_log_repo_stats.go",
+        "backend/internal/repository/usage_log_repo_trend.go",
+        "backend/internal/repository/usage_log_repo_usage_page_test.go",
+        "backend/internal/repository/usage_stats_cache.go",
+        "frontend/src/api/usage.ts",
+        "frontend/src/components/admin/usage/UsageStatsCards.vue",
+        "frontend/src/components/admin/usage/__tests__/UsageStatsCards.spec.ts",
+        "frontend/src/views/user/UsageView.vue",
+        "frontend/src/views/user/__tests__/UsageView.spec.ts"
+      ]
+    },
+    {
+      "commit": "b32e5d9e48ab0361d70ae64f72d527784aba029a",
+      "subject": "test(billing): 固定 Grok 组 messages 分发按实际服务的模型计费，并更正 #605 注释 (#609)",
+      "decision": "deferred",
+      "reason": "Companion tests/comments for the deferred Claude billing-anchor branch; no independent runtime fix.",
+      "changed_paths": [
+        "backend/internal/service/api_key_routes.go",
+        "backend/internal/service/claude_model_admission_gate.go",
+        "backend/internal/service/claude_pricing_anchor.go",
+        "backend/internal/service/grok_dispatch_billing_pin_test.go",
+        "backend/internal/service/openai_gateway_scheduling.go"
+      ]
+    },
+    {
+      "commit": "3836a22ff2454857a2a3ee8c0b5cc90cf62f2012",
+      "subject": "docs(release): 添加 v2.3.159 发版说明 (#611)",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "docs/release-notes/v2.3.159.md"
+      ]
+    },
+    {
+      "commit": "4f632daaa634d0fe20a8610ecc533a9434aec5a9",
+      "subject": "chore: sync VERSION to 2.3.159 [skip ci]",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "commit": "126a04991f900496d14b2cc4ed9505c92019ac4e",
+      "subject": "fix(gateway): base URL 带不带 /v1、写几个 /v1、多一个斜杠都能请求成功；首页 curl 不再多一个 /v1 (#612)",
+      "decision": "selected",
+      "reason": "Backport bounded slash normalization within registered gateway routes; adapt trailing /v1 removal to the existing home cURL component with URL/query/quoting preservation.",
+      "changed_paths": [
+        "backend/internal/server/middleware/gateway_path_alias.go",
+        "backend/internal/server/middleware/gateway_path_base_url_forms_test.go",
+        "backend/internal/server/middleware/gateway_path_index.go",
+        "frontend/src/utils/__tests__/apiBaseUrl.spec.ts",
+        "frontend/src/utils/apiBaseUrl.ts",
+        "frontend/src/views/HomeView.vue",
+        "frontend/src/views/__tests__/HomeView.spec.ts"
+      ]
+    },
+    {
+      "commit": "82f55ec07e2bc88dfecedc7c2fc41c0c44782f88",
+      "subject": "feat(gateway): 用 API 密钥自助查询自身信息（密钥状态 / 可用分组与倍率 / 用量） (#613)",
+      "decision": "deferred",
+      "reason": "New gateway self-service key/group/usage APIs and per-key limit surface need a separate integration and authorization review; current existing APIs remain.",
+      "changed_paths": [
+        "backend/internal/handler/gateway_key_info.go",
+        "backend/internal/handler/gateway_key_info_test.go",
+        "backend/internal/server/middleware/api_key_auth.go",
+        "backend/internal/server/middleware/gateway_path_index.go",
+        "backend/internal/server/middleware/key_info_rate_limit.go",
+        "backend/internal/server/middleware/key_info_rate_limit_test.go",
+        "backend/internal/server/routes/gateway.go",
+        "backend/internal/server/routes/gateway_key_info_test.go",
+        "backend/internal/server/routes/gateway_key_self_service.go",
+        "backend/internal/service/api_key_service.go",
+        "backend/internal/service/ops_upstream_context.go"
+      ]
+    },
+    {
+      "commit": "4fa852e802992125a048f337c76dd4df49824fe9",
+      "subject": "feat(docs): 文档页新增「密钥与账号」分类，侧边栏与代码块体验优化 (#614)",
+      "decision": "deferred",
+      "reason": "Documentation page redesign and new key-self-service examples depend on the excluded gateway API and source UI.",
+      "changed_paths": [
+        "frontend/src/data/__tests__/apiDocs.spec.ts",
+        "frontend/src/data/apiDocs.ts",
+        "frontend/src/i18n/locales/en/docs.ts",
+        "frontend/src/i18n/locales/zh/docs.ts",
+        "frontend/src/views/public/DocsView.vue",
+        "frontend/src/views/public/__tests__/DocsView.spec.ts"
+      ]
+    },
+    {
+      "commit": "20a7df9ebc0b05bc2ce06d3d9d342b774d7ad418",
+      "subject": "docs(release): 添加 v2.3.160 发版说明 (#615)",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "docs/release-notes/v2.3.160.md"
+      ]
+    },
+    {
+      "commit": "45747289fd3a8b07a657e975c6398a3286256f7e",
+      "subject": "chore: sync VERSION to 2.3.160 [skip ci]",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "commit": "23b8c879c269d9191873da68506ed41642b99705",
+      "subject": "fix(keys): 创建密钥第一步名称和分组没填时不能进下一步，并高亮未完成项 (#616)",
+      "decision": "not_applicable",
+      "reason": "Local key creation is a single validated form, not the upstream multi-step wizard.",
+      "changed_paths": [
+        "frontend/src/i18n/locales/en/dashboard.ts",
+        "frontend/src/i18n/locales/zh/dashboard.ts",
+        "frontend/src/views/user/KeysView.vue",
+        "frontend/src/views/user/__tests__/KeysView.spec.ts"
+      ]
+    },
+    {
+      "commit": "28d3aef1fa824a3976ce650aef0d5696bc6d198e",
+      "subject": "perf(ui): 去掉全站樱花；图表取主题色不再用 canvas 读回 (#617)",
+      "decision": "not_applicable",
+      "reason": "Local UI has no Sakura runtime or source dashboardUi canvas color readback helper.",
+      "changed_paths": [
+        "frontend/src/components/dashboard/__tests__/dashboardUi.spec.ts",
+        "frontend/src/components/dashboard/dashboardUi.ts",
+        "frontend/src/components/layout/AppLayout.vue",
+        "frontend/src/components/layout/AuthLayout.vue",
+        "frontend/src/components/layout/InkSakura.vue",
+        "frontend/src/components/layout/README.md",
+        "frontend/src/components/layout/SakuraPetalField.vue",
+        "frontend/src/components/layout/__tests__/InkSakura.spec.ts",
+        "frontend/src/components/layout/__tests__/SakuraPetalPlacement.spec.ts",
+        "frontend/src/components/layout/inkSakura/blossom.ts",
+        "frontend/src/components/layout/inkSakura/ink.ts",
+        "frontend/src/components/layout/inkSakura/model.ts",
+        "frontend/src/components/layout/inkSakura/random.ts",
+        "frontend/src/components/layout/inkSakura/scene.ts",
+        "frontend/src/components/layout/sakuraPetalPlacement.ts",
+        "frontend/src/views/ModelPlazaView.vue"
+      ]
+    },
+    {
+      "commit": "b3529a5c0f4dc67ccd79d44d7513c78d65232af1",
+      "subject": "fix(ui): 自定义 CSS 写圆角的组件也走连续圆角 (#618)",
+      "decision": "excluded_ui",
+      "reason": "Keep the local console/home theme; source Nuxt continuous-corner styling is excluded.",
+      "changed_paths": [
+        "frontend/src/style.css"
+      ]
+    },
+    {
+      "commit": "060fd4739a9fa75c261497a01687a5c3417399be",
+      "subject": "test(signer): 「回填被改过的分享码」用例不再随机失败 (#619)",
+      "decision": "not_applicable",
+      "reason": "Signer shard setup is not part of this distribution.",
+      "changed_paths": [
+        "frontend/src/components/crypto/signer/__tests__/SignerShardSetupWizard.spec.ts"
+      ]
+    },
+    {
+      "commit": "d753e39b6cf55830b9563249a978bf2e66a343fd",
+      "subject": "feat(keys): 创建密钥里「更多设置」展开 / 收起有高度动画 (#620)",
+      "decision": "not_applicable",
+      "reason": "The local single-form key dialog has no source more-settings wizard to animate.",
+      "changed_paths": [
+        "frontend/src/utils/__tests__/collapseMotion.spec.ts",
+        "frontend/src/utils/collapseMotion.ts",
+        "frontend/src/views/user/KeysView.vue"
+      ]
+    },
+    {
+      "commit": "9883e72cb58f11167841f67928ab7cbd953103b6",
+      "subject": "docs(release): 添加 v2.3.161 发版说明 (#621)",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "docs/release-notes/v2.3.161.md"
+      ]
+    },
+    {
+      "commit": "7e1bfa091b9fd23e4816ac25c1011eaf5c8624ed",
+      "subject": "chore: sync VERSION to 2.3.161 [skip ci]",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "commit": "3776958e39cb0f57702883037e27d60f3420132c",
+      "subject": "fix(auth): 后台模式放行密码登录第二因子的 Passkey 完成 (#622)",
+      "decision": "selected",
+      "reason": "Allow exact password-login Passkey completion path in backend mode; keep handler-level admin checks and reject neighboring auth paths.",
+      "changed_paths": [
+        "backend/internal/server/middleware/backend_mode_guard.go",
+        "backend/internal/server/middleware/backend_mode_guard_test.go"
+      ]
+    },
+    {
+      "commit": "c2fcc55631c3571bf7e8927ac91e81114e55e909",
+      "subject": "fix(auth): 避免登录凭据错误时误弹认证器输入框 (#606)",
+      "decision": "already_satisfied",
+      "reason": "Local Login already returns invalid credentials directly and never issues a fake TOTP challenge for a bad password. Preserve fail-closed TOTP for valid users.",
+      "changed_paths": [
+        "backend/internal/handler/auth_handler.go",
+        "backend/internal/handler/auth_login_totp_failclosed_test.go",
+        "backend/internal/service/setting_features.go",
+        "frontend/src/i18n/locales/en/common.ts",
+        "frontend/src/i18n/locales/zh/common.ts",
+        "frontend/src/views/auth/LoginView.vue",
+        "frontend/src/views/auth/__tests__/LoginView.dualFactor.spec.ts"
+      ]
+    },
+    {
+      "commit": "029ae4e13a78308c9562a2ec01b8e3d6d06e0bf9",
+      "subject": "perf(build): Airwallex SDK 单列成懒加载 chunk，不再进必载的 vendor-misc (#623)",
+      "decision": "not_applicable",
+      "reason": "Airwallex native payment SDK is not installed; original payment exclusions remain.",
+      "changed_paths": [
+        "frontend/src/views/user/__tests__/airwallexLazyLoading.spec.ts",
+        "frontend/vite.config.ts"
+      ]
+    },
+    {
+      "commit": "1e79ad330d0392d1f45282d8d2e4953db7d3fac9",
+      "subject": "docs(release): 添加 v2.3.162 发版说明 (#624)",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "docs/release-notes/v2.3.162.md"
+      ]
+    },
+    {
+      "commit": "1a1814eb953fb52199dffadb12036cb7893a4f23",
+      "subject": "chore: sync VERSION to 2.3.162 [skip ci]",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "commit": "e03cf18ddc507b989f6d156f95ae531a91351345",
+      "subject": "fix(ui): 连续圆角补齐第二轮（管理后台页、引导气泡、tab 触发器） (#625)",
+      "decision": "excluded_ui",
+      "reason": "Nuxt/admin continuous-corner styling is excluded in favor of the local theme.",
+      "changed_paths": [
+        "frontend/src/style.css"
+      ]
+    },
+    {
+      "commit": "3ce930865288bd8fb211150deb023e093519aec8",
+      "subject": "perf(frontend): 首屏并行加载语言包与首个页面，慢网加纯 CSS 加载条，标题写入收口 (#626)",
+      "decision": "selected_partial",
+      "reason": "Load locale and initial route in parallel, centralize title writes and add a CSP-compatible CSS boot indicator; retain the local Vue runtime, theme and route guards.",
+      "changed_paths": [
+        "frontend/index.html",
+        "frontend/src/App.vue",
+        "frontend/src/__tests__/indexHtml.spec.ts",
+        "frontend/src/i18n/index.ts",
+        "frontend/src/main.ts",
+        "frontend/src/router/__tests__/documentTitle.spec.ts",
+        "frontend/src/router/documentTitle.ts",
+        "frontend/src/router/guards.ts"
+      ]
+    },
+    {
+      "commit": "e7b1885575aa43080e62a3755cfc9713f7c58048",
+      "subject": "perf(frontend): 首次加载只下载首屏用得到的第三方库（vendor-misc 1.55MB → 0.97MB） (#627)",
+      "decision": "selected",
+      "reason": "Import the actual Rollup static boot-graph selector and regression tests, adapted to local Vite vendor groups.",
+      "changed_paths": [
+        "frontend/src/__tests__/bootChunks.spec.ts",
+        "frontend/vite.config.ts"
+      ]
+    },
+    {
+      "commit": "b0f38c1e73e2ebfa3727d1f6469fcec59c56cca6",
+      "subject": "docs(release): 添加 v2.3.163 发版说明 (#628)",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "docs/release-notes/v2.3.163.md"
+      ]
+    },
+    {
+      "commit": "911fcf2674e5d6a7b3c8eea35a94c60e3dfeeb69",
+      "subject": "chore: sync VERSION to 2.3.163 [skip ci]",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "backend/cmd/server/VERSION"
+      ]
+    },
+    {
+      "commit": "ba0dc28ae8afac148869fd2b88287637ba959aa7",
+      "subject": "fix(auth): 登录改成注册页那种 Quiet 分步，手机端不再被验证码反复重置卡住，暗色背景不再持续重绘 (#629)",
+      "decision": "excluded_ui",
+      "reason": "Keep the local login layout and captcha lifecycle. Source Quiet multi-step login rewrite applies to a different UI/state machine.",
+      "changed_paths": [
+        "frontend/src/components/auth/PasskeyFactorPane.vue",
+        "frontend/src/components/auth/PasskeyLoginModal.vue",
+        "frontend/src/components/auth/TotpFactorPane.vue",
+        "frontend/src/components/auth/TotpLoginModal.vue",
+        "frontend/src/components/auth/__tests__/TotpFactorPane.rateLimit.spec.ts",
+        "frontend/src/components/auth/__tests__/TotpFactorPane.spec.ts",
+        "frontend/src/components/auth/__tests__/TotpLoginModal.rateLimit.spec.ts",
+        "frontend/src/components/auth/__tests__/TotpLoginModal.spec.ts",
+        "frontend/src/components/common/TotpCodeInput.vue",
+        "frontend/src/components/layout/AuthLayout.vue",
+        "frontend/src/i18n/locales/en/common.ts",
+        "frontend/src/i18n/locales/en/dashboard.ts",
+        "frontend/src/i18n/locales/zh/common.ts",
+        "frontend/src/i18n/locales/zh/dashboard.ts",
+        "frontend/src/styles/auth-quiet.css",
+        "frontend/src/views/auth/LoginView.vue",
+        "frontend/src/views/auth/__tests__/LoginView.dualFactor.spec.ts",
+        "frontend/src/views/auth/__tests__/LoginView.spec.ts",
+        "frontend/src/views/auth/__tests__/TencentCaptchaActionGate.spec.ts"
+      ]
+    },
+    {
+      "commit": "078bc0375fa0d842c6c0b6872216b997e3427b08",
+      "subject": "docs(release): 添加 v2.3.164 发版说明 (#630)",
+      "decision": "metadata_only",
+      "reason": "Record upstream release history; keep personal VERSION 2.1.73 and do not rewrite past release notes.",
+      "changed_paths": [
+        "docs/release-notes/v2.3.164.md"
+      ]
+    }
+  ],
+  "path_inventory": [
+    "backend/cmd/server/VERSION",
+    "backend/internal/handler/api_key_account_types_test.go",
+    "backend/internal/handler/api_key_plaintext_guard_test.go",
+    "backend/internal/handler/api_key_verification_handler.go",
+    "backend/internal/handler/api_key_verification_handler_test.go",
+    "backend/internal/handler/auth_handler.go",
+    "backend/internal/handler/auth_login_totp_failclosed_test.go",
+    "backend/internal/handler/gateway_key_info.go",
+    "backend/internal/handler/gateway_key_info_test.go",
+    "backend/internal/handler/openai_gateway_handler.go",
+    "backend/internal/handler/usage_handler.go",
+    "backend/internal/handler/usage_handler_request_type_test.go",
+    "backend/internal/pkg/usagestats/usage_log_types.go",
+    "backend/internal/pkg/usagestats/usage_log_types_test.go",
+    "backend/internal/repository/dashboard_dimension_rollup_reader.go",
+    "backend/internal/repository/usage_log_repo_query.go",
+    "backend/internal/repository/usage_log_repo_stats.go",
+    "backend/internal/repository/usage_log_repo_trend.go",
+    "backend/internal/repository/usage_log_repo_usage_page_test.go",
+    "backend/internal/repository/usage_stats_cache.go",
+    "backend/internal/server/middleware/api_key_auth.go",
+    "backend/internal/server/middleware/backend_mode_guard.go",
+    "backend/internal/server/middleware/backend_mode_guard_test.go",
+    "backend/internal/server/middleware/gateway_path_alias.go",
+    "backend/internal/server/middleware/gateway_path_base_url_forms_test.go",
+    "backend/internal/server/middleware/gateway_path_index.go",
+    "backend/internal/server/middleware/key_info_rate_limit.go",
+    "backend/internal/server/middleware/key_info_rate_limit_test.go",
+    "backend/internal/server/routes/gateway.go",
+    "backend/internal/server/routes/gateway_key_info_test.go",
+    "backend/internal/server/routes/gateway_key_self_service.go",
+    "backend/internal/service/api_key_routes.go",
+    "backend/internal/service/api_key_service.go",
+    "backend/internal/service/api_key_verification.go",
+    "backend/internal/service/api_key_verification_email_bind_test.go",
+    "backend/internal/service/api_key_verification_test.go",
+    "backend/internal/service/billing_service.go",
+    "backend/internal/service/claude_model_admission_gate.go",
+    "backend/internal/service/claude_model_admission_gate_test.go",
+    "backend/internal/service/claude_pricing_anchor.go",
+    "backend/internal/service/gateway_usage_billing.go",
+    "backend/internal/service/grok_dispatch_billing_pin_test.go",
+    "backend/internal/service/model_pricing_resolver.go",
+    "backend/internal/service/openai_compatible_upstream_platforms.go",
+    "backend/internal/service/openai_gateway_scheduling.go",
+    "backend/internal/service/openai_gateway_usage.go",
+    "backend/internal/service/ops_upstream_context.go",
+    "backend/internal/service/setting_features.go",
+    "docs/release-notes/v2.3.159.md",
+    "docs/release-notes/v2.3.160.md",
+    "docs/release-notes/v2.3.161.md",
+    "docs/release-notes/v2.3.162.md",
+    "docs/release-notes/v2.3.163.md",
+    "docs/release-notes/v2.3.164.md",
+    "frontend/index.html",
+    "frontend/src/App.vue",
+    "frontend/src/__tests__/bootChunks.spec.ts",
+    "frontend/src/__tests__/indexHtml.spec.ts",
+    "frontend/src/api/keys.ts",
+    "frontend/src/api/usage.ts",
+    "frontend/src/components/admin/usage/UsageStatsCards.vue",
+    "frontend/src/components/admin/usage/__tests__/UsageStatsCards.spec.ts",
+    "frontend/src/components/auth/PasskeyFactorPane.vue",
+    "frontend/src/components/auth/PasskeyLoginModal.vue",
+    "frontend/src/components/auth/TotpFactorPane.vue",
+    "frontend/src/components/auth/TotpLoginModal.vue",
+    "frontend/src/components/auth/__tests__/TotpFactorPane.rateLimit.spec.ts",
+    "frontend/src/components/auth/__tests__/TotpFactorPane.spec.ts",
+    "frontend/src/components/common/TotpCodeInput.vue",
+    "frontend/src/components/crypto/signer/__tests__/SignerShardSetupWizard.spec.ts",
+    "frontend/src/components/dashboard/__tests__/dashboardUi.spec.ts",
+    "frontend/src/components/dashboard/dashboardUi.ts",
+    "frontend/src/components/keys/ApiKeySecretDialog.vue",
+    "frontend/src/components/keys/__tests__/ApiKeySecretDialog.spec.ts",
+    "frontend/src/components/keys/quietUi.ts",
+    "frontend/src/components/layout/AppHeader.vue",
+    "frontend/src/components/layout/AppLayout.vue",
+    "frontend/src/components/layout/AuthLayout.vue",
+    "frontend/src/components/layout/InkSakura.vue",
+    "frontend/src/components/layout/README.md",
+    "frontend/src/components/layout/SakuraPetalField.vue",
+    "frontend/src/components/layout/__tests__/AppHeaderBalanceSync.spec.ts",
+    "frontend/src/components/layout/__tests__/InkSakura.spec.ts",
+    "frontend/src/components/layout/__tests__/SakuraPetalPlacement.spec.ts",
+    "frontend/src/components/layout/inkSakura/blossom.ts",
+    "frontend/src/components/layout/inkSakura/ink.ts",
+    "frontend/src/components/layout/inkSakura/model.ts",
+    "frontend/src/components/layout/inkSakura/random.ts",
+    "frontend/src/components/layout/inkSakura/scene.ts",
+    "frontend/src/components/layout/sakuraPetalPlacement.ts",
+    "frontend/src/components/user/monitor/ChannelMonitorV3Timeline.vue",
+    "frontend/src/components/user/monitor/__tests__/ChannelMonitorV3Timeline.unknownBar.spec.ts",
+    "frontend/src/composables/__tests__/useAppUpdate.spec.ts",
+    "frontend/src/composables/__tests__/useBalanceSyncIndicator.spec.ts",
+    "frontend/src/composables/useAppUpdate.ts",
+    "frontend/src/composables/useBalanceSyncIndicator.ts",
+    "frontend/src/data/__tests__/apiDocs.spec.ts",
+    "frontend/src/data/apiDocs.ts",
+    "frontend/src/i18n/index.ts",
+    "frontend/src/i18n/locales/en/channelMonitorV3.ts",
+    "frontend/src/i18n/locales/en/common.ts",
+    "frontend/src/i18n/locales/en/dashboard.ts",
+    "frontend/src/i18n/locales/en/docs.ts",
+    "frontend/src/i18n/locales/zh/channelMonitorV3.ts",
+    "frontend/src/i18n/locales/zh/common.ts",
+    "frontend/src/i18n/locales/zh/dashboard.ts",
+    "frontend/src/i18n/locales/zh/docs.ts",
+    "frontend/src/main.ts",
+    "frontend/src/router/__tests__/documentTitle.spec.ts",
+    "frontend/src/router/documentTitle.ts",
+    "frontend/src/router/guards.ts",
+    "frontend/src/stores/__tests__/auth.spec.ts",
+    "frontend/src/stores/auth.ts",
+    "frontend/src/style.css",
+    "frontend/src/styles/auth-quiet.css",
+    "frontend/src/types/index.ts",
+    "frontend/src/utils/__tests__/apiBaseUrl.spec.ts",
+    "frontend/src/utils/__tests__/apiKeyVerification.spec.ts",
+    "frontend/src/utils/__tests__/collapseMotion.spec.ts",
+    "frontend/src/utils/apiBaseUrl.ts",
+    "frontend/src/utils/apiKeyVerification.ts",
+    "frontend/src/utils/collapseMotion.ts",
+    "frontend/src/views/HomeView.vue",
+    "frontend/src/views/ModelPlazaView.vue",
+    "frontend/src/views/__tests__/HomeView.spec.ts",
+    "frontend/src/views/auth/LoginView.vue",
+    "frontend/src/views/auth/__tests__/LoginView.dualFactor.spec.ts",
+    "frontend/src/views/auth/__tests__/LoginView.spec.ts",
+    "frontend/src/views/auth/__tests__/TencentCaptchaActionGate.spec.ts",
+    "frontend/src/views/public/DocsView.vue",
+    "frontend/src/views/public/__tests__/DocsView.spec.ts",
+    "frontend/src/views/user/InfiniteCanvasView.vue",
+    "frontend/src/views/user/KeysView.vue",
+    "frontend/src/views/user/UsageView.vue",
+    "frontend/src/views/user/__tests__/InfiniteCanvasView.spec.ts",
+    "frontend/src/views/user/__tests__/KeysView.spec.ts",
+    "frontend/src/views/user/__tests__/UsageView.spec.ts",
+    "frontend/src/views/user/__tests__/airwallexLazyLoading.spec.ts",
+    "frontend/vite.config.ts"
+  ],
+  "user_directed_removal": "Remove all Infinite Canvas application source and integration; preserve image generation groups and gateway APIs.",
+  "verification": "Recorded in the companion sync note and local diagnostic results."
+}

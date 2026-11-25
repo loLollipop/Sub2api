@@ -51,6 +51,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
+import { apiSiteRoot } from '@/utils/apiBaseUrl'
 
 const props = defineProps<{ apiBaseUrl: string }>()
 const { t } = useI18n()
@@ -63,7 +64,7 @@ const activeProtocol = ref<(typeof protocols)[number]['id']>('responses')
 const endpoint = computed(() => activeProtocol.value === 'responses' ? '/v1/responses' : '/v1/chat/completions')
 const example = computed(() => {
   const url = new URL(props.apiBaseUrl || window.location.origin)
-  const basePath = url.pathname.replace(/\/+$/, '').replace(/\/v1$/, '')
+  const basePath = apiSiteRoot(url.pathname)
   url.pathname = `${basePath}${endpoint.value}`
   url.hash = ''
   // Keep the copied shell literal safe if a configured URL contains a quote.

@@ -47,7 +47,6 @@ WORKDIR /app
 
 # Copy the pre-built binary and runtime fallback resources from GoReleaser
 COPY LICENSE NOTICE.md LOCAL_FORK.md /app/licenses/
-COPY canvas/LICENSE /app/licenses/infinite-canvas-LICENSE
 COPY sub2api /app/sub2api
 COPY --chown=sub2api:sub2api backend/resources /app/resources
 

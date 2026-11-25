@@ -79,18 +79,3 @@ jobs:
           python tools/check_pnpm_audit_exceptions.py \
             --audit frontend/audit.json \
             --exceptions .github/audit-exceptions.yml
-
-  canvas-security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: canvas/web/package-lock.json
-      - name: Install image canvas dependencies
-        run: npm --prefix canvas/web ci --ignore-scripts --no-audit --no-fund
-      - name: Audit image canvas production dependencies
-        run: npm --prefix canvas/web audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org

@@ -6,13 +6,10 @@ package web
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
-
-func bundledCanvasFS() fs.FS { return nil }
 
 // PublicSettingsProvider is an interface to fetch public settings
 // This stub is needed for compilation when frontend is not embedded

@@ -86,7 +86,7 @@ describe('browse navigation and sidebar operations', () => {
     expect(wrapper!.find('.consumer-more-menu').exists()).toBe(false)
     const sections = wrapper!.findAll('.sidebar-nav .sidebar-section')
     expect(sections).toHaveLength(1)
-    expect(sections[0].findAll('a').map(link => link.attributes('href'))).toEqual(['/dashboard', '/keys', '/infinite-canvas', '/batch-image', '/usage', '/purchase', '/redeem', '/affiliate', '/profile', '/custom/extra'])
+    expect(sections[0].findAll('a').map(link => link.attributes('href'))).toEqual(['/dashboard', '/keys', '/batch-image', '/usage', '/purchase', '/redeem', '/affiliate', '/profile', '/custom/extra'])
     expect(wrapper!.find('.sidebar-section-title').exists()).toBe(false)
     expect(wrapper!.text()).not.toContain('Admin only')
     expect(wrapper!.text()).not.toContain('Embedded recharge')
@@ -113,18 +113,18 @@ describe('browse navigation and sidebar operations', () => {
   it('preserves simple and backend mode restrictions', async () => {
     const { app } = await render(true)
     expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1', '/monitor'])
-    expect(sidebarLinks()).toEqual(['/dashboard', '/keys', '/infinite-canvas', '/profile', '/custom/extra'])
+    expect(sidebarLinks()).toEqual(['/dashboard', '/keys', '/profile', '/custom/extra'])
     app.cachedPublicSettings!.backend_mode_enabled = true
     await flushPromises()
     expect(primary()).toEqual(['/', '/dashboard', '/model-plaza?embedded=1'])
     expect(sidebarLinks()).toEqual([])
   })
 
-  it('hides batch image without eligible key access and keeps canvas setup accessible', async () => {
+  it('hides batch image without eligible key access', async () => {
     batchAccess.allowed = false
     await render()
     expect(sidebarLinks()).not.toContain('/batch-image')
-    expect(sidebarLinks()).toContain('/infinite-canvas')
+    expect(sidebarLinks()).not.toContain('/infinite-canvas')
   })
 
   it('sanitizes custom SVG and external documentation links', async () => {

@@ -5,6 +5,7 @@ import router from './router'
 import i18n, { initI18n } from './i18n'
 import { useAppStore } from '@/stores/app'
 import { updateFavicon } from '@/utils/branding'
+import { applyDocumentTitle } from '@/router/documentTitle'
 import { isIOSDevice } from '@/utils/device'
 import './style.css'
 
@@ -54,13 +55,14 @@ async function bootstrap() {
   }
   updateFavicon(appStore.siteLogo)
 
-  await initI18n()
+  const localeReady = initI18n()
 
   app.use(router)
   app.use(i18n)
 
   // 等待路由器完成初始导航后再挂载，避免竞态条件导致的空白渲染
-  await router.isReady()
+  await Promise.all([localeReady, router.isReady()])
+  applyDocumentTitle(router.currentRoute.value)
   app.mount('#app')
 }
 

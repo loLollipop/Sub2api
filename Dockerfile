@@ -34,11 +34,6 @@ RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/stor
     if [ -n "${NPM_CONFIG_REGISTRY}" ]; then pnpm config set registry "${NPM_CONFIG_REGISTRY}"; fi && \
     pnpm install --frozen-lockfile --prefer-offline
 
-COPY canvas/web/package.json canvas/web/package-lock.json /app/canvas/web/
-RUN --mount=type=cache,id=sub2api-canvas-npm,target=/root/.npm \
-    npm --prefix /app/canvas/web ci --ignore-scripts --no-audit --no-fund
-COPY canvas/ /app/canvas/
-
 # Copy frontend source and build.
 # LegalDocumentView.vue (admin-compliance gate) build-time imports
 # ../../../../docs/legal/*.md?raw, so docs/legal/ must sit beside frontend/
@@ -156,7 +151,6 @@ WORKDIR /app
 
 # Copy binary/resources with ownership to avoid extra full-layer chown copy
 COPY LICENSE NOTICE.md LOCAL_FORK.md /app/licenses/
-COPY canvas/LICENSE /app/licenses/infinite-canvas-LICENSE
 COPY --from=backend-builder --chown=sub2api:sub2api /app/sub2api /app/sub2api
 COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
 

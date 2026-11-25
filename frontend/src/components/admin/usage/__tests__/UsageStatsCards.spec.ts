@@ -44,6 +44,21 @@ const stats = {
 }
 
 describe('UsageStatsCards', () => {
+  it('shows placeholders instead of false zero totals during the first request', () => {
+    const wrapper = mount(UsageStatsCards, { props: { stats: null, loading: true }, global: { stubs: { Icon: true } } })
+    expect(wrapper.attributes('aria-busy')).toBe('true')
+    expect(wrapper.findAll('.usage-metric-value').map(value => value.text())).toEqual(['—', '—', '—', '—'])
+    expect(wrapper.text()).not.toContain('$0.0000')
+    wrapper.unmount()
+  })
+
+  it('keeps existing totals visible while refreshing', () => {
+    const wrapper = mount(UsageStatsCards, { props: { stats, loading: true }, global: { stubs: { Icon: true } } })
+    expect(wrapper.classes()).toContain('usage-metrics--refreshing')
+    expect(wrapper.find('.usage-metric-value').text()).toBe('1')
+    wrapper.unmount()
+  })
+
   it('shows cache token breakdown values', () => {
     const wrapper = mount(UsageStatsCards, {
       props: {

@@ -6,13 +6,12 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
-import { useAdminSettingsStore } from '@/stores/adminSettings'
 import { useAdminComplianceStore } from '@/stores/adminCompliance'
 import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
-import { resolveRouteDocumentTitle } from './title'
+import { applyDocumentTitle } from './documentTitle'
 import { isPurchaseEnabled } from '@/utils/featureFlags'
 import { isChunkLoadError, recoverFromChunkLoadError } from '@/utils/chunkLoadError'
 
@@ -217,12 +216,6 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'keys.title',
       descriptionKey: 'keys.description'
     }
-  },
-  {
-    path: '/infinite-canvas',
-    name: 'InfiniteCanvas',
-    component: () => import('@/views/user/InfiniteCanvasView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: false, title: 'Infinite Canvas', titleKey: 'infiniteCanvas.title', descriptionKey: 'infiniteCanvas.description' }
   },
   {
     path: '/batch-image',
@@ -716,12 +709,7 @@ router.beforeEach(async (to, _from, next) => {
 
   // Set page title
   const appStore = useAppStore()
-  const adminSettingsStore = useAdminSettingsStore()
-  const customMenuItems = [
-    ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
-    ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
-  ]
-  document.title = resolveRouteDocumentTitle(to, appStore.siteName, customMenuItems)
+  applyDocumentTitle(to)
 
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true

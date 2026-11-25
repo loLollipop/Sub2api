@@ -411,6 +411,39 @@ describe('useAuthStore', () => {
       hidden.mockRestore()
     })
 
+    it.each([[0, 60_000], [1 - Number.EPSILON, 600_000]])('schedules the random refresh boundary %s at %sms', async (randomValue, delay) => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(randomValue)
+      try {
+        mockLogin.mockResolvedValue(fakeAuthResponse)
+        mockGetCurrentUser.mockResolvedValue({ data: fakeUser })
+        const store = useAuthStore()
+        await store.login({ email: 'test@example.com', password: '123456' })
+        await vi.advanceTimersByTimeAsync(delay - 1)
+        expect(mockGetCurrentUser).not.toHaveBeenCalled()
+        await vi.advanceTimersByTimeAsync(1)
+        expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+      } finally {
+        random.mockRestore()
+      }
+    })
+
+    it('coalesces focus and visibility refreshes and removes both listeners on disposal', async () => {
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      mockGetCurrentUser.mockResolvedValue({ data: fakeUser })
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+      store.$dispose()
+      await vi.advanceTimersByTimeAsync(600_000)
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+    })
+
     it('刷新用户数据并更新 localStorage', async () => {
       mockLogin.mockResolvedValue(fakeAuthResponse)
       const store = useAuthStore()

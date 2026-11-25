@@ -675,43 +675,52 @@ func (r *usageLogRepository) GetStatsWithRollups(ctx context.Context, filters Us
 	if !ok {
 		return nil, false, nil
 	}
+	wantTotals := filters.StatsScope != usagestats.StatsScopeEndpoints
+	wantEndpoints := filters.StatsScope != usagestats.StatsScopeSummary
 	stats := &UsageStats{}
 	var totalDuration float64
 	var durationCount int64
-	if userID > 0 {
-		metrics, err := r.queryRollupMetrics(ctx, start, cutoff, "user", userID, "")
-		if err != nil || len(metrics) == 0 {
-			return nil, false, err
-		}
-		for _, m := range metrics {
-			addUsageMetric(stats, m)
-			totalDuration += float64(m.TotalDurationMs)
-			durationCount += m.DurationCount
-		}
-	} else {
-		metrics, err := r.queryGlobalHourlyMetrics(ctx, start, cutoff)
-		if err != nil || len(metrics) == 0 {
-			return nil, false, err
-		}
-		for _, m := range metrics {
-			addUsageMetric(stats, m)
-			totalDuration += float64(m.TotalDurationMs)
-			durationCount += m.DurationCount
+	if wantTotals {
+		if userID > 0 {
+			metrics, err := r.queryRollupMetrics(ctx, start, cutoff, "user", userID, "")
+			if err != nil || len(metrics) == 0 {
+				return nil, false, err
+			}
+			for _, m := range metrics {
+				addUsageMetric(stats, m)
+				totalDuration += float64(m.TotalDurationMs)
+				durationCount += m.DurationCount
+			}
+		} else {
+			metrics, err := r.queryGlobalHourlyMetrics(ctx, start, cutoff)
+			if err != nil || len(metrics) == 0 {
+				return nil, false, err
+			}
+			for _, m := range metrics {
+				addUsageMetric(stats, m)
+				totalDuration += float64(m.TotalDurationMs)
+				durationCount += m.DurationCount
+			}
 		}
 	}
-	endpointMetrics, err := r.queryRollupMetrics(ctx, start, cutoff, endpointType, userID, "")
-	if err != nil {
-		return nil, false, err
-	}
-	for _, m := range endpointMetrics {
-		endpoint := usagestats.EndpointStat{Endpoint: m.DimensionKey, Requests: m.Requests, TotalTokens: m.InputTokens + m.OutputTokens + m.CacheCreation + m.CacheRead, Cost: m.Cost, ActualCost: m.ActualCost, AccountCost: m.AccountCost}
-		switch m.EndpointType {
-		case "inbound":
-			stats.Endpoints = append(stats.Endpoints, endpoint)
-		case "upstream":
-			stats.UpstreamEndpoints = append(stats.UpstreamEndpoints, endpoint)
-		case "path":
-			stats.EndpointPaths = append(stats.EndpointPaths, endpoint)
+	if wantEndpoints {
+		endpointMetrics, err := r.queryRollupMetrics(ctx, start, cutoff, endpointType, userID, "")
+		if err != nil {
+			return nil, false, err
+		}
+		if !wantTotals && len(endpointMetrics) == 0 {
+			return nil, false, nil
+		}
+		for _, m := range endpointMetrics {
+			endpoint := usagestats.EndpointStat{Endpoint: m.DimensionKey, Requests: m.Requests, TotalTokens: m.InputTokens + m.OutputTokens + m.CacheCreation + m.CacheRead, Cost: m.Cost, ActualCost: m.ActualCost, AccountCost: m.AccountCost}
+			switch m.EndpointType {
+			case "inbound":
+				stats.Endpoints = append(stats.Endpoints, endpoint)
+			case "upstream":
+				stats.UpstreamEndpoints = append(stats.UpstreamEndpoints, endpoint)
+			case "path":
+				stats.EndpointPaths = append(stats.EndpointPaths, endpoint)
+			}
 		}
 	}
 	if effectiveEnd.After(cutoff) {
@@ -723,12 +732,14 @@ func (r *usageLogRepository) GetStatsWithRollups(ctx context.Context, filters Us
 			return nil, false, err
 		}
 		mergeUsageStats(stats, tail)
-		tailDuration, tailCount, err := r.queryRawDurationSummary(ctx, tailStart, tailEnd, userID)
-		if err != nil {
-			return nil, false, err
+		if wantTotals {
+			tailDuration, tailCount, err := r.queryRawDurationSummary(ctx, tailStart, tailEnd, userID)
+			if err != nil {
+				return nil, false, err
+			}
+			totalDuration += tailDuration
+			durationCount += tailCount
 		}
-		totalDuration += tailDuration
-		durationCount += tailCount
 	}
 	if durationCount > 0 {
 		stats.AverageDurationMs = totalDuration / float64(durationCount)

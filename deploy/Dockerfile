@@ -28,10 +28,6 @@ RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-COPY canvas/web/package.json canvas/web/package-lock.json /app/canvas/web/
-RUN npm --prefix /app/canvas/web ci --ignore-scripts --no-audit --no-fund
-COPY canvas/ /app/canvas/
-
 # Copy frontend source and build.
 # LegalDocumentView.vue (admin-compliance gate) build-time imports
 # ../../../../docs/legal/*.md?raw, so docs/legal/ must sit beside frontend/
@@ -112,7 +108,6 @@ WORKDIR /app
 
 # Copy binary and runtime fallback resources from builder
 COPY LICENSE NOTICE.md LOCAL_FORK.md /app/licenses/
-COPY canvas/LICENSE /app/licenses/infinite-canvas-LICENSE
 COPY --from=backend-builder /app/sub2api /app/sub2api
 COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
 

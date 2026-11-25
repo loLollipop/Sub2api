@@ -1,12 +1,12 @@
 <template>
-  <div class="usage-metrics">
+  <div class="usage-metrics" :class="{ 'usage-metrics--refreshing': loading && !!stats }" :aria-busy="loading || undefined">
     <div class="usage-metric" data-testid="usage-metric">
       <div class="usage-stat-icon rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30 text-blue-600">
         <Icon name="document" size="md" />
       </div>
       <div>
         <p class="usage-metric-label">{{ t('usage.totalRequests') }}</p>
-        <p class="usage-metric-value">{{ stats?.total_requests?.toLocaleString() || '0' }}</p>
+        <p class="usage-metric-value">{{ pending ? '—' : stats?.total_requests?.toLocaleString() || '0' }}</p>
         <p class="usage-metric-note">{{ t('usage.inSelectedRange') }}</p>
       </div>
     </div>
@@ -14,8 +14,8 @@
       <div class="usage-stat-icon rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30 text-amber-600"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" /></svg></div>
       <div>
         <p class="usage-metric-label">{{ t('usage.totalTokens') }}</p>
-        <p class="usage-metric-value">{{ formatTokens(stats?.total_tokens || 0) }}</p>
-        <p class="flex flex-wrap items-center gap-x-1 text-xs text-gray-500">
+        <p class="usage-metric-value">{{ pending ? '—' : formatTokens(stats?.total_tokens || 0) }}</p>
+        <p v-if="!pending" class="flex flex-wrap items-center gap-x-1 text-xs text-gray-500">
           <span>{{ t('usage.in') }}: {{ formatTokens(stats?.total_input_tokens || 0) }}</span>
           <span>/</span>
           <span>{{ t('usage.out') }}: {{ formatTokens(stats?.total_output_tokens || 0) }}</span>
@@ -65,9 +65,9 @@
       <div class="min-w-0 flex-1">
         <p class="usage-metric-label">{{ t('usage.totalCost') }}</p>
         <p class="usage-metric-value usage-metric-cost">
-          ${{ (stats?.total_actual_cost || 0).toFixed(4) }}
+          {{ pending ? '—' : '$' + (stats?.total_actual_cost || 0).toFixed(4) }}
         </p>
-        <p class="usage-metric-note">
+        <p v-if="!pending" class="usage-metric-note">
           <template v-if="showAccountCost && totalAccountCost != null">
             <span class="text-orange-500">{{ t('usage.accountCost') }} ${{ totalAccountCost.toFixed(4) }}</span>
             <span> · </span>
@@ -83,7 +83,7 @@
       <div class="usage-stat-icon rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30 text-purple-600">
         <Icon name="clock" size="md" />
       </div>
-      <div><p class="usage-metric-label">{{ t('usage.avgDuration') }}</p><p class="usage-metric-value">{{ formatDuration(stats?.average_duration_ms || 0) }}</p></div>
+      <div><p class="usage-metric-label">{{ t('usage.avgDuration') }}</p><p class="usage-metric-value">{{ pending ? '—' : formatDuration(stats?.average_duration_ms || 0) }}</p></div>
     </div>
   </div>
 </template>
@@ -99,12 +99,15 @@ const props = withDefaults(defineProps<{
   stats: (AdminUsageStatsResponse | UsageStatsResponse) | null
   showAccountCost?: boolean
   strikeStandardCost?: boolean
+  loading?: boolean
 }>(), {
   showAccountCost: true,
   strikeStandardCost: false,
+  loading: false,
 })
 
 const { t } = useI18n()
+const pending = computed(() => props.loading && !props.stats)
 
 const totalAccountCost = computed(() => {
   const stats = props.stats as (AdminUsageStatsResponse & { total_account_cost?: number }) | null
@@ -128,6 +131,7 @@ const cacheDetailLabel = () => t('usage.cacheBreakdown')
 </script>
 
 <style scoped>
+.usage-metrics--refreshing { opacity: .6; }
 .usage-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; border: 1px solid var(--signal-line); border-radius: 12px; background: var(--signal-surface); }
 .usage-metric { display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 22px 20px; border-right: 1px solid var(--signal-line); }
 .usage-metric:last-child { border-right: 0; }

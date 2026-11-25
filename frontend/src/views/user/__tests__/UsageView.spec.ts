@@ -175,6 +175,61 @@ function mountUsageView(attachTo?: HTMLElement) {
 
 describe('user UsageView', () => {
 
+  it('shows summary totals before endpoint statistics and never replaces them with the endpoint response', async () => {
+    const pending: { scope: string; resolve: (value: unknown) => void }[] = []
+    getStats.mockImplementation((params: { scope: string }) => new Promise(resolve => {
+      pending.push({ scope: params.scope, resolve })
+    }))
+    const wrapper = mountUsageView()
+    await flushPromises()
+    const vm = wrapper.vm as unknown as {
+      usageStats: { total_requests: number } | null
+      inboundEndpointStats: { endpoint: string }[]
+      statsLoading: boolean
+      endpointStatsLoading: boolean
+    }
+    expect(pending.map(request => request.scope).sort()).toEqual(['endpoints', 'summary'])
+    pending.find(request => request.scope === 'summary')!.resolve({ total_requests: 7 })
+    await flushPromises()
+    expect(vm.usageStats?.total_requests).toBe(7)
+    expect(vm.statsLoading).toBe(false)
+    expect(vm.endpointStatsLoading).toBe(true)
+    pending.find(request => request.scope === 'endpoints')!.resolve({ endpoints: [{ endpoint: '/v1/messages' }] })
+    await flushPromises()
+    expect(vm.usageStats?.total_requests).toBe(7)
+    expect(vm.inboundEndpointStats[0].endpoint).toBe('/v1/messages')
+    expect(vm.endpointStatsLoading).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps both latest statistics scopes when old filter responses finish later', async () => {
+    const pending: { scope: string; model: string; resolve: (value: unknown) => void }[] = []
+    getStats.mockImplementation((params: { scope: string; model: string }) => new Promise(resolve => {
+      pending.push({ scope: params.scope, model: params.model, resolve })
+    }))
+    const wrapper = mountUsageView()
+    await flushPromises()
+    const vm = wrapper.vm as unknown as {
+      filters: { model: string }
+      applyFilters: () => void
+      usageStats: { total_requests: number } | null
+      inboundEndpointStats: { endpoint: string }[]
+    }
+    vm.filters.model = 'latest'
+    vm.applyFilters()
+    await flushPromises()
+    const complete = (request: typeof pending[number], requests: number, endpoint: string) =>
+      request.resolve(request.scope === 'summary' ? { total_requests: requests } : { endpoints: [{ endpoint }] })
+    pending.filter(request => request.model === 'latest').forEach(request => complete(request, 11, 'latest'))
+    await flushPromises()
+    pending.filter(request => request.model !== 'latest').forEach(request => complete(request, 99, 'stale'))
+    await flushPromises()
+    expect(vm.usageStats?.total_requests).toBe(11)
+    expect(vm.inboundEndpointStats.map(endpoint => endpoint.endpoint)).toEqual(['latest'])
+    wrapper.unmount()
+  })
+
+
   it('prioritizes token counts, billing and latency before secondary columns', async () => {
     const wrapper = mountUsageView()
     await flushPromises()

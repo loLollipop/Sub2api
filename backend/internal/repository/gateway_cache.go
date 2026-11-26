@@ -299,11 +299,11 @@ func (c *gatewayCache) SetReasoningContent(ctx context.Context, itemID string, c
 	if ttl <= 0 {
 		ttl = reasoningContentDefaultTTL
 	}
-	return c.reasoningRdb.Set(ctx, reasoningContentPrefix+itemID, content, ttl).Err()
+	return c.reasoningRdb.Set(ctx, reasoningContentPrefix+itemID, encodeReasoningContent(itemID, content), ttl).Err()
 }
 
 // GetReasoningContent 返回缓存的 reasoning 全文；未命中返回
-// service.ErrReasoningContentNotFound。
+// service.ErrReasoningContentNotFound。损坏或超限的压缩值也按未命中处理。
 func (c *gatewayCache) GetReasoningContent(ctx context.Context, itemID string) (string, error) {
 	if c == nil || c.reasoningRdb == nil {
 		return "", errors.New("gateway cache unavailable")
@@ -319,7 +319,11 @@ func (c *gatewayCache) GetReasoningContent(ctx context.Context, itemID string) (
 		}
 		return "", err
 	}
-	return val, nil
+	content, ok := decodeReasoningContent(val)
+	if !ok {
+		return "", service.ErrReasoningContentNotFound
+	}
+	return content, nil
 }
 
 const (

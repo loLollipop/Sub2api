@@ -177,8 +177,13 @@ func deepSeekNativeReasoningDigest(value string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// DeepSeekNativeReasoningCacheKeyPrefix identifies the JSON cache family that
+// supports transparent compression. The tenant/conversation/model scope stays
+// part of the key so reasoning never crosses those boundaries.
+const DeepSeekNativeReasoningCacheKeyPrefix = "deepseek-native-v1:"
+
 func deepSeekNativeReasoningCacheKey(scope, itemID string) string {
-	return "deepseek-native-v1:" + scope + ":" + deepSeekNativeReasoningDigest(itemID)
+	return DeepSeekNativeReasoningCacheKeyPrefix + scope + ":" + deepSeekNativeReasoningDigest(itemID)
 }
 
 type deepSeekNativeReasoningEntry struct {

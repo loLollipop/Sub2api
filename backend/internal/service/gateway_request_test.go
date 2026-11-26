@@ -350,6 +350,27 @@ func TestFilterThinkingBlocks(t *testing.T) {
 	}
 }
 
+// TestFilterThinkingBlocks_KeepsSignatureWithoutTopLevelThinking 锁定 P0「不支持错误签名」语义：
+// 客户端回传历史 assistant thinking 块、但请求未声明顶层 thinking 时，只要签名非空，
+// 就必须原样透传给上游，让上游自行验签并返回 400；预过滤不能把它删掉变成 200。
+func TestFilterThinkingBlocks_KeepsSignatureWithoutTopLevelThinking(t *testing.T) {
+	// 无 thinking 参数 + assistant 带非空签名（可能来自其它账号/历史）：必须保留。
+	withSig := `{"model":"claude-opus-5","max_tokens":4096,"messages":[{"role":"user","content":"q"},{"role":"assistant","content":[{"type":"thinking","thinking":"t","signature":"EuYECmMIDhgCKkBZ"},{"type":"text","text":"a"}]},{"role":"user","content":"q2"}]}`
+	got := FilterThinkingBlocks([]byte(withSig), "claude-opus-5")
+	require.Equal(t, withSig, string(got), "signature must reach upstream so it can reject invalid ones with 400")
+
+	// 同一 body 声明了 thinking 参数时也应保留（原有行为不回退）。
+	withThinking := `{"thinking":{"type":"adaptive"},"messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"t","signature":"sig_123"},{"type":"text","text":"a"}]}]}`
+	require.Equal(t, withThinking, string(FilterThinkingBlocks([]byte(withThinking), "claude-opus-5")))
+
+	// 空签名 / 缺失签名：仍然剥离，保持 Claude Code 历史不带签名的兼容性。
+	emptySig := `{"messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"t","signature":""},{"type":"text","text":"a"}]}]}`
+	require.NotContains(t, string(FilterThinkingBlocks([]byte(emptySig), "claude-opus-5")), `"type":"thinking"`)
+
+	missingSig := `{"messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"t"},{"type":"text","text":"a"}]}]}`
+	require.NotContains(t, string(FilterThinkingBlocks([]byte(missingSig), "claude-opus-5")), `"type":"thinking"`)
+}
+
 func TestFilterThinkingBlocksForRetry_DisablesThinkingAndPreservesAsText(t *testing.T) {
 	input := []byte(`{
 		"model":"claude-3-5-sonnet-20241022",
@@ -1669,4 +1690,25 @@ func TestNormalizeGLMOpenAIReasoningEffort(t *testing.T) {
 			require.Equal(t, tt.wantValue, gjson.GetBytes(got, tt.wantPath).String())
 		})
 	}
+}
+
+// TestSanitizeAnthropicBodyForBetaTokens_ContextManagementCompactBeta 锁定 P1「beta compact_20260112」：
+// compact_20260112 压缩触发器同样授权 context_management，不能因为 header 只带
+// compact-2026-01-12 就把字段剥掉——剥掉后上游收不到 trigger，compaction 永不触发，
+// stop_reason 会从 "compaction" 退化成 "end_turn"。
+func TestSanitizeAnthropicBodyForBetaTokens_ContextManagementCompactBeta(t *testing.T) {
+	body := []byte(`{"model":"claude-sonnet-5-5","context_management":{"edits":[{"type":"compact_20260112","trigger":{"type":"input_tokens","value":50000},"pause_after_compaction":true}]},"messages":[{"role":"user","content":"hi"}]}`)
+
+	out, changed := sanitizeAnthropicBodyForBetaTokens(body, "compact-2026-01-12")
+	require.False(t, changed, "compact beta must authorize context_management")
+	require.Equal(t, body, out)
+	require.True(t, gjson.GetBytes(out, "context_management").Exists())
+
+	out, changed = sanitizeAnthropicBodyForBetaTokens(body, "context-management-2025-06-27")
+	require.False(t, changed)
+	require.True(t, gjson.GetBytes(out, "context_management").Exists())
+
+	out, changed = sanitizeAnthropicBodyForBetaTokens(body, "context-1m-2025-08-07")
+	require.True(t, changed, "without either beta the field must be stripped")
+	require.False(t, gjson.GetBytes(out, "context_management").Exists())
 }

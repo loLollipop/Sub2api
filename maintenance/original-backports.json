@@ -354,7 +354,7 @@
     },
     "source_inventory": ".artifacts/dual-sync-20261118/original-selection-ledger.json"
   },
-  "latest_observed_main_commit": "2af3f1e15c98c893a89255a037f551046883b8c0",
+  "latest_observed_main_commit": "81ce8356d9a289411987bdefeddc9710340d6d52",
   "sync_20261118_v0223": {
     "evidence": "maintenance/notes/upstream-sync-20261118-v0223.md",
     "source_inventory": "maintenance/notes/original-selection-ledger-20261118-v0223.json",

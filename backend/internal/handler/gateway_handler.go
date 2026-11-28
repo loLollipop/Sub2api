@@ -198,7 +198,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 	body = parsedReq.Body.Bytes()
 	service.CaptureMessagesValidationFacts(c, body)
-	reqModel := parsedReq.Model
+	reqModel := strings.Clone(parsedReq.Model)
 	reqStream := parsedReq.Stream
 	if service.IsChatUnsupportedMediaModel(reqModel) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "This model is not supported on the Messages endpoint")
@@ -219,7 +219,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			return
 		}
 		body = parsedReq.Body.Bytes()
-		reqModel = parsedReq.Model
+		reqModel = strings.Clone(parsedReq.Model)
 		reqStream = parsedReq.Stream
 	}
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
@@ -631,6 +631,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 				sessionID := service.ExtractClientSessionID(c)
 				channelUsageFields := clientRequestedUsageFields(c, channelMapping, reqModel, partial.UpstreamModel)
+				partial.DetachRequestStrings()
 				h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 					if recordErr := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 						Result:             partial,
@@ -1072,6 +1073,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				forceCacheBilling := fs.ForceCacheBilling
 				quotaPlatform := service.QuotaPlatform(c.Request.Context(), currentAPIKey)
 				sessionID := service.ExtractClientSessionID(c)
+				result.DetachRequestStrings()
+				channelUsageFields := clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel)
 				h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 						Result:             result,
@@ -1089,7 +1092,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						RequestPayloadHash: requestPayloadHash,
 						ForceCacheBilling:  forceCacheBilling,
 						APIKeyService:      h.apiKeyService,
-						ChannelUsageFields: clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel),
+						ChannelUsageFields: channelUsageFields,
 					}); err != nil {
 						logger.L().With(
 							zap.String("component", "handler.gateway.messages"),

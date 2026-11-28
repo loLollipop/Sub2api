@@ -53,11 +53,32 @@ func TestBuildRedisOptions(t *testing.T) {
 	require.Equal(t, "localhost", optsTLS.TLSConfig.ServerName)
 }
 
+func TestBuildRedisPoolOptions(t *testing.T) {
+	r := config.RedisConfig{PoolSize: 512, MinIdleConns: 8, MaxIdleConns: 64,
+		PoolFIFO: true, PoolTimeoutMS: 1000, ConnMaxIdleTimeSeconds: 300, ConnMaxLifetimeSeconds: 1800}
+	opts := buildRedisOptions(&config.Config{Redis: r})
+	require.Equal(t, 64, opts.MaxIdleConns)
+	require.True(t, opts.PoolFIFO)
+	require.Equal(t, time.Second, opts.PoolTimeout)
+	require.Equal(t, 5*time.Minute, opts.ConnMaxIdleTime)
+	require.Equal(t, 30*time.Minute, opts.ConnMaxLifetime)
+	require.Equal(t, 3*time.Minute, opts.ConnMaxLifetimeJitter)
+	r.MinIdleConns, r.PoolSize = 256, 4096
+	require.Equal(t, 256, redisMaxIdleConns(r))
+	r.MinIdleConns, r.PoolSize = 0, 32
+	require.Equal(t, 32, redisMaxIdleConns(r))
+	r.MaxIdleConns = 0
+	require.Zero(t, redisMaxIdleConns(r))
+	client := redis.NewClient(buildRedisOptions(&config.Config{}))
+	t.Cleanup(func() { _ = client.Close() })
+	require.Equal(t, time.Duration(-1), client.Options().ConnMaxIdleTime)
+}
+
 func TestProvideReasoningRedisPreservesOrdinaryOptions(t *testing.T) {
 	cfg := &config.Config{Redis: config.RedisConfig{
 		Host: "localhost", Port: 6379, Username: "app-user", Password: "secret", DB: 2,
 		DialTimeoutSeconds: 5, ReadTimeoutSeconds: 3, WriteTimeoutSeconds: 4,
-		PoolSize: 100, MinIdleConns: 10, EnableTLS: true,
+		PoolSize: 100, MinIdleConns: 10, MaxIdleConns: 6, EnableTLS: true,
 	}}
 	ordinaryOptions := buildRedisOptions(cfg)
 	reasoning := ProvideReasoningRedis(cfg)
@@ -65,8 +86,10 @@ func TestProvideReasoningRedisPreservesOrdinaryOptions(t *testing.T) {
 	opts := reasoning.Options()
 	require.False(t, ordinaryOptions.ContextTimeoutEnabled)
 	require.Equal(t, 10, ordinaryOptions.MinIdleConns)
+	require.Equal(t, 10, ordinaryOptions.MaxIdleConns)
 	require.True(t, opts.ContextTimeoutEnabled)
 	require.Zero(t, opts.MinIdleConns)
+	require.Equal(t, 6, opts.MaxIdleConns, "reasoning pool has no prewarm floor")
 	require.Equal(t, ordinaryOptions.Addr, opts.Addr)
 	require.Equal(t, ordinaryOptions.Username, opts.Username)
 	require.Equal(t, ordinaryOptions.Password, opts.Password)

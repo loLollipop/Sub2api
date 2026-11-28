@@ -29,6 +29,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { sanitizeInternalRedirectPath } from '@/utils/url'
 import GitHubMark from './GitHubMark.vue'
 import GoogleMark from './GoogleMark.vue'
 import type { OAuthLoginStart } from '@/api/auth'
@@ -77,7 +78,7 @@ function providerLabel(provider: EmailOAuthProvider): string {
 }
 
 function startLogin(provider: EmailOAuthProvider): void {
-  const redirectTo = (route.query.redirect as string) || '/dashboard'
+  const redirectTo = sanitizeInternalRedirectPath(route.query.redirect)
   const affiliateCode = resolveAffiliateReferralCode(props.affCode, route.query.aff, route.query.aff_code)
   storeOAuthAffiliateCode(affiliateCode)
   window.sessionStorage.setItem(EMAIL_OAUTH_PENDING_PROVIDER_KEY, provider)

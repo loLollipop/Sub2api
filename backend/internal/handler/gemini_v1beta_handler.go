@@ -905,6 +905,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			accountReleaseFunc()
 		}
 		if result != nil {
+			result.DetachRequestStrings()
 			usageInput := &service.RecordUsageInput{
 				Result: result, APIKey: apiKey, User: apiKey.User, Account: account,
 				Subscription: subscription, PricingAt: pricingAt,

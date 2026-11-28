@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -552,27 +553,22 @@ func isAllowedOpsWSOrigin(r *http.Request) bool {
 		}
 	}
 	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Hostname() == "" {
+	if err != nil || !parsed.IsAbs() || parsed.Opaque != "" || parsed.User != nil ||
+		parsed.Path != "" || strings.ContainsAny(origin, "?#") ||
+		(parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return false
 	}
-	originHost := strings.ToLower(parsed.Hostname())
-
-	trustProxyHeaders := shouldTrustOpsWSProxyHeaders(r)
-	reqHost := hostWithoutPort(r.Host)
-	if trustProxyHeaders {
-		xfHost := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
-		if xfHost != "" {
-			xfHost = strings.TrimSpace(strings.Split(xfHost, ",")[0])
-			if xfHost != "" {
-				reqHost = hostWithoutPort(xfHost)
-			}
-		}
-	}
-	reqHost = strings.ToLower(reqHost)
-	if reqHost == "" {
+	validOriginHost, ok := ip.ValidateRequestHost(parsed.Host)
+	if !ok {
 		return false
 	}
-	return originHost == reqHost
+	// Proxies may pass client-controlled X-Forwarded-Host through unchanged.
+	// Compare only the validated request Host, retaining the existing port policy.
+	validReqHost, ok := ip.ValidateRequestHost(r.Host)
+	if !ok {
+		return false
+	}
+	return strings.EqualFold(hostWithoutPort(validOriginHost), hostWithoutPort(validReqHost))
 }
 
 func shouldTrustOpsWSProxyHeaders(r *http.Request) bool {
@@ -639,6 +635,9 @@ func isAddrInTrustedProxies(addr netip.Addr, trusted []netip.Prefix) bool {
 		return false
 	}
 	for _, p := range trusted {
+		if p.Bits() == 0 {
+			continue
+		}
 		if p.Contains(addr) {
 			return true
 		}
@@ -736,9 +735,17 @@ func parseTrustedProxyList(raw string) (prefixes []netip.Prefix, invalid []strin
 			}
 		}
 
-		if err != nil || !p.IsValid() {
+		if err != nil || !p.IsValid() || p.Bits() == 0 {
 			invalid = append(invalid, item)
 			continue
+		}
+		if p.Addr().Is4In6() {
+			bits := p.Bits() - 96
+			if bits <= 0 {
+				invalid = append(invalid, item)
+				continue
+			}
+			p = netip.PrefixFrom(p.Addr().Unmap(), bits)
 		}
 
 		prefixes = append(prefixes, p.Masked())

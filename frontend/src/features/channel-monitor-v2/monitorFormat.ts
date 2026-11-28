@@ -102,7 +102,8 @@ export function availabilityTextClass(value: number | null | undefined): string 
 }
 
 export function formatMonitorMs(value: number | null | undefined): string {
-  if (value == null) return '-'
+  if (value == null || !Number.isFinite(value) || value < 0) return '-'
+  if (value >= 2147483647) return '>600s'
   return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${Math.round(value)}ms`
 }
 

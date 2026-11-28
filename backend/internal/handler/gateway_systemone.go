@@ -287,6 +287,7 @@ func (h *GatewayHandler) recordSystemOneUsage(c *gin.Context, apiKey *service.AP
 	sessionID := service.ExtractClientSessionID(c)
 	requestPayloadHash := service.HashUsageRequestPayload(body)
 	usageFields := clientRequestedUsageFields(c, mapping, model, result.UpstreamModel)
+	result.DetachRequestStrings()
 
 	task := func(ctx context.Context) {
 		if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{

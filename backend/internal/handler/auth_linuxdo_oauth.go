@@ -1039,8 +1039,10 @@ func sanitizeFrontendRedirectPath(path string) string {
 	if strings.Contains(path, "://") {
 		return ""
 	}
-	if strings.ContainsAny(path, "\r\n") {
-		return ""
+	for i := 0; i < len(path); i++ {
+		if path[i] < 0x20 || path[i] == 0x7f || path[i] == '\\' {
+			return ""
+		}
 	}
 	return path
 }

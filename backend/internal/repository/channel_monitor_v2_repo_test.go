@@ -73,6 +73,20 @@ func TestChannelMonitorV2HistogramPercentilesAreMergedFromCounts(t *testing.T) {
 	require.Equal(t, int64(1000), *lat.P95Ms)
 }
 
+func TestChannelMonitorV2HistogramOverflowNeverLeaksInt32MaxSentinel(t *testing.T) {
+	allOverflow := map[int64]int64{channelMonitorV2HistogramInfBound: 9}
+	lat := latencyMetric(9*1193692, 9, allOverflow)
+	require.Equal(t, int64(1193692), *lat.P50Ms)
+	require.Equal(t, int64(1193692), *lat.P90Ms)
+	require.Equal(t, int64(1193692), *lat.P95Ms)
+
+	tail := latencyMetric(90*2000+10*900000, 100, map[int64]int64{3000: 90, channelMonitorV2HistogramInfBound: 10})
+	require.Equal(t, int64(3000), *tail.P50Ms)
+	require.Equal(t, int64(3000), *tail.P90Ms)
+	require.Equal(t, channelMonitorV2HistogramMaxFiniteBound, *tail.P95Ms)
+	require.Equal(t, channelMonitorV2HistogramMaxFiniteBound, *histPercentile(allOverflow, .5))
+}
+
 func TestChannelMonitorV2MetricIncludesSuccessRate(t *testing.T) {
 	acc := newMetricAccumulator()
 	acc.success, acc.errors = 80, 20

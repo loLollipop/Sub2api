@@ -29,6 +29,9 @@ func TestSanitizeFrontendRedirectPath(t *testing.T) {
 	require.Equal(t, "", sanitizeFrontendRedirectPath("//evil.com"))
 	require.Equal(t, "", sanitizeFrontendRedirectPath("https://evil.com"))
 	require.Equal(t, "", sanitizeFrontendRedirectPath("/\nfoo"))
+	for _, path := range []string{"/\\evil.example", "/\t/evil.example", "/bad\x00path", "/bad\x7fpath"} {
+		require.Empty(t, sanitizeFrontendRedirectPath(path), "unsafe redirect %q", path)
+	}
 
 	long := "/" + strings.Repeat("a", linuxDoOAuthMaxRedirectLen)
 	require.Equal(t, "", sanitizeFrontendRedirectPath(long))

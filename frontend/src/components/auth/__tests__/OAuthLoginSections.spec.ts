@@ -42,6 +42,17 @@ describe('OAuth login sections', () => {
     expect(window.location.href).toBe(originalHref)
   })
 
+  it.each([
+    ['linuxdo', LinuxDoOAuthSection],
+    ['dingtalk', DingTalkOAuthSection],
+    ['oidc', OidcOAuthSection]
+  ] as const)('sanitizes repeated redirect parameters before starting %s', async (provider, component) => {
+    routeState.query.redirect = ['/\\evil.example', '/profile']
+    const wrapper = mount(component)
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.emitted('start')?.[0]?.[0]).toEqual({ provider, params: { redirect: '/dashboard' } })
+  })
+
   it('includes a trimmed promo code in the LinuxDo OAuth request', async () => {
     const wrapper = mount(LinuxDoOAuthSection, {
       props: {

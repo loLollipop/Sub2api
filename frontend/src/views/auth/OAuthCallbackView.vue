@@ -188,6 +188,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { sanitizeInternalRedirectPath as sanitizeRedirectPath } from '@/utils/url'
 import { useRoute, useRouter } from 'vue-router'
 import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore, useAuthStore } from '@/stores'
@@ -287,14 +288,6 @@ function readTokenResponse(params: URLSearchParams): OAuthTokenResponse | null {
   return response
 }
 
-function sanitizeRedirectPath(path: string | null | undefined): string {
-  if (!path) return '/dashboard'
-  if (!path.startsWith('/')) return '/dashboard'
-  if (path.startsWith('//')) return '/dashboard'
-  if (path.includes('://')) return '/dashboard'
-  if (path.includes('\n') || path.includes('\r')) return '/dashboard'
-  return path
-}
 
 function readPendingEmailOAuthProvider(): 'github' | 'google' | null {
   if (typeof window === 'undefined') return null

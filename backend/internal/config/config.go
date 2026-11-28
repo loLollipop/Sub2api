@@ -1700,7 +1700,12 @@ type RedisConfig struct {
 	// PoolSize: 连接池大小，控制最大并发连接数
 	PoolSize int `mapstructure:"pool_size"`
 	// MinIdleConns: 最小空闲连接数，保持热连接减少冷启动延迟
-	MinIdleConns int `mapstructure:"min_idle_conns"`
+	MinIdleConns           int  `mapstructure:"min_idle_conns"`
+	MaxIdleConns           int  `mapstructure:"max_idle_conns"`
+	PoolFIFO               bool `mapstructure:"pool_fifo"`
+	PoolTimeoutMS          int  `mapstructure:"pool_timeout_ms"`
+	ConnMaxIdleTimeSeconds int  `mapstructure:"conn_max_idle_time_seconds"`
+	ConnMaxLifetimeSeconds int  `mapstructure:"conn_max_lifetime_seconds"`
 	// EnableTLS: 是否启用 TLS/SSL 连接
 	EnableTLS bool `mapstructure:"enable_tls"`
 }
@@ -2355,8 +2360,13 @@ func setDefaults() {
 	viper.SetDefault("redis.dial_timeout_seconds", 5)
 	viper.SetDefault("redis.read_timeout_seconds", 3)
 	viper.SetDefault("redis.write_timeout_seconds", 3)
-	viper.SetDefault("redis.pool_size", 1024)
-	viper.SetDefault("redis.min_idle_conns", 128)
+	viper.SetDefault("redis.pool_size", 512)
+	viper.SetDefault("redis.min_idle_conns", 8)
+	viper.SetDefault("redis.max_idle_conns", 64)
+	viper.SetDefault("redis.pool_fifo", true)
+	viper.SetDefault("redis.pool_timeout_ms", 1000)
+	viper.SetDefault("redis.conn_max_idle_time_seconds", 300)
+	viper.SetDefault("redis.conn_max_lifetime_seconds", 1800)
 	viper.SetDefault("redis.enable_tls", false)
 
 	// Batch Image queue
@@ -3309,6 +3319,18 @@ func (c *Config) Validate() error {
 	}
 	if c.Redis.MinIdleConns > c.Redis.PoolSize {
 		return fmt.Errorf("redis.min_idle_conns cannot exceed redis.pool_size")
+	}
+	if c.Redis.MaxIdleConns < 0 {
+		return fmt.Errorf("redis.max_idle_conns must be non-negative")
+	}
+	if c.Redis.PoolTimeoutMS <= 0 {
+		return fmt.Errorf("redis.pool_timeout_ms must be positive")
+	}
+	if c.Redis.ConnMaxIdleTimeSeconds < 0 {
+		return fmt.Errorf("redis.conn_max_idle_time_seconds must be non-negative")
+	}
+	if c.Redis.ConnMaxLifetimeSeconds < 0 {
+		return fmt.Errorf("redis.conn_max_lifetime_seconds must be non-negative")
 	}
 	if c.BatchImage.QueueEnabled {
 		if strings.TrimSpace(c.BatchImage.QueueReadyKey) == "" {

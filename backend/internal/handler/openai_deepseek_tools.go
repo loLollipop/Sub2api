@@ -296,6 +296,7 @@ func (h *OpenAIGatewayHandler) recordDeepSeekToolsUsage(
 	upstreamEndpoint := result.UpstreamEndpoint
 	quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 
+	result.DetachRequestStrings()
 	h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 		if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
 			Result:             result,

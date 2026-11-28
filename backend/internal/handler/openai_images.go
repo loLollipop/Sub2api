@@ -83,7 +83,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 	}
 	requestModel := parsed.Model
 	ensureCompositeTargetPlatform(c, apiKey, requestModel)
-	clientRequestModel := clientRequestedModel(c, requestModel)
+	clientRequestModel := strings.Clone(clientRequestedModel(c, requestModel))
 	routingModel := requestModel
 	if resolvedModel, ok := service.ResolvedUpstreamModelFromContext(c.Request.Context()); ok {
 		routingModel = resolvedModel
@@ -449,6 +449,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 			upstreamModel = result.UpstreamModel
 		}
 		sessionID := service.ExtractClientSessionID(c)
+		result.DetachRequestStrings()
 		usageInput := &service.OpenAIRecordUsageInput{
 			Result:             result,
 			APIKey:             apiKey,

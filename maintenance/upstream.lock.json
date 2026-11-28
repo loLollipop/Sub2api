@@ -2,29 +2,29 @@
   "schema_version": 1,
   "upstream_repository": "kiss-kedaya/sub2api",
   "upstream_branch": "main",
-  "imported_version": "2.3.175",
-  "imported_commit": "595b9a2fef6fd141a4a1f94a1659b98b093d7add",
+  "imported_version": "2.4.5",
+  "imported_commit": "1e242d7a64c02d93f4f0c68023a436b99c3e8c16",
   "personal_baseline_commit": "020b77873e0662a34f0169c4a40f883cd3f1b521",
-  "latest_observed_version": "2.3.175",
-  "latest_observed_release_commit": "595b9a2fef6fd141a4a1f94a1659b98b093d7add",
-  "latest_observed_main_commit": "1afd766eca9644df080ce2fcd3f14b6418f57210",
+  "latest_observed_version": "2.4.5",
+  "latest_observed_release_commit": "1e242d7a64c02d93f4f0c68023a436b99c3e8c16",
+  "latest_observed_main_commit": "19a66d9575aae9446e2b998f0e3fad73502e4284",
   "monitoring_policy": "official-releases-only; ignore draft, prerelease and unreleased branch commits",
-  "reviewed_release_tag": "v2.3.175",
-  "reviewed_release_commit": "595b9a2fef6fd141a4a1f94a1659b98b093d7add",
+  "reviewed_release_tag": "v2.4.5",
+  "reviewed_release_commit": "1e242d7a64c02d93f4f0c68023a436b99c3e8c16",
   "observed_delta_review": {
-    "from_commit": "078bc0375fa0d842c6c0b6872216b997e3427b08",
-    "to_commit": "595b9a2fef6fd141a4a1f94a1659b98b093d7add",
-    "status": "formal_v23175_selective_backport",
-    "scope": "Signed thinking history and compact beta; Lite null normalization; parameter/public-link error privacy with encoded-token hardening; Responses ID/Grok request allocation; scoped DeepSeek cache gzip; silent-refusal observer; scheduler policy refresh TTL; durable channel-monitor backfill cursor.",
-    "review_depth": "All 60 commits and 360 changed paths inventoried; selected implementations, callers and tests reviewed. Deferred groups are not claimed line-by-line audited.",
-    "evidence": "maintenance/notes/upstream-sync-20261126-v23175.md",
-    "selection_ledger": "maintenance/notes/fork-selection-ledger-20261126-v23175.json"
+    "from_commit": "595b9a2fef6fd141a4a1f94a1659b98b093d7add",
+    "to_commit": "1e242d7a64c02d93f4f0c68023a436b99c3e8c16",
+    "status": "formal_v245_selective_backport",
+    "scope": "Redis pool reclamation/timeouts; queued usage metadata/string detachment; histogram overflow display; Ops WS origin and auth redirect safety.",
+    "review_depth": "Complete commit/path inventory; selected implementations/callers/tests reviewed. Deferred groups are not claimed line-by-line audited. A checkpoint is not a complete merge.",
+    "evidence": "maintenance/notes/upstream-sync-20261128-v245.md",
+    "selection_ledger": "maintenance/notes/fork-selection-ledger-20261128-v245.json"
   },
   "sync_policy": "review-diff-then-selective-behavior-backport",
   "checkpoint_meaning": "Reviewed source history, not a complete merge. Selected source changes, excluded subfeatures and explicit deferrals are recorded in dated notes; release/deployment gates remain separate.",
   "cumulative_sync": {
     "status": "selective_sync_recorded_with_explicit_deferrals",
-    "source_head": "595b9a2fef6fd141a4a1f94a1659b98b093d7add",
+    "source_head": "1e242d7a64c02d93f4f0c68023a436b99c3e8c16",
     "reviewed_without_runtime_changes": [
       "Formal v2.3.19: catalogue file loader and mutable six-hour upstream-main refresh remain with the deferred provider-blind metadata chain; no independent runtime fix imported. See maintenance/notes/upstream-sync-20261107-v2319.md.",
       "Formal v2.3.15 publishes the GIF numeric-string fix already adapted from leaf 9c518bf7f during the v2.3.14 review. Advance the formal source checkpoint; retain local bounded-integer validation and all existing feature exclusions. See maintenance/notes/upstream-sync-20261106-v2315.md.",
@@ -1685,5 +1685,28 @@
       "race": false,
       "sustained_fuzz": false
     }
+  },
+  "fork_sync_20261128_v245": {
+    "baseline_head": "e57418743161be215e82135b5dd959f75487885f",
+    "from_release": "v2.3.175",
+    "to_release": "v2.4.5",
+    "source_commit": "1e242d7a64c02d93f4f0c68023a436b99c3e8c16",
+    "source_commits": 47,
+    "source_paths": 1152,
+    "personal_version": "2.1.75",
+    "note": "maintenance/notes/upstream-sync-20261128-v245.md",
+    "ledger": "maintenance/notes/fork-selection-ledger-20261128-v245.json",
+    "verification": {
+      "status": "passed_with_explicit_integration_limits",
+      "evidence": "development/diagnostics/sub2api-upstream-sync-20261128/final-acceptance.json",
+      "backend_unique_top_level": 686,
+      "backend_unique_tests_and_subtests": 1728,
+      "frontend_tests": 174,
+      "browser_checks": 11,
+      "linux_embed_build": "passed",
+      "real_postgresql_integration": false,
+      "real_redis_integration": false
+    },
+    "publication": "User subsequently authorized GitHub submission and deployment as personal v2.1.76. Final PR/CI, artifact identity, backup/isolated restore and production acceptance are recorded separately in development/diagnostics/sub2api-release-v2176-20261128/; synchronization-time evidence remains unchanged."
   }
 }
